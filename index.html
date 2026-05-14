@@ -283,7 +283,7 @@ const WORKER_URL = 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
 // ═══════════════════════════════════════════════════════════════════
 
 const classes = {
-  martial: ['Barbarian', 'Fighter', 'Monk', 'Rogue'],
+  martial: ['Barbarian', 'Fighter', 'Monk', 'Rogue', 'Pugilist'],
   hybrid:  ['Artificer', 'Paladin', 'Ranger'],
   caster:  ['Bard', 'Cleric', 'Druid', 'Sorcerer', 'Warlock', 'Wizard']
 };
@@ -322,7 +322,7 @@ const tiers = [
       { id: 'steady_nerves',   name: 'Steady nerves',     desc: 'Gain Advantage on saves against the Frightened condition. If you fail, you may reroll at the start of each of your turns.' },
       { id: 'sure_footed',     name: 'Sure-footed',       desc: 'Gain a Climb speed equal to your walking speed and Advantage on checks to avoid falling on difficult or unstable surfaces.' },
       { id: 'field_mender',    name: 'Field mender',      desc: 'When you stabilise a creature with a Healer\'s Kit, they also regain 1 HP. You can spend 1 minute and one use to let a creature spend a Hit Die.' },
-      { id: 'pack_rat',        name: 'Pack rat',          desc: 'You count as one size larger when determining you carrying capacity. In addition you are no longer ' },
+      { id: 'pack_rat',        name: 'Pack rat',          desc: 'You count as one size larger when determining you carrying capacity. In addition you have advantage on check made to search for treasure or items of value.' },
       { id: 'manhunter',       name: 'Manhunter',         desc: 'Gain advantage on checks to track creature; in addition you gain a +2 bonus on Stealth checks made to hide from the creature.' },
       { id: 'darkvision',      name: 'Darkvision',        desc: 'You gain Darkvision out to a range of 60 feet.' },
     ]
@@ -345,6 +345,9 @@ const tiers = [
       { id: 'fury',                       name: 'Fury',                          desc: 'Once per Short Rest, When you damage a creature with an attack or spell you can cause attack or spell to deal extra damage to the create. The extra damage is equal to your proficiency bonus.' },
       { id: 'war_chest',                  name: 'War chest',                     desc: 'Gain 200 gp in coin and trade goods at campaign start — enough to hire a retainer, buy a quality mount, or fund serious downtime activity.' },
       { id: 'great_thrower',              name: 'Great Thrower',                 desc: 'You treat all Melee weapons as having the thrown property, inaddition increase the range of thrown weapons and objects by 10 feet.' },
+      { id: 'defensive',                  name: 'Defensive',                     desc: 'You gain proficiency in Shields. You also start with a Shield at no cost.' },
+      { id: 'tag_team',                  name: 'Tag Team',                     desc: 'You gain proficiency in Shields. You also start with a Shield at no cost.' },
+      { id: 'grappler',                   name: 'Grappler',            desc: 'You count as 1 size large when determing your carrying capacity and the size of creature you can grapple. In addition you no longer spend extra movement when dragging creatures you have grappled.' },
     ]
   },
   {
@@ -355,18 +358,16 @@ const tiers = [
       // ── ADD 3-POINT PERKS HERE ──────────────────────────────────────────────
       // { id: 'unique_id', name: 'Perk name', desc: 'What it does.' },
       // ───────────────────────────────────────────────────────────────────────
-      { id: 'grappler',        name: 'Grappler',            desc: 'You count as 1 size large when determing your carrying capacity and the size of creature you can grapple. In addition you are no longer spend extra movement when dragging creatures you have grappled.' },
       { id: 'hardy_con',       name: 'Hardy constitution',  desc: 'Gain bonus HP equal to twice your Con modifier (minimum 2) at 1st level, plus 1 additional HP each time you level up.' },
       { id: 'duelist',         name: 'Duelist',             desc: 'While wielding a one-handed weapon with nothing in your off-hand, your weapon attacks score a critical hit on a 19 or 20.' },
       { id: 'shield_wall',     name: 'Shield wall',         desc: 'While wielding a shield, adjacent allies (including yourself) gain +1 AC.' },
       { id: 'vet_reflexes',    name: 'Veteran\'s reflexes', desc: 'Add your Proficiency Bonus to Initiative rolls.' },
       { id: 'owed_debt',       name: 'Owed debt',           desc: 'A named NPC of standing (agreed with DM) owes you a significant favour: their position, influence, or wealth, used on your behalf once.' },
-      { id: 'defensive',       name: 'Defensive',           desc: 'You gain proficiency in Shields. You also start with a Shield at no cost.' },
-      { id: 'prophecy',        name: 'Chosen by fate',      desc: 'You are the subject of a prophecy. Gain Heroic Inspiration at the start of every session.' },
-      // { id: 'noble_title',     name: 'Minor noble title',     desc: 'You hold a minor lordship, knighthood, or equivalent. You receive 5 gp per week in income, command respect from commoners, and have access to noble estates in the region.' },
-      // { id: 'secret',          name: 'Dangerous secret',      desc: 'You possess knowledge someone powerful wants buried. Enormous leverage in the right hands — but you are already a marked person.' },
+      { id: 'prophecy',        name: 'Chosen by fate',      desc: 'You are the subject of a prophecy. Gain a lucky dice after every long rest, which can be used to gain advantage on any D20 test or to get acreature disadvantage on an attack roll against you.' },
       { id: 'seasoned_warrior',name: 'Seasoned warrior',    desc: 'Gain proficiency in all martial weapons and medium armour if not already. You also start with a set of quality medium armour and one martial weapon at no cost.' },
       { id: 'honed_craft',     name: 'Honed craft',         desc: 'Gain Expertise (double Proficiency Bonus) in a skill you are already proficient in, representing years of dedicated practice beyond your background.' },
+      { id: 'noble_title',     name: 'Minor noble title',     desc: 'You hold a minor lordship, knighthood, or equivalent. You receive 5 gp per week in income, command respect from commoners, and have access to noble estates in the region.' },
+      // { id: 'secret',          name: 'Dangerous secret',      desc: 'You possess knowledge someone powerful wants buried. Enormous leverage in the right hands — but you are already a marked person.' },
     ]
   }
 ];
