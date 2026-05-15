@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Initiative Tracker — DM</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #111008;
+  --surface: #1e1a0f;
+  --surface2: #272010;
+  --border: #3a3010;
+  --border-light: #4a3f18;
+  --gold: #b8860b;
+  --gold-light: #d4a820;
+  --gold-faint: #6b4f08;
+  --ink: #e8dfc0;
+  --ink-dim: #a09070;
+  --ink-faint: #6a5a40;
+  --red: #c0392b;
+  --red-bg: #2a0f0d;
+  --green: #2d6a3f;
+  --green-bg: #0d1f12;
+  --green-light: #4a9a60;
+  --blue: #2e4a7a;
+  --blue-bg: #0d1520;
+  --blue-light: #5a80c0;
+  --purple: #5a3e9b;
+  --purple-bg: #18102a;
+  --amber: #c87800;
+  --pc-accent: #2e5a8a;
+  --pc-bg: #0d1e2e;
+  --enemy-accent: #8a2e2e;
+  --enemy-bg: #2e0d0d;
+  --active-glow: rgba(184,134,11,0.25);
+  --radius: 4px;
+}
+
+body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Georgia, serif; min-height: 100vh; }
+
+/* ── Top bar ── */
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0.6rem 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.topbar h1 { font-family: 'Cinzel', serif; font-size: 1rem; letter-spacing: 0.1em; color: var(--gold); flex: 1; }
+.round-display { font-family: 'Cinzel', serif; font-size: 0.8rem; letter-spacing: 0.08em; color: var(--ink-dim); }
+.round-display span { color: var(--gold-light); font-size: 1.1rem; }
+.btn { font-family: 'Cinzel', serif; font-size: 0.7rem; letter-spacing: 0.08em; border: 1px solid; border-radius: var(--radius); padding: 5px 12px; cursor: pointer; transition: all 0.15s; }
+.btn-gold    { background: var(--gold-faint); border-color: var(--gold); color: var(--gold-light); }
+.btn-gold:hover { background: var(--gold); color: var(--bg); }
+.btn-red     { background: var(--red-bg); border-color: var(--red); color: #e88; }
+.btn-red:hover { background: var(--red); color: white; }
+.btn-green   { background: var(--green-bg); border-color: var(--green); color: #8e8; }
+.btn-green:hover { background: var(--green); color: white; }
+.btn-blue    { background: var(--blue-bg); border-color: var(--blue); color: var(--blue-light); }
+.btn-blue:hover { background: var(--blue); color: white; }
+.btn-ghost   { background: transparent; border-color: var(--border-light); color: var(--ink-dim); }
+.btn-ghost:hover { border-color: var(--ink-dim); color: var(--ink); }
+.btn-sm { font-size: 0.62rem; padding: 3px 8px; }
+.btn-icon { padding: 4px 8px; font-size: 0.9rem; line-height: 1; }
+
+/* ── Layout ── */
+.main { display: grid; grid-template-columns: 1fr 260px; gap: 0; min-height: calc(100vh - 44px); }
+.combatant-list { padding: 1rem; }
+.sidebar { background: var(--surface); border-left: 1px solid var(--border); padding: 1rem; overflow-y: auto; }
+
+/* ── Combatant cards ── */
+.combatant-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 6px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  position: relative;
+}
+.combatant-card.is-pc { border-left: 3px solid var(--pc-accent); }
+.combatant-card.is-enemy { border-left: 3px solid var(--enemy-accent); }
+.combatant-card.is-active {
+  border-color: var(--gold);
+  box-shadow: 0 0 12px var(--active-glow);
+}
+.combatant-card.is-dead { opacity: 0.45; }
+
+.card-main {
+  display: grid;
+  grid-template-columns: 36px 1fr auto auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.card-main:hover { background: var(--surface2); }
+
+.init-badge {
+  font-family: 'Cinzel', serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--gold-light);
+  text-align: center;
+  line-height: 1;
+}
+.combatant-name {
+  font-family: 'Cinzel', serif;
+  font-size: 0.88rem;
+  letter-spacing: 0.03em;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.type-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.type-dot.pc     { background: var(--pc-accent); }
+.type-dot.enemy  { background: var(--enemy-accent); }
+.active-arrow { color: var(--gold); font-size: 0.8rem; }
+
+.hp-section { display: flex; align-items: center; gap: 4px; }
+.hp-bar-wrap { width: 70px; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.hp-bar { height: 100%; border-radius: 3px; transition: width 0.3s, background 0.3s; }
+.hp-text { font-size: 0.78rem; color: var(--ink-dim); min-width: 50px; text-align: right; }
+
+.ac-badge {
+  font-family: 'Cinzel', serif;
+  font-size: 0.72rem;
+  color: var(--ink-dim);
+  min-width: 36px;
+  text-align: center;
+}
+.ac-badge span { font-size: 0.6rem; display: block; color: var(--ink-faint); }
+
+.card-actions { display: flex; gap: 3px; }
+
+/* ── Expanded panel ── */
+.card-expanded {
+  display: none;
+  border-top: 1px solid var(--border);
+  padding: 10px 12px;
+  background: var(--surface2);
+}
+.combatant-card.expanded .card-expanded { display: block; }
+
+.exp-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.exp-label { font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.1em; color: var(--ink-faint); white-space: nowrap; }
+.exp-input {
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: 2px;
+  color: var(--ink);
+  font-family: 'Crimson Text', serif;
+  font-size: 0.88rem;
+  padding: 2px 6px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.exp-input:focus { border-color: var(--gold); }
+.exp-input.narrow { width: 56px; }
+.exp-input.wide   { flex: 1; min-width: 0; }
+
+/* HP adjustment */
+.hp-adj { display: flex; align-items: center; gap: 6px; }
+.hp-adj-input { width: 56px; }
+.hp-current { font-family: 'Cinzel', serif; font-size: 1.1rem; color: var(--gold-light); min-width: 60px; text-align: center; }
+
+/* Conditions */
+.conditions-wrap { margin-bottom: 8px; }
+.conditions-grid { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.cond-pill {
+  font-family: 'Cinzel', serif;
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  border-radius: 10px;
+  border: 1px solid;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: transparent;
+  color: var(--ink-faint);
+  border-color: var(--border);
+}
+.cond-pill:hover { color: var(--ink); border-color: var(--ink-dim); }
+.cond-pill.active { color: #f8d080; border-color: #c87800; background: rgba(200,120,0,0.15); }
+.cond-pill.custom-active { color: #c0a0f0; border-color: #7050c0; background: rgba(112,80,192,0.15); }
+
+/* Notes */
+.notes-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: 2px;
+  color: var(--ink);
+  font-family: 'Crimson Text', serif;
+  font-size: 0.88rem;
+  padding: 4px 6px;
+  outline: none;
+  resize: vertical;
+  min-height: 44px;
+}
+.notes-input:focus { border-color: var(--gold); }
+
+/* ── Sidebar ── */
+.sidebar-section { margin-bottom: 1.2rem; }
+.sidebar-title { font-family: 'Cinzel', serif; font-size: 0.65rem; letter-spacing: 0.12em; color: var(--gold-faint); margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between; }
+.add-form { display: flex; flex-direction: column; gap: 6px; }
+.add-form input, .add-form select {
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: 2px;
+  color: var(--ink);
+  font-family: 'Crimson Text', serif;
+  font-size: 0.88rem;
+  padding: 4px 8px;
+  outline: none;
+  width: 100%;
+}
+.add-form input:focus, .add-form select:focus { border-color: var(--gold); }
+.add-form-row { display: flex; gap: 6px; }
+.add-form-row input { flex: 1; }
+.type-toggle { display: flex; gap: 4px; }
+.type-toggle button {
+  flex: 1;
+  font-family: 'Cinzel', serif;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  padding: 4px;
+  border-radius: 2px;
+  border: 1px solid;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.type-toggle .t-pc    { background: var(--pc-bg); border-color: var(--pc-accent); color: var(--blue-light); }
+.type-toggle .t-enemy { background: var(--enemy-bg); border-color: var(--enemy-accent); color: #e88; }
+.type-toggle .t-pc.active    { background: var(--pc-accent); color: white; }
+.type-toggle .t-enemy.active { background: var(--enemy-accent); color: white; }
+
+/* Custom conditions */
+.custom-cond-add { display: flex; gap: 4px; }
+.custom-cond-add input { flex: 1; background: var(--bg); border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink); font-family: 'Crimson Text', serif; font-size: 0.82rem; padding: 3px 6px; outline: none; }
+.custom-cond-add input:focus { border-color: var(--gold); }
+.custom-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.custom-tag { font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.06em; padding: 2px 6px 2px 8px; border-radius: 10px; border: 1px solid #7050c0; color: #c0a0f0; background: rgba(112,80,192,0.1); display: flex; align-items: center; gap: 4px; }
+.custom-tag-del { cursor: pointer; color: #a080e0; font-size: 0.7rem; }
+.custom-tag-del:hover { color: #f0a0f0; }
+
+/* Sync status */
+.sync-status { font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.08em; color: var(--ink-faint); text-align: center; padding-top: 0.5rem; }
+.sync-status.ok   { color: var(--green-light); }
+.sync-status.fail { color: var(--red); }
+.sync-status.ing  { color: var(--amber); }
+
+/* Empty state */
+.empty-state { text-align: center; padding: 3rem 1rem; color: var(--ink-faint); font-style: italic; font-size: 0.95rem; }
+
+/* Drag handle */
+.drag-handle { cursor: grab; color: var(--ink-faint); font-size: 0.8rem; padding: 0 2px; user-select: none; }
+.drag-handle:active { cursor: grabbing; }
+.combatant-card.dragging { opacity: 0.4; }
+.combatant-card.drag-over { border-top: 2px solid var(--gold); }
+
+@media (max-width: 700px) {
+  .main { grid-template-columns: 1fr; }
+  .sidebar { border-left: none; border-top: 1px solid var(--border); }
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <h1>⚔ Initiative Tracker — DM</h1>
+  <div class="round-display">ROUND <span id="round-num">1</span></div>
+  <button class="btn btn-gold" onclick="nextTurn()">Next Turn ▶</button>
+  <button class="btn btn-ghost btn-sm" onclick="sortByInit()">Sort</button>
+  <button class="btn btn-ghost btn-sm" onclick="resetRound()">Reset Round</button>
+  <button class="btn btn-red btn-sm" onclick="newCombat()">New Combat</button>
+  <div id="sync-status" class="sync-status">—</div>
+</div>
+
+<div class="main">
+  <!-- COMBATANT LIST -->
+  <div class="combatant-list">
+    <div id="empty-state" class="empty-state">No combatants yet.<br>Add PCs and enemies using the panel →</div>
+    <div id="combatant-list"></div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <!-- Add combatant -->
+    <div class="sidebar-section">
+      <div class="sidebar-title">ADD COMBATANT</div>
+      <div class="add-form">
+        <div class="type-toggle">
+          <button class="t-pc active" id="type-pc-btn" onclick="setAddType('pc')">PC</button>
+          <button class="t-enemy" id="type-enemy-btn" onclick="setAddType('enemy')">Enemy</button>
+        </div>
+        <input type="text" id="add-name" placeholder="Name…" maxlength="40">
+        <div class="add-form-row">
+          <input type="number" id="add-init" placeholder="Init" min="-10" max="40" style="width:60px;flex:none">
+          <input type="number" id="add-hp" placeholder="Max HP" min="1" max="9999">
+          <input type="number" id="add-ac" placeholder="AC" min="1" max="40" style="width:50px;flex:none">
+        </div>
+        <button class="btn btn-gold" style="width:100%" onclick="addCombatant()">Add</button>
+      </div>
+    </div>
+
+    <!-- Custom conditions -->
+    <div class="sidebar-section">
+      <div class="sidebar-title">CUSTOM CONDITIONS</div>
+      <div class="custom-cond-add">
+        <input type="text" id="custom-cond-input" placeholder="e.g. Hexed…" maxlength="20" onkeydown="if(event.key==='Enter')addCustomCondition()">
+        <button class="btn btn-ghost btn-sm" onclick="addCustomCondition()">+</button>
+      </div>
+      <div class="custom-list" id="custom-list"></div>
+    </div>
+
+    <!-- Quick reference -->
+    <div class="sidebar-section">
+      <div class="sidebar-title">QUICK ROLL</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="rollForAll()">Roll init for all</button>
+        <button class="btn btn-ghost btn-sm" onclick="rollForEnemies()">Roll enemies only</button>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-title">MANAGE</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="clearEnemies()">Clear enemies</button>
+        <button class="btn btn-red btn-sm" onclick="clearAll()">Clear all</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  CONFIG — update if your worker URL changes
+// ═══════════════════════════════════════════════════════
+const WORKER_URL = 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+const STD_CONDITIONS = [
+  'Blinded','Charmed','Deafened','Exhaustion','Frightened',
+  'Grappled','Incapacitated','Invisible','Paralyzed','Petrified',
+  'Poisoned','Prone','Restrained','Stunned','Unconscious','Concentration'
+];
+
+let state = {
+  round: 1,
+  activeIndex: 0,
+  combatants: [],   // { id, name, type, init, hp, maxHp, ac, conditions:[], notes, dead }
+  customConditions: []
+};
+let addType = 'pc';
+let dragSrc = null;
+let syncTimer = null;
+
+// ═══════════════════════════════════════════════════════
+//  PERSISTENCE — save PCs to localStorage
+// ═══════════════════════════════════════════════════════
+function savePCs() {
+  const pcs = state.combatants.filter(c => c.type === 'pc');
+  localStorage.setItem('initiative_pcs', JSON.stringify(pcs));
+}
+function loadPCs() {
+  try {
+    return JSON.parse(localStorage.getItem('initiative_pcs') || '[]');
+  } catch { return []; }
+}
+function saveCustomConditions() {
+  localStorage.setItem('initiative_custom_conds', JSON.stringify(state.customConditions));
+}
+function loadCustomConditions() {
+  try {
+    return JSON.parse(localStorage.getItem('initiative_custom_conds') || '[]');
+  } catch { return []; }
+}
+
+// ═══════════════════════════════════════════════════════
+//  ID
+// ═══════════════════════════════════════════════════════
+let _id = 0;
+function uid() { return ++_id; }
+
+// ═══════════════════════════════════════════════════════
+//  ADD / REMOVE
+// ═══════════════════════════════════════════════════════
+function setAddType(t) {
+  addType = t;
+  document.getElementById('type-pc-btn').classList.toggle('active', t === 'pc');
+  document.getElementById('type-enemy-btn').classList.toggle('active', t === 'enemy');
+}
+
+function addCombatant() {
+  const name = document.getElementById('add-name').value.trim();
+  if (!name) { document.getElementById('add-name').focus(); return; }
+  const init  = parseInt(document.getElementById('add-init').value) || 0;
+  const maxHp = parseInt(document.getElementById('add-hp').value)   || 10;
+  const ac    = parseInt(document.getElementById('add-ac').value)    || 10;
+  state.combatants.push({ id: uid(), name, type: addType, init, hp: maxHp, maxHp, ac, conditions: [], notes: '', dead: false });
+  document.getElementById('add-name').value = '';
+  document.getElementById('add-init').value = '';
+  document.getElementById('add-hp').value   = '';
+  document.getElementById('add-ac').value   = '';
+  if (addType === 'pc') savePCs();
+  render();
+  pushState();
+}
+
+function removeCombatant(id) {
+  state.combatants = state.combatants.filter(c => c.id !== id);
+  if (state.activeIndex >= state.combatants.length) state.activeIndex = 0;
+  savePCs();
+  render();
+  pushState();
+}
+
+// ═══════════════════════════════════════════════════════
+//  HP
+// ═══════════════════════════════════════════════════════
+function adjustHP(id, delta) {
+  const c = state.combatants.find(x => x.id === id);
+  if (!c) return;
+  c.hp = Math.max(0, Math.min(c.maxHp, c.hp + delta));
+  c.dead = c.hp <= 0;
+  if (c.type === 'pc') savePCs();
+  render();
+  pushState();
+}
+
+function setHP(id, val) {
+  const c = state.combatants.find(x => x.id === id);
+  if (!c) return;
+  const v = parseInt(val);
+  if (isNaN(v)) return;
+  c.hp = Math.max(0, Math.min(c.maxHp, v));
+  c.dead = c.hp <= 0;
+  if (c.type === 'pc') savePCs();
+  render();
+  pushState();
+}
+
+function setMaxHP(id, val) {
+  const c = state.combatants.find(x => x.id === id);
+  if (!c) return;
+  const v = parseInt(val);
+  if (isNaN(v) || v < 1) return;
+  c.maxHp = v;
+  c.hp = Math.min(c.hp, v);
+  if (c.type === 'pc') savePCs();
+  render();
+  pushState();
+}
+
+// ═══════════════════════════════════════════════════════
+//  FIELDS
+// ═══════════════════════════════════════════════════════
+function setInit(id, val) {
+  const c = state.combatants.find(x => x.id === id);
+  if (!c) return;
+  c.init = parseInt(val) || 0;
+  if (c.type === 'pc') savePCs();
+  pushState();
+}
+
+function setAC(id, val) {
+  const c = state.combatants.find(x => x.id === id);
+  if (!c) return;
+  c.ac = parseInt(val) || 10;
+  if (c.type === 'pc') savePCs();
+  pushState();
+}
+
+function setName(id, val) {
+  const c = state.combatants.find(x => x.id === id);
+  if (!c) return;
+  c.name = val;
+  if (c.type === 'pc') savePCs();
+  pushState();
+}
+
+function setNotes(id, val) {
+  const c = state.combatants.find(x => x.id === id);
+  if (!c) return;
+  c.notes = val;
+  pushState();
+}
+
+// ═══════════════════════════════════════════════════════
+//  CONDITIONS
+// ═══════════════════════════════════════════════════════
+function toggleCondition(id, cond) {
+  const c = state.combatants.find(x => x.id === id);
+  if (!c) return;
+  const idx = c.conditions.indexOf(cond);
+  if (idx >= 0) c.conditions.splice(idx, 1);
+  else c.conditions.push(cond);
+  if (c.type === 'pc') savePCs();
+  render();
+  pushState();
+}
+
+function addCustomCondition() {
+  const inp = document.getElementById('custom-cond-input');
+  const val = inp.value.trim();
+  if (!val || state.customConditions.includes(val)) return;
+  state.customConditions.push(val);
+  inp.value = '';
+  saveCustomConditions();
+  render();
+}
+
+function removeCustomCondition(cond) {
+  state.customConditions = state.customConditions.filter(c => c !== cond);
+  // remove from all combatants too
+  state.combatants.forEach(c => {
+    c.conditions = c.conditions.filter(x => x !== cond);
+  });
+  saveCustomConditions();
+  render();
+  pushState();
+}
+
+// ═══════════════════════════════════════════════════════
+//  TURN / ROUND
+// ═══════════════════════════════════════════════════════
+function nextTurn() {
+  if (state.combatants.length === 0) return;
+  state.activeIndex = (state.activeIndex + 1) % state.combatants.length;
+  if (state.activeIndex === 0) state.round++;
+  render();
+  pushState();
+}
+
+function sortByInit() {
+  state.combatants.sort((a, b) => b.init - a.init);
+  state.activeIndex = 0;
+  render();
+  pushState();
+}
+
+function resetRound() {
+  state.round = 1;
+  state.activeIndex = 0;
+  render();
+  pushState();
+}
+
+function newCombat() {
+  if (!confirm('Start a new combat? This clears enemies and resets the round. PCs are kept.')) return;
+  state.combatants = state.combatants.filter(c => c.type === 'pc');
+  state.combatants.forEach(c => { c.conditions = []; c.hp = c.maxHp; c.dead = false; });
+  state.round = 1;
+  state.activeIndex = 0;
+  savePCs();
+  render();
+  pushState();
+}
+
+function clearEnemies() {
+  state.combatants = state.combatants.filter(c => c.type === 'pc');
+  if (state.activeIndex >= state.combatants.length) state.activeIndex = 0;
+  render();
+  pushState();
+}
+
+function clearAll() {
+  if (!confirm('Clear all combatants?')) return;
+  state.combatants = [];
+  state.round = 1;
+  state.activeIndex = 0;
+  render();
+  pushState();
+}
+
+function rollForAll() {
+  state.combatants.forEach(c => { c.init = Math.ceil(Math.random() * 20); });
+  sortByInit();
+}
+
+function rollForEnemies() {
+  state.combatants.filter(c => c.type === 'enemy').forEach(c => { c.init = Math.ceil(Math.random() * 20); });
+  sortByInit();
+}
+
+// ═══════════════════════════════════════════════════════
+//  HP BAR COLOR
+// ═══════════════════════════════════════════════════════
+function hpColor(hp, max) {
+  const pct = hp / max;
+  if (pct > 0.6) return '#2d6a3f';
+  if (pct > 0.3) return '#c87800';
+  return '#c0392b';
+}
+
+// ═══════════════════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════════════════
+let expandedIds = new Set();
+
+function toggleExpand(id) {
+  if (expandedIds.has(id)) expandedIds.delete(id);
+  else expandedIds.add(id);
+  render();
+}
+
+function render() {
+  document.getElementById('round-num').textContent = state.round;
+  const list = document.getElementById('combatant-list');
+  const empty = document.getElementById('empty-state');
+  empty.style.display = state.combatants.length === 0 ? 'block' : 'none';
+
+  list.innerHTML = '';
+  const allConds = [...STD_CONDITIONS, ...state.customConditions];
+
+  state.combatants.forEach((c, idx) => {
+    const isActive  = idx === state.activeIndex;
+    const isExpanded = expandedIds.has(c.id);
+    const hpPct     = Math.max(0, (c.hp / c.maxHp) * 100);
+
+    const card = document.createElement('div');
+    card.className = `combatant-card is-${c.type}${isActive ? ' is-active' : ''}${c.dead ? ' is-dead' : ''}${isExpanded ? ' expanded' : ''}`;
+    card.dataset.id = c.id;
+    card.draggable = true;
+
+    // Conditions pills for expanded
+    const stdPills = STD_CONDITIONS.map(cond => {
+      const on = c.conditions.includes(cond);
+      return `<button class="cond-pill${on ? ' active' : ''}" onclick="event.stopPropagation();toggleCondition(${c.id},'${cond}')">${cond}</button>`;
+    }).join('');
+
+    const customPills = state.customConditions.map(cond => {
+      const on = c.conditions.includes(cond);
+      return `<button class="cond-pill${on ? ' custom-active' : ''}" onclick="event.stopPropagation();toggleCondition(${c.id},'${cond}')">${cond}</button>`;
+    }).join('');
+
+    // Active conditions shown in header
+    const activeConds = c.conditions.length > 0
+      ? `<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:2px">${c.conditions.map(cond => `<span style="font-size:0.6rem;padding:1px 5px;border-radius:8px;background:rgba(200,120,0,0.2);color:#d4a820;border:1px solid rgba(200,120,0,0.4)">${cond}</span>`).join('')}</div>`
+      : '';
+
+    card.innerHTML = `
+      <div class="card-main" onclick="toggleExpand(${c.id})">
+        <span class="drag-handle" onclick="event.stopPropagation()" title="Drag to reorder">⠿</span>
+        <div class="init-badge">${c.init}</div>
+        <div>
+          <div class="combatant-name">
+            <span class="type-dot ${c.type}"></span>
+            ${isActive ? '<span class="active-arrow">▶</span>' : ''}
+            ${c.name}
+          </div>
+          ${activeConds}
+        </div>
+        <div class="hp-section">
+          <div>
+            <div class="hp-bar-wrap"><div class="hp-bar" style="width:${hpPct}%;background:${hpColor(c.hp,c.maxHp)}"></div></div>
+          </div>
+          <div class="hp-text">${c.hp}/${c.maxHp}</div>
+        </div>
+        <div class="ac-badge"><span>AC</span>${c.ac}</div>
+        <div class="card-actions" onclick="event.stopPropagation()">
+          <button class="btn btn-ghost btn-icon btn-sm" onclick="adjustHP(${c.id},-1)" title="Damage">−</button>
+          <button class="btn btn-ghost btn-icon btn-sm" onclick="adjustHP(${c.id},1)" title="Heal">+</button>
+          <button class="btn btn-red btn-icon btn-sm" onclick="removeCombatant(${c.id})" title="Remove">✕</button>
+        </div>
+      </div>
+      <div class="card-expanded">
+        <div class="exp-row">
+          <span class="exp-label">NAME</span>
+          <input class="exp-input wide" type="text" value="${c.name}" onchange="setName(${c.id},this.value)" onclick="event.stopPropagation()">
+          <span class="exp-label">INIT</span>
+          <input class="exp-input narrow" type="number" value="${c.init}" onchange="setInit(${c.id},this.value)" onclick="event.stopPropagation()">
+          <span class="exp-label">AC</span>
+          <input class="exp-input narrow" type="number" value="${c.ac}" onchange="setAC(${c.id},this.value)" onclick="event.stopPropagation()">
+        </div>
+        <div class="exp-row">
+          <span class="exp-label">HP</span>
+          <div class="hp-adj">
+            <button class="btn btn-red btn-sm" onclick="event.stopPropagation();applyHpAdj(${c.id},'dmg')">Dmg</button>
+            <input class="exp-input hp-adj-input" id="hp-adj-${c.id}" type="number" min="0" placeholder="amt" onclick="event.stopPropagation()" onkeydown="if(event.key==='Enter'){event.preventDefault();applyHpAdj(${c.id},'dmg')}">
+            <button class="btn btn-green btn-sm" onclick="event.stopPropagation();applyHpAdj(${c.id},'heal')">Heal</button>
+          </div>
+          <div class="hp-current">${c.hp} / ${c.maxHp}</div>
+          <span class="exp-label">MAX</span>
+          <input class="exp-input narrow" type="number" value="${c.maxHp}" onchange="setMaxHP(${c.id},this.value)" onclick="event.stopPropagation()">
+        </div>
+        <div class="conditions-wrap">
+          <span class="exp-label">CONDITIONS</span>
+          <div class="conditions-grid">${stdPills}${customPills ? customPills : ''}</div>
+        </div>
+        <div>
+          <span class="exp-label">NOTES (DM ONLY)</span>
+          <textarea class="notes-input" onclick="event.stopPropagation()" onchange="setNotes(${c.id},this.value)" placeholder="Secret notes…">${c.notes}</textarea>
+        </div>
+      </div>
+    `;
+
+    // Drag events
+    card.addEventListener('dragstart', e => { dragSrc = c.id; card.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+    card.addEventListener('dragend',   () => { card.classList.remove('dragging'); document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over')); });
+    card.addEventListener('dragover',  e => { e.preventDefault(); card.classList.add('drag-over'); });
+    card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+    card.addEventListener('drop', e => {
+      e.preventDefault();
+      card.classList.remove('drag-over');
+      if (dragSrc === c.id) return;
+      const fromIdx = state.combatants.findIndex(x => x.id === dragSrc);
+      const toIdx   = state.combatants.findIndex(x => x.id === c.id);
+      if (fromIdx < 0 || toIdx < 0) return;
+      const [moved] = state.combatants.splice(fromIdx, 1);
+      state.combatants.splice(toIdx, 0, moved);
+      render();
+      pushState();
+    });
+
+    list.appendChild(card);
+  });
+
+  // Custom conditions sidebar
+  const customList = document.getElementById('custom-list');
+  customList.innerHTML = state.customConditions.map(cond =>
+    `<div class="custom-tag">${cond}<span class="custom-tag-del" onclick="removeCustomCondition('${cond}')">✕</span></div>`
+  ).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+//  HP ADJUST (damage/heal with input field)
+// ═══════════════════════════════════════════════════════
+function applyHpAdj(id, mode) {
+  const inp = document.getElementById(`hp-adj-${id}`);
+  const amt = parseInt(inp.value);
+  if (isNaN(amt) || amt <= 0) return;
+  adjustHP(id, mode === 'heal' ? amt : -amt);
+  inp.value = '';
+}
+
+// ═══════════════════════════════════════════════════════
+//  SYNC — push state to worker so player view can read it
+// ═══════════════════════════════════════════════════════
+function setSyncStatus(type, msg) {
+  const el = document.getElementById('sync-status');
+  el.className = `sync-status ${type}`;
+  el.textContent = msg;
+}
+
+async function pushState() {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(async () => {
+    setSyncStatus('ing', '⟳ Syncing…');
+    // Build player-safe version (no notes, no enemy exact HP — just %)
+    const playerState = {
+      round: state.round,
+      activeIndex: state.activeIndex,
+      combatants: state.combatants.map(c => ({
+        id: c.id, name: c.name, type: c.type,
+        init: c.init, ac: c.ac,
+        hpPct: Math.round((c.hp / c.maxHp) * 100),
+        hp: c.type === 'pc' ? c.hp : null,
+        maxHp: c.type === 'pc' ? c.maxHp : null,
+        conditions: c.conditions, dead: c.dead
+      }))
+    };
+    try {
+      const res = await fetch(WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'initiative_state', payload: playerState })
+      });
+      if (res.ok) setSyncStatus('ok', '✦ Synced');
+      else setSyncStatus('fail', '⚠ Sync failed');
+    } catch {
+      setSyncStatus('fail', '⚠ Offline');
+    }
+  }, 600);
+}
+
+// ═══════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════
+function init() {
+  state.customConditions = loadCustomConditions();
+  const pcs = loadPCs();
+  if (pcs.length > 0) {
+    state.combatants = pcs;
+    _id = Math.max(...pcs.map(c => c.id), 0);
+  }
+  render();
+  // Enter key on add form
+  ['add-name','add-init','add-hp','add-ac'].forEach(id => {
+    document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') addCombatant(); });
+  });
+}
+
+init();
+</script>
+</body>
+</html>
