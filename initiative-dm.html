@@ -198,6 +198,39 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
 .sync-status.ing  { color: var(--amber); }
 .empty-state { text-align: center; padding: 3rem 1rem; color: var(--ink-faint); font-style: italic; }
 
+/* ── Hidden creatures ── */
+.combatant-card.is-hidden {
+  opacity: 0.5;
+  border-style: dashed;
+}
+.combatant-card.is-hidden .combatant-name { color: var(--ink-faint); }
+.hidden-badge {
+  font-family: 'Cinzel', serif;
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  padding: 1px 5px;
+  border-radius: 8px;
+  border: 1px solid #3a6060;
+  color: #80c0c0;
+  background: rgba(58,96,96,0.2);
+  vertical-align: middle;
+}
+.reveal-btn {
+  font-family: 'Cinzel', serif;
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  padding: 2px 7px;
+  border-radius: 2px;
+  border: 1px solid var(--lobby-accent);
+  background: var(--lobby-bg);
+  color: #80c0c0;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.reveal-btn:hover { background: var(--lobby-accent); color: white; }
+.reveal-btn.is-visible { border-color: var(--enemy-accent); background: var(--enemy-bg); color: #e88; }
+.reveal-btn.is-visible:hover { background: var(--enemy-accent); color: white; }
+
 /* ── Modals ── */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 1rem; }
 .modal-backdrop.hidden { display: none; }
@@ -278,7 +311,19 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
           <input type="number" id="add-hp"   placeholder="Max HP" min="1" max="9999">
           <input type="number" id="add-ac"   placeholder="AC" min="1" max="40" style="width:50px;flex:none">
         </div>
+        <label style="display:flex;align-items:center;gap:6px;font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.06em;color:var(--ink-faint);cursor:pointer">
+          <input type="checkbox" id="add-hidden" style="accent-color:var(--lobby-accent);width:13px;height:13px">
+          Add as hidden
+        </label>
         <button class="btn btn-gold" style="width:100%" onclick="addCombatant()">Add</button>
+      </div>
+    </div>
+
+    <div class="sidebar-section" id="lobby-pc-section">
+      <div class="sidebar-title">PARTY PREP (LOBBY)</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-green btn-sm" onclick="resetAllPCHp()">Restore all HP</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearAllPCConditions()">Clear all conditions</button>
       </div>
     </div>
 
@@ -494,6 +539,7 @@ function updateModeUI() {
   document.getElementById('btn-end').style.display       = inCombat ? '' : 'none';
   document.getElementById('btn-export').style.display    = inCombat ? '' : 'none';
   document.getElementById('lobby-banner').classList.toggle('hidden', inCombat);
+  document.getElementById('lobby-pc-section').style.display = inCombat ? 'none' : '';
 }
 
 // ═══════════════════════════════════════════════════════
@@ -584,6 +630,8 @@ function setAddType(t) {
   addType = t;
   document.getElementById('type-pc-btn').classList.toggle('active', t === 'pc');
   document.getElementById('type-enemy-btn').classList.toggle('active', t === 'enemy');
+  // Hidden option only makes sense for enemies
+  document.getElementById('add-hidden').closest('label').style.display = t === 'enemy' ? '' : 'none';
 }
 
 function addCombatant() {
@@ -592,10 +640,12 @@ function addCombatant() {
   const init  = parseInt(document.getElementById('add-init').value) || 0;
   const maxHp = parseInt(document.getElementById('add-hp').value)   || 10;
   const ac    = parseInt(document.getElementById('add-ac').value)    || 10;
-  const c = { id: uid(), name, type: addType, init, hp: maxHp, maxHp, ac, conditions: [], notes: '', dead: false };
+  const hidden = addType === 'enemy' && document.getElementById('add-hidden').checked;
+  const c = { id: uid(), name, type: addType, init, hp: maxHp, maxHp, ac, conditions: [], notes: '', dead: false, hidden };
   state.combatants.push(c);
   if (mode === 'combat') snapshotCombatant(c);
   ['add-name','add-init','add-hp','add-ac'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('add-hidden').checked = false;
   if (addType === 'pc') savePCs();
   render(); pushState();
 }
@@ -681,8 +731,23 @@ function rollForEnemies() { state.combatants.filter(c=>c.type==='enemy').forEach
 function clearEnemies() { state.combatants=state.combatants.filter(c=>c.type==='pc'); if(state.activeIndex>=state.combatants.length)state.activeIndex=0; render(); pushState(); }
 function clearAll() { if(!confirm('Clear all combatants?'))return; state.combatants=[]; state.round=1; state.activeIndex=0; render(); pushState(); }
 
+function toggleVisibility(id) {
+  const c = state.combatants.find(x => x.id === id); if (!c) return;
+  c.hidden = !c.hidden;
+  render(); pushState();
+}
+
+function resetAllPCHp() {
+  state.combatants.filter(c => c.type === 'pc').forEach(c => { c.hp = c.maxHp; c.dead = false; });
+  savePCs(); render(); pushState();
+}
+
+function clearAllPCConditions() {
+  state.combatants.filter(c => c.type === 'pc').forEach(c => { c.conditions = []; });
+  savePCs(); render(); pushState();
+}
+
 // ═══════════════════════════════════════════════════════
-//  HP COLOR
 // ═══════════════════════════════════════════════════════
 function hpColor(hp, max) { const p=hp/max; return p>0.6?'#2d6a3f':p>0.3?'#c87800':'#c0392b'; }
 
@@ -705,7 +770,7 @@ function render() {
     const isPC       = c.type === 'pc';
 
     const card = document.createElement('div');
-    card.className = `combatant-card is-${c.type}${isActive?' is-active':''}${c.dead?' is-dead':''}${isExpanded?' expanded':''}`;
+    card.className = `combatant-card is-${c.type}${isActive?' is-active':''}${c.dead?' is-dead':''}${isExpanded?' expanded':''}${c.hidden?' is-hidden':''}`;
     card.draggable = true;
 
     const stdPills = STD_CONDITIONS.map(cond => {
@@ -724,6 +789,13 @@ function render() {
       ? `<div class="ac-badge"><small>AC</small>${c.ac}</div>`
       : `<div style="min-width:36px"></div>`;
 
+    // Reveal button — only for enemies, always shown to DM
+    const revealBtn = !isPC
+      ? `<button class="reveal-btn ${c.hidden ? '' : 'is-visible'}" onclick="event.stopPropagation();toggleVisibility(${c.id})">${c.hidden ? '👁 Reveal' : '🙈 Hide'}</button>`
+      : '';
+
+    const hiddenBadge = c.hidden ? `<span class="hidden-badge">HIDDEN</span>` : '';
+
     card.innerHTML = `
       <div class="card-main" onclick="toggleExpand(${c.id})">
         <span class="drag-handle" onclick="event.stopPropagation()">⠿</span>
@@ -733,6 +805,7 @@ function render() {
             <span class="type-dot ${c.type}"></span>
             ${isActive ? '<span class="active-arrow">▶</span>' : ''}
             ${c.name}
+            ${hiddenBadge}
           </div>
           ${condChips}
         </div>
@@ -742,6 +815,7 @@ function render() {
         </div>
         ${acHeader}
         <div class="card-actions" onclick="event.stopPropagation()">
+          ${revealBtn}
           <button class="btn btn-ghost btn-icon btn-sm" onclick="adjustHP(${c.id},-1)">−</button>
           <button class="btn btn-ghost btn-icon btn-sm" onclick="adjustHP(${c.id},1)">+</button>
           <button class="btn btn-red btn-icon btn-sm"   onclick="removeCombatant(${c.id})">✕</button>
@@ -814,14 +888,19 @@ async function pushState() {
   clearTimeout(syncTimer);
   syncTimer = setTimeout(async () => {
     setSyncStatus('ing','⟳ Syncing…');
+    const visibleCombatants = state.combatants.filter(c => !c.hidden);
+    const activeCombatant   = state.combatants[state.activeIndex];
+    const visibleActiveIndex = activeCombatant
+      ? visibleCombatants.findIndex(c => c.id === activeCombatant.id)
+      : 0;
+
     const playerState = {
       mode,
       round: state.round,
-      activeIndex: state.activeIndex,
-      combatants: state.combatants.map(c => ({
+      activeIndex: Math.max(0, visibleActiveIndex),
+      combatants: visibleCombatants.map(c => ({
         id: c.id, name: c.name, type: c.type,
         init: c.init,
-        // AC: only for PCs
         ac: c.type === 'pc' ? c.ac : null,
         hpPct: Math.round((c.hp/c.maxHp)*100),
         hp:    c.type==='pc' ? c.hp    : null,
@@ -929,6 +1008,8 @@ function init() {
   updateModeUI();
   render();
   pushState();
+  // PC is default type — hide the hidden checkbox
+  document.getElementById('add-hidden').closest('label').style.display = 'none';
   ['add-name','add-init','add-hp','add-ac'].forEach(id => {
     document.getElementById(id).addEventListener('keydown', e => { if(e.key==='Enter') addCombatant(); });
   });
