@@ -300,20 +300,56 @@ function buildRegionMap() {
   }
 
   // Zones
+  const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.style.cssText=`position:absolute;top:0;left:0;width:${W}px;height:${H}px;pointer-events:none;overflow:visible`;
+  svg.setAttribute('width',W); svg.setAttribute('height',H);
+
   (data.zones || []).filter(z => z.visible !== false).forEach(zone => {
-    const el = document.createElement('div');
-    el.className = 'zone';
-    el.style.cssText = `left:${zone.x}%;top:${zone.y}%;width:${zone.width}%;height:${zone.height}%;background:${zone.color};opacity:${zone.opacity};border-color:${zone.color}`;
-    const label = document.createElement('div');
-    label.className = 'zone-label';
-    label.style.color = zone.color;
-    label.style.opacity = 1 / zone.opacity * 0.7;
-    label.textContent = zone.name;
-    el.appendChild(label);
-    el.addEventListener('mouseenter', e => showTooltip(e, zone.name));
-    el.addEventListener('mouseleave', hideTooltip);
-    canvas.appendChild(el);
+    if (zone.shape === 'polygon') {
+      if (!zone.points || zone.points.length < 3) return;
+      const pts = zone.points.map(p=>`${p.x/100*W},${p.y/100*H}`).join(' ');
+      const cx  = zone.points.reduce((s,p)=>s+p.x,0)/zone.points.length/100*W;
+      const cy  = zone.points.reduce((s,p)=>s+p.y,0)/zone.points.length/100*H;
+      const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+      g.style.pointerEvents='all'; g.style.cursor='pointer';
+      const poly = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+      poly.setAttribute('points',pts);
+      poly.setAttribute('fill',zone.color);
+      poly.setAttribute('fill-opacity',zone.opacity);
+      poly.setAttribute('stroke',zone.color);
+      poly.setAttribute('stroke-width','1.5');
+      poly.setAttribute('stroke-opacity','0.7');
+      const label = document.createElementNS('http://www.w3.org/2000/svg','text');
+      label.setAttribute('x',cx); label.setAttribute('y',cy);
+      label.setAttribute('text-anchor','middle'); label.setAttribute('dominant-baseline','middle');
+      label.setAttribute('fill',zone.color);
+      label.setAttribute('font-family','Cinzel,serif');
+      label.setAttribute('font-size','11');
+      label.setAttribute('letter-spacing','0.08em');
+      label.style.textShadow='0 1px 3px rgba(0,0,0,0.9)';
+      label.style.pointerEvents='none';
+      label.textContent = zone.name;
+      g.appendChild(poly); g.appendChild(label);
+      g.addEventListener('mouseenter', e => showTooltip(e, zone.name));
+      g.addEventListener('mouseleave', hideTooltip);
+      svg.appendChild(g);
+    } else {
+      // Rectangle zone
+      const el = document.createElement('div');
+      el.className = 'zone';
+      el.style.cssText = `left:${zone.x}%;top:${zone.y}%;width:${zone.width}%;height:${zone.height}%;background:${zone.color};opacity:${zone.opacity};border-color:${zone.color}`;
+      const label = document.createElement('div');
+      label.className = 'zone-label';
+      label.style.color = zone.color;
+      label.style.opacity = 1 / zone.opacity * 0.7;
+      label.textContent = zone.name;
+      el.appendChild(label);
+      el.addEventListener('mouseenter', e => showTooltip(e, zone.name));
+      el.addEventListener('mouseleave', hideTooltip);
+      canvas.appendChild(el);
+    }
   });
+  canvas.appendChild(svg);
 
   // Pins
   (data.locations || []).filter(loc => loc.visible !== false).forEach(loc => {
