@@ -617,6 +617,8 @@ function buildMap() {
   // ── Polygon draw preview dots ─────────────────────────────
   if (polyDrawMode) renderPolyPreviewDots();
 
+  canvas.removeEventListener('click', onMapClick);
+  canvas.removeEventListener('mousemove', onMapMouseMove);
   canvas.addEventListener('click', onMapClick);
   canvas.addEventListener('mousemove', onMapMouseMove);
 
