@@ -125,6 +125,60 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 
 .publish-section{padding:0.8rem;border-top:1px solid var(--border);flex-shrink:0}
 
+/* ── Import modal ── */
+.import-drop-zone {
+  border: 2px dashed var(--border-light);
+  border-radius: var(--radius);
+  padding: 2rem 1rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  margin-bottom: 1rem;
+}
+.import-drop-zone:hover, .import-drop-zone.drag-over {
+  border-color: var(--purple);
+  background: var(--purple-bg);
+}
+.import-drop-zone-icon { font-size: 2rem; margin-bottom: 0.4rem; opacity: 0.6; }
+.import-drop-label { font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.08em; color: var(--ink-dim); }
+.import-drop-sub { font-size: 0.78rem; color: var(--ink-faint); margin-top: 0.3rem; font-style: italic; }
+.import-file-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 1rem; max-height: 120px; overflow-y: auto; }
+.import-file-item { display: flex; align-items: center; gap: 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 5px 8px; font-size: 0.82rem; }
+.import-file-item .fi-icon { font-size: 0.9rem; flex-shrink: 0; }
+.import-file-item .fi-name { flex: 1; color: var(--ink-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.import-file-item .fi-type { font-family: 'Cinzel', serif; font-size: 0.58rem; letter-spacing: 0.08em; padding: 1px 5px; border-radius: 8px; flex-shrink: 0; }
+.fi-type.location { background: rgba(74,128,192,0.15); color: #4a80c0; border: 1px solid rgba(74,128,192,0.3); }
+.fi-type.npc      { background: rgba(138,112,64,0.15);  color: #8a7040; border: 1px solid rgba(138,112,64,0.3); }
+.fi-type.unknown  { background: var(--surface); color: var(--ink-faint); border: 1px solid var(--border); }
+.import-file-item .fi-del { background: none; border: none; color: var(--ink-faint); cursor: pointer; font-size: 0.8rem; padding: 0 2px; flex-shrink: 0; }
+.import-file-item .fi-del:hover { color: var(--red); }
+
+/* Import preview */
+.import-preview { margin-bottom: 1rem; }
+.import-preview-title { font-family: 'Cinzel', serif; font-size: 0.65rem; letter-spacing: 0.1em; color: var(--gold-faint); margin-bottom: 0.5rem; }
+.import-loc-card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; margin-bottom: 6px; }
+.import-loc-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.import-loc-name { font-family: 'Cinzel', serif; font-size: 0.8rem; color: var(--ink); flex: 1; }
+.import-loc-badge { font-family: 'Cinzel', serif; font-size: 0.58rem; padding: 1px 6px; border-radius: 8px; }
+.import-loc-details { font-size: 0.78rem; color: var(--ink-faint); line-height: 1.4; }
+.import-loc-details span { display: inline-block; margin-right: 10px; }
+.conflict-badge { background: rgba(200,120,0,0.15); color: #c87800; border: 1px solid rgba(200,120,0,0.4); font-family: 'Cinzel', serif; font-size: 0.58rem; padding: 1px 6px; border-radius: 8px; }
+
+/* Conflict resolution row */
+.conflict-row { background: rgba(200,120,0,0.08); border: 1px solid rgba(200,120,0,0.3); border-radius: var(--radius); padding: 8px 10px; margin-bottom: 6px; }
+.conflict-row-title { font-family: 'Cinzel', serif; font-size: 0.72rem; color: #c87800; margin-bottom: 6px; }
+.conflict-opts { display: flex; gap: 6px; flex-wrap: wrap; }
+.conflict-opt { font-family: 'Cinzel', serif; font-size: 0.62rem; padding: 4px 10px; border-radius: var(--radius); border: 1px solid; cursor: pointer; transition: all 0.15s; background: transparent; }
+.conflict-opt.merge   { border-color: var(--green);  color: #8e8; }
+.conflict-opt.merge.selected   { background: var(--green);  color: white; }
+.conflict-opt.replace { border-color: var(--amber);  color: #c87800; }
+.conflict-opt.replace.selected { background: var(--amber);  color: var(--bg); }
+.conflict-opt.skip    { border-color: var(--border-light); color: var(--ink-faint); }
+.conflict-opt.skip.selected    { background: var(--border-light); color: var(--ink); }
+
+.import-summary { font-size: 0.82rem; color: var(--ink-dim); margin-bottom: 0.8rem; line-height: 1.5; }
+.import-summary strong { color: var(--ink); }
+
 /* Modal */
 .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:200;padding:1rem}
 .modal-backdrop.hidden{display:none}
@@ -151,6 +205,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
   <button class="btn btn-ghost btn-sm" onclick="switchTab('zones')">Zones</button>
   <button class="btn btn-ghost btn-sm" onclick="switchTab('world')">World</button>
   <button class="btn btn-ghost btn-sm" id="move-mode-btn" onclick="toggleMoveMode()">✥ Move mode</button>
+  <button class="btn btn-purple btn-sm" onclick="openImport()">⬇ Import</button>
   <button class="btn btn-green" onclick="publishData()">▲ Publish to players</button>
   <button class="btn btn-ghost btn-sm" onclick="window.open('map.html','_blank')">Preview ↗</button>
   <div class="sync-status" id="sync-status">—</div>
@@ -211,6 +266,46 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
       <button class="btn btn-green" style="width:100%;margin-bottom:5px" onclick="publishData()">▲ Publish to players</button>
       <button class="btn btn-ghost" style="width:100%;font-size:0.62rem" onclick="saveToKV().then(()=>{setSyncStatus('ok','✦ DM data saved to cloud');setTimeout(()=>setSyncStatus('',''),3000)})">☁ Save DM data to cloud</button>
       <div style="margin-top:4px;text-align:center" id="publish-status" class="sync-status">Unpublished changes</div>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT MODAL -->
+<div class="modal-backdrop hidden" id="import-modal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <h2>⬇ Import from Obsidian</h2>
+      <button class="modal-close" onclick="closeImport()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- STEP 1: Drop files -->
+      <div id="import-step-1">
+        <div class="import-drop-zone" id="import-drop-zone"
+             onclick="document.getElementById('import-file-input').click()"
+             ondragover="event.preventDefault();this.classList.add('drag-over')"
+             ondragleave="this.classList.remove('drag-over')"
+             ondrop="handleImportDrop(event)">
+          <div class="import-drop-zone-icon">📂</div>
+          <div class="import-drop-label">Drop .md files here or click to browse</div>
+          <div class="import-drop-sub">Drop location files and NPC files together — they'll be linked automatically</div>
+        </div>
+        <input type="file" id="import-file-input" accept=".md" multiple style="display:none" onchange="handleImportFiles(this.files)">
+        <div class="import-file-list" id="import-file-list"></div>
+        <p class="import-summary" id="import-file-summary" style="display:none"></p>
+      </div>
+
+      <!-- STEP 2: Preview & conflicts -->
+      <div id="import-step-2" style="display:none">
+        <p class="import-summary" id="import-preview-summary"></p>
+        <div class="import-preview" id="import-preview-list"></div>
+      </div>
+
+    </div>
+    <div class="modal-footer" id="import-footer">
+      <button class="btn btn-ghost" onclick="closeImport()">Cancel</button>
+      <button class="btn btn-purple" id="import-next-btn" onclick="importStep2()" style="display:none">Preview import →</button>
+      <button class="btn btn-gold" id="import-confirm-btn" onclick="confirmImport()" style="display:none">Import into map</button>
     </div>
   </div>
 </div>
@@ -308,7 +403,7 @@ const ZONE_COLORS = ['#6a5a40','#2d6a3f','#2e4a7a','#8a3030','#5a3e9b','#4a6060'
 //  DATA
 // ══════════════════════════════════════════════════════════════
 let data = {
-  world:{ name:'The Realm', mapImage:'', mapWidth:1200, mapHeight:800 },
+  world:{ name:'Velemere', mapImage:'./Velmere.jpeg', mapWidth:1456, mapHeight:816 },
   locations:[], zones:[]
 };
 
@@ -1110,6 +1205,469 @@ async function init() {
 }
 
 init();
+// ══════════════════════════════════════════════════════════════
+//  OBSIDIAN IMPORT
+// ══════════════════════════════════════════════════════════════
+
+let importFiles   = [];   // { name, content, parsed }
+let importParsed  = [];   // final parsed locations ready to preview
+let conflictChoices = {}; // { locId: 'merge'|'replace'|'skip' }
+
+// ── Open / close ─────────────────────────────────────────────
+function openImport() {
+  importFiles  = [];
+  importParsed = [];
+  conflictChoices = {};
+  document.getElementById('import-file-list').innerHTML = '';
+  document.getElementById('import-file-summary').style.display = 'none';
+  document.getElementById('import-step-1').style.display = 'block';
+  document.getElementById('import-step-2').style.display = 'none';
+  document.getElementById('import-next-btn').style.display = 'none';
+  document.getElementById('import-confirm-btn').style.display = 'none';
+  document.getElementById('import-file-input').value = '';
+  document.getElementById('import-modal').classList.remove('hidden');
+}
+function closeImport() {
+  document.getElementById('import-modal').classList.add('hidden');
+}
+
+// ── File drop / select ────────────────────────────────────────
+function handleImportDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  handleImportFiles(e.dataTransfer.files);
+}
+
+function handleImportFiles(fileList) {
+  const mdFiles = Array.from(fileList).filter(f => f.name.endsWith('.md'));
+  if (!mdFiles.length) return;
+
+  const readers = mdFiles.map(file => new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => resolve({ name: file.name, content: e.target.result });
+    reader.readAsText(file);
+  }));
+
+  Promise.all(readers).then(loaded => {
+    loaded.forEach(f => {
+      if (!importFiles.find(x => x.name === f.name)) {
+        importFiles.push({ ...f, parsed: parseObsidianNote(f.name, f.content) });
+      }
+    });
+    renderImportFileList();
+  });
+}
+
+function removeImportFile(name) {
+  importFiles = importFiles.filter(f => f.name !== name);
+  renderImportFileList();
+}
+
+function renderImportFileList() {
+  const list = document.getElementById('import-file-list');
+  const summary = document.getElementById('import-file-summary');
+  const nextBtn = document.getElementById('import-next-btn');
+  list.innerHTML = '';
+
+  if (importFiles.length === 0) {
+    summary.style.display = 'none';
+    nextBtn.style.display = 'none';
+    return;
+  }
+
+  importFiles.forEach(f => {
+    const type = f.parsed.noteType;
+    const typeLabel = type === 'location' ? 'Location' : type === 'npc' ? 'NPC' : '?';
+    const typeClass = type === 'location' ? 'location' : type === 'npc' ? 'npc' : 'unknown';
+    const icon = type === 'location' ? '📍' : type === 'npc' ? '👤' : '📄';
+    const el = document.createElement('div');
+    el.className = 'import-file-item';
+    el.innerHTML = `
+      <span class="fi-icon">${icon}</span>
+      <span class="fi-name">${f.name}</span>
+      <span class="fi-type ${typeClass}">${typeLabel}</span>
+      <button class="fi-del" onclick="removeImportFile('${f.name}')">✕</button>
+    `;
+    list.appendChild(el);
+  });
+
+  const locs = importFiles.filter(f => f.parsed.noteType === 'location').length;
+  const npcs = importFiles.filter(f => f.parsed.noteType === 'npc').length;
+  const unknown = importFiles.filter(f => f.parsed.noteType === 'unknown').length;
+  summary.innerHTML = `<strong>${importFiles.length}</strong> file${importFiles.length !== 1 ? 's' : ''} loaded — <strong>${locs}</strong> location${locs !== 1 ? 's' : ''}, <strong>${npcs}</strong> NPC${npcs !== 1 ? 's' : ''}${unknown ? `, <strong>${unknown}</strong> unrecognised` : ''}`;
+  summary.style.display = 'block';
+  nextBtn.style.display = importFiles.length > 0 ? '' : 'none';
+}
+
+// ── YAML frontmatter parser ───────────────────────────────────
+function parseFrontmatter(content) {
+  const fm = {};
+  const match = content.match(/^---\s*\n([\s\S]*?)\n---/);
+  if (!match) return { fm, body: content.trim() };
+
+  const yamlText = match[1];
+  const body = content.slice(match[0].length).trim();
+
+  yamlText.split('\n').forEach(line => {
+    const colonIdx = line.indexOf(':');
+    if (colonIdx < 0) return;
+    const key = line.slice(0, colonIdx).trim();
+    let val = line.slice(colonIdx + 1).trim();
+
+    // Handle YAML lists (- item)
+    if (!val) {
+      // Multi-line list — collect following indented lines
+      return;
+    }
+    // Strip quotes
+    val = val.replace(/^["']|["']$/g, '');
+    fm[key] = val;
+  });
+
+  // Second pass for YAML lists
+  const listMatches = yamlText.matchAll(/^(\w[\w_-]*):\s*\n((?:\s+-[^\n]+\n?)+)/gm);
+  for (const m of listMatches) {
+    const key = m[1];
+    const items = m[2].match(/-\s*(.+)/g)?.map(s => s.replace(/^-\s*/, '').trim()) || [];
+    fm[key] = items;
+  }
+
+  return { fm, body };
+}
+
+// ── Parse a single .md note ───────────────────────────────────
+function parseObsidianNote(filename, content) {
+  const { fm, body } = parseFrontmatter(content);
+  const baseName = filename.replace(/\.md$/, '');
+
+  // Determine note type from frontmatter tags or fields
+  const tags = (fm.tags || fm.tag || '').toString().toLowerCase();
+  const obsidianType = (fm.type || '').toLowerCase(); // Obsidian data type (place, NPC, faction, shop…)
+  const isExplicitLocation = ['place','location','city','town','village','settlement','dungeon','cave','ruin','ruins','wilderness','forest','port','harbour','harbor'].includes(obsidianType);
+  const isExplicitNPC     = obsidianType === 'npc' || obsidianType === 'character';
+  const isExplicitOther   = ['faction','shop'].includes(obsidianType); // skip these
+  const hasLocationType   = fm.type && ['city','dungeon','wilderness','ruin','port','location','settlement','town','village'].includes(obsidianType);
+  const isNPCByTag = tags.includes('npc') || tags.includes('character') || tags.includes('person');
+  const isLocByTag = tags.includes('location') || tags.includes('place') || tags.includes('settlement');
+  const hasRole = !!fm.role;
+  // Only use hasLocationField as NPC signal when the note isn't explicitly a location
+  const hasLocationField = !isExplicitLocation && !!(fm.location || fm.Location);
+
+  let noteType = 'unknown';
+  if (isExplicitOther) noteType = 'unknown'; // faction/shop — skip
+  else if (isExplicitLocation) noteType = 'location';
+  else if (isExplicitNPC || hasRole || isNPCByTag || hasLocationField) noteType = 'npc';
+  else if (hasLocationType || isLocByTag || fm.shortDesc || fm.lore) noteType = 'location';
+  else if (body.match(/^#{1,3} (NPCs?|Characters?|Inhabitants)/m)) noteType = 'location';
+  else if (fm.name && !hasRole) noteType = 'location'; // default guess
+
+  if (noteType === 'npc') {
+    return parseNPCNote(baseName, fm, body);
+  } else if (noteType === 'location') {
+    return parseLocationNote(baseName, fm, body);
+  }
+  return { noteType: 'unknown', name: baseName, raw: { fm, body } };
+}
+
+// ── Parse location note ───────────────────────────────────────
+function parseLocationNote(baseName, fm, body) {
+  const name = fm.name || fm.title || baseName;
+  const id   = (fm.id || name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+  // Extract sections from markdown body
+  const sections = extractMarkdownSections(body);
+
+  // Lore: everything before the first heading, or a ## Description / ## About section
+  const lore = sections['description'] || sections['about'] || sections['lore'] || sections['overview'] || sections['_intro'] || '';
+
+  // Quest hooks from YAML list or ## Quests section
+  let quests = [];
+  if (Array.isArray(fm.quests)) {
+    quests = fm.quests.map(q => typeof q === 'string' ? { title: q, desc: '' } : q);
+  }
+  const questSection = sections['quests'] || sections['quest hooks'] || sections['hooks'] || '';
+  if (questSection) {
+    questSection.split('\n').filter(l => l.trim().startsWith('-')).forEach(line => {
+      const text = line.replace(/^-\s*/, '').trim();
+      if (text) quests.push({ title: text, desc: '' });
+    });
+  }
+
+  // Connected locations from YAML or body wiki links
+  let connected = [];
+  if (fm.connected) connected = Array.isArray(fm.connected) ? fm.connected : fm.connected.split(',').map(s => s.trim());
+  const wikiLinks = [...body.matchAll(/\[\[([^\]|#]+?)(?:\|[^\]]*)?\]\]/g)].map(m => m[1].trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+  connected = [...new Set([...connected, ...wikiLinks])].filter(Boolean);
+
+  // DM notes from ## DM Notes / ## Secrets section
+  const dmNotes = [
+    sections['dm notes'] || sections['dm'] || sections['secrets'] || sections['secret'] || '',
+    fm.secret || fm.secrets || '',
+    fm.statblock || ''
+  ].filter(Boolean).join('\n\n').trim();
+
+  // Map type — prefer explicit map_type field, fall back to type field
+  const rawType = (fm.map_type || fm.mapType || fm.type || '').toLowerCase();
+  const typeMap = { city:'city', town:'city', village:'city', settlement:'city', dungeon:'dungeon', cave:'dungeon', ruins:'ruin', ruin:'ruin', wilderness:'wilderness', forest:'wilderness', port:'port', harbour:'port', harbor:'port' };
+  const locType = typeMap[rawType] || 'default';
+
+  return {
+    noteType: 'location',
+    name,
+    id,
+    type:      locType,
+    shortDesc: fm.shortDesc || fm.description || fm.desc || fm.summary || '',
+    lore:      lore.trim(),
+    mapImage:  fm.mapImage || fm.map || '',
+    connected,
+    quests,
+    visible:   fm.visible !== 'false' && fm.visible !== false,
+    x:         parseFloat(fm.x) || null,
+    y:         parseFloat(fm.y) || null,
+    dmNotes,
+    npcs:      [],  // filled in later from NPC files
+  };
+}
+
+// ── Parse NPC note ────────────────────────────────────────────
+function parseNPCNote(baseName, fm, body) {
+  const name = fm.name || fm.title || baseName;
+
+  // Location link: frontmatter field OR wiki link in body
+  let locationRef = fm.location || fm.Location || fm.place || '';
+  if (!locationRef) {
+    const wikiMatch = body.match(/\[\[([^\]|#]+?)(?:\|[^\]]*)?\]\]/);
+    if (wikiMatch) locationRef = wikiMatch[1].trim();
+  }
+  const locationId = locationRef ? locationRef.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : '';
+
+  // Description: frontmatter desc or body intro
+  const { _intro } = extractMarkdownSections(body);
+  const desc = fm.description || fm.desc || fm.bio || _intro || '';
+
+  // DM notes: statblock + secrets
+  const dmParts = [fm.statblock, fm.secrets, fm.secret, fm.notes].filter(Boolean);
+  const dmNotes = dmParts.join('\n\n').trim();
+
+  return {
+    noteType:   'npc',
+    name,
+    role:       fm.role || fm.title || fm.occupation || '',
+    desc:       desc.trim(),
+    faction:    fm.faction || fm.affiliation || '',
+    locationId,
+    dmNotes,
+  };
+}
+
+// ── Extract ## sections from markdown body ────────────────────
+function extractMarkdownSections(body) {
+  const sections = {};
+  const lines = body.split('\n');
+  let currentKey = '_intro';
+  let buffer = [];
+
+  lines.forEach(line => {
+    const headingMatch = line.match(/^#{1,4}\s+(.+)/);
+    if (headingMatch) {
+      sections[currentKey] = buffer.join('\n').trim();
+      currentKey = headingMatch[1].trim().toLowerCase();
+      buffer = [];
+    } else {
+      buffer.push(line);
+    }
+  });
+  sections[currentKey] = buffer.join('\n').trim();
+  return sections;
+}
+
+// ── Step 2: build preview ─────────────────────────────────────
+function importStep2() {
+  // Stitch NPCs into their locations
+  const locationNotes = importFiles.filter(f => f.parsed.noteType === 'location').map(f => ({ ...f.parsed }));
+  const npcNotes      = importFiles.filter(f => f.parsed.noteType === 'npc').map(f => f.parsed);
+
+  // Build a lookup of location id → location
+  const locById   = {};
+  const locByName = {};
+  locationNotes.forEach(loc => {
+    locById[loc.id] = loc;
+    locByName[loc.name.toLowerCase()] = loc;
+  });
+
+  // Also check existing map locations for NPC assignment
+  data.locations.forEach(loc => {
+    if (!locById[loc.id]) locById[loc.id] = loc;
+    if (!locByName[loc.name.toLowerCase()]) locByName[loc.name.toLowerCase()] = loc;
+  });
+
+  npcNotes.forEach(npc => {
+    const targetLoc = locById[npc.locationId] || locByName[npc.locationId] || locByName[npc.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')];
+    if (targetLoc) {
+      if (!targetLoc.npcs) targetLoc.npcs = [];
+      const npcEntry = { name: npc.name, role: npc.role, desc: npc.desc + (npc.faction ? ` (${npc.faction})` : '') };
+      if (!targetLoc.npcs.find(n => n.name === npc.name)) {
+        targetLoc.npcs.push(npcEntry);
+      }
+      // DM notes from NPC go into location DM notes
+      if (npc.dmNotes) {
+        targetLoc.dmNotes = (targetLoc.dmNotes ? targetLoc.dmNotes + '\n\n' : '') + `## ${npc.name}\n${npc.dmNotes}`;
+      }
+    }
+  });
+
+  importParsed = locationNotes;
+  conflictChoices = {};
+
+  // Build preview
+  const previewList = document.getElementById('import-preview-list');
+  const previewSummary = document.getElementById('import-preview-summary');
+  previewList.innerHTML = '';
+
+  const conflicts   = importParsed.filter(loc => data.locations.find(e => e.id === loc.id));
+  const newLocs     = importParsed.filter(loc => !data.locations.find(e => e.id === loc.id));
+  const unlinkedNPCs = npcNotes.filter(npc => !locById[npc.locationId] && !locByName[(npc.locationId||'').toLowerCase()]);
+
+  previewSummary.innerHTML = `Importing <strong>${importParsed.length}</strong> location${importParsed.length !== 1 ? 's' : ''} (<strong>${newLocs.length}</strong> new, <strong>${conflicts.length}</strong> conflict${conflicts.length !== 1 ? 's' : ''}) with <strong>${npcNotes.length}</strong> NPC${npcNotes.length !== 1 ? 's' : ''}.${unlinkedNPCs.length ? ` <span style="color:#c87800">${unlinkedNPCs.length} NPC${unlinkedNPCs.length !== 1 ? 's' : ''} could not be matched to a location.</span>` : ''}`;
+
+  // Conflicts first
+  conflicts.forEach(loc => {
+    conflictChoices[loc.id] = 'merge'; // default
+    const existing = data.locations.find(e => e.id === loc.id);
+    const card = document.createElement('div');
+    card.className = 'conflict-row';
+    card.innerHTML = `
+      <div class="conflict-row-title">⚠ Conflict — "${loc.name}" already exists on the map</div>
+      <div style="font-size:0.78rem;color:var(--ink-faint);margin-bottom:6px">
+        Existing: ${existing.npcs?.length||0} NPCs, ${existing.quests?.length||0} quests &nbsp;|&nbsp;
+        Importing: ${loc.npcs?.length||0} NPCs, ${loc.quests?.length||0} quests
+      </div>
+      <div class="conflict-opts">
+        <button class="conflict-opt merge selected" id="co-merge-${loc.id}" onclick="setConflict('${loc.id}','merge')">Merge — add new data, keep existing</button>
+        <button class="conflict-opt replace" id="co-replace-${loc.id}" onclick="setConflict('${loc.id}','replace')">Replace — overwrite completely</button>
+        <button class="conflict-opt skip" id="co-skip-${loc.id}" onclick="setConflict('${loc.id}','skip')">Skip — leave unchanged</button>
+      </div>
+    `;
+    previewList.appendChild(card);
+  });
+
+  // New locations
+  if (newLocs.length) {
+    const header = document.createElement('div');
+    header.className = 'import-preview-title';
+    header.textContent = `NEW LOCATIONS (${newLocs.length})`;
+    previewList.appendChild(header);
+  }
+  newLocs.forEach(loc => {
+    const typeColor = TYPE_COLORS[loc.type] || TYPE_COLORS.default;
+    const card = document.createElement('div');
+    card.className = 'import-loc-card';
+    card.innerHTML = `
+      <div class="import-loc-header">
+        <span class="import-loc-name">${TYPE_ICONS[loc.type]||'📍'} ${loc.name}</span>
+        <span class="import-loc-badge" style="background:${typeColor}22;color:${typeColor};border:1px solid ${typeColor}44">${loc.type}</span>
+      </div>
+      <div class="import-loc-details">
+        ${loc.shortDesc ? `<span>${loc.shortDesc.slice(0,80)}${loc.shortDesc.length>80?'…':''}</span>` : ''}
+        ${loc.npcs?.length ? `<span>👤 ${loc.npcs.length} NPC${loc.npcs.length!==1?'s':''}</span>` : ''}
+        ${loc.quests?.length ? `<span>✦ ${loc.quests.length} quest${loc.quests.length!==1?'s':''}</span>` : ''}
+        ${loc.lore ? `<span>📜 Lore</span>` : ''}
+        ${loc.dmNotes ? `<span>🔒 DM notes</span>` : ''}
+      </div>
+    `;
+    previewList.appendChild(card);
+  });
+
+  // Unlinked NPCs warning
+  if (unlinkedNPCs.length) {
+    const warn = document.createElement('div');
+    warn.style.cssText = 'background:rgba(200,120,0,0.08);border:1px solid rgba(200,120,0,0.3);border-radius:4px;padding:8px 10px;margin-top:8px;font-size:0.78rem;color:#c87800;font-family:Cinzel,serif;font-size:0.65rem;letter-spacing:0.06em';
+    warn.innerHTML = `⚠ UNMATCHED NPCs — no location found:<br><span style="font-family:inherit;color:var(--ink-faint);font-size:0.75rem">${unlinkedNPCs.map(n=>n.name).join(', ')}</span>`;
+    previewList.appendChild(warn);
+  }
+
+  document.getElementById('import-step-1').style.display = 'none';
+  document.getElementById('import-step-2').style.display = 'block';
+  document.getElementById('import-next-btn').style.display = 'none';
+  document.getElementById('import-confirm-btn').style.display = '';
+}
+
+function setConflict(locId, choice) {
+  conflictChoices[locId] = choice;
+  ['merge','replace','skip'].forEach(opt => {
+    const btn = document.getElementById(`co-${opt}-${locId}`);
+    if (btn) btn.classList.toggle('selected', opt === choice);
+  });
+}
+
+// ── Commit the import ─────────────────────────────────────────
+function confirmImport() {
+  let added = 0, merged = 0, replaced = 0, skipped = 0;
+
+  importParsed.forEach(loc => {
+    const existingIdx = data.locations.findIndex(e => e.id === loc.id);
+
+    if (existingIdx >= 0) {
+      const choice = conflictChoices[loc.id] || 'merge';
+      if (choice === 'skip') { skipped++; return; }
+
+      if (choice === 'replace') {
+        // Keep map position if already placed
+        const existing = data.locations[existingIdx];
+        data.locations[existingIdx] = {
+          ...loc,
+          x: loc.x ?? existing.x,
+          y: loc.y ?? existing.y,
+          visible: existing.visible,
+        };
+        replaced++;
+      } else { // merge
+        const existing = data.locations[existingIdx];
+        // Merge NPCs (no duplicates by name)
+        const existingNPCNames = new Set((existing.npcs||[]).map(n => n.name));
+        const newNPCs = (loc.npcs||[]).filter(n => !existingNPCNames.has(n.name));
+        // Merge quests (no duplicates by title)
+        const existingQuestTitles = new Set((existing.quests||[]).map(q => q.title));
+        const newQuests = (loc.quests||[]).filter(q => !existingQuestTitles.has(q.title));
+        data.locations[existingIdx] = {
+          ...existing,
+          shortDesc: loc.shortDesc || existing.shortDesc,
+          lore:      loc.lore      || existing.lore,
+          npcs:      [...(existing.npcs||[]), ...newNPCs],
+          quests:    [...(existing.quests||[]), ...newQuests],
+          dmNotes:   [existing.dmNotes, loc.dmNotes].filter(Boolean).join('\n\n'),
+          connected: [...new Set([...(existing.connected||[]), ...(loc.connected||[])])],
+        };
+        merged++;
+      }
+    } else {
+      // New location — place at a sensible random position if not specified
+      data.locations.push({
+        ...loc,
+        x:       loc.x ?? Math.round(10 + Math.random() * 80),
+        y:       loc.y ?? Math.round(10 + Math.random() * 80),
+        npcs:    loc.npcs   || [],
+        quests:  loc.quests || [],
+        visible: loc.visible !== false,
+      });
+      added++;
+    }
+  });
+
+  saveAll();
+  renderLocList();
+  buildMap();
+  closeImport();
+
+  const parts = [];
+  if (added)    parts.push(`${added} added`);
+  if (merged)   parts.push(`${merged} merged`);
+  if (replaced) parts.push(`${replaced} replaced`);
+  if (skipped)  parts.push(`${skipped} skipped`);
+  setSyncStatus('ok', `✦ Import done — ${parts.join(', ')}`);
+  setTimeout(() => setSyncStatus('', ''), 5000);
+}
+
 //]]></script>
 </body>
 </html>
