@@ -1,21 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Campaign Creation Bonus — Perk Selection</title>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap"
-    rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
   <style>
-    *,
-    *::before,
-    *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
       --parchment: #f5eed8;
@@ -48,8 +39,8 @@
     body {
       background: #1a1208;
       background-image:
-        radial-gradient(ellipse at 20% 20%, rgba(60, 40, 10, 0.6) 0%, transparent 60%),
-        radial-gradient(ellipse at 80% 80%, rgba(40, 20, 5, 0.6) 0%, transparent 60%);
+        radial-gradient(ellipse at 20% 20%, rgba(60,40,10,0.6) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 80%, rgba(40,20,5,0.6) 0%, transparent 60%);
       min-height: 100vh;
       font-family: 'Crimson Text', Georgia, serif;
       color: var(--ink);
@@ -67,641 +58,173 @@
       border-radius: 4px;
       border: 1px solid var(--border);
       box-shadow:
-        0 0 0 6px rgba(196, 169, 109, 0.3),
-        0 0 0 12px rgba(196, 169, 109, 0.1),
-        0 20px 60px rgba(0, 0, 0, 0.6),
-        inset 0 0 80px rgba(196, 169, 109, 0.15);
+        0 0 0 6px rgba(196,169,109,0.3),
+        0 0 0 12px rgba(196,169,109,0.1),
+        0 20px 60px rgba(0,0,0,0.6),
+        inset 0 0 80px rgba(196,169,109,0.15);
       padding: 3rem 3.5rem;
     }
 
-    .ornament {
-      text-align: center;
-      color: var(--amber);
-      font-size: 1.4rem;
-      letter-spacing: 0.5em;
-      opacity: 0.7;
-    }
+    .ornament { text-align: center; color: var(--amber); font-size: 1.4rem; letter-spacing: 0.5em; opacity: 0.7; }
+    .ornament.bottom { font-size: 1rem; letter-spacing: 0.4em; opacity: 0.5; margin-top: 2rem; }
 
-    .ornament.bottom {
-      font-size: 1rem;
-      letter-spacing: 0.4em;
-      opacity: 0.5;
-      margin-top: 2rem;
-    }
+    h1 { font-family: 'Cinzel', serif; font-weight: 600; font-size: 2rem; text-align: center; color: var(--ink); letter-spacing: 0.05em; line-height: 1.2; margin: 1rem 0 0.4rem; }
+    .subtitle { text-align: center; font-size: 1.05rem; color: var(--ink-light); font-style: italic; margin-bottom: 0.5rem; }
 
-    h1 {
-      font-family: 'Cinzel', serif;
-      font-weight: 600;
-      font-size: 2rem;
-      text-align: center;
-      color: var(--ink);
-      letter-spacing: 0.05em;
-      line-height: 1.2;
-      margin: 1rem 0 0.4rem;
-    }
-
-    .subtitle {
-      text-align: center;
-      font-size: 1.05rem;
-      color: var(--ink-light);
-      font-style: italic;
-      margin-bottom: 0.5rem;
-    }
-
-    .divider {
-      border: none;
-      border-top: 1px solid var(--border-light);
-      margin: 1.2rem 0;
-      position: relative;
-    }
-
-    .divider::before {
-      content: '✦';
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      background: var(--parchment);
-      padding: 0 0.6rem;
-      color: var(--amber);
-      font-size: 0.8rem;
-    }
+    .divider { border: none; border-top: 1px solid var(--border-light); margin: 1.2rem 0; position: relative; }
+    .divider::before { content: '✦'; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); background: var(--parchment); padding: 0 0.6rem; color: var(--amber); font-size: 0.8rem; }
 
     /* Class picker */
-    .class-picker {
-      margin-bottom: 1.8rem;
-    }
-
-    .class-picker-label {
-      font-family: 'Cinzel', serif;
-      font-size: 0.75rem;
-      letter-spacing: 0.1em;
-      color: var(--ink-faint);
-      margin-bottom: 0.7rem;
-      display: block;
-    }
-
-    .class-groups {
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-
-    .class-group {
-      flex: 1;
-      min-width: 180px;
-    }
-
-    .class-group-label {
-      font-family: 'Cinzel', serif;
-      font-size: 0.65rem;
-      letter-spacing: 0.12em;
-      font-weight: 600;
-      padding: 3px 10px;
-      border-radius: 2px;
-      display: inline-block;
-      margin-bottom: 6px;
-    }
-
-    .class-group-label.martial {
-      background: var(--martial-bg);
-      color: var(--martial-color);
-    }
-
-    .class-group-label.hybrid {
-      background: var(--hybrid-bg);
-      color: var(--hybrid-color);
-    }
-
-    .class-group-label.caster {
-      background: var(--caster-bg);
-      color: var(--caster-color);
-    }
-
-    .class-btn-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 5px;
-    }
-
-    .class-btn {
-      font-family: 'Crimson Text', serif;
-      font-size: 0.92rem;
-      background: var(--parchment);
-      border: 1px solid var(--border-light);
-      border-radius: 2px;
-      padding: 3px 10px;
-      cursor: pointer;
-      transition: all 0.15s;
-      color: var(--ink-light);
-    }
-
-    .class-btn:hover {
-      border-color: var(--border);
-      color: var(--ink);
-    }
-
-    .class-btn.selected-martial {
-      background: var(--martial-bg);
-      border-color: var(--martial-color);
-      color: var(--martial-color);
-      font-weight: 600;
-    }
-
-    .class-btn.selected-hybrid {
-      background: var(--hybrid-bg);
-      border-color: var(--hybrid-color);
-      color: var(--hybrid-color);
-      font-weight: 600;
-    }
-
-    .class-btn.selected-caster {
-      background: var(--caster-bg);
-      border-color: var(--caster-color);
-      color: var(--caster-color);
-      font-weight: 600;
-    }
-
-    .points-callout {
-      margin-top: 1rem;
-      padding: 0.7rem 1rem;
-      border-radius: 3px;
-      border: 1px solid;
-      font-family: 'Cinzel', serif;
-      font-size: 0.8rem;
-      letter-spacing: 0.05em;
-      display: none;
-      align-items: center;
-      gap: 0.6rem;
-    }
-
-    .points-callout.martial {
-      background: var(--martial-bg);
-      border-color: var(--martial-color);
-      color: var(--martial-color);
-    }
-
-    .points-callout.hybrid {
-      background: var(--hybrid-bg);
-      border-color: var(--hybrid-color);
-      color: var(--hybrid-color);
-    }
-
-    .points-callout.caster {
-      background: var(--caster-bg);
-      border-color: var(--caster-color);
-      color: var(--caster-color);
-    }
+    .class-picker { margin-bottom: 1.8rem; }
+    .class-picker-label { font-family: 'Cinzel', serif; font-size: 0.75rem; letter-spacing: 0.1em; color: var(--ink-faint); margin-bottom: 0.7rem; display: block; }
+    .class-groups { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .class-group { flex: 1; min-width: 180px; }
+    .class-group-label { font-family: 'Cinzel', serif; font-size: 0.65rem; letter-spacing: 0.12em; font-weight: 600; padding: 3px 10px; border-radius: 2px; display: inline-block; margin-bottom: 6px; }
+    .class-group-label.martial { background: var(--martial-bg); color: var(--martial-color); }
+    .class-group-label.hybrid  { background: var(--hybrid-bg);  color: var(--hybrid-color);  }
+    .class-group-label.caster  { background: var(--caster-bg);  color: var(--caster-color);  }
+    .class-btn-grid { display: flex; flex-wrap: wrap; gap: 5px; }
+    .class-btn { font-family: 'Crimson Text', serif; font-size: 0.92rem; background: var(--parchment); border: 1px solid var(--border-light); border-radius: 2px; padding: 3px 10px; cursor: pointer; transition: all 0.15s; color: var(--ink-light); }
+    .class-btn:hover { border-color: var(--border); color: var(--ink); }
+    .class-btn.selected-martial { background: var(--martial-bg); border-color: var(--martial-color); color: var(--martial-color); font-weight: 600; }
+    .class-btn.selected-hybrid  { background: var(--hybrid-bg);  border-color: var(--hybrid-color);  color: var(--hybrid-color);  font-weight: 600; }
+    .class-btn.selected-caster  { background: var(--caster-bg);  border-color: var(--caster-color);  color: var(--caster-color);  font-weight: 600; }
+    .points-callout { margin-top: 1rem; padding: 0.7rem 1rem; border-radius: 3px; border: 1px solid; font-family: 'Cinzel', serif; font-size: 0.8rem; letter-spacing: 0.05em; display: none; align-items: center; gap: 0.6rem; }
+    .points-callout.martial { background: var(--martial-bg); border-color: var(--martial-color); color: var(--martial-color); }
+    .points-callout.hybrid  { background: var(--hybrid-bg);  border-color: var(--hybrid-color);  color: var(--hybrid-color);  }
+    .points-callout.caster  { background: var(--caster-bg);  border-color: var(--caster-color);  color: var(--caster-color);  }
 
     /* Name row */
-    .name-row {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      margin-bottom: 1.5rem;
-      flex-wrap: wrap;
-    }
-
-    .name-row label {
-      font-family: 'Cinzel', serif;
-      font-size: 0.75rem;
-      letter-spacing: 0.08em;
-      color: var(--ink-light);
-      white-space: nowrap;
-    }
-
-    .name-row input {
-      flex: 1;
-      min-width: 140px;
-      background: transparent;
-      border: none;
-      border-bottom: 1px solid var(--border);
-      padding: 4px 6px;
-      font-family: 'Crimson Text', serif;
-      font-size: 1.1rem;
-      color: var(--ink);
-      outline: none;
-      transition: border-color 0.2s;
-    }
-
-    .name-row input:focus {
-      border-bottom-color: var(--amber);
-    }
-
-    .name-row input::placeholder {
-      color: var(--ink-faint);
-      font-style: italic;
-    }
+    .name-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .name-row label { font-family: 'Cinzel', serif; font-size: 0.75rem; letter-spacing: 0.08em; color: var(--ink-light); white-space: nowrap; }
+    .name-row input { flex: 1; min-width: 140px; background: transparent; border: none; border-bottom: 1px solid var(--border); padding: 4px 6px; font-family: 'Crimson Text', serif; font-size: 1.1rem; color: var(--ink); outline: none; transition: border-color 0.2s; }
+    .name-row input:focus { border-bottom-color: var(--amber); }
+    .name-row input::placeholder { color: var(--ink-faint); font-style: italic; }
 
     /* Tracker */
-    .tracker {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: var(--parchment-dark);
-      border: 1px solid var(--border-light);
-      border-radius: 3px;
-      padding: 0.9rem 1.2rem;
-      margin-bottom: 1.8rem;
-    }
-
-    .tracker-left {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-    }
-
-    .tracker-label {
-      font-family: 'Cinzel', serif;
-      font-size: 0.72rem;
-      letter-spacing: 0.1em;
-      color: var(--ink-faint);
-      display: block;
-      margin-bottom: 2px;
-    }
-
-    .tracker-count {
-      font-family: 'Cinzel', serif;
-      font-size: 1.5rem;
-      font-weight: 600;
-      color: var(--ink);
-    }
-
-    .pip-row {
-      display: flex;
-      gap: 5px;
-    }
-
-    .pip {
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      border: 1.5px solid var(--border);
-      background: var(--parchment);
-      transition: background 0.2s, border-color 0.2s;
-    }
-
-    .pip.filled {
-      background: var(--amber);
-      border-color: var(--amber-dark);
-    }
-
-    .reset-btn {
-      font-family: 'Cinzel', serif;
-      font-size: 0.7rem;
-      letter-spacing: 0.08em;
-      color: var(--ink-faint);
-      background: transparent;
-      border: 1px solid var(--border-light);
-      border-radius: 2px;
-      padding: 5px 12px;
-      cursor: pointer;
-      transition: color 0.2s, border-color 0.2s, background 0.2s;
-    }
-
-    .reset-btn:hover {
-      color: var(--red);
-      border-color: var(--red);
-      background: var(--crimson-light);
-    }
+    .tracker { display: flex; align-items: center; justify-content: space-between; background: var(--parchment-dark); border: 1px solid var(--border-light); border-radius: 3px; padding: 0.9rem 1.2rem; margin-bottom: 1.8rem; }
+    .tracker-left { display: flex; align-items: center; gap: 1rem; }
+    .tracker-label { font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.1em; color: var(--ink-faint); display: block; margin-bottom: 2px; }
+    .tracker-count { font-family: 'Cinzel', serif; font-size: 1.5rem; font-weight: 600; color: var(--ink); }
+    .pip-row { display: flex; gap: 5px; }
+    .pip { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--border); background: var(--parchment); transition: background 0.2s, border-color 0.2s; }
+    .pip.filled { background: var(--amber); border-color: var(--amber-dark); }
+    .reset-btn { font-family: 'Cinzel', serif; font-size: 0.7rem; letter-spacing: 0.08em; color: var(--ink-faint); background: transparent; border: 1px solid var(--border-light); border-radius: 2px; padding: 5px 12px; cursor: pointer; transition: color 0.2s, border-color 0.2s, background 0.2s; }
+    .reset-btn:hover { color: var(--red); border-color: var(--red); background: var(--crimson-light); }
 
     /* Perk grid */
-    #perk-sections {
+    #perk-sections { display: none; }
+    .pick-prompt { text-align: center; padding: 2rem 0; color: var(--ink-faint); font-style: italic; font-size: 1rem; }
+    .tier-section { margin-bottom: 2rem; }
+    .tier-header { display: flex; align-items: center; gap: 10px; margin-bottom: 0.8rem; }
+    .tier-badge { font-family: 'Cinzel', serif; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.12em; padding: 3px 10px; border-radius: 2px; white-space: nowrap; }
+    .tier-rule { flex: 1; height: 1px; background: var(--border-light); }
+    .perk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(195px, 1fr)); gap: 8px; }
+    .perk-card { background: var(--parchment); border: 1px solid var(--border-light); border-radius: 3px; padding: 10px 12px; cursor: pointer; transition: border-color 0.15s, background 0.15s, transform 0.1s; user-select: none; position: relative; }
+    .perk-card:hover:not(.disabled) { border-color: var(--border); transform: translateY(-1px); }
+    .perk-card.selected { border-width: 1.5px; }
+    .perk-card.disabled { opacity: 0.38; cursor: not-allowed; }
+    .perk-card.selected.disabled { opacity: 1; }
+    .perk-card .check { position: absolute; top: 8px; right: 8px; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; color: white; opacity: 0; transition: opacity 0.15s; }
+    .perk-card.selected .check { opacity: 1; }
+    .perk-name { font-family: 'Cinzel', serif; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.04em; margin-bottom: 4px; padding-right: 18px; }
+    .perk-desc { font-size: 0.88rem; line-height: 1.45; color: var(--ink-light); }
+    .perk-cost { font-family: 'Cinzel', serif; font-size: 0.65rem; letter-spacing: 0.08em; margin-top: 6px; font-weight: 600; }
+
+    /* ── Inline choice controls ─────────────────────────────────── */
+    .perk-choice {
       display: none;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--border-light);
     }
+    .perk-card.selected .perk-choice { display: block; }
 
-    .pick-prompt {
-      text-align: center;
-      padding: 2rem 0;
+    .choice-label {
+      font-family: 'Cinzel', serif;
+      font-size: 0.6rem;
+      letter-spacing: 0.1em;
       color: var(--ink-faint);
-      font-style: italic;
-      font-size: 1rem;
-    }
-
-    .tier-section {
-      margin-bottom: 2rem;
-    }
-
-    .tier-header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 0.8rem;
-    }
-
-    .tier-badge {
-      font-family: 'Cinzel', serif;
-      font-size: 0.68rem;
-      font-weight: 600;
-      letter-spacing: 0.12em;
-      padding: 3px 10px;
-      border-radius: 2px;
-      white-space: nowrap;
-    }
-
-    .tier-rule {
-      flex: 1;
-      height: 1px;
-      background: var(--border-light);
-    }
-
-    .perk-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
-      gap: 8px;
-    }
-
-    .perk-card {
-      background: var(--parchment);
-      border: 1px solid var(--border-light);
-      border-radius: 3px;
-      padding: 10px 12px;
-      cursor: pointer;
-      transition: border-color 0.15s, background 0.15s, transform 0.1s;
-      user-select: none;
-      position: relative;
-    }
-
-    .perk-card:hover:not(.disabled) {
-      border-color: var(--border);
-      transform: translateY(-1px);
-    }
-
-    .perk-card.selected {
-      border-width: 1.5px;
-    }
-
-    .perk-card.disabled {
-      opacity: 0.38;
-      cursor: not-allowed;
-    }
-
-    .perk-card.selected.disabled {
-      opacity: 1;
-    }
-
-    .perk-card .check {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 9px;
-      color: white;
-      opacity: 0;
-      transition: opacity 0.15s;
-    }
-
-    .perk-card.selected .check {
-      opacity: 1;
-    }
-
-    .perk-name {
-      font-family: 'Cinzel', serif;
-      font-size: 0.78rem;
-      font-weight: 600;
-      letter-spacing: 0.04em;
+      display: block;
       margin-bottom: 4px;
-      padding-right: 18px;
     }
 
-    .perk-desc {
+    /* stop card-click bubbling from choice inputs */
+    .perk-choice select,
+    .perk-choice input[type="text"] {
+      width: 100%;
+      font-family: 'Crimson Text', serif;
       font-size: 0.88rem;
-      line-height: 1.45;
-      color: var(--ink-light);
-    }
-
-    .perk-cost {
-      font-family: 'Cinzel', serif;
-      font-size: 0.65rem;
-      letter-spacing: 0.08em;
-      margin-top: 6px;
-      font-weight: 600;
-    }
-
-    .t1 .tier-badge {
-      background: var(--green-light);
-      color: var(--green-dark);
-    }
-
-    .t1 .perk-card.selected {
-      border-color: var(--green);
-      background: #f0faf3;
-    }
-
-    .t1 .perk-card.selected .check {
-      background: var(--green);
-    }
-
-    .t1 .perk-name {
-      color: var(--green-dark);
-    }
-
-    .t1 .perk-cost {
-      color: var(--green);
-    }
-
-    .t2 .tier-badge {
-      background: var(--purple-light);
-      color: var(--purple-dark);
-    }
-
-    .t2 .perk-card.selected {
-      border-color: var(--purple);
-      background: #f3f0fd;
-    }
-
-    .t2 .perk-card.selected .check {
-      background: var(--purple);
-    }
-
-    .t2 .perk-name {
-      color: var(--purple-dark);
-    }
-
-    .t2 .perk-cost {
-      color: var(--purple);
-    }
-
-    .t3 .tier-badge {
-      background: var(--amber-light);
-      color: var(--amber-dark);
-    }
-
-    .t3 .perk-card.selected {
-      border-color: var(--amber);
-      background: #fef8ec;
-    }
-
-    .t3 .perk-card.selected .check {
-      background: var(--amber);
-    }
-
-    .t3 .perk-name {
-      color: var(--amber-dark);
-    }
-
-    .t3 .perk-cost {
-      color: var(--amber);
-    }
-
-    /* Selected list */
-    .selected-section {
+      color: var(--ink);
       background: var(--parchment-dark);
       border: 1px solid var(--border-light);
-      border-radius: 3px;
-      padding: 1rem 1.2rem;
-      margin-top: 1.5rem;
-    }
-
-    .selected-section h3 {
-      font-family: 'Cinzel', serif;
-      font-size: 0.72rem;
-      letter-spacing: 0.12em;
-      color: var(--ink-faint);
-      margin-bottom: 0.7rem;
-    }
-
-    .selected-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      font-size: 0.95rem;
-      color: var(--ink-light);
-      padding: 3px 0;
-      border-bottom: 1px dashed var(--border-light);
-    }
-
-    .selected-item:last-of-type {
-      border-bottom: none;
-    }
-
-    .selected-item .item-name {
-      color: var(--ink);
-    }
-
-    .selected-item .item-pts {
-      font-family: 'Cinzel', serif;
-      font-size: 0.7rem;
-      color: var(--ink-faint);
-    }
-
-    .empty-msg {
-      font-style: italic;
-      color: var(--ink-faint);
-      font-size: 0.95rem;
-    }
-
-    /* Send button */
-    .send-section {
-      margin-top: 1.5rem;
-      text-align: center;
-    }
-
-    .send-btn {
-      font-family: 'Cinzel', serif;
-      font-size: 0.85rem;
-      letter-spacing: 0.1em;
-      color: var(--parchment);
-      background: var(--ink);
-      border: none;
       border-radius: 2px;
-      padding: 12px 32px;
-      cursor: pointer;
-      transition: background 0.2s, transform 0.1s;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
+      padding: 3px 6px;
+      outline: none;
+      cursor: auto;
+      transition: border-color 0.15s;
     }
+    .perk-choice select:focus,
+    .perk-choice input[type="text"]:focus { border-color: var(--border); }
 
-    .send-btn:hover:not(:disabled) {
-      background: var(--ink-light);
-      transform: translateY(-1px);
-    }
-
-    .send-btn:active {
-      transform: scale(0.98);
-    }
-
-    .send-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      transform: none;
-    }
-
-    .send-hint {
-      font-size: 0.85rem;
-      font-style: italic;
-      color: var(--ink-faint);
-      margin-top: 0.5rem;
-    }
-
-    .feedback {
+    .choice-warning {
       font-family: 'Cinzel', serif;
-      font-size: 0.78rem;
-      letter-spacing: 0.06em;
-      margin-top: 0.8rem;
-      padding: 8px 16px;
-      border-radius: 2px;
-      display: none;
-    }
-
-    .feedback.sending {
-      background: var(--amber-light);
-      color: var(--amber-dark);
-      border: 1px solid var(--amber);
-      display: block;
-    }
-
-    .feedback.success {
-      background: var(--green-light);
-      color: var(--green-dark);
-      border: 1px solid var(--green);
-      display: block;
-    }
-
-    .feedback.error {
-      background: var(--crimson-light);
-      color: var(--crimson-dark);
-      border: 1px solid var(--red);
-      display: block;
-    }
-
-    .validation-msg {
-      font-family: 'Cinzel', serif;
-      font-size: 0.72rem;
-      letter-spacing: 0.06em;
+      font-size: 0.6rem;
       color: var(--red);
-      margin-top: 0.5rem;
+      margin-top: 3px;
       display: none;
     }
+    /* ─────────────────────────────────────────────────────────────── */
+
+    .t1 .tier-badge { background: var(--green-light); color: var(--green-dark); }
+    .t1 .perk-card.selected { border-color: var(--green); background: #f0faf3; }
+    .t1 .perk-card.selected .check { background: var(--green); }
+    .t1 .perk-name { color: var(--green-dark); }
+    .t1 .perk-cost { color: var(--green); }
+
+    .t2 .tier-badge { background: var(--purple-light); color: var(--purple-dark); }
+    .t2 .perk-card.selected { border-color: var(--purple); background: #f3f0fd; }
+    .t2 .perk-card.selected .check { background: var(--purple); }
+    .t2 .perk-name { color: var(--purple-dark); }
+    .t2 .perk-cost { color: var(--purple); }
+
+    .t3 .tier-badge { background: var(--amber-light); color: var(--amber-dark); }
+    .t3 .perk-card.selected { border-color: var(--amber); background: #fef8ec; }
+    .t3 .perk-card.selected .check { background: var(--amber); }
+    .t3 .perk-name { color: var(--amber-dark); }
+    .t3 .perk-cost { color: var(--amber); }
+
+    /* Selected list */
+    .selected-section { background: var(--parchment-dark); border: 1px solid var(--border-light); border-radius: 3px; padding: 1rem 1.2rem; margin-top: 1.5rem; }
+    .selected-section h3 { font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.12em; color: var(--ink-faint); margin-bottom: 0.7rem; }
+    .selected-item { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.95rem; color: var(--ink-light); padding: 3px 0; border-bottom: 1px dashed var(--border-light); }
+    .selected-item:last-of-type { border-bottom: none; }
+    .selected-item .item-name { color: var(--ink); }
+    .selected-item .item-choice { font-style: italic; color: var(--ink-faint); font-size: 0.85rem; margin-left: 4px; }
+    .selected-item .item-pts { font-family: 'Cinzel', serif; font-size: 0.7rem; color: var(--ink-faint); white-space: nowrap; }
+    .empty-msg { font-style: italic; color: var(--ink-faint); font-size: 0.95rem; }
+
+    /* Send */
+    .send-section { margin-top: 1.5rem; text-align: center; }
+    .send-btn { font-family: 'Cinzel', serif; font-size: 0.85rem; letter-spacing: 0.1em; color: var(--parchment); background: var(--ink); border: none; border-radius: 2px; padding: 12px 32px; cursor: pointer; transition: background 0.2s, transform 0.1s; display: inline-flex; align-items: center; gap: 8px; }
+    .send-btn:hover:not(:disabled) { background: var(--ink-light); transform: translateY(-1px); }
+    .send-btn:active { transform: scale(0.98); }
+    .send-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .send-hint { font-size: 0.85rem; font-style: italic; color: var(--ink-faint); margin-top: 0.5rem; }
+    .feedback { font-family: 'Cinzel', serif; font-size: 0.78rem; letter-spacing: 0.06em; margin-top: 0.8rem; padding: 8px 16px; border-radius: 2px; display: none; }
+    .feedback.sending { background: var(--amber-light); color: var(--amber-dark); border: 1px solid var(--amber); display: block; }
+    .feedback.success  { background: var(--green-light); color: var(--green-dark); border: 1px solid var(--green); display: block; }
+    .feedback.error    { background: var(--crimson-light); color: var(--crimson-dark); border: 1px solid var(--red); display: block; }
+    .validation-msg { font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.06em; color: var(--red); margin-top: 0.5rem; display: none; }
 
     @media (max-width: 620px) {
-      .scroll {
-        padding: 2rem 1.5rem;
-      }
-
-      h1 {
-        font-size: 1.5rem;
-      }
-
-      .perk-grid {
-        grid-template-columns: 1fr 1fr;
-      }
-
-      .class-groups {
-        flex-direction: column;
-      }
+      .scroll { padding: 2rem 1.5rem; }
+      h1 { font-size: 1.5rem; }
+      .perk-grid { grid-template-columns: 1fr 1fr; }
+      .class-groups { flex-direction: column; }
     }
-
     @media (max-width: 420px) {
-      .perk-grid {
-        grid-template-columns: 1fr;
-      }
+      .perk-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -777,8 +300,7 @@
     <div class="send-section">
       <button class="send-btn" id="send-btn" onclick="sendToDiscord()">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-          <path
-            d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z" />
+          <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/>
         </svg>
         Send selections to DM
       </button>
@@ -792,62 +314,104 @@
 
   <script>
     // ═══════════════════════════════════════════════════════════════════
-    //  Cloudflare Worker proxy URL — routes submissions to Discord
-    //  (already configured — no changes needed here)
+    //  Cloudflare Worker proxy URL
     // ═══════════════════════════════════════════════════════════════════
-
     const WORKER_URL = 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
 
     // ═══════════════════════════════════════════════════════════════════
     //  CLASS CONFIGURATION
-    //  Move classes between groups as needed.
     // ═══════════════════════════════════════════════════════════════════
-
     const classes = {
       martial: ['Barbarian', 'Fighter', 'Monk', 'Rogue', 'Pugilist'],
-      hybrid: ['Artificer', 'Paladin', 'Ranger'],
-      caster: ['Bard', 'Cleric', 'Druid', 'Sorcerer', 'Warlock', 'Wizard']
+      hybrid:  ['Artificer', 'Paladin', 'Ranger'],
+      caster:  ['Bard', 'Cleric', 'Druid', 'Sorcerer', 'Warlock', 'Wizard']
     };
-
     const pointsFor = { martial: 5, hybrid: 4, caster: 3 };
 
     // ═══════════════════════════════════════════════════════════════════
-    //  PERK CONFIGURATION
-    //  id: unique, no spaces.  name: card title.  desc: rules text.
-    //  To add a perk: copy any line, paste inside the right tier's
-    //  perks block, change all three fields.
-    //  To change max points per class: edit pointsFor above.
+    //  CHOICE DEFINITIONS
+    //
+    //  Perks that need a player choice use a `choice` object:
+    //
+    //  type: 'select'   → dropdown of fixed options
+    //    options: ['Option A', 'Option B', ...]
+    //
+    //  type: 'text'     → free-text field
+    //    placeholder: 'Hint shown in the box'
+    //
+    //  label: text shown above the control
+    //  required: true → blocks send if empty (for mechanical choices)
+    //            false → optional flavour field
     // ═══════════════════════════════════════════════════════════════════
 
+    // ═══════════════════════════════════════════════════════════════════
+    //  PERK CONFIGURATION
+    //  Add a `choice` object to any perk that needs one (see above).
+    // ═══════════════════════════════════════════════════════════════════
     const tiers = [
       {
         cost: 1,
         cls: 't1',
         label: '1 Point — Minor Boons',
         perks: [
-          // ── ADD 1-POINT PERKS HERE ──────────────────────────────────────────────
-          // { id: 'unique_id', name: 'Perk name', desc: 'What it does.' },
-          // ───────────────────────────────────────────────────────────────────────
-          { id: 'lucky_start', name: 'Lucky start', desc: 'Gain 1 Lucky Point at campaign start, usable on any d20 roll before the outcome is revealed.' },
-          { id: 'tough_hide', name: 'Thick-skinned', desc: 'Gain +3 maximum HP at 1st level.' },
-          { id: 'proficient', name: 'Proficient', desc: 'You gain gain proficency in one skill or tool of your choice.' },
-          { id: 'local_knowledge', name: 'Local knowledge', desc: 'You know the starting region intimately. Gain Advantage on History, Nature, and Survival checks made within it.' },
-          { id: 'animal_bond', name: 'Animal Bond', desc: 'You have a loyal non-combat pet  (dog, cat, crow, etc.) that obeys simple commands and can carry small items' },
-          { id: 'danger_sense', name: 'Danger sense', desc: 'You cannot be surprised while conscious. If an ambush would catch your group, you act normally in the surprise round even if allies do not.' },
-          { id: 'forager', name: 'Forager', desc: 'You can always find food and clean water for up to 4 people in non-barren wilderness without a roll, consuming no rations.' },
-          { id: 'street_smart', name: 'Street smart', desc: 'Gain Advantage on checks to find black markets, identify criminal activity, or recall the layout of any settlement you have visited.' },
-          { id: 'nimble_fingers', name: 'Nimble fingers', desc: 'Gain Advantage on Sleight of Hand checks. You can draw or conceal a Small object as a free object interaction once per turn.' },
-          { id: 'iron_stomach', name: 'Iron stomach', desc: 'Gain Advantage on saves against poison. When poisoned, the duration is halved (rounded down, minimum 1 round).' },
-          { id: 'light_sleeper', name: 'Light sleeper', desc: 'You complete a Long Rest in only 6 hours. You automatically wake if any creature approaches within 15 ft while you sleep.' },
-          { id: 'swift', name: 'Swift', desc: 'Increase your Speed by 5 feet.' },
-          { id: 'steady_nerves', name: 'Steady nerves', desc: 'Gain Advantage on saves against the Frightened condition. If you fail, you may reroll at the start of each of your turns.' },
-          { id: 'sure_footed', name: 'Sure-footed', desc: 'Gain a Climb speed equal to your walking speed and Advantage on checks to avoid falling on difficult or unstable surfaces.' },
-          { id: 'field_mender', name: 'Field mender', desc: 'When you stabilise a creature with a Healer\'s Kit, they also regain 1 HP. You can spend 1 minute and one use to let a creature spend a Hit Die.' },
-          { id: 'pack_rat', name: 'Pack rat', desc: 'You count as one size larger when determining you carrying capacity. In addition you have advantage on check made to search for treasure or items of value.' },
-          { id: 'manhunter', name: 'Manhunter', desc: 'Gain advantage on checks to track creature; in addition you gain a +2 bonus on Stealth checks made to hide from the creature.' },
-          { id: 'darkvision', name: 'Darkvision', desc: 'You gain Darkvision out to a range of 60 feet.' },
-          { id: 'swift_swim', name: 'Swift Swimmer', desc: 'You gain swim speed equal to you walking speed, in addition you can hold your breath twice as long.' },
-          { id: 'paranoid', name: 'Paranoid', desc: 'Gain Advantage on Perception, Investigation and Insight checks to notice or find hidden intentions, objects or traps.' },
+          { id: 'lucky_start',     name: 'Lucky start',      desc: 'Gain 1 Lucky Point at campaign start, usable on any d20 roll before the outcome is revealed.' },
+          { id: 'tough_hide',      name: 'Thick-skinned',    desc: 'Gain +3 maximum HP at 1st level.' },
+          {
+            id: 'proficient', name: 'Proficient',
+            desc: 'You gain proficiency in one skill or tool of your choice.',
+            choice: {
+              type: 'select', required: true, label: 'Choose a skill or tool',
+              options: [
+                '— choose —',
+                '── Skills ──',
+                'Acrobatics','Animal Handling','Arcana','Athletics',
+                'Deception','History','Insight','Intimidation',
+                'Investigation','Medicine','Nature','Perception',
+                'Performance','Persuasion','Religion','Sleight of Hand',
+                'Stealth','Survival',
+                '── Tools ──',
+                "Alchemist's Supplies","Brewer's Supplies","Calligrapher's Supplies",
+                "Carpenter's Tools","Cartographer's Tools","Cobbler's Tools",
+                "Cook's Utensils","Disguise Kit","Forgery Kit",
+                "Glassblower's Tools","Herbalism Kit","Jeweler's Tools",
+                "Leatherworker's Tools","Mason's Tools","Navigator's Tools",
+                "Painter's Supplies","Poisoner's Kit","Potter's Tools",
+                "Smith's Tools","Thieves' Tools","Tinker's Tools",
+                "Weaver's Tools","Woodcarver's Tools",
+                '── Gaming Sets ──',
+                'Dice Set','Dragonchess Set','Playing Card Set','Three-Dragon Ante Set',
+                '── Musical Instruments ──',
+                'Bagpipes','Drum','Dulcimer','Flute','Lute','Lyre',
+                'Horn','Pan Flute','Shawm','Viol',
+                '── Vehicles ──',
+                'Land Vehicles','Water Vehicles'
+              ]
+            }
+          },
+          { id: 'local_knowledge', name: 'Local knowledge',  desc: 'You know the starting region intimately. Gain Advantage on History, Nature, and Survival checks made within it.' },
+          {
+            id: 'animal_bond', name: 'Animal Bond',
+            desc: 'You have a loyal non-combat pet (dog, cat, crow, etc.) that obeys simple commands and can carry small items.',
+            choice: {
+              type: 'text', required: false, label: 'Pet type & name (optional)',
+              placeholder: 'e.g. a grey tabby named Ash…'
+            }
+          },
+          { id: 'danger_sense',    name: 'Danger sense',     desc: 'You cannot be surprised while conscious. If an ambush would catch your group, you act normally in the surprise round even if allies do not.' },
+          { id: 'forager',         name: 'Forager',          desc: 'You can always find food and clean water for up to 4 people in non-barren wilderness without a roll, consuming no rations.' },
+          { id: 'street_smart',    name: 'Street smart',     desc: 'Gain Advantage on checks to find black markets, identify criminal activity, or recall the layout of any settlement you have visited.' },
+          { id: 'nimble_fingers',  name: 'Nimble fingers',   desc: 'Gain Advantage on Sleight of Hand checks. You can draw or conceal a Small object as a free object interaction once per turn.' },
+          { id: 'iron_stomach',    name: 'Iron stomach',     desc: 'Gain Advantage on saves against poison. When poisoned, the duration is halved (rounded down, minimum 1 round).' },
+          { id: 'light_sleeper',   name: 'Light sleeper',    desc: 'You complete a Long Rest in only 6 hours. You automatically wake if any creature approaches within 15 ft while you sleep.' },
+          { id: 'swift',           name: 'Swift',            desc: 'Increase your Speed by 5 feet.' },
+          { id: 'steady_nerves',   name: 'Steady nerves',    desc: 'Gain Advantage on saves against the Frightened condition. If you fail, you may reroll at the start of each of your turns.' },
+          { id: 'sure_footed',     name: 'Sure-footed',      desc: 'Gain a Climb speed equal to your walking speed and Advantage on checks to avoid falling on difficult or unstable surfaces.' },
+          { id: 'field_mender',    name: 'Field mender',     desc: "When you stabilise a creature with a Healer's Kit, they also regain 1 HP. You can spend 1 minute and one use to let a creature spend a Hit Die." },
+          { id: 'pack_rat',        name: 'Pack rat',         desc: 'You count as one size larger when determining your carrying capacity. In addition you have advantage on checks made to search for treasure or items of value.' },
+          { id: 'manhunter',       name: 'Manhunter',        desc: 'Gain advantage on checks to track a creature; in addition you gain a +2 bonus on Stealth checks made to hide from that creature.' },
+          { id: 'darkvision',      name: 'Darkvision',       desc: 'You gain Darkvision out to a range of 60 feet.' },
+          { id: 'swift_swim',      name: 'Swift Swimmer',    desc: 'You gain a swim speed equal to your walking speed. In addition you can hold your breath twice as long.' },
+          { id: 'paranoid',        name: 'Paranoid',         desc: 'Gain Advantage on Perception, Investigation and Insight checks to notice or find hidden intentions, objects or traps.' },
         ]
       },
       {
@@ -855,23 +419,41 @@
         cls: 't2',
         label: '2 Points — Special Features',
         perks: [
-          // ── ADD 2-POINT PERKS HERE ──────────────────────────────────────────────
-          // { id: 'unique_id', name: 'Perk name', desc: 'What it does.' },
-          // ───────────────────────────────────────────────────────────────────────
-          { id: 'scrapper', name: 'Scrapper', desc: 'Once per Long Rest, when you drop to 0 HP you instead drop to 1 HP and may immediately move up to 10 ft without provoking opportunity attacks.' },
-          { id: 'silver_tongue', name: 'Commanding presence', desc: 'Once per Short Rest, reroll any Persuasion, Deception, or Intimidation check and take the higher result. You may use Intimidation in place of Persuasion with soldiers or criminals.' },
-          { id: 'weapon_mastery', name: 'Weapon Mastery', desc: 'Your training with weapons allows you to use the mastery property of one kind of Simple or Martial weapon of your choice, provided you have proficiency with it.' },
-          { id: 'ambush_pred', name: 'Ambush predator', desc: 'When you attack a creature that has not yet taken a turn in combat, deal an extra 1d6 damage on each attack against that creature.' },
-          { id: 'nimble', name: 'Nimble', desc: 'You can take the Disengage or Hide action as a bonus action on each of your turns' },
-          { id: 'brewer', name: 'Brewer', desc: 'Whenever you finish a long rest you may craft 1 healing potion at no cost. In addition gain a page of potion brewing recipes' },
+          { id: 'scrapper',        name: 'Scrapper',          desc: 'Once per Long Rest, when you drop to 0 HP you instead drop to 1 HP and may immediately move up to 10 ft without provoking opportunity attacks.' },
+          { id: 'silver_tongue',   name: 'Commanding presence', desc: 'Once per Short Rest, reroll any Persuasion, Deception, or Intimidation check and take the higher result. You may use Intimidation in place of Persuasion with soldiers or criminals.' },
+          {
+            id: 'weapon_mastery', name: 'Weapon Mastery',
+            desc: 'Your training with weapons allows you to use the mastery property of one kind of Simple or Martial weapon of your choice, provided you have proficiency with it.',
+            choice: {
+              type: 'select', required: true, label: 'Choose a weapon',
+              options: [
+                '— choose —',
+                '── Simple Melee ──',
+                'Club','Dagger','Greatclub','Handaxe','Javelin',
+                'Light Hammer','Mace','Quarterstaff','Sickle','Spear',
+                '── Simple Ranged ──',
+                'Light Crossbow','Dart','Shortbow','Sling',
+                '── Martial Melee ──',
+                'Battleaxe','Flail','Glaive','Greataxe','Greatsword',
+                'Halberd','Lance','Longsword','Maul','Morningstar',
+                'Pike','Rapier','Scimitar','Shortsword','Trident',
+                'War Pick','Warhammer','Whip',
+                '── Martial Ranged ──',
+                'Blowgun','Hand Crossbow','Heavy Crossbow','Longbow','Net'
+              ]
+            }
+          },
+          { id: 'ambush_pred',     name: 'Ambush predator',   desc: 'When you attack a creature that has not yet taken a turn in combat, deal an extra 1d6 damage on each attack against that creature.' },
+          { id: 'nimble',          name: 'Nimble',            desc: 'You can take the Disengage or Hide action as a bonus action on each of your turns.' },
+          { id: 'brewer',          name: 'Brewer',            desc: 'Whenever you finish a long rest you may craft 1 healing potion at no cost. In addition gain a page of potion brewing recipes.' },
           { id: 'burst_of_endurance', name: 'Burst of Endurance', desc: 'Once per Short Rest, as a bonus action you gain 1d6 Temporary Hit Points and +1 bonus to your Armor Class for 1 minute.' },
-          { id: 'fury', name: 'Fury', desc: 'Once per Short Rest, When you damage a creature with an attack or spell you can cause attack or spell to deal extra damage to the create. The extra damage is equal to your proficiency bonus.' },
-          { id: 'war_chest', name: 'War chest', desc: 'Gain 200 gp in coin and trade goods at campaign start — enough to hire a retainer, buy a quality mount, or fund serious downtime activity.' },
-          { id: 'great_thrower', name: 'Great Thrower', desc: 'You treat all Melee weapons as having the thrown property, inaddition increase the range of thrown weapons and objects by 10 feet.' },
-          { id: 'defensive', name: 'Defensive', desc: 'You gain proficiency in Shields. You also start with a Shield at no cost.' },
-          { id: 'tag_team', name: 'Tag Team', desc: 'When you take the Help action, you can switch places with a willing ally within 5 feet of yourself as part of that same action. This movement doesn\'t provoke opportunity attacks.' },
-          { id: 'grappler', name: 'Grappler', desc: 'You count as 1 size large when determing your carrying capacity and the size of creature you can grapple. In addition you no longer spend extra movement when dragging creatures you have grappled.' },
-          { id: 'rally', name: 'Rallying Cry', desc: 'Once per Long Rest, when you roll Initiative and don’t have the Incapacitated condition, you can choose a number of creatures equal to your Proficiency Bonus that you can see within 30 feet of yourself. Those creatures gain Heroic Inspiration.' },
+          { id: 'fury',            name: 'Fury',              desc: 'Once per Short Rest, when you damage a creature with an attack you can cause it to deal extra damage equal to your proficiency bonus.' },
+          { id: 'war_chest',       name: 'War chest',         desc: 'Gain 200 gp in coin and trade goods at campaign start — enough to hire a retainer, buy a quality mount, or fund serious downtime activity.' },
+          { id: 'great_thrower',   name: 'Great Thrower',     desc: 'You treat all Melee weapons as having the thrown property. In addition, increase the range of thrown weapons and objects by 10 feet.' },
+          { id: 'defensive',       name: 'Defensive',         desc: 'You gain proficiency in Shields. You also start with a Shield at no cost.' },
+          { id: 'tag_team',        name: 'Tag Team',          desc: "When you take the Help action, you can switch places with a willing ally within 5 feet of yourself as part of that same action. This movement doesn't provoke opportunity attacks." },
+          { id: 'grappler',        name: 'Grappler',          desc: 'You count as 1 size larger when determining your carrying capacity and the size of creature you can grapple. In addition you no longer spend extra movement when dragging creatures you have grappled.' },
+          { id: 'rally',           name: 'Rallying Cry',      desc: "Once per Long Rest, when you roll Initiative and don't have the Incapacitated condition, you can choose a number of creatures equal to your Proficiency Bonus that you can see within 30 feet. Those creatures gain Heroic Inspiration." },
         ]
       },
       {
@@ -879,44 +461,62 @@
         cls: 't3',
         label: '3 Points — Major Boons',
         perks: [
-          // ── ADD 3-POINT PERKS HERE ──────────────────────────────────────────────
-          // { id: 'unique_id', name: 'Perk name', desc: 'What it does.' },
-          // ───────────────────────────────────────────────────────────────────────
-          { id: 'hardy_con', name: 'Hardy constitution', desc: 'Gain bonus HP equal to twice your Con modifier (minimum 2) at 1st level, plus 1 additional HP each time you level up.' },
-          { id: 'duelist', name: 'Duelist', desc: 'While wielding a one-handed weapon with nothing in your off-hand, your weapon attacks score a critical hit on a 19 or 20.' },
-          { id: 'shield_wall', name: 'Shield wall', desc: 'While wielding a shield, adjacent allies (including yourself) gain +1 AC.' },
-          { id: 'vet_reflexes', name: 'Veteran\'s reflexes', desc: 'Add your Proficiency Bonus to Initiative rolls.' },
-          { id: 'owed_debt', name: 'Owed debt', desc: 'A named NPC of standing (agreed with DM) owes you a significant favour: their position, influence, or wealth, used on your behalf once.' },
-          { id: 'prophecy', name: 'Chosen by fate', desc: 'You are the subject of a prophecy. Gain a lucky dice after every long rest, which can be used to gain advantage on any D20 test or to get acreature disadvantage on an attack roll against you.' },
-          { id: 'seasoned_warrior', name: 'Seasoned warrior', desc: 'Gain proficiency in all martial weapons and medium armour if not already. You also start with a set of quality medium armour and one martial weapon at no cost.' },
-          { id: 'honed_craft', name: 'Honed craft', desc: 'Gain Expertise (double Proficiency Bonus) in a skill you are already proficient in, representing years of dedicated practice beyond your background.' },
-          { id: 'distracting', name: 'Annoying', desc: 'Once per short rest, you may take the Help action as a bonus action. In addtion whenever you take the Help action, the enemy you are distracting can be within 30 feet of you, rather than 5 feet of you, provided they can see or hear you.' },
-          { id: 'family_first', name: 'Family First', desc: 'If you have Heroic Inspiration when you roll Initiative, you can expend it to give yourself and your allies Advantage on that Initiative roll.' },
-          // { id: 'secret',          name: 'Dangerous secret',      desc: 'You possess knowledge someone powerful wants buried. Enormous leverage in the right hands — but you are already a marked person.' },
+          { id: 'hardy_con',       name: 'Hardy constitution', desc: 'Gain bonus HP equal to twice your Con modifier (minimum 2) at 1st level, plus 1 additional HP each time you level up.' },
+          { id: 'duelist',         name: 'Duelist',            desc: 'While wielding a one-handed weapon with nothing in your off-hand, your weapon attacks score a critical hit on a 19 or 20.' },
+          { id: 'shield_wall',     name: 'Shield wall',        desc: 'While wielding a shield, adjacent allies (including yourself) gain +1 AC.' },
+          { id: 'vet_reflexes',    name: "Veteran's reflexes", desc: 'Add your Proficiency Bonus to Initiative rolls.' },
+          {
+            id: 'owed_debt', name: 'Owed debt',
+            desc: 'A named NPC of standing (agreed with DM) owes you a significant favour: their position, influence, or wealth, used on your behalf once.',
+            choice: {
+              type: 'text', required: false, label: 'Who owes you? (optional)',
+              placeholder: 'e.g. a retired general, a guild master…'
+            }
+          },
+          { id: 'prophecy',        name: 'Chosen by fate',     desc: 'You are the subject of a prophecy. Gain a lucky dice after every long rest, which can be used to gain advantage on any D20 test or to give a creature disadvantage on an attack roll against you.' },
+          { id: 'seasoned_warrior',name: 'Seasoned warrior',   desc: 'Gain proficiency in all martial weapons and medium armour if not already. You also start with a set of quality medium armour and one martial weapon at no cost.' },
+          {
+            id: 'honed_craft', name: 'Honed craft',
+            desc: 'Gain Expertise (double Proficiency Bonus) in a skill you are already proficient in, representing years of dedicated practice beyond your background.',
+            choice: {
+              type: 'select', required: true, label: 'Choose a skill (must be proficient)',
+              options: [
+                '— choose —',
+                'Acrobatics','Animal Handling','Arcana','Athletics',
+                'Deception','History','Insight','Intimidation',
+                'Investigation','Medicine','Nature','Perception',
+                'Performance','Persuasion','Religion','Sleight of Hand',
+                'Stealth','Survival'
+              ]
+            }
+          },
+          { id: 'distracting',     name: 'Annoying',           desc: 'Once per short rest, you may take the Help action as a bonus action. Whenever you take the Help action, the enemy you are distracting can be within 30 feet of you rather than 5 feet, provided they can see or hear you.' },
+          { id: 'family_first',    name: 'Family First',       desc: 'If you have Heroic Inspiration when you roll Initiative, you can expend it to give yourself and your allies Advantage on that Initiative roll.' },
         ]
       }
     ];
 
     // ═══════════════════════════════════════════════════════════════════
-    //  No need to edit anything below this line
+    //  No need to edit below this line
     // ═══════════════════════════════════════════════════════════════════
 
     const allPerks = tiers.flatMap(t => t.perks.map(pk => ({ ...pk, cost: t.cost })));
     let selectedClass = null;
-    let selectedType = null;
-    let total = 0;
-    let spent = {};
-    let totalSpent = 0;
+    let selectedType  = null;
+    let total         = 0;
+    let spent         = {};    // { id: { id, cost, name, choiceValue } }
+    let totalSpent    = 0;
 
+    // ── Class buttons ────────────────────────────────────────────────
     function buildClassButtons() {
       ['martial', 'hybrid', 'caster'].forEach(type => {
         const container = document.getElementById(`${type}-btns`);
         classes[type].forEach(cls => {
           const btn = document.createElement('button');
-          btn.className = 'class-btn';
-          btn.textContent = cls;
+          btn.className     = 'class-btn';
+          btn.textContent   = cls;
           btn.dataset.class = cls;
-          btn.dataset.type = type;
+          btn.dataset.type  = type;
           btn.addEventListener('click', () => selectClass(cls, type));
           container.appendChild(btn);
         });
@@ -929,24 +529,26 @@
       if (btn) btn.classList.add(`selected-${type}`);
 
       selectedClass = cls;
-      selectedType = type;
-      total = pointsFor[type];
-      spent = {};
-      totalSpent = 0;
+      selectedType  = type;
+      total         = pointsFor[type];
+      spent         = {};
+      totalSpent    = 0;
 
       const callout = document.getElementById('points-callout');
-      callout.className = `points-callout ${type}`;
+      callout.className     = `points-callout ${type}`;
       callout.style.display = 'flex';
       document.getElementById('callout-text').textContent =
         `${cls} is a ${type.charAt(0).toUpperCase() + type.slice(1)} class — you have ${total} point${total !== 1 ? 's' : ''} to spend.`;
 
-      document.getElementById('pick-prompt').style.display = 'none';
+      document.getElementById('pick-prompt').style.display   = 'none';
       document.getElementById('perk-sections').style.display = 'block';
 
-      // Re-enable send button in case it was locked from a previous submission
       const sendBtn = document.getElementById('send-btn');
-      sendBtn.disabled = false;
+      sendBtn.disabled  = false;
       sendBtn.innerHTML = discordIcon() + ' Send selections to DM';
+
+      // Clear all choice controls
+      document.querySelectorAll('.perk-choice select, .perk-choice input').forEach(el => { el.value = el.tagName === 'SELECT' ? el.options[0].value : ''; });
 
       hideFeedback();
       renderPips();
@@ -954,6 +556,7 @@
       renderSelectedList();
     }
 
+    // ── Pips ─────────────────────────────────────────────────────────
     function renderPips() {
       const row = document.getElementById('pip-row');
       row.innerHTML = '';
@@ -966,8 +569,9 @@
       }
     }
 
+    // ── Selected list ─────────────────────────────────────────────────
     function renderSelectedList() {
-      const list = document.getElementById('selected-list');
+      const list  = document.getElementById('selected-list');
       const empty = document.getElementById('empty-msg');
       list.querySelectorAll('.selected-item').forEach(el => el.remove());
       const items = Object.values(spent);
@@ -976,31 +580,44 @@
       items.forEach(p => {
         const div = document.createElement('div');
         div.className = 'selected-item';
-        div.innerHTML = `<span class="item-name">${p.name}</span><span class="item-pts">${p.cost} pt${p.cost !== 1 ? 's' : ''}</span>`;
+        const choicePart = p.choiceValue ? `<span class="item-choice">— ${p.choiceValue}</span>` : '';
+        div.innerHTML = `<span class="item-name">${p.name}${choicePart}</span><span class="item-pts">${p.cost} pt${p.cost !== 1 ? 's' : ''}</span>`;
         list.appendChild(div);
       });
     }
 
+    // ── Card states ───────────────────────────────────────────────────
     function updateCards() {
       document.querySelectorAll('.perk-card').forEach(card => {
-        const id = card.dataset.id;
-        const cost = parseInt(card.dataset.cost);
+        const id         = card.dataset.id;
+        const cost       = parseInt(card.dataset.cost);
         const isSelected = !!spent[id];
-        const canAfford = (total - totalSpent) >= cost;
+        const canAfford  = (total - totalSpent) >= cost;
         card.classList.toggle('selected', isSelected);
         card.classList.toggle('disabled', !isSelected && !canAfford);
       });
     }
 
+    // ── Toggle perk ───────────────────────────────────────────────────
     function togglePerk(id, cost, name) {
       if (!selectedClass) return;
       if (spent[id]) {
+        // Deselect — clear the choice control too
         totalSpent -= cost;
         delete spent[id];
+        const card = document.querySelector(`.perk-card[data-id="${id}"]`);
+        if (card) {
+          const sel = card.querySelector('select');
+          const inp = card.querySelector('input');
+          if (sel) sel.value = sel.options[0].value;
+          if (inp) inp.value = '';
+          const warn = card.querySelector('.choice-warning');
+          if (warn) warn.style.display = 'none';
+        }
       } else {
         if (totalSpent + cost > total) return;
         totalSpent += cost;
-        spent[id] = { id, cost, name };
+        spent[id] = { id, cost, name, choiceValue: '' };
       }
       renderPips();
       updateCards();
@@ -1008,119 +625,144 @@
       hideFeedback();
     }
 
+    // ── Handle choice input changes ───────────────────────────────────
+    function onChoiceChange(id, value) {
+      if (spent[id]) {
+        spent[id].choiceValue = value === '— choose —' ? '' : value;
+        renderSelectedList();
+      }
+    }
+
     function resetPerks() {
       spent = {}; totalSpent = 0;
+      document.querySelectorAll('.perk-choice select').forEach(el => { el.value = el.options[0].value; });
+      document.querySelectorAll('.perk-choice input').forEach(el => { el.value = ''; });
+      document.querySelectorAll('.choice-warning').forEach(el => { el.style.display = 'none'; });
       const sendBtn = document.getElementById('send-btn');
-      sendBtn.disabled = false;
+      sendBtn.disabled  = false;
       sendBtn.innerHTML = discordIcon() + ' Send selections to DM';
       renderPips(); updateCards(); renderSelectedList();
       hideFeedback();
     }
 
+    // ── Feedback helpers ──────────────────────────────────────────────
     function showFeedback(type, msg) {
       const el = document.getElementById('feedback');
-      el.className = `feedback ${type}`;
+      el.className   = `feedback ${type}`;
       el.textContent = msg;
     }
-
     function hideFeedback() {
       const el = document.getElementById('feedback');
-      el.className = 'feedback';
+      el.className   = 'feedback';
       el.textContent = '';
       document.getElementById('validation-msg').style.display = 'none';
     }
 
+    // ── Discord icon SVG ──────────────────────────────────────────────
     function discordIcon() {
       return `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>`;
     }
 
+    // ── Send to Discord ───────────────────────────────────────────────
     async function sendToDiscord() {
-      const charName = document.getElementById('char-name').value.trim();
-      const playerName = document.getElementById('player-name').value.trim();
+      const charName     = document.getElementById('char-name').value.trim();
+      const playerName   = document.getElementById('player-name').value.trim();
       const validationEl = document.getElementById('validation-msg');
 
-      // Validate
       const missing = [];
       if (!selectedClass) missing.push('a class');
-      if (!playerName) missing.push('your player name');
-      if (!charName) missing.push('your character name');
+      if (!playerName)    missing.push('your player name');
+      if (!charName)      missing.push('your character name');
+
+      // Check required choices
+      const incompleteChoices = [];
+      Object.values(spent).forEach(p => {
+        const perkDef = allPerks.find(pk => pk.id === p.id);
+        if (perkDef && perkDef.choice && perkDef.choice.required && !p.choiceValue) {
+          incompleteChoices.push(perkDef.name);
+          // Highlight the warning on the card
+          const card = document.querySelector(`.perk-card[data-id="${p.id}"]`);
+          if (card) {
+            const warn = card.querySelector('.choice-warning');
+            if (warn) warn.style.display = 'block';
+          }
+        }
+      });
+      if (incompleteChoices.length > 0) missing.push(`a choice for: ${incompleteChoices.join(', ')}`);
+
       if (missing.length > 0) {
-        validationEl.textContent = `Please fill in: ${missing.join(', ')}.`;
+        validationEl.textContent   = `Please fill in: ${missing.join(' · ')}.`;
         validationEl.style.display = 'block';
         return;
       }
       validationEl.style.display = 'none';
 
-      const items = Object.values(spent);
+      const items     = Object.values(spent);
       const typeLabel = selectedType.charAt(0).toUpperCase() + selectedType.slice(1);
-      const colorMap = { martial: 0xB22222, hybrid: 0xB8860B, caster: 0x5A3E9B };
+      const colorMap  = { martial: 0xB22222, hybrid: 0xB8860B, caster: 0x5A3E9B };
 
       const perkFields = items.map(p => {
         const match = allPerks.find(pk => pk.id === p.id);
+        const choiceLine = p.choiceValue ? `\n**Choice:** ${p.choiceValue}` : '';
         return {
-          name: `✦ ${p.name} (${p.cost} pt${p.cost !== 1 ? 's' : ''})`,
-          value: match ? match.desc : '—',
+          name:   `✦ ${p.name} (${p.cost} pt${p.cost !== 1 ? 's' : ''})`,
+          value:  (match ? match.desc : '—') + choiceLine,
           inline: false
         };
       });
 
       if (perkFields.length === 0) {
-        perkFields.push({
-          name: 'No perks selected',
-          value: `${total - totalSpent} point${total - totalSpent !== 1 ? 's' : ''} left unspent.`,
-          inline: false
-        });
+        perkFields.push({ name: 'No perks selected', value: `${total - totalSpent} point${total - totalSpent !== 1 ? 's' : ''} left unspent.`, inline: false });
       }
 
       const payload = {
         embeds: [{
-          title: '📜 Campaign Creation Bonus — Perk Selections',
-          color: colorMap[selectedType] || 0x8B7355,
+          title:  '📜 Campaign Creation Bonus — Perk Selections',
+          color:  colorMap[selectedType] || 0x8B7355,
           fields: [
-            { name: 'Player', value: playerName, inline: true },
-            { name: 'Character', value: charName, inline: true },
-            { name: 'Class', value: `${selectedClass} (${typeLabel})`, inline: true },
-            { name: 'Points spent', value: `${totalSpent} / ${total}`, inline: true },
+            { name: 'Player',       value: playerName, inline: true },
+            { name: 'Character',    value: charName,   inline: true },
+            { name: 'Class',        value: `${selectedClass} (${typeLabel})`, inline: true },
+            { name: 'Points spent', value: `${totalSpent} / ${total}`,        inline: true },
             { name: '────────────────────────', value: ' ', inline: false },
             ...perkFields
           ],
-          footer: { text: 'Sent via Campaign Creation Bonus sheet' },
+          footer:    { text: 'Sent via Campaign Creation Bonus sheet' },
           timestamp: new Date().toISOString()
         }]
       };
 
-      // Send via Cloudflare Worker
       const btn = document.getElementById('send-btn');
-      btn.disabled = true;
+      btn.disabled  = true;
       btn.innerHTML = '⏳ Sending…';
       showFeedback('sending', '⏳ Sending your selections to the DM…');
 
       try {
         const res = await fetch(WORKER_URL, {
-          method: 'POST',
+          method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body:    JSON.stringify(payload)
         });
-
         if (res.ok) {
           showFeedback('success', `✦ Sent! Your DM has received ${charName}'s perk selections in Discord.`);
           btn.innerHTML = '✦ Selections sent';
-          // Keep button disabled to prevent double-send
         } else {
           showFeedback('error', `⚠ Something went wrong (${res.status}). Try again or let your DM know.`);
-          btn.disabled = false;
+          btn.disabled  = false;
           btn.innerHTML = discordIcon() + ' Send selections to DM';
         }
       } catch (err) {
         showFeedback('error', '⚠ Could not reach the server. Check your internet connection and try again.');
-        btn.disabled = false;
+        btn.disabled  = false;
         btn.innerHTML = discordIcon() + ' Send selections to DM';
       }
     }
 
+    // ── Build perk sections ───────────────────────────────────────────
     function buildPerkSections() {
       const container = document.getElementById('perk-sections');
       container.style.display = 'none';
+
       tiers.forEach(tier => {
         const section = document.createElement('div');
         section.className = `tier-section ${tier.cls}`;
@@ -1128,7 +770,7 @@
         const header = document.createElement('div');
         header.className = 'tier-header';
         const badge = document.createElement('span');
-        badge.className = 'tier-badge';
+        badge.className   = 'tier-badge';
         badge.textContent = tier.label;
         const rule = document.createElement('div');
         rule.className = 'tier-rule';
@@ -1138,23 +780,57 @@
 
         const grid = document.createElement('div');
         grid.className = 'perk-grid';
+
         tier.perks.forEach(perk => {
           const card = document.createElement('div');
-          card.className = 'perk-card';
-          card.dataset.id = perk.id;
+          card.className    = 'perk-card';
+          card.dataset.id   = perk.id;
           card.dataset.cost = tier.cost;
+
+          // Build choice HTML if needed
+          let choiceHTML = '';
+          if (perk.choice) {
+            const requiredMark = perk.choice.required ? ' *' : '';
+            if (perk.choice.type === 'select') {
+              const optionsHTML = perk.choice.options.map(o => {
+                if (o.startsWith('──')) return `<option disabled>${o}</option>`;
+                return `<option value="${o}">${o}</option>`;
+              }).join('');
+              choiceHTML = `
+                <div class="perk-choice">
+                  <span class="choice-label">${perk.choice.label.toUpperCase()}${requiredMark}</span>
+                  <select onchange="onChoiceChange('${perk.id}', this.value)" onclick="event.stopPropagation()">
+                    ${optionsHTML}
+                  </select>
+                  <span class="choice-warning">⚠ Please make a selection before sending.</span>
+                </div>`;
+            } else {
+              choiceHTML = `
+                <div class="perk-choice">
+                  <span class="choice-label">${perk.choice.label.toUpperCase()}${requiredMark}</span>
+                  <input type="text" placeholder="${perk.choice.placeholder || ''}"
+                    oninput="onChoiceChange('${perk.id}', this.value)"
+                    onclick="event.stopPropagation()">
+                </div>`;
+            }
+          }
+
           card.innerHTML = `
-        <div class="check">✓</div>
-        <div class="perk-name">${perk.name}</div>
-        <div class="perk-desc">${perk.desc}</div>
-        <div class="perk-cost">${tier.cost} pt${tier.cost !== 1 ? 's' : ''}</div>
-      `;
+            <div class="check">✓</div>
+            <div class="perk-name">${perk.name}</div>
+            <div class="perk-desc">${perk.desc}</div>
+            <div class="perk-cost">${tier.cost} pt${tier.cost !== 1 ? 's' : ''}</div>
+            ${choiceHTML}
+          `;
+
           card.addEventListener('click', () => {
             if (!spent[perk.id] && totalSpent + tier.cost > total) return;
             togglePerk(perk.id, tier.cost, perk.name);
           });
+
           grid.appendChild(card);
         });
+
         section.appendChild(grid);
         container.appendChild(section);
       });
@@ -1166,5 +842,4 @@
     renderSelectedList();
   </script>
 </body>
-
 </html>
