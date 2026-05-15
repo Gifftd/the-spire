@@ -208,7 +208,8 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
     </div>
 
     <div class="publish-section">
-      <button class="btn btn-green" style="width:100%" onclick="publishData()">▲ Publish to players</button>
+      <button class="btn btn-green" style="width:100%;margin-bottom:5px" onclick="publishData()">▲ Publish to players</button>
+      <button class="btn btn-ghost" style="width:100%;font-size:0.62rem" onclick="saveToKV().then(()=>{setSyncStatus('ok','✦ DM data saved to cloud');setTimeout(()=>setSyncStatus('',''),3000)})">☁ Save DM data to cloud</button>
       <div style="margin-top:4px;text-align:center" id="publish-status" class="sync-status">Unpublished changes</div>
     </div>
   </div>
@@ -329,14 +330,53 @@ let isMapDragging=false, dragStartX, dragStartY, dragOriginX, dragOriginY;
 let moveDragTarget=null;   // { type:'pin'|'rectzone'|'polyzone', id, origX, origY, origPoints, mouseStartX, mouseStartY }
 
 // ══════════════════════════════════════════════════════════════
-//  PERSISTENCE
+//  PERSISTENCE — localStorage (fast cache) + KV (persistent backup)
 // ══════════════════════════════════════════════════════════════
-function saveLocal() { localStorage.setItem('dm_map_data', JSON.stringify(data)); }
+function saveLocal() {
+  localStorage.setItem('dm_map_data', JSON.stringify(data));
+}
+
 function loadLocal() {
   try {
-    const d = JSON.parse(localStorage.getItem('dm_map_data')||'null');
+    const d = JSON.parse(localStorage.getItem('dm_map_data') || 'null');
     if (d && d.locations) data = d;
   } catch {}
+}
+
+// Save full DM data (including notes) to KV via the Worker
+async function saveToKV() {
+  try {
+    await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'map_data_dm', payload: data })
+    });
+  } catch {
+    // Silently fail — localStorage is the fallback
+  }
+}
+
+// Load full DM data from KV on startup
+async function loadFromKV() {
+  try {
+    const res = await fetch(WORKER_URL + '?type=map_data_dm', { cache: 'no-store' });
+    if (!res.ok) return false;
+    const d = await res.json();
+    if (d && d.locations && d.locations.length > 0) {
+      data = d;
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
+// Called after every edit — saves locally immediately, queues KV save
+let kvSaveTimer = null;
+function saveAll() {
+  saveAll();
+  clearTimeout(kvSaveTimer);
+  kvSaveTimer = setTimeout(saveToKV, 1500); // debounce KV writes
+  setPublishStatus('', 'Unsaved changes');
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -586,7 +626,7 @@ function finishPolygon() {
   const color = ZONE_COLORS[data.zones.length % ZONE_COLORS.length];
   data.zones.push({ id, name:'New Region', shape:'polygon', points:[...polyPoints], color, opacity:0.18, visible:true });
   polyPoints = [];
-  saveLocal(); renderZoneList(); buildMap();
+  saveAll(); renderZoneList(); buildMap();
   setPublishStatus('','Unpublished changes');
   cancelPolyDraw();
   selectZone(id);
@@ -730,7 +770,7 @@ window.addEventListener('mousemove', e => {
 
 window.addEventListener('mouseup', e => {
   if (!moveDragTarget) return;
-  saveLocal();
+  saveAll();
   renderLocList();
   renderZoneList();
   buildMap();
@@ -915,7 +955,7 @@ function saveLocation() {
   };
   const idx = data.locations.findIndex(l=>l.id===editingLocId);
   if (idx>=0) data.locations[idx]=locData; else data.locations.push(locData);
-  selectedLocId=id; saveLocal(); renderLocList(); buildMap(); closeLocModal();
+  selectedLocId=id; saveAll(); renderLocList(); buildMap(); closeLocModal();
   setPublishStatus('','Unpublished changes');
 }
 
@@ -923,7 +963,7 @@ function deleteLocation() {
   if (!editingLocId) return;
   if (!confirm(`Delete ${data.locations.find(l=>l.id===editingLocId)?.name}?`)) return;
   data.locations=data.locations.filter(l=>l.id!==editingLocId);
-  selectedLocId=null; saveLocal(); renderLocList(); buildMap(); closeLocModal();
+  selectedLocId=null; saveAll(); renderLocList(); buildMap(); closeLocModal();
   setPublishStatus('','Unpublished changes');
 }
 
@@ -968,7 +1008,7 @@ function addZone() {
   const id='zone_'+Date.now();
   const color=ZONE_COLORS[data.zones.length%ZONE_COLORS.length];
   data.zones.push({ id, name:'New Zone', shape:'rect', x:20, y:20, width:30, height:25, color, opacity:0.18, visible:true });
-  saveLocal(); renderZoneList(); buildMap();
+  saveAll(); renderZoneList(); buildMap();
   setPublishStatus('','Unpublished changes');
 }
 
@@ -1014,13 +1054,13 @@ function renderZoneList() {
 
 function updateZone(id,key,val) {
   const z=data.zones.find(z=>z.id===id); if(!z) return;
-  z[key]=val; saveLocal(); buildMap();
+  z[key]=val; saveAll(); buildMap();
   setPublishStatus('','Unpublished changes');
 }
 function deleteZone(id) {
   if (!confirm('Delete this zone?')) return;
   data.zones=data.zones.filter(z=>z.id!==id);
-  saveLocal(); renderZoneList(); buildMap();
+  saveAll(); renderZoneList(); buildMap();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1037,19 +1077,39 @@ function saveWorldSettings() {
   data.world.mapImage  = document.getElementById('world-mapImage').value.trim();
   data.world.mapWidth  = parseInt(document.getElementById('world-mapWidth').value)||1200;
   data.world.mapHeight = parseInt(document.getElementById('world-mapHeight').value)||800;
-  saveLocal(); buildMap();
+  saveAll(); buildMap();
   setPublishStatus('','Unpublished changes');
 }
 
 // ══════════════════════════════════════════════════════════════
-//  INIT
+//  INIT — load from KV first, fall back to localStorage
 // ══════════════════════════════════════════════════════════════
-loadLocal();
-loadWorldFields();
-buildMap();
-renderLocList();
-renderZoneList();
-updateModeUI();
+async function init() {
+  // Show loading state
+  setSyncStatus('ing', '⟳ Loading map data…');
+
+  // Try KV first (most up-to-date, works across devices)
+  const kvLoaded = await loadFromKV();
+
+  if (!kvLoaded) {
+    // Fall back to localStorage (same browser/device)
+    loadLocal();
+    setSyncStatus('', kvLoaded ? '' : '');
+  } else {
+    // KV loaded — sync localStorage to match
+    saveLocal();
+    setSyncStatus('ok', '✦ Loaded from cloud');
+    setTimeout(() => setSyncStatus('', ''), 3000);
+  }
+
+  loadWorldFields();
+  buildMap();
+  renderLocList();
+  renderZoneList();
+  updateModeUI();
+}
+
+init();
 //]]></script>
 </body>
 </html>
