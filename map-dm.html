@@ -468,7 +468,7 @@ async function loadFromKV() {
 // Called after every edit — saves locally immediately, queues KV save
 let kvSaveTimer = null;
 function saveAll() {
-  saveAll();
+  saveLocal();
   clearTimeout(kvSaveTimer);
   kvSaveTimer = setTimeout(saveToKV, 1500); // debounce KV writes
   setPublishStatus('', 'Unsaved changes');
