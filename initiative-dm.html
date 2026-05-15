@@ -27,8 +27,6 @@
   --blue: #2e4a7a;
   --blue-bg: #0d1520;
   --blue-light: #5a80c0;
-  --purple: #5a3e9b;
-  --purple-bg: #18102a;
   --amber: #c87800;
   --pc-accent: #2e5a8a;
   --pc-bg: #0d1e2e;
@@ -47,31 +45,32 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
   padding: 0.6rem 1.2rem;
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.6rem;
   flex-wrap: wrap;
   position: sticky;
   top: 0;
   z-index: 100;
 }
-.topbar h1 { font-family: 'Cinzel', serif; font-size: 1rem; letter-spacing: 0.1em; color: var(--gold); flex: 1; }
+.topbar h1 { font-family: 'Cinzel', serif; font-size: 1rem; letter-spacing: 0.1em; color: var(--gold); flex: 1; min-width: 120px; }
 .round-display { font-family: 'Cinzel', serif; font-size: 0.8rem; letter-spacing: 0.08em; color: var(--ink-dim); }
 .round-display span { color: var(--gold-light); font-size: 1.1rem; }
-.btn { font-family: 'Cinzel', serif; font-size: 0.7rem; letter-spacing: 0.08em; border: 1px solid; border-radius: var(--radius); padding: 5px 12px; cursor: pointer; transition: all 0.15s; }
-.btn-gold    { background: var(--gold-faint); border-color: var(--gold); color: var(--gold-light); }
+
+.btn { font-family: 'Cinzel', serif; font-size: 0.7rem; letter-spacing: 0.08em; border: 1px solid; border-radius: var(--radius); padding: 5px 12px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.btn-gold   { background: var(--gold-faint); border-color: var(--gold); color: var(--gold-light); }
 .btn-gold:hover { background: var(--gold); color: var(--bg); }
-.btn-red     { background: var(--red-bg); border-color: var(--red); color: #e88; }
+.btn-red    { background: var(--red-bg); border-color: var(--red); color: #e88; }
 .btn-red:hover { background: var(--red); color: white; }
-.btn-green   { background: var(--green-bg); border-color: var(--green); color: #8e8; }
+.btn-green  { background: var(--green-bg); border-color: var(--green); color: #8e8; }
 .btn-green:hover { background: var(--green); color: white; }
-.btn-blue    { background: var(--blue-bg); border-color: var(--blue); color: var(--blue-light); }
-.btn-blue:hover { background: var(--blue); color: white; }
-.btn-ghost   { background: transparent; border-color: var(--border-light); color: var(--ink-dim); }
+.btn-purple { background: #1a1030; border-color: #7050c0; color: #c0a0f0; }
+.btn-purple:hover { background: #7050c0; color: white; }
+.btn-ghost  { background: transparent; border-color: var(--border-light); color: var(--ink-dim); }
 .btn-ghost:hover { border-color: var(--ink-dim); color: var(--ink); }
 .btn-sm { font-size: 0.62rem; padding: 3px 8px; }
 .btn-icon { padding: 4px 8px; font-size: 0.9rem; line-height: 1; }
 
 /* ── Layout ── */
-.main { display: grid; grid-template-columns: 1fr 260px; gap: 0; min-height: calc(100vh - 44px); }
+.main { display: grid; grid-template-columns: 1fr 260px; gap: 0; min-height: calc(100vh - 48px); }
 .combatant-list { padding: 1rem; }
 .sidebar { background: var(--surface); border-left: 1px solid var(--border); padding: 1rem; overflow-y: auto; }
 
@@ -84,17 +83,14 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
   transition: border-color 0.2s, box-shadow 0.2s;
   position: relative;
 }
-.combatant-card.is-pc { border-left: 3px solid var(--pc-accent); }
+.combatant-card.is-pc    { border-left: 3px solid var(--pc-accent); }
 .combatant-card.is-enemy { border-left: 3px solid var(--enemy-accent); }
-.combatant-card.is-active {
-  border-color: var(--gold);
-  box-shadow: 0 0 12px var(--active-glow);
-}
-.combatant-card.is-dead { opacity: 0.45; }
+.combatant-card.is-active { border-color: var(--gold); box-shadow: 0 0 12px var(--active-glow); }
+.combatant-card.is-dead  { opacity: 0.45; }
 
 .card-main {
   display: grid;
-  grid-template-columns: 36px 1fr auto auto auto;
+  grid-template-columns: 28px 36px 1fr auto auto auto;
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
@@ -102,147 +98,72 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
 }
 .card-main:hover { background: var(--surface2); }
 
-.init-badge {
-  font-family: 'Cinzel', serif;
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--gold-light);
-  text-align: center;
-  line-height: 1;
-}
-.combatant-name {
-  font-family: 'Cinzel', serif;
-  font-size: 0.88rem;
-  letter-spacing: 0.03em;
-  color: var(--ink);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
+.drag-handle { cursor: grab; color: var(--ink-faint); font-size: 0.8rem; user-select: none; text-align: center; }
+.drag-handle:active { cursor: grabbing; }
+
+.init-badge { font-family: 'Cinzel', serif; font-size: 1.1rem; font-weight: 600; color: var(--gold-light); text-align: center; }
+
+.combatant-name { font-family: 'Cinzel', serif; font-size: 0.88rem; letter-spacing: 0.03em; color: var(--ink); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .type-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.type-dot.pc     { background: var(--pc-accent); }
-.type-dot.enemy  { background: var(--enemy-accent); }
+.type-dot.pc    { background: var(--pc-accent); }
+.type-dot.enemy { background: var(--enemy-accent); }
 .active-arrow { color: var(--gold); font-size: 0.8rem; }
 
-.hp-section { display: flex; align-items: center; gap: 4px; }
-.hp-bar-wrap { width: 70px; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
-.hp-bar { height: 100%; border-radius: 3px; transition: width 0.3s, background 0.3s; }
-.hp-text { font-size: 0.78rem; color: var(--ink-dim); min-width: 50px; text-align: right; }
+.cond-chips { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+.cond-chip { font-size: 0.58rem; padding: 1px 5px; border-radius: 8px; background: rgba(200,120,0,0.15); color: #d4a820; border: 1px solid rgba(200,120,0,0.35); font-family: 'Cinzel', serif; letter-spacing: 0.04em; }
 
-.ac-badge {
-  font-family: 'Cinzel', serif;
-  font-size: 0.72rem;
-  color: var(--ink-dim);
-  min-width: 36px;
-  text-align: center;
-}
-.ac-badge span { font-size: 0.6rem; display: block; color: var(--ink-faint); }
+.hp-section { display: flex; align-items: center; gap: 6px; }
+.hp-bar-wrap { width: 60px; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.hp-bar { height: 100%; border-radius: 3px; transition: width 0.3s, background 0.3s; }
+.hp-text { font-size: 0.78rem; color: var(--ink-dim); min-width: 54px; text-align: right; }
+
+.ac-badge { font-family: 'Cinzel', serif; font-size: 0.72rem; color: var(--ink-dim); min-width: 36px; text-align: center; }
+.ac-badge small { font-size: 0.55rem; display: block; color: var(--ink-faint); }
 
 .card-actions { display: flex; gap: 3px; }
+.combatant-card.dragging { opacity: 0.4; }
+.combatant-card.drag-over { border-top: 2px solid var(--gold); }
 
 /* ── Expanded panel ── */
-.card-expanded {
-  display: none;
-  border-top: 1px solid var(--border);
-  padding: 10px 12px;
-  background: var(--surface2);
-}
+.card-expanded { display: none; border-top: 1px solid var(--border); padding: 10px 12px; background: var(--surface2); }
 .combatant-card.expanded .card-expanded { display: block; }
 
 .exp-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .exp-label { font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.1em; color: var(--ink-faint); white-space: nowrap; }
-.exp-input {
-  background: var(--bg);
-  border: 1px solid var(--border-light);
-  border-radius: 2px;
-  color: var(--ink);
-  font-family: 'Crimson Text', serif;
-  font-size: 0.88rem;
-  padding: 2px 6px;
-  outline: none;
-  transition: border-color 0.15s;
-}
+.exp-input { background: var(--bg); border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink); font-family: 'Crimson Text', serif; font-size: 0.88rem; padding: 2px 6px; outline: none; transition: border-color 0.15s; }
 .exp-input:focus { border-color: var(--gold); }
 .exp-input.narrow { width: 56px; }
 .exp-input.wide   { flex: 1; min-width: 0; }
 
-/* HP adjustment */
 .hp-adj { display: flex; align-items: center; gap: 6px; }
 .hp-adj-input { width: 56px; }
 .hp-current { font-family: 'Cinzel', serif; font-size: 1.1rem; color: var(--gold-light); min-width: 60px; text-align: center; }
 
-/* Conditions */
 .conditions-wrap { margin-bottom: 8px; }
 .conditions-grid { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-.cond-pill {
-  font-family: 'Cinzel', serif;
-  font-size: 0.6rem;
-  letter-spacing: 0.06em;
-  padding: 2px 7px;
-  border-radius: 10px;
-  border: 1px solid;
-  cursor: pointer;
-  transition: all 0.15s;
-  background: transparent;
-  color: var(--ink-faint);
-  border-color: var(--border);
-}
+.cond-pill { font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.06em; padding: 2px 7px; border-radius: 10px; border: 1px solid; cursor: pointer; transition: all 0.15s; background: transparent; color: var(--ink-faint); border-color: var(--border); }
 .cond-pill:hover { color: var(--ink); border-color: var(--ink-dim); }
 .cond-pill.active { color: #f8d080; border-color: #c87800; background: rgba(200,120,0,0.15); }
 .cond-pill.custom-active { color: #c0a0f0; border-color: #7050c0; background: rgba(112,80,192,0.15); }
 
-/* Notes */
-.notes-input {
-  width: 100%;
-  background: var(--bg);
-  border: 1px solid var(--border-light);
-  border-radius: 2px;
-  color: var(--ink);
-  font-family: 'Crimson Text', serif;
-  font-size: 0.88rem;
-  padding: 4px 6px;
-  outline: none;
-  resize: vertical;
-  min-height: 44px;
-}
+.notes-input { width: 100%; background: var(--bg); border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink); font-family: 'Crimson Text', serif; font-size: 0.88rem; padding: 4px 6px; outline: none; resize: vertical; min-height: 44px; }
 .notes-input:focus { border-color: var(--gold); }
 
 /* ── Sidebar ── */
 .sidebar-section { margin-bottom: 1.2rem; }
-.sidebar-title { font-family: 'Cinzel', serif; font-size: 0.65rem; letter-spacing: 0.12em; color: var(--gold-faint); margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between; }
+.sidebar-title { font-family: 'Cinzel', serif; font-size: 0.65rem; letter-spacing: 0.12em; color: var(--gold-faint); margin-bottom: 0.5rem; }
 .add-form { display: flex; flex-direction: column; gap: 6px; }
-.add-form input, .add-form select {
-  background: var(--bg);
-  border: 1px solid var(--border-light);
-  border-radius: 2px;
-  color: var(--ink);
-  font-family: 'Crimson Text', serif;
-  font-size: 0.88rem;
-  padding: 4px 8px;
-  outline: none;
-  width: 100%;
-}
-.add-form input:focus, .add-form select:focus { border-color: var(--gold); }
+.add-form input, .add-form select { background: var(--bg); border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink); font-family: 'Crimson Text', serif; font-size: 0.88rem; padding: 4px 8px; outline: none; width: 100%; }
+.add-form input:focus { border-color: var(--gold); }
 .add-form-row { display: flex; gap: 6px; }
 .add-form-row input { flex: 1; }
 .type-toggle { display: flex; gap: 4px; }
-.type-toggle button {
-  flex: 1;
-  font-family: 'Cinzel', serif;
-  font-size: 0.62rem;
-  letter-spacing: 0.06em;
-  padding: 4px;
-  border-radius: 2px;
-  border: 1px solid;
-  cursor: pointer;
-  transition: all 0.15s;
-}
+.type-toggle button { flex: 1; font-family: 'Cinzel', serif; font-size: 0.62rem; letter-spacing: 0.06em; padding: 4px; border-radius: 2px; border: 1px solid; cursor: pointer; transition: all 0.15s; }
 .type-toggle .t-pc    { background: var(--pc-bg); border-color: var(--pc-accent); color: var(--blue-light); }
 .type-toggle .t-enemy { background: var(--enemy-bg); border-color: var(--enemy-accent); color: #e88; }
 .type-toggle .t-pc.active    { background: var(--pc-accent); color: white; }
 .type-toggle .t-enemy.active { background: var(--enemy-accent); color: white; }
 
-/* Custom conditions */
 .custom-cond-add { display: flex; gap: 4px; }
 .custom-cond-add input { flex: 1; background: var(--bg); border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink); font-family: 'Crimson Text', serif; font-size: 0.82rem; padding: 3px 6px; outline: none; }
 .custom-cond-add input:focus { border-color: var(--gold); }
@@ -251,20 +172,73 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
 .custom-tag-del { cursor: pointer; color: #a080e0; font-size: 0.7rem; }
 .custom-tag-del:hover { color: #f0a0f0; }
 
-/* Sync status */
-.sync-status { font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.08em; color: var(--ink-faint); text-align: center; padding-top: 0.5rem; }
+.sync-status { font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.08em; color: var(--ink-faint); text-align: center; padding-top: 0.4rem; }
 .sync-status.ok   { color: var(--green-light); }
 .sync-status.fail { color: var(--red); }
 .sync-status.ing  { color: var(--amber); }
 
-/* Empty state */
 .empty-state { text-align: center; padding: 3rem 1rem; color: var(--ink-faint); font-style: italic; font-size: 0.95rem; }
 
-/* Drag handle */
-.drag-handle { cursor: grab; color: var(--ink-faint); font-size: 0.8rem; padding: 0 2px; user-select: none; }
-.drag-handle:active { cursor: grabbing; }
-.combatant-card.dragging { opacity: 0.4; }
-.combatant-card.drag-over { border-top: 2px solid var(--gold); }
+/* ── Export modal ── */
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.75);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200;
+  padding: 1rem;
+}
+.modal-backdrop.hidden { display: none; }
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  max-width: 600px;
+  width: 100%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+}
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 1.2rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+}
+.modal-header h2 { font-family: 'Cinzel', serif; font-size: 0.9rem; letter-spacing: 0.08em; color: var(--gold); }
+.modal-close { background: none; border: none; color: var(--ink-faint); font-size: 1.1rem; cursor: pointer; padding: 2px 6px; }
+.modal-close:hover { color: var(--ink); }
+.modal-body { padding: 1rem 1.2rem; overflow-y: auto; flex: 1; }
+.modal-field { margin-bottom: 0.8rem; }
+.modal-field label { font-family: 'Cinzel', serif; font-size: 0.62rem; letter-spacing: 0.1em; color: var(--ink-faint); display: block; margin-bottom: 4px; }
+.modal-field input, .modal-field textarea, .modal-field select {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: 2px;
+  color: var(--ink);
+  font-family: 'Crimson Text', serif;
+  font-size: 0.95rem;
+  padding: 5px 8px;
+  outline: none;
+}
+.modal-field input:focus, .modal-field textarea:focus { border-color: var(--gold); }
+.modal-field textarea { resize: vertical; min-height: 70px; }
+.modal-row { display: flex; gap: 8px; }
+.modal-row .modal-field { flex: 1; }
+.modal-preview {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 8px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.72rem;
+  color: var(--ink-dim);
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 6px;
+}
+.modal-footer { padding: 0.8rem 1.2rem; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
 
 @media (max-width: 700px) {
   .main { grid-template-columns: 1fr; }
@@ -276,11 +250,12 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
 
 <!-- TOP BAR -->
 <div class="topbar">
-  <h1>⚔ Initiative Tracker — DM</h1>
+  <h1>⚔ Initiative — DM</h1>
   <div class="round-display">ROUND <span id="round-num">1</span></div>
   <button class="btn btn-gold" onclick="nextTurn()">Next Turn ▶</button>
-  <button class="btn btn-ghost btn-sm" onclick="sortByInit()">Sort</button>
+  <button class="btn btn-ghost btn-sm" onclick="sortByInit()">Sort ↓</button>
   <button class="btn btn-ghost btn-sm" onclick="resetRound()">Reset Round</button>
+  <button class="btn btn-purple btn-sm" onclick="openExport()">Export Log</button>
   <button class="btn btn-red btn-sm" onclick="newCombat()">New Combat</button>
   <div id="sync-status" class="sync-status">—</div>
 </div>
@@ -294,8 +269,6 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
 
   <!-- SIDEBAR -->
   <div class="sidebar">
-
-    <!-- Add combatant -->
     <div class="sidebar-section">
       <div class="sidebar-title">ADD COMBATANT</div>
       <div class="add-form">
@@ -313,22 +286,21 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
       </div>
     </div>
 
-    <!-- Custom conditions -->
     <div class="sidebar-section">
       <div class="sidebar-title">CUSTOM CONDITIONS</div>
       <div class="custom-cond-add">
-        <input type="text" id="custom-cond-input" placeholder="e.g. Hexed…" maxlength="20" onkeydown="if(event.key==='Enter')addCustomCondition()">
+        <input type="text" id="custom-cond-input" placeholder="e.g. Hexed…" maxlength="20"
+          onkeydown="if(event.key==='Enter')addCustomCondition()">
         <button class="btn btn-ghost btn-sm" onclick="addCustomCondition()">+</button>
       </div>
       <div class="custom-list" id="custom-list"></div>
     </div>
 
-    <!-- Quick reference -->
     <div class="sidebar-section">
       <div class="sidebar-title">QUICK ROLL</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn btn-ghost btn-sm" onclick="rollForAll()">Roll init for all</button>
-        <button class="btn btn-ghost btn-sm" onclick="rollForEnemies()">Roll enemies only</button>
+        <button class="btn btn-ghost btn-sm" onclick="rollForAll()">Roll all</button>
+        <button class="btn btn-ghost btn-sm" onclick="rollForEnemies()">Roll enemies</button>
       </div>
     </div>
 
@@ -340,60 +312,145 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
       </div>
     </div>
 
+    <div id="sync-status-side" class="sync-status" style="margin-top:0.5rem">—</div>
+  </div>
+</div>
+
+<!-- EXPORT MODAL -->
+<div class="modal-backdrop hidden" id="export-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>📋 Export Combat Log</h2>
+      <button class="modal-close" onclick="closeExport()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-row">
+        <div class="modal-field">
+          <label>COMBAT TITLE</label>
+          <input type="text" id="exp-title" placeholder="e.g. Ambush at the Crossroads">
+        </div>
+        <div class="modal-field" style="max-width:130px">
+          <label>DATE</label>
+          <input type="text" id="exp-date" placeholder="YYYY-MM-DD">
+        </div>
+      </div>
+      <div class="modal-row">
+        <div class="modal-field">
+          <label>LOCATION</label>
+          <input type="text" id="exp-location" placeholder="e.g. The King's Road, Mile 12">
+        </div>
+        <div class="modal-field" style="max-width:130px">
+          <label>OUTCOME</label>
+          <select id="exp-outcome">
+            <option value="Victory">Victory</option>
+            <option value="Defeat">Defeat</option>
+            <option value="Retreat">Retreat</option>
+            <option value="Stalemate">Stalemate</option>
+            <option value="Pyrrhic Victory">Pyrrhic Victory</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-field">
+        <label>SESSION / CAMPAIGN TAG</label>
+        <input type="text" id="exp-session" placeholder="e.g. Session 4, Arc 1">
+      </div>
+      <div class="modal-field">
+        <label>SUMMARY NOTES</label>
+        <textarea id="exp-summary" placeholder="Brief description of what happened — why the fight started, key moments, consequences…"></textarea>
+      </div>
+      <div class="modal-field">
+        <label>MARKDOWN PREVIEW</label>
+        <div class="modal-preview" id="exp-preview"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeExport()">Cancel</button>
+      <button class="btn btn-ghost btn-sm" onclick="updatePreview()">Refresh preview</button>
+      <button class="btn btn-purple" onclick="downloadLog()">Download .md</button>
+    </div>
   </div>
 </div>
 
 <script>
 // ═══════════════════════════════════════════════════════
-//  CONFIG — update if your worker URL changes
+//  CONFIG
 // ═══════════════════════════════════════════════════════
 const WORKER_URL = 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
 
-// ═══════════════════════════════════════════════════════
-//  STATE
-// ═══════════════════════════════════════════════════════
 const STD_CONDITIONS = [
   'Blinded','Charmed','Deafened','Exhaustion','Frightened',
   'Grappled','Incapacitated','Invisible','Paralyzed','Petrified',
   'Poisoned','Prone','Restrained','Stunned','Unconscious','Concentration'
 ];
 
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
 let state = {
   round: 1,
   activeIndex: 0,
-  combatants: [],   // { id, name, type, init, hp, maxHp, ac, conditions:[], notes, dead }
+  combatants: [],
   customConditions: []
 };
-let addType = 'pc';
-let dragSrc = null;
+// Combat history: track HP changes and events per combatant id
+let combatLog = {};   // { id: { startHp, endHp, conditionsApplied: Set, name, type } }
+let combatStartRound = 1;
+
+let addType  = 'pc';
+let dragSrc  = null;
 let syncTimer = null;
+let expandedIds = new Set();
+let _id = 0;
+function uid() { return ++_id; }
 
 // ═══════════════════════════════════════════════════════
-//  PERSISTENCE — save PCs to localStorage
+//  PERSISTENCE
 // ═══════════════════════════════════════════════════════
 function savePCs() {
   const pcs = state.combatants.filter(c => c.type === 'pc');
-  localStorage.setItem('initiative_pcs', JSON.stringify(pcs));
+  localStorage.setItem('init_pcs', JSON.stringify(pcs));
 }
 function loadPCs() {
-  try {
-    return JSON.parse(localStorage.getItem('initiative_pcs') || '[]');
-  } catch { return []; }
+  try { return JSON.parse(localStorage.getItem('init_pcs') || '[]'); } catch { return []; }
 }
-function saveCustomConditions() {
-  localStorage.setItem('initiative_custom_conds', JSON.stringify(state.customConditions));
+function saveCustomConds() {
+  localStorage.setItem('init_custom_conds', JSON.stringify(state.customConditions));
 }
-function loadCustomConditions() {
-  try {
-    return JSON.parse(localStorage.getItem('initiative_custom_conds') || '[]');
-  } catch { return []; }
+function loadCustomConds() {
+  try { return JSON.parse(localStorage.getItem('init_custom_conds') || '[]'); } catch { return []; }
 }
 
 // ═══════════════════════════════════════════════════════
-//  ID
+//  COMBAT LOG TRACKING
 // ═══════════════════════════════════════════════════════
-let _id = 0;
-function uid() { return ++_id; }
+function initCombatLog() {
+  combatLog = {};
+  combatStartRound = state.round;
+  state.combatants.forEach(c => {
+    combatLog[c.id] = {
+      name: c.name, type: c.type,
+      startHp: c.hp, maxHp: c.maxHp,
+      endHp: c.hp,
+      conditionsApplied: new Set(),
+      notes: c.notes
+    };
+  });
+}
+function logCombatant(c) {
+  if (!combatLog[c.id]) {
+    combatLog[c.id] = {
+      name: c.name, type: c.type,
+      startHp: c.hp, maxHp: c.maxHp,
+      endHp: c.hp,
+      conditionsApplied: new Set(),
+      notes: c.notes
+    };
+  } else {
+    combatLog[c.id].endHp  = c.hp;
+    combatLog[c.id].notes  = c.notes;
+    c.conditions.forEach(cond => combatLog[c.id].conditionsApplied.add(cond));
+  }
+}
 
 // ═══════════════════════════════════════════════════════
 //  ADD / REMOVE
@@ -410,22 +467,21 @@ function addCombatant() {
   const init  = parseInt(document.getElementById('add-init').value) || 0;
   const maxHp = parseInt(document.getElementById('add-hp').value)   || 10;
   const ac    = parseInt(document.getElementById('add-ac').value)    || 10;
-  state.combatants.push({ id: uid(), name, type: addType, init, hp: maxHp, maxHp, ac, conditions: [], notes: '', dead: false });
-  document.getElementById('add-name').value = '';
-  document.getElementById('add-init').value = '';
-  document.getElementById('add-hp').value   = '';
-  document.getElementById('add-ac').value   = '';
+  const c = { id: uid(), name, type: addType, init, hp: maxHp, maxHp, ac, conditions: [], notes: '', dead: false };
+  state.combatants.push(c);
+  logCombatant(c);
+  ['add-name','add-init','add-hp','add-ac'].forEach(id => document.getElementById(id).value = '');
   if (addType === 'pc') savePCs();
-  render();
-  pushState();
+  render(); pushState();
 }
 
 function removeCombatant(id) {
+  const c = state.combatants.find(x => x.id === id);
+  if (c) logCombatant(c);
   state.combatants = state.combatants.filter(c => c.id !== id);
   if (state.activeIndex >= state.combatants.length) state.activeIndex = 0;
-  savePCs();
-  render();
-  pushState();
+  expandedIds.delete(id);
+  savePCs(); render(); pushState();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -434,68 +490,52 @@ function removeCombatant(id) {
 function adjustHP(id, delta) {
   const c = state.combatants.find(x => x.id === id);
   if (!c) return;
-  c.hp = Math.max(0, Math.min(c.maxHp, c.hp + delta));
+  c.hp   = Math.max(0, Math.min(c.maxHp, c.hp + delta));
   c.dead = c.hp <= 0;
+  logCombatant(c);
   if (c.type === 'pc') savePCs();
-  render();
-  pushState();
+  render(); pushState();
 }
-
-function setHP(id, val) {
-  const c = state.combatants.find(x => x.id === id);
-  if (!c) return;
-  const v = parseInt(val);
-  if (isNaN(v)) return;
-  c.hp = Math.max(0, Math.min(c.maxHp, v));
-  c.dead = c.hp <= 0;
-  if (c.type === 'pc') savePCs();
-  render();
-  pushState();
+function applyHpAdj(id, mode) {
+  const inp = document.getElementById(`hp-adj-${id}`);
+  const amt = parseInt(inp.value);
+  if (isNaN(amt) || amt <= 0) return;
+  adjustHP(id, mode === 'heal' ? amt : -amt);
+  inp.value = '';
 }
-
 function setMaxHP(id, val) {
   const c = state.combatants.find(x => x.id === id);
   if (!c) return;
-  const v = parseInt(val);
-  if (isNaN(v) || v < 1) return;
-  c.maxHp = v;
-  c.hp = Math.min(c.hp, v);
+  const v = parseInt(val); if (isNaN(v) || v < 1) return;
+  c.maxHp = v; c.hp = Math.min(c.hp, v);
+  logCombatant(c);
   if (c.type === 'pc') savePCs();
-  render();
-  pushState();
+  render(); pushState();
 }
 
 // ═══════════════════════════════════════════════════════
 //  FIELDS
 // ═══════════════════════════════════════════════════════
 function setInit(id, val) {
-  const c = state.combatants.find(x => x.id === id);
-  if (!c) return;
+  const c = state.combatants.find(x => x.id === id); if (!c) return;
   c.init = parseInt(val) || 0;
-  if (c.type === 'pc') savePCs();
-  pushState();
+  if (c.type === 'pc') savePCs(); pushState();
 }
-
 function setAC(id, val) {
-  const c = state.combatants.find(x => x.id === id);
-  if (!c) return;
+  const c = state.combatants.find(x => x.id === id); if (!c) return;
   c.ac = parseInt(val) || 10;
-  if (c.type === 'pc') savePCs();
-  pushState();
+  if (c.type === 'pc') savePCs(); pushState();
 }
-
 function setName(id, val) {
-  const c = state.combatants.find(x => x.id === id);
-  if (!c) return;
+  const c = state.combatants.find(x => x.id === id); if (!c) return;
   c.name = val;
-  if (c.type === 'pc') savePCs();
-  pushState();
+  if (combatLog[id]) combatLog[id].name = val;
+  if (c.type === 'pc') savePCs(); pushState();
 }
-
 function setNotes(id, val) {
-  const c = state.combatants.find(x => x.id === id);
-  if (!c) return;
+  const c = state.combatants.find(x => x.id === id); if (!c) return;
   c.notes = val;
+  if (combatLog[id]) combatLog[id].notes = val;
   pushState();
 }
 
@@ -503,35 +543,24 @@ function setNotes(id, val) {
 //  CONDITIONS
 // ═══════════════════════════════════════════════════════
 function toggleCondition(id, cond) {
-  const c = state.combatants.find(x => x.id === id);
-  if (!c) return;
+  const c = state.combatants.find(x => x.id === id); if (!c) return;
   const idx = c.conditions.indexOf(cond);
   if (idx >= 0) c.conditions.splice(idx, 1);
-  else c.conditions.push(cond);
+  else { c.conditions.push(cond); if (combatLog[id]) combatLog[id].conditionsApplied.add(cond); }
   if (c.type === 'pc') savePCs();
-  render();
-  pushState();
+  render(); pushState();
 }
-
 function addCustomCondition() {
   const inp = document.getElementById('custom-cond-input');
   const val = inp.value.trim();
   if (!val || state.customConditions.includes(val)) return;
-  state.customConditions.push(val);
-  inp.value = '';
-  saveCustomConditions();
-  render();
+  state.customConditions.push(val); inp.value = '';
+  saveCustomConds(); render();
 }
-
 function removeCustomCondition(cond) {
   state.customConditions = state.customConditions.filter(c => c !== cond);
-  // remove from all combatants too
-  state.combatants.forEach(c => {
-    c.conditions = c.conditions.filter(x => x !== cond);
-  });
-  saveCustomConditions();
-  render();
-  pushState();
+  state.combatants.forEach(c => { c.conditions = c.conditions.filter(x => x !== cond); });
+  saveCustomConds(); render(); pushState();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -541,116 +570,91 @@ function nextTurn() {
   if (state.combatants.length === 0) return;
   state.activeIndex = (state.activeIndex + 1) % state.combatants.length;
   if (state.activeIndex === 0) state.round++;
-  render();
-  pushState();
+  render(); pushState();
 }
-
 function sortByInit() {
   state.combatants.sort((a, b) => b.init - a.init);
-  state.activeIndex = 0;
-  render();
-  pushState();
+  state.activeIndex = 0; render(); pushState();
 }
-
 function resetRound() {
-  state.round = 1;
-  state.activeIndex = 0;
-  render();
-  pushState();
+  state.round = 1; state.activeIndex = 0; render(); pushState();
 }
-
 function newCombat() {
-  if (!confirm('Start a new combat? This clears enemies and resets the round. PCs are kept.')) return;
+  if (!confirm('Start a new combat? Enemies are cleared, PCs are kept and healed to full.')) return;
+  // snapshot log before clearing
+  state.combatants.forEach(c => logCombatant(c));
   state.combatants = state.combatants.filter(c => c.type === 'pc');
   state.combatants.forEach(c => { c.conditions = []; c.hp = c.maxHp; c.dead = false; });
-  state.round = 1;
-  state.activeIndex = 0;
-  savePCs();
-  render();
-  pushState();
+  state.round = 1; state.activeIndex = 0;
+  savePCs(); render(); pushState();
+  initCombatLog();
 }
-
 function clearEnemies() {
+  state.combatants.forEach(c => logCombatant(c));
   state.combatants = state.combatants.filter(c => c.type === 'pc');
   if (state.activeIndex >= state.combatants.length) state.activeIndex = 0;
-  render();
-  pushState();
+  render(); pushState();
 }
-
 function clearAll() {
   if (!confirm('Clear all combatants?')) return;
-  state.combatants = [];
-  state.round = 1;
-  state.activeIndex = 0;
-  render();
-  pushState();
+  state.combatants.forEach(c => logCombatant(c));
+  state.combatants = []; state.round = 1; state.activeIndex = 0;
+  render(); pushState();
 }
-
-function rollForAll() {
-  state.combatants.forEach(c => { c.init = Math.ceil(Math.random() * 20); });
-  sortByInit();
-}
-
-function rollForEnemies() {
-  state.combatants.filter(c => c.type === 'enemy').forEach(c => { c.init = Math.ceil(Math.random() * 20); });
-  sortByInit();
-}
+function rollForAll()     { state.combatants.forEach(c => { c.init = Math.ceil(Math.random()*20); }); sortByInit(); }
+function rollForEnemies() { state.combatants.filter(c=>c.type==='enemy').forEach(c => { c.init = Math.ceil(Math.random()*20); }); sortByInit(); }
 
 // ═══════════════════════════════════════════════════════
-//  HP BAR COLOR
+//  HP COLOR
 // ═══════════════════════════════════════════════════════
 function hpColor(hp, max) {
-  const pct = hp / max;
-  if (pct > 0.6) return '#2d6a3f';
-  if (pct > 0.3) return '#c87800';
-  return '#c0392b';
+  const p = hp / max;
+  return p > 0.6 ? '#2d6a3f' : p > 0.3 ? '#c87800' : '#c0392b';
 }
 
 // ═══════════════════════════════════════════════════════
 //  RENDER
 // ═══════════════════════════════════════════════════════
-let expandedIds = new Set();
-
 function toggleExpand(id) {
-  if (expandedIds.has(id)) expandedIds.delete(id);
-  else expandedIds.add(id);
+  if (expandedIds.has(id)) expandedIds.delete(id); else expandedIds.add(id);
   render();
 }
 
 function render() {
   document.getElementById('round-num').textContent = state.round;
-  const list = document.getElementById('combatant-list');
+  const list  = document.getElementById('combatant-list');
   const empty = document.getElementById('empty-state');
   empty.style.display = state.combatants.length === 0 ? 'block' : 'none';
-
   list.innerHTML = '';
-  const allConds = [...STD_CONDITIONS, ...state.customConditions];
 
   state.combatants.forEach((c, idx) => {
-    const isActive  = idx === state.activeIndex;
+    const isActive   = idx === state.activeIndex;
     const isExpanded = expandedIds.has(c.id);
-    const hpPct     = Math.max(0, (c.hp / c.maxHp) * 100);
+    const hpPct      = Math.max(0, (c.hp / c.maxHp) * 100);
+    const isPC       = c.type === 'pc';
 
     const card = document.createElement('div');
-    card.className = `combatant-card is-${c.type}${isActive ? ' is-active' : ''}${c.dead ? ' is-dead' : ''}${isExpanded ? ' expanded' : ''}`;
+    card.className = `combatant-card is-${c.type}${isActive?' is-active':''}${c.dead?' is-dead':''}${isExpanded?' expanded':''}`;
     card.dataset.id = c.id;
-    card.draggable = true;
+    card.draggable  = true;
 
-    // Conditions pills for expanded
     const stdPills = STD_CONDITIONS.map(cond => {
       const on = c.conditions.includes(cond);
-      return `<button class="cond-pill${on ? ' active' : ''}" onclick="event.stopPropagation();toggleCondition(${c.id},'${cond}')">${cond}</button>`;
+      return `<button class="cond-pill${on?' active':''}" onclick="event.stopPropagation();toggleCondition(${c.id},'${cond}')">${cond}</button>`;
     }).join('');
-
     const customPills = state.customConditions.map(cond => {
       const on = c.conditions.includes(cond);
-      return `<button class="cond-pill${on ? ' custom-active' : ''}" onclick="event.stopPropagation();toggleCondition(${c.id},'${cond}')">${cond}</button>`;
+      return `<button class="cond-pill${on?' custom-active':''}" onclick="event.stopPropagation();toggleCondition(${c.id},'${cond}')">${cond}</button>`;
     }).join('');
 
-    // Active conditions shown in header
-    const activeConds = c.conditions.length > 0
-      ? `<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:2px">${c.conditions.map(cond => `<span style="font-size:0.6rem;padding:1px 5px;border-radius:8px;background:rgba(200,120,0,0.2);color:#d4a820;border:1px solid rgba(200,120,0,0.4)">${cond}</span>`).join('')}</div>`
+    const condChips = c.conditions.length > 0
+      ? `<div class="cond-chips">${c.conditions.map(cond=>`<span class="cond-chip">${cond}</span>`).join('')}</div>`
       : '';
+
+    // AC only shown for PCs in card header; always shown in expanded for DM
+    const acHeader = isPC
+      ? `<div class="ac-badge"><small>AC</small>${c.ac}</div>`
+      : `<div class="ac-badge" style="opacity:0;pointer-events:none"><small>AC</small>—</div>`;
 
     card.innerHTML = `
       <div class="card-main" onclick="toggleExpand(${c.id})">
@@ -662,19 +666,17 @@ function render() {
             ${isActive ? '<span class="active-arrow">▶</span>' : ''}
             ${c.name}
           </div>
-          ${activeConds}
+          ${condChips}
         </div>
         <div class="hp-section">
-          <div>
-            <div class="hp-bar-wrap"><div class="hp-bar" style="width:${hpPct}%;background:${hpColor(c.hp,c.maxHp)}"></div></div>
-          </div>
+          <div class="hp-bar-wrap"><div class="hp-bar" style="width:${hpPct}%;background:${hpColor(c.hp,c.maxHp)}"></div></div>
           <div class="hp-text">${c.hp}/${c.maxHp}</div>
         </div>
-        <div class="ac-badge"><span>AC</span>${c.ac}</div>
+        ${acHeader}
         <div class="card-actions" onclick="event.stopPropagation()">
           <button class="btn btn-ghost btn-icon btn-sm" onclick="adjustHP(${c.id},-1)" title="Damage">−</button>
-          <button class="btn btn-ghost btn-icon btn-sm" onclick="adjustHP(${c.id},1)" title="Heal">+</button>
-          <button class="btn btn-red btn-icon btn-sm" onclick="removeCombatant(${c.id})" title="Remove">✕</button>
+          <button class="btn btn-ghost btn-icon btn-sm" onclick="adjustHP(${c.id},1)"  title="Heal">+</button>
+          <button class="btn btn-red btn-icon btn-sm"   onclick="removeCombatant(${c.id})" title="Remove">✕</button>
         </div>
       </div>
       <div class="card-expanded">
@@ -690,77 +692,64 @@ function render() {
           <span class="exp-label">HP</span>
           <div class="hp-adj">
             <button class="btn btn-red btn-sm" onclick="event.stopPropagation();applyHpAdj(${c.id},'dmg')">Dmg</button>
-            <input class="exp-input hp-adj-input" id="hp-adj-${c.id}" type="number" min="0" placeholder="amt" onclick="event.stopPropagation()" onkeydown="if(event.key==='Enter'){event.preventDefault();applyHpAdj(${c.id},'dmg')}">
+            <input class="exp-input hp-adj-input" id="hp-adj-${c.id}" type="number" min="0" placeholder="amt"
+              onclick="event.stopPropagation()"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();applyHpAdj(${c.id},'dmg')}">
             <button class="btn btn-green btn-sm" onclick="event.stopPropagation();applyHpAdj(${c.id},'heal')">Heal</button>
           </div>
           <div class="hp-current">${c.hp} / ${c.maxHp}</div>
-          <span class="exp-label">MAX</span>
+          <span class="exp-label">MAX HP</span>
           <input class="exp-input narrow" type="number" value="${c.maxHp}" onchange="setMaxHP(${c.id},this.value)" onclick="event.stopPropagation()">
         </div>
         <div class="conditions-wrap">
           <span class="exp-label">CONDITIONS</span>
-          <div class="conditions-grid">${stdPills}${customPills ? customPills : ''}</div>
+          <div class="conditions-grid">${stdPills}${customPills}</div>
         </div>
         <div>
-          <span class="exp-label">NOTES (DM ONLY)</span>
+          <span class="exp-label">DM NOTES (NOT SHOWN TO PLAYERS)</span>
           <textarea class="notes-input" onclick="event.stopPropagation()" onchange="setNotes(${c.id},this.value)" placeholder="Secret notes…">${c.notes}</textarea>
         </div>
       </div>
     `;
 
-    // Drag events
-    card.addEventListener('dragstart', e => { dragSrc = c.id; card.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
-    card.addEventListener('dragend',   () => { card.classList.remove('dragging'); document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over')); });
+    card.addEventListener('dragstart', e => { dragSrc = c.id; card.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; });
+    card.addEventListener('dragend',   () => { card.classList.remove('dragging'); document.querySelectorAll('.drag-over').forEach(el=>el.classList.remove('drag-over')); });
     card.addEventListener('dragover',  e => { e.preventDefault(); card.classList.add('drag-over'); });
     card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
     card.addEventListener('drop', e => {
-      e.preventDefault();
-      card.classList.remove('drag-over');
+      e.preventDefault(); card.classList.remove('drag-over');
       if (dragSrc === c.id) return;
-      const fromIdx = state.combatants.findIndex(x => x.id === dragSrc);
-      const toIdx   = state.combatants.findIndex(x => x.id === c.id);
-      if (fromIdx < 0 || toIdx < 0) return;
-      const [moved] = state.combatants.splice(fromIdx, 1);
-      state.combatants.splice(toIdx, 0, moved);
-      render();
-      pushState();
+      const fi = state.combatants.findIndex(x=>x.id===dragSrc);
+      const ti = state.combatants.findIndex(x=>x.id===c.id);
+      if (fi<0||ti<0) return;
+      const [moved] = state.combatants.splice(fi,1);
+      state.combatants.splice(ti,0,moved);
+      render(); pushState();
     });
 
     list.appendChild(card);
   });
 
-  // Custom conditions sidebar
-  const customList = document.getElementById('custom-list');
-  customList.innerHTML = state.customConditions.map(cond =>
+  // Sidebar custom conditions
+  document.getElementById('custom-list').innerHTML = state.customConditions.map(cond =>
     `<div class="custom-tag">${cond}<span class="custom-tag-del" onclick="removeCustomCondition('${cond}')">✕</span></div>`
   ).join('');
 }
 
 // ═══════════════════════════════════════════════════════
-//  HP ADJUST (damage/heal with input field)
-// ═══════════════════════════════════════════════════════
-function applyHpAdj(id, mode) {
-  const inp = document.getElementById(`hp-adj-${id}`);
-  const amt = parseInt(inp.value);
-  if (isNaN(amt) || amt <= 0) return;
-  adjustHP(id, mode === 'heal' ? amt : -amt);
-  inp.value = '';
-}
-
-// ═══════════════════════════════════════════════════════
-//  SYNC — push state to worker so player view can read it
+//  SYNC
 // ═══════════════════════════════════════════════════════
 function setSyncStatus(type, msg) {
-  const el = document.getElementById('sync-status');
-  el.className = `sync-status ${type}`;
-  el.textContent = msg;
+  ['sync-status','sync-status-side'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.className = `sync-status ${type}`; el.textContent = msg; }
+  });
 }
 
 async function pushState() {
   clearTimeout(syncTimer);
   syncTimer = setTimeout(async () => {
     setSyncStatus('ing', '⟳ Syncing…');
-    // Build player-safe version (no notes, no enemy exact HP — just %)
     const playerState = {
       round: state.round,
       activeIndex: state.activeIndex,
@@ -768,9 +757,10 @@ async function pushState() {
         id: c.id, name: c.name, type: c.type,
         init: c.init, ac: c.ac,
         hpPct: Math.round((c.hp / c.maxHp) * 100),
-        hp: c.type === 'pc' ? c.hp : null,
+        hp:    c.type === 'pc' ? c.hp    : null,
         maxHp: c.type === 'pc' ? c.maxHp : null,
         conditions: c.conditions, dead: c.dead
+        // enemy AC intentionally not included in player payload
       }))
     };
     try {
@@ -779,31 +769,162 @@ async function pushState() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'initiative_state', payload: playerState })
       });
-      if (res.ok) setSyncStatus('ok', '✦ Synced');
-      else setSyncStatus('fail', '⚠ Sync failed');
-    } catch {
-      setSyncStatus('fail', '⚠ Offline');
-    }
+      setSyncStatus(res.ok ? 'ok' : 'fail', res.ok ? '✦ Synced' : '⚠ Sync failed');
+    } catch { setSyncStatus('fail', '⚠ Offline'); }
   }, 600);
 }
+
+// ═══════════════════════════════════════════════════════
+//  EXPORT — build Obsidian markdown
+// ═══════════════════════════════════════════════════════
+function openExport() {
+  // Snapshot current state into log
+  state.combatants.forEach(c => logCombatant(c));
+
+  // Pre-fill date
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  document.getElementById('exp-date').value = dateStr;
+
+  updatePreview();
+  document.getElementById('export-modal').classList.remove('hidden');
+}
+function closeExport() {
+  document.getElementById('export-modal').classList.add('hidden');
+}
+
+function buildMarkdown() {
+  const title    = document.getElementById('exp-title').value.trim()    || 'Combat';
+  const date     = document.getElementById('exp-date').value.trim()     || '—';
+  const location = document.getElementById('exp-location').value.trim() || '—';
+  const outcome  = document.getElementById('exp-outcome').value;
+  const session  = document.getElementById('exp-session').value.trim()  || '—';
+  const summary  = document.getElementById('exp-summary').value.trim()  || '';
+  const rounds   = state.round;
+
+  const pcs      = Object.values(combatLog).filter(e => e.type === 'pc');
+  const enemies  = Object.values(combatLog).filter(e => e.type === 'enemy');
+
+  const pcKilled    = pcs.filter(e    => e.endHp <= 0).map(e => e.name);
+  const enemyKilled = enemies.filter(e => e.endHp <= 0).map(e => e.name);
+
+  // ── Frontmatter ──────────────────────────────────────
+  let md = `---\n`;
+  md += `tags: [combat-log]\n`;
+  md += `date: ${date}\n`;
+  md += `session: "${session}"\n`;
+  md += `location: "${location}"\n`;
+  md += `outcome: ${outcome}\n`;
+  md += `rounds: ${rounds}\n`;
+  md += `pcs_downed: [${pcKilled.map(n=>`"${n}"`).join(', ')}]\n`;
+  md += `enemies_defeated: [${enemyKilled.map(n=>`"${n}"`).join(', ')}]\n`;
+  md += `---\n\n`;
+
+  // ── Title ─────────────────────────────────────────────
+  md += `# ⚔ ${title}\n\n`;
+
+  // ── Summary callout ───────────────────────────────────
+  md += `> [!summary] Combat Summary\n`;
+  md += `> **Date:** ${date}  \n`;
+  md += `> **Session:** ${session}  \n`;
+  md += `> **Location:** ${location}  \n`;
+  md += `> **Outcome:** ${outcome}  \n`;
+  md += `> **Rounds:** ${rounds}  \n`;
+  if (pcKilled.length > 0)    md += `> **PCs Downed:** ${pcKilled.join(', ')}  \n`;
+  if (enemyKilled.length > 0) md += `> **Enemies Defeated:** ${enemyKilled.join(', ')}  \n`;
+  md += `\n`;
+
+  // ── Narrative summary ─────────────────────────────────
+  if (summary) {
+    md += `## Narrative\n\n${summary}\n\n`;
+  }
+
+  // ── PC details ────────────────────────────────────────
+  if (pcs.length > 0) {
+    md += `## Party\n\n`;
+    md += `| Character | Start HP | End HP | Max HP | HP Lost | Conditions | Status |\n`;
+    md += `|-----------|----------|--------|--------|---------|------------|--------|\n`;
+    pcs.forEach(e => {
+      const lost   = Math.max(0, e.startHp - e.endHp);
+      const conds  = [...e.conditionsApplied].join(', ') || '—';
+      const status = e.endHp <= 0 ? '💀 Downed' : e.endHp < e.maxHp * 0.5 ? '🩸 Wounded' : '✅ OK';
+      md += `| ${e.name} | ${e.startHp} | ${e.endHp} | ${e.maxHp} | ${lost} | ${conds} | ${status} |\n`;
+    });
+    md += `\n`;
+  }
+
+  // ── Enemy details ─────────────────────────────────────
+  if (enemies.length > 0) {
+    md += `## Enemies\n\n`;
+    md += `| Enemy | Start HP | End HP | Max HP | HP Lost | Conditions | Status |\n`;
+    md += `|-------|----------|--------|--------|---------|------------|--------|\n`;
+    enemies.forEach(e => {
+      const lost   = Math.max(0, e.startHp - e.endHp);
+      const conds  = [...e.conditionsApplied].join(', ') || '—';
+      const status = e.endHp <= 0 ? '💀 Defeated' : e.endHp < e.maxHp * 0.5 ? '🩸 Wounded' : '🟢 Survived';
+      md += `| ${e.name} | ${e.startHp} | ${e.endHp} | ${e.maxHp} | ${lost} | ${conds} | ${status} |\n`;
+    });
+    md += `\n`;
+  }
+
+  // ── DM Notes ─────────────────────────────────────────
+  const withNotes = Object.values(combatLog).filter(e => e.notes && e.notes.trim());
+  if (withNotes.length > 0) {
+    md += `## DM Notes\n\n`;
+    withNotes.forEach(e => {
+      md += `> [!note] ${e.name}\n`;
+      e.notes.trim().split('\n').forEach(line => { md += `> ${line}\n`; });
+      md += `\n`;
+    });
+  }
+
+  md += `---\n*Exported from Initiative Tracker · ${new Date().toLocaleString()}*\n`;
+  return md;
+}
+
+function updatePreview() {
+  document.getElementById('exp-preview').textContent = buildMarkdown();
+}
+
+function downloadLog() {
+  const md      = buildMarkdown();
+  const title   = document.getElementById('exp-title').value.trim() || 'combat';
+  const date    = document.getElementById('exp-date').value.trim()  || 'unknown';
+  const safe    = title.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+  const filename = `${date}-${safe}.md`;
+
+  const blob = new Blob([md], { type: 'text/markdown' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+  closeExport();
+}
+
+// ── Preview updates on field change ──────────────────────
+['exp-title','exp-date','exp-location','exp-outcome','exp-session','exp-summary'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', updatePreview);
+});
 
 // ═══════════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════════
 function init() {
-  state.customConditions = loadCustomConditions();
+  state.customConditions = loadCustomConds();
   const pcs = loadPCs();
   if (pcs.length > 0) {
     state.combatants = pcs;
     _id = Math.max(...pcs.map(c => c.id), 0);
   }
+  initCombatLog();
   render();
-  // Enter key on add form
   ['add-name','add-init','add-hp','add-ac'].forEach(id => {
-    document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') addCombatant(); });
+    document.getElementById(id).addEventListener('keydown', e => { if (e.key==='Enter') addCombatant(); });
   });
 }
-
 init();
 </script>
 </body>
