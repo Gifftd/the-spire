@@ -24,8 +24,6 @@
   --green: #2d6a3f;
   --green-bg: #0d1f12;
   --green-light: #4a9a60;
-  --blue: #2e4a7a;
-  --blue-bg: #0d1520;
   --blue-light: #5a80c0;
   --amber: #c87800;
   --pc-accent: #2e5a8a;
@@ -33,6 +31,8 @@
   --enemy-accent: #8a2e2e;
   --enemy-bg: #2e0d0d;
   --active-glow: rgba(184,134,11,0.25);
+  --lobby-accent: #3a6060;
+  --lobby-bg: #0d1e1e;
   --radius: 4px;
 }
 
@@ -51,28 +51,63 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
   top: 0;
   z-index: 100;
 }
-.topbar h1 { font-family: 'Cinzel', serif; font-size: 1rem; letter-spacing: 0.1em; color: var(--gold); flex: 1; min-width: 120px; }
+.topbar h1 { font-family: 'Cinzel', serif; font-size: 1rem; letter-spacing: 0.1em; color: var(--gold); flex: 1; min-width: 100px; }
+
+/* Mode pill */
+.mode-pill {
+  font-family: 'Cinzel', serif;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  padding: 3px 10px;
+  border-radius: 10px;
+  border: 1px solid;
+}
+.mode-pill.lobby  { background: var(--lobby-bg);  border-color: var(--lobby-accent); color: #80c0c0; }
+.mode-pill.combat { background: var(--red-bg);     border-color: var(--red);          color: #f08080; animation: combatPulse 2s ease-in-out infinite; }
+@keyframes combatPulse { 0%,100%{opacity:1} 50%{opacity:0.7} }
+
 .round-display { font-family: 'Cinzel', serif; font-size: 0.8rem; letter-spacing: 0.08em; color: var(--ink-dim); }
 .round-display span { color: var(--gold-light); font-size: 1.1rem; }
 
 .btn { font-family: 'Cinzel', serif; font-size: 0.7rem; letter-spacing: 0.08em; border: 1px solid; border-radius: var(--radius); padding: 5px 12px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
-.btn-gold   { background: var(--gold-faint); border-color: var(--gold); color: var(--gold-light); }
-.btn-gold:hover { background: var(--gold); color: var(--bg); }
-.btn-red    { background: var(--red-bg); border-color: var(--red); color: #e88; }
-.btn-red:hover { background: var(--red); color: white; }
-.btn-green  { background: var(--green-bg); border-color: var(--green); color: #8e8; }
+.btn-gold    { background: var(--gold-faint);  border-color: var(--gold);     color: var(--gold-light); }
+.btn-gold:hover  { background: var(--gold);  color: var(--bg); }
+.btn-red     { background: var(--red-bg);    border-color: var(--red);      color: #e88; }
+.btn-red:hover   { background: var(--red);   color: white; }
+.btn-green   { background: var(--green-bg);  border-color: var(--green);    color: #8e8; }
 .btn-green:hover { background: var(--green); color: white; }
-.btn-purple { background: #1a1030; border-color: #7050c0; color: #c0a0f0; }
+.btn-teal    { background: var(--lobby-bg);  border-color: var(--lobby-accent); color: #80c0c0; }
+.btn-teal:hover  { background: var(--lobby-accent); color: white; }
+.btn-purple  { background: #1a1030; border-color: #7050c0; color: #c0a0f0; }
 .btn-purple:hover { background: #7050c0; color: white; }
-.btn-ghost  { background: transparent; border-color: var(--border-light); color: var(--ink-dim); }
+.btn-ghost   { background: transparent; border-color: var(--border-light); color: var(--ink-dim); }
 .btn-ghost:hover { border-color: var(--ink-dim); color: var(--ink); }
-.btn-sm { font-size: 0.62rem; padding: 3px 8px; }
+.btn-sm   { font-size: 0.62rem; padding: 3px 8px; }
 .btn-icon { padding: 4px 8px; font-size: 0.9rem; line-height: 1; }
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* ── Layout ── */
-.main { display: grid; grid-template-columns: 1fr 260px; gap: 0; min-height: calc(100vh - 48px); }
-.combatant-list { padding: 1rem; }
+.main { display: grid; grid-template-columns: 1fr 264px; min-height: calc(100vh - 48px); }
+.combatant-col { padding: 1rem; }
 .sidebar { background: var(--surface); border-left: 1px solid var(--border); padding: 1rem; overflow-y: auto; }
+
+/* ── Lobby banner ── */
+.lobby-banner {
+  background: var(--lobby-bg);
+  border: 1px solid var(--lobby-accent);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Cinzel', serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  color: #80c0c0;
+}
+.lobby-banner.hidden { display: none; }
+.lobby-banner-icon { font-size: 1.1rem; }
 
 /* ── Combatant cards ── */
 .combatant-card {
@@ -81,12 +116,13 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
   border-radius: var(--radius);
   margin-bottom: 6px;
   transition: border-color 0.2s, box-shadow 0.2s;
-  position: relative;
 }
 .combatant-card.is-pc    { border-left: 3px solid var(--pc-accent); }
 .combatant-card.is-enemy { border-left: 3px solid var(--enemy-accent); }
 .combatant-card.is-active { border-color: var(--gold); box-shadow: 0 0 12px var(--active-glow); }
 .combatant-card.is-dead  { opacity: 0.45; }
+.combatant-card.dragging { opacity: 0.4; }
+.combatant-card.drag-over { border-top: 2px solid var(--gold); }
 
 .card-main {
   display: grid;
@@ -97,55 +133,41 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
   cursor: pointer;
 }
 .card-main:hover { background: var(--surface2); }
-
 .drag-handle { cursor: grab; color: var(--ink-faint); font-size: 0.8rem; user-select: none; text-align: center; }
 .drag-handle:active { cursor: grabbing; }
-
 .init-badge { font-family: 'Cinzel', serif; font-size: 1.1rem; font-weight: 600; color: var(--gold-light); text-align: center; }
-
-.combatant-name { font-family: 'Cinzel', serif; font-size: 0.88rem; letter-spacing: 0.03em; color: var(--ink); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.combatant-name { font-family: 'Cinzel', serif; font-size: 0.88rem; letter-spacing: 0.03em; color: var(--ink); display: flex; align-items: center; gap: 6px; }
 .type-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .type-dot.pc    { background: var(--pc-accent); }
 .type-dot.enemy { background: var(--enemy-accent); }
 .active-arrow { color: var(--gold); font-size: 0.8rem; }
-
 .cond-chips { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
 .cond-chip { font-size: 0.58rem; padding: 1px 5px; border-radius: 8px; background: rgba(200,120,0,0.15); color: #d4a820; border: 1px solid rgba(200,120,0,0.35); font-family: 'Cinzel', serif; letter-spacing: 0.04em; }
-
 .hp-section { display: flex; align-items: center; gap: 6px; }
 .hp-bar-wrap { width: 60px; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
 .hp-bar { height: 100%; border-radius: 3px; transition: width 0.3s, background 0.3s; }
 .hp-text { font-size: 0.78rem; color: var(--ink-dim); min-width: 54px; text-align: right; }
-
 .ac-badge { font-family: 'Cinzel', serif; font-size: 0.72rem; color: var(--ink-dim); min-width: 36px; text-align: center; }
 .ac-badge small { font-size: 0.55rem; display: block; color: var(--ink-faint); }
-
 .card-actions { display: flex; gap: 3px; }
-.combatant-card.dragging { opacity: 0.4; }
-.combatant-card.drag-over { border-top: 2px solid var(--gold); }
 
-/* ── Expanded panel ── */
+/* ── Expanded ── */
 .card-expanded { display: none; border-top: 1px solid var(--border); padding: 10px 12px; background: var(--surface2); }
 .combatant-card.expanded .card-expanded { display: block; }
-
 .exp-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .exp-label { font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.1em; color: var(--ink-faint); white-space: nowrap; }
 .exp-input { background: var(--bg); border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink); font-family: 'Crimson Text', serif; font-size: 0.88rem; padding: 2px 6px; outline: none; transition: border-color 0.15s; }
 .exp-input:focus { border-color: var(--gold); }
 .exp-input.narrow { width: 56px; }
 .exp-input.wide   { flex: 1; min-width: 0; }
-
 .hp-adj { display: flex; align-items: center; gap: 6px; }
-.hp-adj-input { width: 56px; }
 .hp-current { font-family: 'Cinzel', serif; font-size: 1.1rem; color: var(--gold-light); min-width: 60px; text-align: center; }
-
 .conditions-wrap { margin-bottom: 8px; }
 .conditions-grid { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .cond-pill { font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.06em; padding: 2px 7px; border-radius: 10px; border: 1px solid; cursor: pointer; transition: all 0.15s; background: transparent; color: var(--ink-faint); border-color: var(--border); }
 .cond-pill:hover { color: var(--ink); border-color: var(--ink-dim); }
 .cond-pill.active { color: #f8d080; border-color: #c87800; background: rgba(200,120,0,0.15); }
 .cond-pill.custom-active { color: #c0a0f0; border-color: #7050c0; background: rgba(112,80,192,0.15); }
-
 .notes-input { width: 100%; background: var(--bg); border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink); font-family: 'Crimson Text', serif; font-size: 0.88rem; padding: 4px 6px; outline: none; resize: vertical; min-height: 44px; }
 .notes-input:focus { border-color: var(--gold); }
 
@@ -153,7 +175,7 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
 .sidebar-section { margin-bottom: 1.2rem; }
 .sidebar-title { font-family: 'Cinzel', serif; font-size: 0.65rem; letter-spacing: 0.12em; color: var(--gold-faint); margin-bottom: 0.5rem; }
 .add-form { display: flex; flex-direction: column; gap: 6px; }
-.add-form input, .add-form select { background: var(--bg); border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink); font-family: 'Crimson Text', serif; font-size: 0.88rem; padding: 4px 8px; outline: none; width: 100%; }
+.add-form input { background: var(--bg); border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink); font-family: 'Crimson Text', serif; font-size: 0.88rem; padding: 4px 8px; outline: none; width: 100%; }
 .add-form input:focus { border-color: var(--gold); }
 .add-form-row { display: flex; gap: 6px; }
 .add-form-row input { flex: 1; }
@@ -163,82 +185,53 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
 .type-toggle .t-enemy { background: var(--enemy-bg); border-color: var(--enemy-accent); color: #e88; }
 .type-toggle .t-pc.active    { background: var(--pc-accent); color: white; }
 .type-toggle .t-enemy.active { background: var(--enemy-accent); color: white; }
-
 .custom-cond-add { display: flex; gap: 4px; }
 .custom-cond-add input { flex: 1; background: var(--bg); border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink); font-family: 'Crimson Text', serif; font-size: 0.82rem; padding: 3px 6px; outline: none; }
 .custom-cond-add input:focus { border-color: var(--gold); }
 .custom-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .custom-tag { font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.06em; padding: 2px 6px 2px 8px; border-radius: 10px; border: 1px solid #7050c0; color: #c0a0f0; background: rgba(112,80,192,0.1); display: flex; align-items: center; gap: 4px; }
-.custom-tag-del { cursor: pointer; color: #a080e0; font-size: 0.7rem; }
+.custom-tag-del { cursor: pointer; color: #a080e0; }
 .custom-tag-del:hover { color: #f0a0f0; }
-
 .sync-status { font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.08em; color: var(--ink-faint); text-align: center; padding-top: 0.4rem; }
 .sync-status.ok   { color: var(--green-light); }
 .sync-status.fail { color: var(--red); }
 .sync-status.ing  { color: var(--amber); }
+.empty-state { text-align: center; padding: 3rem 1rem; color: var(--ink-faint); font-style: italic; }
 
-.empty-state { text-align: center; padding: 3rem 1rem; color: var(--ink-faint); font-style: italic; font-size: 0.95rem; }
-
-/* ── Export modal ── */
-.modal-backdrop {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.75);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 200;
-  padding: 1rem;
-}
+/* ── Modals ── */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 1rem; }
 .modal-backdrop.hidden { display: none; }
-.modal {
-  background: var(--surface);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius);
-  max-width: 600px;
-  width: 100%;
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.8);
-}
-.modal-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 1rem 1.2rem 0.8rem;
-  border-bottom: 1px solid var(--border);
-}
+.modal { background: var(--surface); border: 1px solid var(--border-light); border-radius: var(--radius); max-width: 560px; width: 100%; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.8); }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.2rem 0.8rem; border-bottom: 1px solid var(--border); }
 .modal-header h2 { font-family: 'Cinzel', serif; font-size: 0.9rem; letter-spacing: 0.08em; color: var(--gold); }
 .modal-close { background: none; border: none; color: var(--ink-faint); font-size: 1.1rem; cursor: pointer; padding: 2px 6px; }
 .modal-close:hover { color: var(--ink); }
 .modal-body { padding: 1rem 1.2rem; overflow-y: auto; flex: 1; }
+.modal-footer { padding: 0.8rem 1.2rem; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
 .modal-field { margin-bottom: 0.8rem; }
 .modal-field label { font-family: 'Cinzel', serif; font-size: 0.62rem; letter-spacing: 0.1em; color: var(--ink-faint); display: block; margin-bottom: 4px; }
-.modal-field input, .modal-field textarea, .modal-field select {
-  width: 100%;
-  background: var(--bg);
-  border: 1px solid var(--border-light);
-  border-radius: 2px;
-  color: var(--ink);
-  font-family: 'Crimson Text', serif;
-  font-size: 0.95rem;
-  padding: 5px 8px;
-  outline: none;
-}
+.modal-field input, .modal-field textarea, .modal-field select { width: 100%; background: var(--bg); border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink); font-family: 'Crimson Text', serif; font-size: 0.95rem; padding: 5px 8px; outline: none; }
 .modal-field input:focus, .modal-field textarea:focus { border-color: var(--gold); }
 .modal-field textarea { resize: vertical; min-height: 70px; }
 .modal-row { display: flex; gap: 8px; }
 .modal-row .modal-field { flex: 1; }
-.modal-preview {
+.modal-preview { background: var(--bg); border: 1px solid var(--border); border-radius: 2px; padding: 8px; font-family: 'Courier New', monospace; font-size: 0.72rem; color: var(--ink-dim); white-space: pre-wrap; max-height: 180px; overflow-y: auto; margin-top: 4px; }
+
+/* ── Carry-over modal ── */
+.pc-carryover-list { display: flex; flex-direction: column; gap: 8px; margin: 0.5rem 0; }
+.pc-carry-row {
   background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 2px;
-  padding: 8px;
-  font-family: 'Courier New', monospace;
-  font-size: 0.72rem;
-  color: var(--ink-dim);
-  white-space: pre-wrap;
-  max-height: 200px;
-  overflow-y: auto;
-  margin-top: 6px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  padding: 10px 12px;
 }
-.modal-footer { padding: 0.8rem 1.2rem; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+.pc-carry-name { font-family: 'Cinzel', serif; font-size: 0.82rem; color: var(--ink); margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.pc-carry-hp { font-size: 0.78rem; color: var(--ink-dim); }
+.carry-opts { display: flex; gap: 10px; flex-wrap: wrap; }
+.carry-check { display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 0.82rem; color: var(--ink-dim); }
+.carry-check input[type=checkbox] { accent-color: var(--gold); width: 14px; height: 14px; cursor: pointer; }
+.carry-check:hover { color: var(--ink); }
+.carry-preset { display: flex; gap: 6px; margin-bottom: 0.8rem; flex-wrap: wrap; }
 
 @media (max-width: 700px) {
   .main { grid-template-columns: 1fr; }
@@ -251,23 +244,26 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
 <!-- TOP BAR -->
 <div class="topbar">
   <h1>⚔ Initiative — DM</h1>
-  <div class="round-display">ROUND <span id="round-num">1</span></div>
-  <button class="btn btn-gold" onclick="nextTurn()">Next Turn ▶</button>
-  <button class="btn btn-ghost btn-sm" onclick="sortByInit()">Sort ↓</button>
-  <button class="btn btn-ghost btn-sm" onclick="resetRound()">Reset Round</button>
-  <button class="btn btn-purple btn-sm" onclick="openExport()">Export Log</button>
-  <button class="btn btn-red btn-sm" onclick="newCombat()">New Combat</button>
+  <span class="mode-pill lobby" id="mode-pill">LOBBY</span>
+  <div class="round-display" id="round-display" style="display:none">ROUND <span id="round-num">1</span></div>
+  <button class="btn btn-gold" id="btn-next"    onclick="nextTurn()"   style="display:none">Next Turn ▶</button>
+  <button class="btn btn-ghost btn-sm" id="btn-sort"  onclick="sortByInit()" style="display:none">Sort ↓</button>
+  <button class="btn btn-teal"  id="btn-start"  onclick="startCombat()">▶ Start Combat</button>
+  <button class="btn btn-red btn-sm" id="btn-end" onclick="endCombat()" style="display:none">■ End Combat</button>
+  <button class="btn btn-purple btn-sm" id="btn-export" onclick="openExport()" style="display:none">Export Log</button>
   <div id="sync-status" class="sync-status">—</div>
 </div>
 
 <div class="main">
-  <!-- COMBATANT LIST -->
-  <div class="combatant-list">
-    <div id="empty-state" class="empty-state">No combatants yet.<br>Add PCs and enemies using the panel →</div>
+  <div class="combatant-col">
+    <div class="lobby-banner" id="lobby-banner">
+      <span class="lobby-banner-icon">🔒</span>
+      <span>You are in <strong>Lobby</strong> mode — players see "Combat incoming…" until you press Start Combat. Add enemies and set initiative freely.</span>
+    </div>
+    <div id="empty-state" class="empty-state">No combatants yet. Add PCs and enemies using the panel →</div>
     <div id="combatant-list"></div>
   </div>
 
-  <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="sidebar-section">
       <div class="sidebar-title">ADD COMBATANT</div>
@@ -279,8 +275,8 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
         <input type="text" id="add-name" placeholder="Name…" maxlength="40">
         <div class="add-form-row">
           <input type="number" id="add-init" placeholder="Init" min="-10" max="40" style="width:60px;flex:none">
-          <input type="number" id="add-hp" placeholder="Max HP" min="1" max="9999">
-          <input type="number" id="add-ac" placeholder="AC" min="1" max="40" style="width:50px;flex:none">
+          <input type="number" id="add-hp"   placeholder="Max HP" min="1" max="9999">
+          <input type="number" id="add-ac"   placeholder="AC" min="1" max="40" style="width:50px;flex:none">
         </div>
         <button class="btn btn-gold" style="width:100%" onclick="addCombatant()">Add</button>
       </div>
@@ -308,11 +304,39 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
       <div class="sidebar-title">MANAGE</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-ghost btn-sm" onclick="clearEnemies()">Clear enemies</button>
-        <button class="btn btn-red btn-sm" onclick="clearAll()">Clear all</button>
+        <button class="btn btn-red btn-sm"   onclick="clearAll()">Clear all</button>
       </div>
     </div>
 
-    <div id="sync-status-side" class="sync-status" style="margin-top:0.5rem">—</div>
+    <div id="sync-status-side" class="sync-status">—</div>
+  </div>
+</div>
+
+<!-- CARRY-OVER MODAL -->
+<div class="modal-backdrop hidden" id="carryover-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>⚔ End Combat — Carry Over</h2>
+      <button class="modal-close" onclick="closeCarryover()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:0.88rem;color:var(--ink-dim);margin-bottom:1rem">
+        Choose what to keep for each PC heading into the next encounter.
+        Enemies will be cleared. Round counter resets.
+      </p>
+      <div class="carry-preset">
+        <button class="btn btn-ghost btn-sm" onclick="setAllCarry('hp',true)">Keep all HP</button>
+        <button class="btn btn-ghost btn-sm" onclick="setAllCarry('hp',false)">Restore all HP</button>
+        <button class="btn btn-ghost btn-sm" onclick="setAllCarry('cond',true)">Keep all conditions</button>
+        <button class="btn btn-ghost btn-sm" onclick="setAllCarry('cond',false)">Clear all conditions</button>
+      </div>
+      <div class="pc-carryover-list" id="pc-carryover-list"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeCarryover()">Cancel</button>
+      <button class="btn btn-gold"  onclick="openExportFromCarryover()">Export log first</button>
+      <button class="btn btn-teal"  onclick="confirmCarryover()">Confirm &amp; go to Lobby</button>
+    </div>
   </div>
 </div>
 
@@ -331,7 +355,7 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
         </div>
         <div class="modal-field" style="max-width:130px">
           <label>DATE</label>
-          <input type="text" id="exp-date" placeholder="YYYY-MM-DD">
+          <input type="text" id="exp-date">
         </div>
       </div>
       <div class="modal-row">
@@ -342,11 +366,11 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
         <div class="modal-field" style="max-width:130px">
           <label>OUTCOME</label>
           <select id="exp-outcome">
-            <option value="Victory">Victory</option>
-            <option value="Defeat">Defeat</option>
-            <option value="Retreat">Retreat</option>
-            <option value="Stalemate">Stalemate</option>
-            <option value="Pyrrhic Victory">Pyrrhic Victory</option>
+            <option>Victory</option>
+            <option>Defeat</option>
+            <option>Retreat</option>
+            <option>Stalemate</option>
+            <option>Pyrrhic Victory</option>
           </select>
         </div>
       </div>
@@ -356,7 +380,7 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
       </div>
       <div class="modal-field">
         <label>SUMMARY NOTES</label>
-        <textarea id="exp-summary" placeholder="Brief description of what happened — why the fight started, key moments, consequences…"></textarea>
+        <textarea id="exp-summary" placeholder="Brief description of what happened…"></textarea>
       </div>
       <div class="modal-field">
         <label>MARKDOWN PREVIEW</label>
@@ -365,7 +389,7 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeExport()">Cancel</button>
-      <button class="btn btn-ghost btn-sm" onclick="updatePreview()">Refresh preview</button>
+      <button class="btn btn-ghost btn-sm" onclick="updatePreview()">Refresh</button>
       <button class="btn btn-purple" onclick="downloadLog()">Download .md</button>
     </div>
   </div>
@@ -386,29 +410,31 @@ const STD_CONDITIONS = [
 // ═══════════════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════════════
+let mode = 'lobby'; // 'lobby' | 'combat'
+
 let state = {
   round: 1,
   activeIndex: 0,
   combatants: [],
   customConditions: []
 };
-// Combat history: track HP changes and events per combatant id
-let combatLog = {};   // { id: { startHp, endHp, conditionsApplied: Set, name, type } }
-let combatStartRound = 1;
 
-let addType  = 'pc';
-let dragSrc  = null;
-let syncTimer = null;
+let combatLog   = {};  // { id: { name, type, startHp, maxHp, endHp, conditionsApplied, notes } }
 let expandedIds = new Set();
-let _id = 0;
+let addType     = 'pc';
+let dragSrc     = null;
+let syncTimer   = null;
+let _id         = 0;
 function uid() { return ++_id; }
+
+// Flag: whether we're returning to carryover modal after export
+let exportCalledFromCarryover = false;
 
 // ═══════════════════════════════════════════════════════
 //  PERSISTENCE
 // ═══════════════════════════════════════════════════════
 function savePCs() {
-  const pcs = state.combatants.filter(c => c.type === 'pc');
-  localStorage.setItem('init_pcs', JSON.stringify(pcs));
+  localStorage.setItem('init_pcs', JSON.stringify(state.combatants.filter(c => c.type === 'pc')));
 }
 function loadPCs() {
   try { return JSON.parse(localStorage.getItem('init_pcs') || '[]'); } catch { return []; }
@@ -421,35 +447,134 @@ function loadCustomConds() {
 }
 
 // ═══════════════════════════════════════════════════════
-//  COMBAT LOG TRACKING
+//  COMBAT LOG
 // ═══════════════════════════════════════════════════════
 function initCombatLog() {
   combatLog = {};
-  combatStartRound = state.round;
-  state.combatants.forEach(c => {
-    combatLog[c.id] = {
-      name: c.name, type: c.type,
-      startHp: c.hp, maxHp: c.maxHp,
-      endHp: c.hp,
-      conditionsApplied: new Set(),
-      notes: c.notes
-    };
-  });
+  state.combatants.forEach(snapshotCombatant);
 }
-function logCombatant(c) {
+function snapshotCombatant(c) {
   if (!combatLog[c.id]) {
     combatLog[c.id] = {
       name: c.name, type: c.type,
-      startHp: c.hp, maxHp: c.maxHp,
-      endHp: c.hp,
-      conditionsApplied: new Set(),
-      notes: c.notes
+      startHp: c.hp, maxHp: c.maxHp, endHp: c.hp,
+      conditionsApplied: new Set(), notes: c.notes || ''
     };
   } else {
-    combatLog[c.id].endHp  = c.hp;
-    combatLog[c.id].notes  = c.notes;
+    combatLog[c.id].endHp = c.hp;
+    combatLog[c.id].notes = c.notes || '';
     c.conditions.forEach(cond => combatLog[c.id].conditionsApplied.add(cond));
   }
+}
+
+// ═══════════════════════════════════════════════════════
+//  MODE CONTROL
+// ═══════════════════════════════════════════════════════
+function startCombat() {
+  mode = 'combat';
+  initCombatLog();
+  updateModeUI();
+  pushState();
+}
+
+function endCombat() {
+  // Snapshot everything before opening modal
+  state.combatants.forEach(snapshotCombatant);
+  openCarryover();
+}
+
+function updateModeUI() {
+  const inCombat = mode === 'combat';
+  document.getElementById('mode-pill').className   = `mode-pill ${mode}`;
+  document.getElementById('mode-pill').textContent  = inCombat ? 'COMBAT' : 'LOBBY';
+  document.getElementById('round-display').style.display = inCombat ? '' : 'none';
+  document.getElementById('btn-next').style.display      = inCombat ? '' : 'none';
+  document.getElementById('btn-sort').style.display      = inCombat ? '' : 'none';
+  document.getElementById('btn-start').style.display     = inCombat ? 'none' : '';
+  document.getElementById('btn-end').style.display       = inCombat ? '' : 'none';
+  document.getElementById('btn-export').style.display    = inCombat ? '' : 'none';
+  document.getElementById('lobby-banner').classList.toggle('hidden', inCombat);
+}
+
+// ═══════════════════════════════════════════════════════
+//  CARRY-OVER MODAL
+// ═══════════════════════════════════════════════════════
+function openCarryover() {
+  const pcs = state.combatants.filter(c => c.type === 'pc');
+  const list = document.getElementById('pc-carryover-list');
+  list.innerHTML = '';
+
+  if (pcs.length === 0) {
+    list.innerHTML = '<p style="color:var(--ink-faint);font-style:italic;font-size:0.88rem">No PCs in this combat.</p>';
+  } else {
+    pcs.forEach(c => {
+      const hpPct = Math.round((c.hp / c.maxHp) * 100);
+      const hpColor = hpPct > 60 ? '#4a9a60' : hpPct > 30 ? '#c87800' : '#c0392b';
+      const row = document.createElement('div');
+      row.className = 'pc-carry-row';
+      row.innerHTML = `
+        <div class="pc-carry-name">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--pc-accent);display:inline-block;flex-shrink:0"></span>
+          ${c.name}
+          <span class="pc-carry-hp" style="color:${hpColor}">${c.hp} / ${c.maxHp} HP</span>
+          ${c.conditions.length > 0 ? `<span style="font-size:0.72rem;color:var(--ink-faint)">(${c.conditions.join(', ')})</span>` : ''}
+        </div>
+        <div class="carry-opts">
+          <label class="carry-check">
+            <input type="checkbox" id="carry-hp-${c.id}" checked>
+            Keep current HP (${c.hp})
+          </label>
+          <label class="carry-check">
+            <input type="checkbox" id="carry-cond-${c.id}" ${c.conditions.length > 0 ? '' : 'disabled'}>
+            Keep conditions
+          </label>
+        </div>
+      `;
+      list.appendChild(row);
+    });
+  }
+
+  document.getElementById('carryover-modal').classList.remove('hidden');
+}
+
+function closeCarryover() {
+  document.getElementById('carryover-modal').classList.add('hidden');
+}
+
+function setAllCarry(field, val) {
+  const pcs = state.combatants.filter(c => c.type === 'pc');
+  pcs.forEach(c => {
+    const el = document.getElementById(`carry-${field}-${c.id}`);
+    if (el && !el.disabled) el.checked = val;
+  });
+}
+
+function confirmCarryover() {
+  const pcs = state.combatants.filter(c => c.type === 'pc');
+  pcs.forEach(c => {
+    const keepHp   = document.getElementById(`carry-hp-${c.id}`)?.checked   ?? false;
+    const keepCond = document.getElementById(`carry-cond-${c.id}`)?.checked ?? false;
+    if (!keepHp)   { c.hp = c.maxHp; c.dead = false; }
+    if (!keepCond) { c.conditions = []; }
+  });
+
+  // Clear enemies, reset round, go to lobby
+  state.combatants = state.combatants.filter(c => c.type === 'pc');
+  state.round       = 1;
+  state.activeIndex = 0;
+  mode = 'lobby';
+
+  closeCarryover();
+  savePCs();
+  updateModeUI();
+  render();
+  pushState();
+}
+
+function openExportFromCarryover() {
+  exportCalledFromCarryover = true;
+  closeCarryover();
+  openExport();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -469,7 +594,7 @@ function addCombatant() {
   const ac    = parseInt(document.getElementById('add-ac').value)    || 10;
   const c = { id: uid(), name, type: addType, init, hp: maxHp, maxHp, ac, conditions: [], notes: '', dead: false };
   state.combatants.push(c);
-  logCombatant(c);
+  if (mode === 'combat') snapshotCombatant(c);
   ['add-name','add-init','add-hp','add-ac'].forEach(id => document.getElementById(id).value = '');
   if (addType === 'pc') savePCs();
   render(); pushState();
@@ -477,8 +602,8 @@ function addCombatant() {
 
 function removeCombatant(id) {
   const c = state.combatants.find(x => x.id === id);
-  if (c) logCombatant(c);
-  state.combatants = state.combatants.filter(c => c.id !== id);
+  if (c && mode === 'combat') snapshotCombatant(c);
+  state.combatants = state.combatants.filter(x => x.id !== id);
   if (state.activeIndex >= state.combatants.length) state.activeIndex = 0;
   expandedIds.delete(id);
   savePCs(); render(); pushState();
@@ -488,27 +613,23 @@ function removeCombatant(id) {
 //  HP
 // ═══════════════════════════════════════════════════════
 function adjustHP(id, delta) {
-  const c = state.combatants.find(x => x.id === id);
-  if (!c) return;
+  const c = state.combatants.find(x => x.id === id); if (!c) return;
   c.hp   = Math.max(0, Math.min(c.maxHp, c.hp + delta));
   c.dead = c.hp <= 0;
-  logCombatant(c);
+  if (mode === 'combat') snapshotCombatant(c);
   if (c.type === 'pc') savePCs();
   render(); pushState();
 }
-function applyHpAdj(id, mode) {
+function applyHpAdj(id, mode_) {
   const inp = document.getElementById(`hp-adj-${id}`);
-  const amt = parseInt(inp.value);
-  if (isNaN(amt) || amt <= 0) return;
-  adjustHP(id, mode === 'heal' ? amt : -amt);
-  inp.value = '';
+  const amt = parseInt(inp.value); if (isNaN(amt) || amt <= 0) return;
+  adjustHP(id, mode_ === 'heal' ? amt : -amt); inp.value = '';
 }
 function setMaxHP(id, val) {
-  const c = state.combatants.find(x => x.id === id);
-  if (!c) return;
+  const c = state.combatants.find(x => x.id === id); if (!c) return;
   const v = parseInt(val); if (isNaN(v) || v < 1) return;
   c.maxHp = v; c.hp = Math.min(c.hp, v);
-  logCombatant(c);
+  if (mode === 'combat') snapshotCombatant(c);
   if (c.type === 'pc') savePCs();
   render(); pushState();
 }
@@ -516,38 +637,20 @@ function setMaxHP(id, val) {
 // ═══════════════════════════════════════════════════════
 //  FIELDS
 // ═══════════════════════════════════════════════════════
-function setInit(id, val) {
-  const c = state.combatants.find(x => x.id === id); if (!c) return;
-  c.init = parseInt(val) || 0;
-  if (c.type === 'pc') savePCs(); pushState();
-}
-function setAC(id, val) {
-  const c = state.combatants.find(x => x.id === id); if (!c) return;
-  c.ac = parseInt(val) || 10;
-  if (c.type === 'pc') savePCs(); pushState();
-}
-function setName(id, val) {
-  const c = state.combatants.find(x => x.id === id); if (!c) return;
-  c.name = val;
-  if (combatLog[id]) combatLog[id].name = val;
-  if (c.type === 'pc') savePCs(); pushState();
-}
-function setNotes(id, val) {
-  const c = state.combatants.find(x => x.id === id); if (!c) return;
-  c.notes = val;
-  if (combatLog[id]) combatLog[id].notes = val;
-  pushState();
-}
+function setInit(id, val) { const c = state.combatants.find(x=>x.id===id); if(!c) return; c.init = parseInt(val)||0; if(c.type==='pc') savePCs(); pushState(); }
+function setAC(id, val)   { const c = state.combatants.find(x=>x.id===id); if(!c) return; c.ac   = parseInt(val)||10; if(c.type==='pc') savePCs(); pushState(); }
+function setName(id, val) { const c = state.combatants.find(x=>x.id===id); if(!c) return; c.name = val; if(combatLog[id]) combatLog[id].name=val; if(c.type==='pc') savePCs(); pushState(); }
+function setNotes(id, val){ const c = state.combatants.find(x=>x.id===id); if(!c) return; c.notes=val; if(combatLog[id]) combatLog[id].notes=val; pushState(); }
 
 // ═══════════════════════════════════════════════════════
 //  CONDITIONS
 // ═══════════════════════════════════════════════════════
 function toggleCondition(id, cond) {
-  const c = state.combatants.find(x => x.id === id); if (!c) return;
+  const c = state.combatants.find(x=>x.id===id); if(!c) return;
   const idx = c.conditions.indexOf(cond);
   if (idx >= 0) c.conditions.splice(idx, 1);
   else { c.conditions.push(cond); if (combatLog[id]) combatLog[id].conditionsApplied.add(cond); }
-  if (c.type === 'pc') savePCs();
+  if (c.type==='pc') savePCs();
   render(); pushState();
 }
 function addCustomCondition() {
@@ -558,8 +661,8 @@ function addCustomCondition() {
   saveCustomConds(); render();
 }
 function removeCustomCondition(cond) {
-  state.customConditions = state.customConditions.filter(c => c !== cond);
-  state.combatants.forEach(c => { c.conditions = c.conditions.filter(x => x !== cond); });
+  state.customConditions = state.customConditions.filter(c=>c!==cond);
+  state.combatants.forEach(c => { c.conditions = c.conditions.filter(x=>x!==cond); });
   saveCustomConds(); render(); pushState();
 }
 
@@ -567,58 +670,26 @@ function removeCustomCondition(cond) {
 //  TURN / ROUND
 // ═══════════════════════════════════════════════════════
 function nextTurn() {
-  if (state.combatants.length === 0) return;
+  if (state.combatants.length === 0 || mode !== 'combat') return;
   state.activeIndex = (state.activeIndex + 1) % state.combatants.length;
   if (state.activeIndex === 0) state.round++;
   render(); pushState();
 }
-function sortByInit() {
-  state.combatants.sort((a, b) => b.init - a.init);
-  state.activeIndex = 0; render(); pushState();
-}
-function resetRound() {
-  state.round = 1; state.activeIndex = 0; render(); pushState();
-}
-function newCombat() {
-  if (!confirm('Start a new combat? Enemies are cleared, PCs are kept and healed to full.')) return;
-  // snapshot log before clearing
-  state.combatants.forEach(c => logCombatant(c));
-  state.combatants = state.combatants.filter(c => c.type === 'pc');
-  state.combatants.forEach(c => { c.conditions = []; c.hp = c.maxHp; c.dead = false; });
-  state.round = 1; state.activeIndex = 0;
-  savePCs(); render(); pushState();
-  initCombatLog();
-}
-function clearEnemies() {
-  state.combatants.forEach(c => logCombatant(c));
-  state.combatants = state.combatants.filter(c => c.type === 'pc');
-  if (state.activeIndex >= state.combatants.length) state.activeIndex = 0;
-  render(); pushState();
-}
-function clearAll() {
-  if (!confirm('Clear all combatants?')) return;
-  state.combatants.forEach(c => logCombatant(c));
-  state.combatants = []; state.round = 1; state.activeIndex = 0;
-  render(); pushState();
-}
-function rollForAll()     { state.combatants.forEach(c => { c.init = Math.ceil(Math.random()*20); }); sortByInit(); }
-function rollForEnemies() { state.combatants.filter(c=>c.type==='enemy').forEach(c => { c.init = Math.ceil(Math.random()*20); }); sortByInit(); }
+function sortByInit() { state.combatants.sort((a,b)=>b.init-a.init); state.activeIndex=0; render(); pushState(); }
+function rollForAll()     { state.combatants.forEach(c=>{c.init=Math.ceil(Math.random()*20);}); sortByInit(); }
+function rollForEnemies() { state.combatants.filter(c=>c.type==='enemy').forEach(c=>{c.init=Math.ceil(Math.random()*20);}); sortByInit(); }
+function clearEnemies() { state.combatants=state.combatants.filter(c=>c.type==='pc'); if(state.activeIndex>=state.combatants.length)state.activeIndex=0; render(); pushState(); }
+function clearAll() { if(!confirm('Clear all combatants?'))return; state.combatants=[]; state.round=1; state.activeIndex=0; render(); pushState(); }
 
 // ═══════════════════════════════════════════════════════
 //  HP COLOR
 // ═══════════════════════════════════════════════════════
-function hpColor(hp, max) {
-  const p = hp / max;
-  return p > 0.6 ? '#2d6a3f' : p > 0.3 ? '#c87800' : '#c0392b';
-}
+function hpColor(hp, max) { const p=hp/max; return p>0.6?'#2d6a3f':p>0.3?'#c87800':'#c0392b'; }
 
 // ═══════════════════════════════════════════════════════
 //  RENDER
 // ═══════════════════════════════════════════════════════
-function toggleExpand(id) {
-  if (expandedIds.has(id)) expandedIds.delete(id); else expandedIds.add(id);
-  render();
-}
+function toggleExpand(id) { if(expandedIds.has(id)) expandedIds.delete(id); else expandedIds.add(id); render(); }
 
 function render() {
   document.getElementById('round-num').textContent = state.round;
@@ -628,15 +699,14 @@ function render() {
   list.innerHTML = '';
 
   state.combatants.forEach((c, idx) => {
-    const isActive   = idx === state.activeIndex;
+    const isActive   = idx === state.activeIndex && mode === 'combat';
     const isExpanded = expandedIds.has(c.id);
     const hpPct      = Math.max(0, (c.hp / c.maxHp) * 100);
     const isPC       = c.type === 'pc';
 
     const card = document.createElement('div');
     card.className = `combatant-card is-${c.type}${isActive?' is-active':''}${c.dead?' is-dead':''}${isExpanded?' expanded':''}`;
-    card.dataset.id = c.id;
-    card.draggable  = true;
+    card.draggable = true;
 
     const stdPills = STD_CONDITIONS.map(cond => {
       const on = c.conditions.includes(cond);
@@ -648,17 +718,15 @@ function render() {
     }).join('');
 
     const condChips = c.conditions.length > 0
-      ? `<div class="cond-chips">${c.conditions.map(cond=>`<span class="cond-chip">${cond}</span>`).join('')}</div>`
-      : '';
+      ? `<div class="cond-chips">${c.conditions.map(cond=>`<span class="cond-chip">${cond}</span>`).join('')}</div>` : '';
 
-    // AC only shown for PCs in card header; always shown in expanded for DM
     const acHeader = isPC
       ? `<div class="ac-badge"><small>AC</small>${c.ac}</div>`
-      : `<div class="ac-badge" style="opacity:0;pointer-events:none"><small>AC</small>—</div>`;
+      : `<div style="min-width:36px"></div>`;
 
     card.innerHTML = `
       <div class="card-main" onclick="toggleExpand(${c.id})">
-        <span class="drag-handle" onclick="event.stopPropagation()" title="Drag to reorder">⠿</span>
+        <span class="drag-handle" onclick="event.stopPropagation()">⠿</span>
         <div class="init-badge">${c.init}</div>
         <div>
           <div class="combatant-name">
@@ -674,9 +742,9 @@ function render() {
         </div>
         ${acHeader}
         <div class="card-actions" onclick="event.stopPropagation()">
-          <button class="btn btn-ghost btn-icon btn-sm" onclick="adjustHP(${c.id},-1)" title="Damage">−</button>
-          <button class="btn btn-ghost btn-icon btn-sm" onclick="adjustHP(${c.id},1)"  title="Heal">+</button>
-          <button class="btn btn-red btn-icon btn-sm"   onclick="removeCombatant(${c.id})" title="Remove">✕</button>
+          <button class="btn btn-ghost btn-icon btn-sm" onclick="adjustHP(${c.id},-1)">−</button>
+          <button class="btn btn-ghost btn-icon btn-sm" onclick="adjustHP(${c.id},1)">+</button>
+          <button class="btn btn-red btn-icon btn-sm"   onclick="removeCombatant(${c.id})">✕</button>
         </div>
       </div>
       <div class="card-expanded">
@@ -692,7 +760,7 @@ function render() {
           <span class="exp-label">HP</span>
           <div class="hp-adj">
             <button class="btn btn-red btn-sm" onclick="event.stopPropagation();applyHpAdj(${c.id},'dmg')">Dmg</button>
-            <input class="exp-input hp-adj-input" id="hp-adj-${c.id}" type="number" min="0" placeholder="amt"
+            <input class="exp-input" id="hp-adj-${c.id}" type="number" min="0" placeholder="amt" style="width:56px"
               onclick="event.stopPropagation()"
               onkeydown="if(event.key==='Enter'){event.preventDefault();applyHpAdj(${c.id},'dmg')}">
             <button class="btn btn-green btn-sm" onclick="event.stopPropagation();applyHpAdj(${c.id},'heal')">Heal</button>
@@ -712,25 +780,22 @@ function render() {
       </div>
     `;
 
-    card.addEventListener('dragstart', e => { dragSrc = c.id; card.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; });
+    card.addEventListener('dragstart', e => { dragSrc=c.id; card.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; });
     card.addEventListener('dragend',   () => { card.classList.remove('dragging'); document.querySelectorAll('.drag-over').forEach(el=>el.classList.remove('drag-over')); });
     card.addEventListener('dragover',  e => { e.preventDefault(); card.classList.add('drag-over'); });
     card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
     card.addEventListener('drop', e => {
       e.preventDefault(); card.classList.remove('drag-over');
-      if (dragSrc === c.id) return;
-      const fi = state.combatants.findIndex(x=>x.id===dragSrc);
-      const ti = state.combatants.findIndex(x=>x.id===c.id);
+      if (dragSrc===c.id) return;
+      const fi=state.combatants.findIndex(x=>x.id===dragSrc), ti=state.combatants.findIndex(x=>x.id===c.id);
       if (fi<0||ti<0) return;
-      const [moved] = state.combatants.splice(fi,1);
-      state.combatants.splice(ti,0,moved);
+      const [moved]=state.combatants.splice(fi,1); state.combatants.splice(ti,0,moved);
       render(); pushState();
     });
 
     list.appendChild(card);
   });
 
-  // Sidebar custom conditions
   document.getElementById('custom-list').innerHTML = state.customConditions.map(cond =>
     `<div class="custom-tag">${cond}<span class="custom-tag-del" onclick="removeCustomCondition('${cond}')">✕</span></div>`
   ).join('');
@@ -742,55 +807,51 @@ function render() {
 function setSyncStatus(type, msg) {
   ['sync-status','sync-status-side'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) { el.className = `sync-status ${type}`; el.textContent = msg; }
+    if (el) { el.className=`sync-status ${type}`; el.textContent=msg; }
   });
 }
-
 async function pushState() {
   clearTimeout(syncTimer);
   syncTimer = setTimeout(async () => {
-    setSyncStatus('ing', '⟳ Syncing…');
+    setSyncStatus('ing','⟳ Syncing…');
     const playerState = {
+      mode,
       round: state.round,
       activeIndex: state.activeIndex,
       combatants: state.combatants.map(c => ({
         id: c.id, name: c.name, type: c.type,
-        init: c.init, ac: c.ac,
-        hpPct: Math.round((c.hp / c.maxHp) * 100),
-        hp:    c.type === 'pc' ? c.hp    : null,
-        maxHp: c.type === 'pc' ? c.maxHp : null,
+        init: c.init,
+        // AC: only for PCs
+        ac: c.type === 'pc' ? c.ac : null,
+        hpPct: Math.round((c.hp/c.maxHp)*100),
+        hp:    c.type==='pc' ? c.hp    : null,
+        maxHp: c.type==='pc' ? c.maxHp : null,
         conditions: c.conditions, dead: c.dead
-        // enemy AC intentionally not included in player payload
       }))
     };
     try {
       const res = await fetch(WORKER_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'initiative_state', payload: playerState })
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ type:'initiative_state', payload: playerState })
       });
-      setSyncStatus(res.ok ? 'ok' : 'fail', res.ok ? '✦ Synced' : '⚠ Sync failed');
-    } catch { setSyncStatus('fail', '⚠ Offline'); }
+      setSyncStatus(res.ok?'ok':'fail', res.ok?'✦ Synced':'⚠ Sync failed');
+    } catch { setSyncStatus('fail','⚠ Offline'); }
   }, 600);
 }
 
 // ═══════════════════════════════════════════════════════
-//  EXPORT — build Obsidian markdown
+//  EXPORT
 // ═══════════════════════════════════════════════════════
 function openExport() {
-  // Snapshot current state into log
-  state.combatants.forEach(c => logCombatant(c));
-
-  // Pre-fill date
+  state.combatants.forEach(snapshotCombatant);
   const today = new Date();
-  const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-  document.getElementById('exp-date').value = dateStr;
-
+  document.getElementById('exp-date').value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
   updatePreview();
   document.getElementById('export-modal').classList.remove('hidden');
 }
 function closeExport() {
   document.getElementById('export-modal').classList.add('hidden');
+  if (exportCalledFromCarryover) { exportCalledFromCarryover = false; openCarryover(); }
 }
 
 function buildMarkdown() {
@@ -802,111 +863,60 @@ function buildMarkdown() {
   const summary  = document.getElementById('exp-summary').value.trim()  || '';
   const rounds   = state.round;
 
-  const pcs      = Object.values(combatLog).filter(e => e.type === 'pc');
-  const enemies  = Object.values(combatLog).filter(e => e.type === 'enemy');
+  const pcs     = Object.values(combatLog).filter(e=>e.type==='pc');
+  const enemies = Object.values(combatLog).filter(e=>e.type==='enemy');
+  const pcKilled    = pcs.filter(e=>e.endHp<=0).map(e=>e.name);
+  const enemyKilled = enemies.filter(e=>e.endHp<=0).map(e=>e.name);
 
-  const pcKilled    = pcs.filter(e    => e.endHp <= 0).map(e => e.name);
-  const enemyKilled = enemies.filter(e => e.endHp <= 0).map(e => e.name);
-
-  // ── Frontmatter ──────────────────────────────────────
-  let md = `---\n`;
-  md += `tags: [combat-log]\n`;
-  md += `date: ${date}\n`;
-  md += `session: "${session}"\n`;
-  md += `location: "${location}"\n`;
-  md += `outcome: ${outcome}\n`;
-  md += `rounds: ${rounds}\n`;
-  md += `pcs_downed: [${pcKilled.map(n=>`"${n}"`).join(', ')}]\n`;
-  md += `enemies_defeated: [${enemyKilled.map(n=>`"${n}"`).join(', ')}]\n`;
-  md += `---\n\n`;
-
-  // ── Title ─────────────────────────────────────────────
+  let md = `---\ntags: [combat-log]\ndate: ${date}\nsession: "${session}"\nlocation: "${location}"\noutcome: ${outcome}\nrounds: ${rounds}\npcs_downed: [${pcKilled.map(n=>`"${n}"`).join(', ')}]\nenemies_defeated: [${enemyKilled.map(n=>`"${n}"`).join(', ')}]\n---\n\n`;
   md += `# ⚔ ${title}\n\n`;
-
-  // ── Summary callout ───────────────────────────────────
-  md += `> [!summary] Combat Summary\n`;
-  md += `> **Date:** ${date}  \n`;
-  md += `> **Session:** ${session}  \n`;
-  md += `> **Location:** ${location}  \n`;
-  md += `> **Outcome:** ${outcome}  \n`;
-  md += `> **Rounds:** ${rounds}  \n`;
+  md += `> [!summary] Combat Summary\n> **Date:** ${date}  \n> **Session:** ${session}  \n> **Location:** ${location}  \n> **Outcome:** ${outcome}  \n> **Rounds:** ${rounds}  \n`;
   if (pcKilled.length > 0)    md += `> **PCs Downed:** ${pcKilled.join(', ')}  \n`;
   if (enemyKilled.length > 0) md += `> **Enemies Defeated:** ${enemyKilled.join(', ')}  \n`;
   md += `\n`;
+  if (summary) md += `## Narrative\n\n${summary}\n\n`;
 
-  // ── Narrative summary ─────────────────────────────────
-  if (summary) {
-    md += `## Narrative\n\n${summary}\n\n`;
-  }
-
-  // ── PC details ────────────────────────────────────────
   if (pcs.length > 0) {
-    md += `## Party\n\n`;
-    md += `| Character | Start HP | End HP | Max HP | HP Lost | Conditions | Status |\n`;
-    md += `|-----------|----------|--------|--------|---------|------------|--------|\n`;
+    md += `## Party\n\n| Character | Start HP | End HP | Max HP | HP Lost | Conditions | Status |\n|-----------|----------|--------|--------|---------|------------|--------|\n`;
     pcs.forEach(e => {
-      const lost   = Math.max(0, e.startHp - e.endHp);
-      const conds  = [...e.conditionsApplied].join(', ') || '—';
-      const status = e.endHp <= 0 ? '💀 Downed' : e.endHp < e.maxHp * 0.5 ? '🩸 Wounded' : '✅ OK';
+      const lost=Math.max(0,e.startHp-e.endHp), conds=[...e.conditionsApplied].join(', ')||'—';
+      const status=e.endHp<=0?'💀 Downed':e.endHp<e.maxHp*0.5?'🩸 Wounded':'✅ OK';
       md += `| ${e.name} | ${e.startHp} | ${e.endHp} | ${e.maxHp} | ${lost} | ${conds} | ${status} |\n`;
     });
     md += `\n`;
   }
-
-  // ── Enemy details ─────────────────────────────────────
   if (enemies.length > 0) {
-    md += `## Enemies\n\n`;
-    md += `| Enemy | Start HP | End HP | Max HP | HP Lost | Conditions | Status |\n`;
-    md += `|-------|----------|--------|--------|---------|------------|--------|\n`;
+    md += `## Enemies\n\n| Enemy | Start HP | End HP | Max HP | HP Lost | Conditions | Status |\n|-------|----------|--------|--------|---------|------------|--------|\n`;
     enemies.forEach(e => {
-      const lost   = Math.max(0, e.startHp - e.endHp);
-      const conds  = [...e.conditionsApplied].join(', ') || '—';
-      const status = e.endHp <= 0 ? '💀 Defeated' : e.endHp < e.maxHp * 0.5 ? '🩸 Wounded' : '🟢 Survived';
+      const lost=Math.max(0,e.startHp-e.endHp), conds=[...e.conditionsApplied].join(', ')||'—';
+      const status=e.endHp<=0?'💀 Defeated':e.endHp<e.maxHp*0.5?'🩸 Wounded':'🟢 Survived';
       md += `| ${e.name} | ${e.startHp} | ${e.endHp} | ${e.maxHp} | ${lost} | ${conds} | ${status} |\n`;
     });
     md += `\n`;
   }
-
-  // ── DM Notes ─────────────────────────────────────────
-  const withNotes = Object.values(combatLog).filter(e => e.notes && e.notes.trim());
+  const withNotes = Object.values(combatLog).filter(e=>e.notes&&e.notes.trim());
   if (withNotes.length > 0) {
     md += `## DM Notes\n\n`;
-    withNotes.forEach(e => {
-      md += `> [!note] ${e.name}\n`;
-      e.notes.trim().split('\n').forEach(line => { md += `> ${line}\n`; });
-      md += `\n`;
-    });
+    withNotes.forEach(e => { md += `> [!note] ${e.name}\n`; e.notes.trim().split('\n').forEach(l=>{md+=`> ${l}\n`;}); md+=`\n`; });
   }
-
   md += `---\n*Exported from Initiative Tracker · ${new Date().toLocaleString()}*\n`;
   return md;
 }
 
-function updatePreview() {
-  document.getElementById('exp-preview').textContent = buildMarkdown();
-}
+function updatePreview() { document.getElementById('exp-preview').textContent = buildMarkdown(); }
 
 function downloadLog() {
-  const md      = buildMarkdown();
-  const title   = document.getElementById('exp-title').value.trim() || 'combat';
-  const date    = document.getElementById('exp-date').value.trim()  || 'unknown';
-  const safe    = title.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-  const filename = `${date}-${safe}.md`;
-
-  const blob = new Blob([md], { type: 'text/markdown' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  const md = buildMarkdown();
+  const title = document.getElementById('exp-title').value.trim() || 'combat';
+  const date  = document.getElementById('exp-date').value.trim()  || 'unknown';
+  const filename = `${date}-${title.replace(/[^a-z0-9]/gi,'-').toLowerCase()}.md`;
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([md],{type:'text/markdown'})), download: filename });
+  a.click(); URL.revokeObjectURL(a.href);
   closeExport();
 }
 
-// ── Preview updates on field change ──────────────────────
 ['exp-title','exp-date','exp-location','exp-outcome','exp-session','exp-summary'].forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.addEventListener('input', updatePreview);
+  document.getElementById(id)?.addEventListener('input', updatePreview);
 });
 
 // ═══════════════════════════════════════════════════════
@@ -915,14 +925,12 @@ function downloadLog() {
 function init() {
   state.customConditions = loadCustomConds();
   const pcs = loadPCs();
-  if (pcs.length > 0) {
-    state.combatants = pcs;
-    _id = Math.max(...pcs.map(c => c.id), 0);
-  }
-  initCombatLog();
+  if (pcs.length > 0) { state.combatants = pcs; _id = Math.max(...pcs.map(c=>c.id), 0); }
+  updateModeUI();
   render();
+  pushState();
   ['add-name','add-init','add-hp','add-ac'].forEach(id => {
-    document.getElementById(id).addEventListener('keydown', e => { if (e.key==='Enter') addCombatant(); });
+    document.getElementById(id).addEventListener('keydown', e => { if(e.key==='Enter') addCombatant(); });
   });
 }
 init();

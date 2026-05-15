@@ -26,6 +26,8 @@
   --pc-accent: #2e5a8a;
   --enemy-accent: #8a2e2e;
   --active-glow: rgba(184,134,11,0.3);
+  --lobby-accent: #3a6060;
+  --lobby-bg: #0d1e1e;
   --radius: 4px;
 }
 
@@ -40,156 +42,94 @@ body {
   padding: 1rem;
 }
 
-/* Header */
+/* ── Header ── */
 .header {
   width: 100%;
   max-width: 640px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1.2rem;
+  margin-bottom: 1rem;
   padding-bottom: 0.8rem;
   border-bottom: 1px solid var(--border);
 }
 .header h1 { font-family: 'Cinzel', serif; font-size: 1.1rem; letter-spacing: 0.1em; color: var(--gold); }
-.round-badge {
-  font-family: 'Cinzel', serif;
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
-  color: var(--ink-dim);
-  background: var(--surface);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius);
-  padding: 4px 12px;
-}
+.round-badge { font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.1em; color: var(--ink-dim); background: var(--surface); border: 1px solid var(--border-light); border-radius: var(--radius); padding: 4px 12px; }
 .round-badge span { color: var(--gold-light); font-size: 1rem; margin-left: 4px; }
 
-/* Connection */
-.conn-bar {
-  width: 100%;
-  max-width: 640px;
-  font-family: 'Cinzel', serif;
-  font-size: 0.62rem;
-  letter-spacing: 0.1em;
-  text-align: center;
-  margin-bottom: 0.8rem;
-  padding: 4px;
-  border-radius: var(--radius);
-}
-.conn-bar.live    { color: #4a9a60; background: rgba(74,154,96,0.1); border: 1px solid rgba(74,154,96,0.3); }
+/* ── Connection bar ── */
+.conn-bar { width: 100%; max-width: 640px; font-family: 'Cinzel', serif; font-size: 0.62rem; letter-spacing: 0.1em; text-align: center; margin-bottom: 0.8rem; padding: 4px; border-radius: var(--radius); }
+.conn-bar.live    { color: #4a9a60; background: rgba(74,154,96,0.1);  border: 1px solid rgba(74,154,96,0.3); }
 .conn-bar.waiting { color: var(--ink-faint); background: var(--surface); border: 1px solid var(--border); }
 .conn-bar.error   { color: #e88; background: var(--red-bg); border: 1px solid var(--red); }
 
-/* Combatant list */
-.list { width: 100%; max-width: 640px; }
-
-.row {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  margin-bottom: 8px;
-  transition: border-color 0.3s, box-shadow 0.3s;
-  overflow: hidden;
-}
-.row.is-pc    { border-left: 3px solid var(--pc-accent); }
-.row.is-enemy { border-left: 3px solid var(--enemy-accent); }
-.row.is-active {
-  border-color: var(--gold);
-  box-shadow: 0 0 16px var(--active-glow);
-  background: var(--surface2);
-}
-.row.is-dead { opacity: 0.38; }
-
-.row-main {
-  display: grid;
-  grid-template-columns: 40px 1fr auto;
+/* ── Lobby screen ── */
+.lobby-screen {
+  width: 100%;
+  max-width: 640px;
+  display: none;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-}
-
-.init-num {
-  font-family: 'Cinzel', serif;
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: var(--gold-light);
+  justify-content: center;
+  padding: 4rem 2rem;
   text-align: center;
 }
+.lobby-screen.show { display: flex; }
+.lobby-icon { font-size: 3rem; margin-bottom: 1.2rem; opacity: 0.6; animation: breathe 3s ease-in-out infinite; }
+@keyframes breathe { 0%,100%{opacity:0.5;transform:scale(1)} 50%{opacity:0.8;transform:scale(1.04)} }
+.lobby-title { font-family: 'Cinzel', serif; font-size: 1.3rem; letter-spacing: 0.08em; color: var(--gold); margin-bottom: 0.6rem; }
+.lobby-sub { font-size: 1rem; color: var(--ink-faint); font-style: italic; }
+.lobby-dots span {
+  display: inline-block;
+  animation: dot 1.4s ease-in-out infinite;
+  color: var(--gold-faint);
+  font-size: 1.4rem;
+  line-height: 1;
+  margin: 0 1px;
+}
+.lobby-dots span:nth-child(2) { animation-delay: 0.2s; }
+.lobby-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dot { 0%,80%,100%{opacity:0.2;transform:translateY(0)} 40%{opacity:1;transform:translateY(-4px)} }
+
+/* ── Combat view ── */
+.combat-view { width: 100%; max-width: 640px; display: none; }
+.combat-view.show { display: block; }
+
+/* ── Active banner ── */
+.active-banner { width: 100%; background: linear-gradient(90deg,var(--gold-faint),transparent); border: 1px solid var(--gold); border-radius: var(--radius); padding: 8px 16px; margin-bottom: 1rem; font-family: 'Cinzel', serif; font-size: 0.8rem; letter-spacing: 0.08em; color: var(--gold-light); display: none; }
+.active-banner.show { display: block; }
+
+/* ── Rows ── */
+.row { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; transition: border-color 0.3s, box-shadow 0.3s; overflow: hidden; }
+.row.is-pc    { border-left: 3px solid var(--pc-accent); }
+.row.is-enemy { border-left: 3px solid var(--enemy-accent); }
+.row.is-active { border-color: var(--gold); box-shadow: 0 0 16px var(--active-glow); background: var(--surface2); }
+.row.is-dead  { opacity: 0.38; }
+
+.row-main { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 10px; padding: 10px 14px; }
+.init-num { font-family: 'Cinzel', serif; font-size: 1.2rem; font-weight: 600; color: var(--gold-light); text-align: center; }
 .row.is-active .init-num { color: var(--gold); }
 
-.name-block {}
-.name-text {
-  font-family: 'Cinzel', serif;
-  font-size: 0.92rem;
-  letter-spacing: 0.03em;
-  color: var(--ink);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
+.name-text { font-family: 'Cinzel', serif; font-size: 0.92rem; letter-spacing: 0.03em; color: var(--ink); display: flex; align-items: center; gap: 6px; }
 .active-marker { color: var(--gold); font-size: 0.85rem; animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 .type-pip { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .type-pip.pc    { background: var(--pc-accent); }
 .type-pip.enemy { background: var(--enemy-accent); }
 
-.conds {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-  margin-top: 4px;
-}
-.cond-tag {
-  font-family: 'Cinzel', serif;
-  font-size: 0.58rem;
-  letter-spacing: 0.05em;
-  padding: 1px 6px;
-  border-radius: 8px;
-  background: rgba(200,120,0,0.15);
-  color: #d4a820;
-  border: 1px solid rgba(200,120,0,0.35);
-}
+.conds { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
+.cond-tag { font-family: 'Cinzel', serif; font-size: 0.58rem; letter-spacing: 0.05em; padding: 1px 6px; border-radius: 8px; background: rgba(200,120,0,0.15); color: #d4a820; border: 1px solid rgba(200,120,0,0.35); }
 
-/* HP section */
-.hp-block { text-align: right; min-width: 120px; }
+.hp-block { text-align: right; min-width: 110px; }
 .hp-label { font-family: 'Cinzel', serif; font-size: 0.58rem; letter-spacing: 0.1em; color: var(--ink-faint); margin-bottom: 3px; }
 .hp-bar-wrap { width: 100%; height: 8px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; }
 .hp-bar { height: 100%; border-radius: 4px; transition: width 0.5s ease, background 0.5s ease; }
 .hp-num { font-size: 0.78rem; color: var(--ink-dim); margin-top: 2px; }
 
-/* AC badge */
-.ac-chip {
-  font-family: 'Cinzel', serif;
-  font-size: 0.7rem;
-  color: var(--ink-dim);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius);
-  padding: 2px 8px;
-  text-align: center;
-  margin-left: 8px;
-  white-space: nowrap;
-}
+.ac-chip { font-family: 'Cinzel', serif; font-size: 0.7rem; color: var(--ink-dim); border: 1px solid var(--border-light); border-radius: var(--radius); padding: 2px 8px; text-align: center; margin-left: 8px; white-space: nowrap; }
 .ac-chip small { display: block; font-size: 0.55rem; color: var(--ink-faint); }
 
-/* Whose turn banner */
-.active-banner {
-  width: 100%;
-  max-width: 640px;
-  background: linear-gradient(90deg, var(--gold-faint), transparent);
-  border: 1px solid var(--gold);
-  border-radius: var(--radius);
-  padding: 8px 16px;
-  margin-bottom: 1rem;
-  font-family: 'Cinzel', serif;
-  font-size: 0.8rem;
-  letter-spacing: 0.08em;
-  color: var(--gold-light);
-  display: none;
-}
-.active-banner.show { display: block; }
-
-/* Empty */
-.empty { color: var(--ink-faint); font-style: italic; text-align: center; padding: 3rem 1rem; width: 100%; max-width: 640px; }
+.right-col { display: flex; align-items: center; }
 </style>
 </head>
 <body>
@@ -199,31 +139,34 @@ body {
   <div class="round-badge">ROUND <span id="round-num">—</span></div>
 </div>
 
-<div class="conn-bar waiting" id="conn-bar">⟳ Connecting to DM…</div>
-<div class="active-banner" id="active-banner"></div>
-<div class="list" id="list"></div>
-<div class="empty" id="empty-state">Waiting for the DM to start combat…</div>
+<div class="conn-bar waiting" id="conn-bar">⟳ Connecting…</div>
+
+<!-- LOBBY SCREEN -->
+<div class="lobby-screen" id="lobby-screen">
+  <div class="lobby-icon">⚔</div>
+  <div class="lobby-title">Combat incoming</div>
+  <div class="lobby-sub">Your DM is preparing the encounter…</div>
+  <div class="lobby-dots" style="margin-top:1.2rem">
+    <span>●</span><span>●</span><span>●</span>
+  </div>
+</div>
+
+<!-- COMBAT VIEW -->
+<div class="combat-view" id="combat-view">
+  <div class="active-banner" id="active-banner"></div>
+  <div id="list"></div>
+</div>
 
 <script>
-// ═══════════════════════════════════════════════════════
-//  CONFIG
-// ═══════════════════════════════════════════════════════
 const WORKER_URL = 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
-const POLL_MS    = 2500; // poll every 2.5 seconds
+const POLL_MS    = 2500;
 
-let lastState = null;
-let pollTimer = null;
+let lastMode = null;
 let failCount = 0;
 
-// ═══════════════════════════════════════════════════════
-//  HP BAR COLOR
-// ═══════════════════════════════════════════════════════
 function hpColor(pct) {
-  if (pct > 60) return '#2d6a3f';
-  if (pct > 30) return '#c87800';
-  return '#c0392b';
+  return pct > 60 ? '#2d6a3f' : pct > 30 ? '#c87800' : '#c0392b';
 }
-
 function hpLabel(pct, type, hp, maxHp) {
   if (type === 'pc' && hp !== null) return `${hp} / ${maxHp}`;
   if (pct >= 100) return 'Unharmed';
@@ -234,23 +177,26 @@ function hpLabel(pct, type, hp, maxHp) {
   return 'Unconscious';
 }
 
-// ═══════════════════════════════════════════════════════
-//  RENDER
-// ═══════════════════════════════════════════════════════
-function render(s) {
+function showLobby() {
+  document.getElementById('lobby-screen').classList.add('show');
+  document.getElementById('combat-view').classList.remove('show');
+  document.getElementById('active-banner').classList.remove('show');
+  document.getElementById('round-num').textContent = '—';
+}
+
+function showCombat(s) {
+  document.getElementById('lobby-screen').classList.remove('show');
+  document.getElementById('combat-view').classList.add('show');
   document.getElementById('round-num').textContent = s.round;
 
-  const list  = document.getElementById('list');
-  const empty = document.getElementById('empty-state');
+  const list   = document.getElementById('list');
   const banner = document.getElementById('active-banner');
 
   if (!s.combatants || s.combatants.length === 0) {
     list.innerHTML = '';
-    empty.style.display = 'block';
     banner.classList.remove('show');
     return;
   }
-  empty.style.display = 'none';
 
   const active = s.combatants[s.activeIndex];
   if (active) {
@@ -261,6 +207,9 @@ function render(s) {
   list.innerHTML = '';
   s.combatants.forEach((c, idx) => {
     const isActive = idx === s.activeIndex;
+    const isPC     = c.type === 'pc';
+    const hpPct    = c.hpPct ?? 100;
+
     const row = document.createElement('div');
     row.className = `row is-${c.type}${isActive ? ' is-active' : ''}${c.dead ? ' is-dead' : ''}`;
 
@@ -268,13 +217,15 @@ function render(s) {
       ? `<div class="conds">${c.conditions.map(cond => `<span class="cond-tag">${cond}</span>`).join('')}</div>`
       : '';
 
-    const hpPct = c.hpPct ?? 100;
-    const isPC  = c.type === 'pc';
+    // AC: only shown for PCs (enemies have ac:null in payload)
+    const acHtml = (isPC && c.ac)
+      ? `<div class="ac-chip"><small>AC</small>${c.ac}</div>`
+      : '';
 
     row.innerHTML = `
       <div class="row-main">
         <div class="init-num">${c.init}</div>
-        <div class="name-block">
+        <div>
           <div class="name-text">
             <span class="type-pip ${c.type}"></span>
             ${isActive ? '<span class="active-marker">▶</span>' : ''}
@@ -282,7 +233,7 @@ function render(s) {
           </div>
           ${condsHtml}
         </div>
-        <div style="display:flex;align-items:center">
+        <div class="right-col">
           <div class="hp-block">
             <div class="hp-label">${isPC ? 'HP' : 'CONDITION'}</div>
             <div class="hp-bar-wrap">
@@ -290,7 +241,7 @@ function render(s) {
             </div>
             <div class="hp-num">${hpLabel(hpPct, c.type, c.hp, c.maxHp)}</div>
           </div>
-          ${isPC ? `<div class="ac-chip"><small>AC</small>${c.ac}</div>` : ''}
+          ${acHtml}
         </div>
       </div>
     `;
@@ -298,31 +249,34 @@ function render(s) {
   });
 }
 
-// ═══════════════════════════════════════════════════════
-//  POLL
-// ═══════════════════════════════════════════════════════
 async function poll() {
   try {
-    const res = await fetch(WORKER_URL + '?type=initiative_state', { cache: 'no-store' });
+    const res  = await fetch(WORKER_URL + '?type=initiative_state', { cache: 'no-store' });
     if (!res.ok) throw new Error(res.status);
     const data = await res.json();
-    failCount = 0;
+    failCount  = 0;
+
     const bar = document.getElementById('conn-bar');
-    bar.className = 'conn-bar live';
+    bar.className   = 'conn-bar live';
     bar.textContent = '✦ Live — updates every few seconds';
-    if (data && data.combatants) {
-      lastState = data;
-      render(data);
+
+    if (data && typeof data.mode !== 'undefined') {
+      if (data.mode === 'lobby') {
+        showLobby();
+      } else {
+        showCombat(data);
+      }
+      lastMode = data.mode;
     }
   } catch {
     failCount++;
     const bar = document.getElementById('conn-bar');
     if (failCount > 3) {
-      bar.className = 'conn-bar error';
+      bar.className   = 'conn-bar error';
       bar.textContent = '⚠ Connection lost — retrying…';
     }
   }
-  pollTimer = setTimeout(poll, POLL_MS);
+  setTimeout(poll, POLL_MS);
 }
 
 poll();
