@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World Map — DM Editor</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0806;--surface:#13100a;--surface2:#1c1810;--surface3:#242018;--border:#2e2510;--border-light:#3e3418;
+  --gold:#b8860b;--gold-light:#d4a820;--gold-faint:#6b4f08;--gold-dim:#4a3606;
+  --ink:#e8dfc0;--ink-dim:#a09070;--ink-faint:#6a5a40;
+  --red:#8b2020;--red-bg:#2a0f0d;--green:#2d6a3f;--green-bg:#0d1f12;--green-light:#4a9a60;
+  --purple:#5a3e9b;--purple-bg:#18102a;--amber:#c87800;
+  --pc-accent:#2e5a8a;--enemy-accent:#8a2e2e;
+  --radius:4px;--topbar:48px;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,serif;display:flex;flex-direction:column}
+
+/* ── Topbar ── */
+.topbar{height:var(--topbar);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1rem;gap:0.6rem;flex-shrink:0;z-index:50;flex-wrap:wrap}
+.topbar h1{font-family:'Cinzel',serif;font-size:0.95rem;letter-spacing:0.1em;color:var(--gold);flex:1;min-width:80px}
+.btn{font-family:'Cinzel',serif;font-size:0.68rem;letter-spacing:0.08em;border:1px solid;border-radius:var(--radius);padding:4px 10px;cursor:pointer;transition:all 0.15s;white-space:nowrap;background:transparent}
+.btn-gold{background:var(--gold-dim);border-color:var(--gold);color:var(--gold-light)}.btn-gold:hover{background:var(--gold);color:var(--bg)}
+.btn-green{background:var(--green-bg);border-color:var(--green);color:#8e8}.btn-green:hover{background:var(--green);color:white}
+.btn-red{background:var(--red-bg);border-color:var(--red);color:#e88}.btn-red:hover{background:var(--red);color:white}
+.btn-purple{background:var(--purple-bg);border-color:var(--purple);color:#c0a0f0}.btn-purple:hover{background:var(--purple);color:white}
+.btn-ghost{border-color:var(--border-light);color:var(--ink-dim)}.btn-ghost:hover{border-color:var(--ink-dim);color:var(--ink)}
+.btn-sm{font-size:0.6rem;padding:3px 7px}
+.sync-status{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.08em;color:var(--ink-faint)}
+.sync-status.ok{color:var(--green-light)}.sync-status.fail{color:var(--red)}.sync-status.ing{color:var(--amber)}
+
+/* ── Layout ── */
+.main{flex:1;display:grid;grid-template-columns:1fr 320px;overflow:hidden}
+.map-col{position:relative;overflow:hidden;display:flex;flex-direction:column}
+.editor-col{background:var(--surface);border-left:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column}
+
+/* ── Map ── */
+.map-container{flex:1;position:relative;overflow:hidden;cursor:crosshair}
+.map-canvas{position:absolute;top:0;left:0;transform-origin:0 0;user-select:none}
+.map-img{display:block;max-width:none;pointer-events:none}
+.map-placeholder{background:linear-gradient(135deg,#0d1a0d,#0a1a14,#0d1510);display:flex;align-items:center;justify-content:center;color:var(--ink-faint);font-style:italic;font-size:0.9rem;border:1px dashed var(--border);flex-direction:column;gap:8px}
+.map-controls{position:absolute;bottom:1rem;right:1rem;display:flex;flex-direction:column;gap:4px;z-index:20}
+.map-btn{width:30px;height:30px;background:rgba(19,16,10,0.9);border:1px solid var(--border-light);border-radius:var(--radius);color:var(--ink-dim);font-size:0.9rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+.map-btn:hover{border-color:var(--gold);color:var(--gold)}
+.map-hint{position:absolute;top:0.5rem;left:50%;transform:translateX(-50%);background:rgba(19,16,10,0.9);border:1px solid var(--border-light);border-radius:var(--radius);padding:4px 10px;font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.08em;color:var(--ink-faint);z-index:20;pointer-events:none}
+
+/* ── Pins & zones (DM view) ── */
+.pin{position:absolute;transform:translate(-50%,-100%);cursor:pointer;z-index:10;transition:transform 0.15s}
+.pin:hover{transform:translate(-50%,-100%) scale(1.15)}
+.pin-icon{width:28px;height:36px;display:flex;flex-direction:column;align-items:center}
+.pin-marker{width:22px;height:22px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid;display:flex;align-items:center;justify-content:center}
+.pin-marker .pin-emoji{transform:rotate(45deg);font-size:10px;line-height:1}
+.pin-tail{width:2px;height:10px;margin-top:1px}
+.pin.type-city    .pin-marker{background:#1a2e4a;border-color:#4a80c0}.pin.type-city    .pin-tail{background:#4a80c0}
+.pin.type-dungeon .pin-marker{background:#2a1a1a;border-color:#8a3030}.pin.type-dungeon .pin-tail{background:#8a3030}
+.pin.type-wilderness .pin-marker{background:#1a2e1a;border-color:#4a8a50}.pin.type-wilderness .pin-tail{background:#4a8a50}
+.pin.type-ruin    .pin-marker{background:#2a2010;border-color:#8a7040}.pin.type-ruin    .pin-tail{background:#8a7040}
+.pin.type-port    .pin-marker{background:#102030;border-color:#4080a0}.pin.type-port    .pin-tail{background:#4080a0}
+.pin.type-default .pin-marker{background:#201a10;border-color:#a08040}.pin.type-default .pin-tail{background:#a08040}
+.pin.hidden-pin   .pin-marker{opacity:0.45;border-style:dashed}
+.pin.selected-pin{filter:drop-shadow(0 0 6px var(--gold))}
+.pin-label{position:absolute;top:calc(100% + 4px);left:50%;transform:translateX(-50%);white-space:nowrap;font-family:'Cinzel',serif;font-size:0.58rem;letter-spacing:0.06em;color:var(--ink);background:rgba(10,8,6,0.85);padding:2px 5px;border-radius:2px;border:1px solid var(--border);pointer-events:none}
+.zone{position:absolute;border-radius:6px;border:2px solid;cursor:pointer;transition:opacity 0.2s}
+.zone:hover{outline:2px solid var(--gold)}
+.zone.selected-zone{outline:2px solid var(--gold)}
+.zone-label{font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.08em;text-align:center;pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,0.8);padding:2px 6px;width:100%;display:flex;align-items:center;justify-content:center;height:100%}
+
+/* ── Editor panel ── */
+.editor-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.editor-tab{flex:1;font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.08em;padding:8px 4px;text-align:center;cursor:pointer;color:var(--ink-faint);border:none;background:transparent;border-bottom:2px solid transparent;transition:all 0.15s}
+.editor-tab.active{color:var(--gold);border-bottom-color:var(--gold)}
+.editor-tab:hover:not(.active){color:var(--ink-dim)}
+.editor-pane{display:none;flex:1;overflow-y:auto;padding:0.8rem}
+.editor-pane.active{display:block}
+
+.field{margin-bottom:0.7rem}
+.field label{font-family:'Cinzel',serif;font-size:0.58rem;letter-spacing:0.1em;color:var(--ink-faint);display:block;margin-bottom:3px}
+.field input,.field textarea,.field select{width:100%;background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.88rem;padding:4px 7px;outline:none;transition:border-color 0.15s}
+.field input:focus,.field textarea:focus{border-color:var(--gold)}
+.field textarea{resize:vertical;min-height:60px}
+.field select{cursor:pointer}
+.field-row{display:flex;gap:6px}.field-row .field{flex:1}
+.toggle-row{display:flex;align-items:center;gap:8px;margin-bottom:0.7rem}
+.toggle-row label{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.08em;color:var(--ink-dim);cursor:pointer}
+.toggle-row input[type=checkbox]{accent-color:var(--gold);width:14px;height:14px;cursor:pointer}
+
+.section-header{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.12em;color:var(--gold-faint);margin:0.8rem 0 0.4rem;display:flex;align-items:center;justify-content:space-between}
+.item-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:8px;margin-bottom:6px}
+.item-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.item-card-title{font-family:'Cinzel',serif;font-size:0.75rem;color:var(--ink)}
+.item-card-del{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:0.85rem;padding:0 2px}
+.item-card-del:hover{color:var(--red)}
+
+.loc-list{display:flex;flex-direction:column;gap:4px}
+.loc-list-item{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:7px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:border-color 0.15s}
+.loc-list-item:hover{border-color:var(--border-light)}
+.loc-list-item.selected{border-color:var(--gold)}
+.loc-list-name{font-family:'Cinzel',serif;font-size:0.78rem;color:var(--ink);flex:1}
+.loc-list-type{font-size:0.65rem;color:var(--ink-faint)}
+.hidden-tag{font-size:0.55rem;padding:1px 4px;border-radius:4px;border:1px solid #3a6060;color:#80c0c0;background:rgba(58,96,96,0.15);font-family:'Cinzel',serif}
+
+.dm-note-area{background:#12102a;border:1px solid #3a2a6a;border-radius:var(--radius);padding:8px;margin-top:0.5rem}
+.dm-note-label{font-family:'Cinzel',serif;font-size:0.58rem;letter-spacing:0.1em;color:#7050c0;margin-bottom:4px}
+
+.publish-section{padding:0.8rem;border-top:1px solid var(--border);flex-shrink:0}
+
+/* Modal */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:200;padding:1rem}
+.modal-backdrop.hidden{display:none}
+.modal{background:var(--surface);border:1px solid var(--border-light);border-radius:var(--radius);max-width:480px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.8)}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:0.8rem 1rem;border-bottom:1px solid var(--border)}
+.modal-header h2{font-family:'Cinzel',serif;font-size:0.85rem;letter-spacing:0.08em;color:var(--gold)}
+.modal-close{background:none;border:none;color:var(--ink-faint);font-size:1.1rem;cursor:pointer;padding:2px 6px}
+.modal-close:hover{color:var(--ink)}
+.modal-body{padding:0.8rem 1rem;overflow-y:auto;flex:1}
+.modal-footer{padding:0.7rem 1rem;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+
+@media(max-width:800px){
+  .main{grid-template-columns:1fr}
+  .editor-col{max-height:45vh;border-left:none;border-top:1px solid var(--border)}
+}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <h1>⚔ World Map — DM Editor</h1>
+  <button class="btn btn-ghost btn-sm" onclick="switchTab('locations')">Locations</button>
+  <button class="btn btn-ghost btn-sm" onclick="switchTab('zones')">Zones</button>
+  <button class="btn btn-ghost btn-sm" onclick="switchTab('world')">World</button>
+  <button class="btn btn-green" onclick="publishData()">▲ Publish to players</button>
+  <button class="btn btn-ghost btn-sm" onclick="window.open('map.html','_blank')">Preview ↗</button>
+  <div class="sync-status" id="sync-status">—</div>
+</div>
+
+<div class="main">
+  <!-- MAP -->
+  <div class="map-col">
+    <div class="map-container" id="map-container">
+      <div class="map-canvas" id="map-canvas"></div>
+    </div>
+    <div class="map-controls">
+      <button class="map-btn" onclick="mapZoom(1.2)">+</button>
+      <button class="map-btn" onclick="mapZoom(0.8)">−</button>
+      <button class="map-btn" onclick="mapReset()">⌂</button>
+    </div>
+    <div class="map-hint" id="map-hint">Click map to place a new location pin</div>
+  </div>
+
+  <!-- EDITOR -->
+  <div class="editor-col">
+    <div class="editor-tabs">
+      <button class="editor-tab active" id="tab-locations" onclick="switchTab('locations')">LOCATIONS</button>
+      <button class="editor-tab" id="tab-zones" onclick="switchTab('zones')">ZONES</button>
+      <button class="editor-tab" id="tab-world" onclick="switchTab('world')">WORLD</button>
+    </div>
+
+    <!-- LOCATIONS TAB -->
+    <div class="editor-pane active" id="pane-locations">
+      <div style="display:flex;gap:6px;margin-bottom:0.6rem;flex-wrap:wrap">
+        <button class="btn btn-gold btn-sm" onclick="addLocation()">+ Add location</button>
+        <button class="btn btn-ghost btn-sm" id="place-mode-btn" onclick="togglePlaceMode()">📍 Click to place</button>
+      </div>
+      <div class="loc-list" id="loc-list"></div>
+    </div>
+
+    <!-- ZONES TAB -->
+    <div class="editor-pane" id="pane-zones">
+      <button class="btn btn-gold btn-sm" style="margin-bottom:0.6rem" onclick="addZone()">+ Add zone</button>
+      <div id="zone-list"></div>
+    </div>
+
+    <!-- WORLD TAB -->
+    <div class="editor-pane" id="pane-world">
+      <div class="field"><label>WORLD NAME</label><input type="text" id="world-name" placeholder="The Realm…"></div>
+      <div class="field"><label>REGION MAP IMAGE URL</label><input type="text" id="world-mapImage" placeholder="https://… or leave blank"></div>
+      <div class="field-row">
+        <div class="field"><label>MAP WIDTH (px)</label><input type="number" id="world-mapWidth" value="1200"></div>
+        <div class="field"><label>MAP HEIGHT (px)</label><input type="number" id="world-mapHeight" value="800"></div>
+      </div>
+      <button class="btn btn-gold" onclick="saveWorldSettings()">Save world settings</button>
+    </div>
+
+    <div class="publish-section">
+      <button class="btn btn-green" style="width:100%" onclick="publishData()">▲ Publish to players</button>
+      <div style="margin-top:4px;text-align:center" id="publish-status" class="sync-status">Unpublished changes</div>
+    </div>
+  </div>
+</div>
+
+<!-- LOCATION EDITOR MODAL -->
+<div class="modal-backdrop hidden" id="loc-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="loc-modal-title">Edit Location</h2>
+      <button class="modal-close" onclick="closeLocModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="editor-tabs" style="margin:-0.8rem -1rem 0.8rem;border-radius:0">
+        <button class="editor-tab active" id="ltab-info"   onclick="switchLocTab('info')">INFO</button>
+        <button class="editor-tab" id="ltab-lore"   onclick="switchLocTab('lore')">LORE</button>
+        <button class="editor-tab" id="ltab-npcs"   onclick="switchLocTab('npcs')">NPCs</button>
+        <button class="editor-tab" id="ltab-quests" onclick="switchLocTab('quests')">QUESTS</button>
+        <button class="editor-tab" id="ltab-dm"     onclick="switchLocTab('dm')">DM NOTES</button>
+      </div>
+
+      <!-- INFO -->
+      <div class="editor-pane active" id="lpane-info">
+        <div class="field"><label>LOCATION NAME</label><input type="text" id="loc-name" placeholder="Ironhaven…"></div>
+        <div class="field-row">
+          <div class="field"><label>TYPE</label>
+            <select id="loc-type">
+              <option value="city">City</option>
+              <option value="dungeon">Dungeon</option>
+              <option value="wilderness">Wilderness</option>
+              <option value="ruin">Ruin</option>
+              <option value="port">Port</option>
+              <option value="default">Other</option>
+            </select>
+          </div>
+          <div class="field"><label>ID (URL slug)</label><input type="text" id="loc-id" placeholder="ironhaven"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>X POS (%)</label><input type="number" id="loc-x" min="0" max="100" step="0.5"></div>
+          <div class="field"><label>Y POS (%)</label><input type="number" id="loc-y" min="0" max="100" step="0.5"></div>
+        </div>
+        <div class="field"><label>SHORT DESCRIPTION (shown on hover)</label><textarea id="loc-shortDesc" rows="2"></textarea></div>
+        <div class="field"><label>SUB-MAP IMAGE URL (optional)</label><input type="text" id="loc-mapImage" placeholder="https://… or leave blank"></div>
+        <div class="field"><label>CONNECTED LOCATIONS (comma-separated IDs)</label><input type="text" id="loc-connected" placeholder="ironhaven,greypass"></div>
+        <div class="toggle-row">
+          <input type="checkbox" id="loc-visible" checked>
+          <label for="loc-visible">Visible to players</label>
+        </div>
+      </div>
+
+      <!-- LORE -->
+      <div class="editor-pane" id="lpane-lore">
+        <div class="field"><label>PLAYER-FACING LORE</label><textarea id="loc-lore" rows="12" placeholder="What the players know or can learn about this place…"></textarea></div>
+      </div>
+
+      <!-- NPCs -->
+      <div class="editor-pane" id="lpane-npcs">
+        <button class="btn btn-gold btn-sm" style="margin-bottom:0.6rem" onclick="addNPC()">+ Add NPC</button>
+        <div id="npc-editor-list"></div>
+      </div>
+
+      <!-- QUESTS -->
+      <div class="editor-pane" id="lpane-quests">
+        <button class="btn btn-gold btn-sm" style="margin-bottom:0.6rem" onclick="addQuest()">+ Add quest hook</button>
+        <div id="quest-editor-list"></div>
+      </div>
+
+      <!-- DM NOTES -->
+      <div class="editor-pane" id="lpane-dm">
+        <div class="dm-note-area">
+          <div class="dm-note-label">🔒 DM ONLY — NOT PUBLISHED TO PLAYERS</div>
+          <textarea id="loc-dmNotes" rows="12" style="width:100%;background:transparent;border:none;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.9rem;outline:none;resize:vertical;line-height:1.5" placeholder="Secret notes, monster stats, plot hooks, treasure…"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-red btn-sm" onclick="deleteLocation()">Delete</button>
+      <button class="btn btn-ghost" onclick="closeLocModal()">Cancel</button>
+      <button class="btn btn-gold" onclick="saveLocation()">Save location</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════════════════════════════
+const WORKER_URL = 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+
+const TYPE_ICONS  = { city:'🏙',dungeon:'⚔',wilderness:'🌲',ruin:'🏚',port:'⚓',default:'📍' };
+const TYPE_LABELS = { city:'City',dungeon:'Dungeon',wilderness:'Wilderness',ruin:'Ruin',port:'Port',default:'Location' };
+const TYPE_COLORS = { city:'#4a80c0',dungeon:'#8a3030',wilderness:'#4a8a50',ruin:'#8a7040',port:'#4080a0',default:'#a08040' };
+const ZONE_COLORS = ['#6a5a40','#2d6a3f','#2e4a7a','#8a3030','#5a3e9b','#4a6060'];
+
+// ══════════════════════════════════════════════════════════════
+//  DATA
+// ══════════════════════════════════════════════════════════════
+let data = {
+  world:{ name:'The Realm', mapImage:'', mapWidth:1200, mapHeight:800 },
+  locations:[], zones:[]
+};
+
+let selectedLocId  = null;
+let selectedZoneId = null;
+let placeMode      = false;
+let editingLocId   = null; // id of loc being edited in modal
+let tempNPCs       = [];
+let tempQuests     = [];
+
+// ── Map pan/zoom ──────────────────────────────────────────────
+let mapScale=1, mapX=0, mapY=0;
+let isDragging=false, dragStartX, dragStartY, dragOriginX, dragOriginY;
+
+// ══════════════════════════════════════════════════════════════
+//  PERSISTENCE
+// ══════════════════════════════════════════════════════════════
+function saveLocal() { localStorage.setItem('dm_map_data', JSON.stringify(data)); }
+function loadLocal() {
+  try {
+    const d = JSON.parse(localStorage.getItem('dm_map_data')||'null');
+    if (d && d.locations) data = d;
+  } catch {}
+}
+
+// ══════════════════════════════════════════════════════════════
+//  PUBLISH
+// ══════════════════════════════════════════════════════════════
+async function publishData() {
+  setSyncStatus('ing','⟳ Publishing…');
+  // Strip DM notes from player payload
+  const playerData = {
+    world: data.world,
+    zones: data.zones,
+    locations: data.locations.map(loc => {
+      const { dmNotes, ...rest } = loc;
+      return rest;
+    })
+  };
+  try {
+    const res = await fetch(WORKER_URL, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ type:'map_data', payload: playerData })
+    });
+    if (res.ok) { setSyncStatus('ok','✦ Published'); setPublishStatus('ok','✦ Published to players'); }
+    else { setSyncStatus('fail','⚠ Failed'); setPublishStatus('fail','⚠ Publish failed'); }
+  } catch { setSyncStatus('fail','⚠ Offline'); setPublishStatus('fail','⚠ Could not reach server'); }
+}
+
+function setSyncStatus(type, msg) {
+  const el = document.getElementById('sync-status');
+  el.className = `sync-status ${type}`; el.textContent = msg;
+}
+function setPublishStatus(type, msg) {
+  const el = document.getElementById('publish-status');
+  el.className = `sync-status ${type}`; el.textContent = msg;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TABS
+// ══════════════════════════════════════════════════════════════
+function switchTab(name) {
+  ['locations','zones','world'].forEach(t => {
+    document.getElementById(`tab-${t}`).classList.toggle('active', t===name);
+    document.getElementById(`pane-${t}`).classList.toggle('active', t===name);
+  });
+  placeMode = name === 'locations';
+  updatePlaceModeUI();
+}
+function switchLocTab(name) {
+  ['info','lore','npcs','quests','dm'].forEach(t => {
+    document.getElementById(`ltab-${t}`).classList.toggle('active', t===name);
+    document.getElementById(`lpane-${t}`).classList.toggle('active', t===name);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MAP BUILD & RENDER
+// ══════════════════════════════════════════════════════════════
+function buildMap() {
+  const canvas = document.getElementById('map-canvas');
+  canvas.innerHTML = '';
+  const W = data.world.mapWidth  || 1200;
+  const H = data.world.mapHeight || 800;
+
+  if (data.world.mapImage) {
+    const img = document.createElement('img');
+    img.className='map-img'; img.src=data.world.mapImage; img.width=W; img.height=H;
+    canvas.appendChild(img);
+  } else {
+    const ph = document.createElement('div');
+    ph.className='map-placeholder'; ph.style.cssText=`width:${W}px;height:${H}px`;
+    ph.innerHTML=`<span>📍 Click anywhere to place a location</span><small style="color:var(--ink-faint);font-size:0.75rem">Set a map image in the World tab</small>`;
+    canvas.appendChild(ph);
+  }
+
+  // Zones
+  (data.zones||[]).forEach(zone => {
+    const el = document.createElement('div');
+    el.className = `zone${zone.id===selectedZoneId?' selected-zone':''}`;
+    el.style.cssText=`left:${zone.x}%;top:${zone.y}%;width:${zone.width}%;height:${zone.height}%;background:${zone.color};opacity:${zone.opacity};border-color:${zone.color};position:absolute`;
+    const label = document.createElement('div');
+    label.className='zone-label'; label.style.color=zone.color; label.style.opacity=1/zone.opacity*0.7;
+    label.textContent=zone.name;
+    el.appendChild(label);
+    el.addEventListener('click', e => { e.stopPropagation(); selectZone(zone.id); });
+    canvas.appendChild(el);
+  });
+
+  // Pins (all — DM sees hidden ones)
+  (data.locations||[]).forEach(loc => {
+    const type = loc.type||'default';
+    const pin = document.createElement('div');
+    pin.className = `pin type-${type}${loc.visible===false?' hidden-pin':''}${loc.id===selectedLocId?' selected-pin':''}`;
+    pin.style.cssText=`left:${loc.x}%;top:${loc.y}%`;
+    pin.innerHTML=`
+      <div class="pin-icon">
+        <div class="pin-marker"><span class="pin-emoji">${TYPE_ICONS[type]||TYPE_ICONS.default}</span></div>
+        <div class="pin-tail"></div>
+      </div>
+      <div class="pin-label">${loc.name}${loc.visible===false?' 🙈':''}</div>
+    `;
+    pin.addEventListener('click', e => { e.stopPropagation(); selectLocation(loc.id); });
+    canvas.appendChild(pin);
+  });
+
+  // Click to place
+  canvas.addEventListener('click', onMapClick);
+  resetMapView();
+  setupMapDrag();
+}
+
+function onMapClick(e) {
+  if (!placeMode) return;
+  if (e.target.closest('.pin') || e.target.closest('.zone')) return;
+  const canvas = document.getElementById('map-canvas');
+  const rect = canvas.getBoundingClientRect();
+  const W = data.world.mapWidth || 1200;
+  const H = data.world.mapHeight || 800;
+  const xPct = ((e.clientX - rect.left) / (W * mapScale)) * 100;
+  const yPct = ((e.clientY - rect.top)  / (H * mapScale)) * 100;
+  openLocModal(null, Math.round(xPct*10)/10, Math.round(yPct*10)/10);
+}
+
+function resetMapView() {
+  const container = document.getElementById('map-container');
+  const W = data.world.mapWidth||1200, H = data.world.mapHeight||800;
+  const cw = container.clientWidth||800, ch = container.clientHeight||600;
+  mapScale = Math.min(cw/W, ch/H)*0.88;
+  mapX = (cw - W*mapScale)/2; mapY = (ch - H*mapScale)/2;
+  applyTransform();
+}
+function mapReset() { resetMapView(); }
+function mapZoom(f) {
+  const container = document.getElementById('map-container');
+  const cx=container.clientWidth/2, cy=container.clientHeight/2;
+  const ns = Math.min(Math.max(mapScale*f,0.15),4);
+  mapX=cx-(cx-mapX)*(ns/mapScale); mapY=cy-(cy-mapY)*(ns/mapScale); mapScale=ns;
+  applyTransform();
+}
+function applyTransform() {
+  document.getElementById('map-canvas').style.transform=`translate(${mapX}px,${mapY}px) scale(${mapScale})`;
+}
+
+function setupMapDrag() {
+  const container = document.getElementById('map-container');
+  container.onmousedown = e => {
+    if (e.target.closest('.pin')||e.target.closest('.zone')) return;
+    if (placeMode) return; // let click handle it
+    isDragging=true; dragStartX=e.clientX; dragStartY=e.clientY; dragOriginX=mapX; dragOriginY=mapY;
+  };
+  window.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    mapX=dragOriginX+(e.clientX-dragStartX); mapY=dragOriginY+(e.clientY-dragStartY); applyTransform();
+  });
+  window.addEventListener('mouseup', ()=>{ isDragging=false; });
+  container.addEventListener('wheel', e => {
+    e.preventDefault();
+    const f=e.deltaY<0?1.1:0.9, rect=container.getBoundingClientRect();
+    const cx=e.clientX-rect.left, cy=e.clientY-rect.top;
+    const ns=Math.min(Math.max(mapScale*f,0.15),4);
+    mapX=cx-(cx-mapX)*(ns/mapScale); mapY=cy-(cy-mapY)*(ns/mapScale); mapScale=ns; applyTransform();
+  },{passive:false});
+}
+
+// ══════════════════════════════════════════════════════════════
+//  PLACE MODE
+// ══════════════════════════════════════════════════════════════
+function togglePlaceMode() {
+  placeMode = !placeMode;
+  updatePlaceModeUI();
+}
+function updatePlaceModeUI() {
+  const btn  = document.getElementById('place-mode-btn');
+  const hint = document.getElementById('map-hint');
+  const container = document.getElementById('map-container');
+  if (placeMode) {
+    btn.style.background='var(--gold-dim)'; btn.style.borderColor='var(--gold)'; btn.style.color='var(--gold-light)';
+    hint.style.display='block'; container.style.cursor='crosshair';
+  } else {
+    btn.style.background=''; btn.style.borderColor=''; btn.style.color='';
+    hint.style.display='none'; container.style.cursor='grab';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  LOCATION LIST
+// ══════════════════════════════════════════════════════════════
+function renderLocList() {
+  const list = document.getElementById('loc-list');
+  list.innerHTML = '';
+  if (data.locations.length === 0) {
+    list.innerHTML='<div style="color:var(--ink-faint);font-style:italic;font-size:0.82rem;padding:0.5rem 0">No locations yet. Click the map or use + Add location.</div>';
+    return;
+  }
+  data.locations.forEach(loc => {
+    const el = document.createElement('div');
+    el.className = `loc-list-item${loc.id===selectedLocId?' selected':''}`;
+    el.innerHTML = `
+      <span style="font-size:0.85rem">${TYPE_ICONS[loc.type||'default']||'📍'}</span>
+      <span class="loc-list-name">${loc.name}</span>
+      <span class="loc-list-type">${TYPE_LABELS[loc.type||'default']||loc.type}</span>
+      ${loc.visible===false?'<span class="hidden-tag">HIDDEN</span>':''}
+    `;
+    el.addEventListener('click', () => selectLocation(loc.id));
+    list.appendChild(el);
+  });
+}
+
+function selectLocation(id) {
+  selectedLocId = id;
+  selectedZoneId = null;
+  renderLocList();
+  buildMap();
+  openLocModal(id);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  LOCATION MODAL
+// ══════════════════════════════════════════════════════════════
+function addLocation() {
+  openLocModal(null, 50, 50);
+}
+
+function openLocModal(id, defaultX, defaultY) {
+  editingLocId = id;
+  const loc = id ? data.locations.find(l=>l.id===id) : null;
+
+  document.getElementById('loc-modal-title').textContent = loc ? `Edit: ${loc.name}` : 'New Location';
+  document.getElementById('loc-name').value       = loc?.name || '';
+  document.getElementById('loc-id').value         = loc?.id   || '';
+  document.getElementById('loc-type').value       = loc?.type || 'default';
+  document.getElementById('loc-x').value          = loc?.x    ?? defaultX ?? 50;
+  document.getElementById('loc-y').value          = loc?.y    ?? defaultY ?? 50;
+  document.getElementById('loc-shortDesc').value  = loc?.shortDesc || '';
+  document.getElementById('loc-lore').value       = loc?.lore || '';
+  document.getElementById('loc-mapImage').value   = loc?.mapImage || '';
+  document.getElementById('loc-connected').value  = (loc?.connected||[]).join(', ');
+  document.getElementById('loc-visible').checked  = loc?.visible !== false;
+  document.getElementById('loc-dmNotes').value    = loc?.dmNotes || '';
+
+  tempNPCs   = JSON.parse(JSON.stringify(loc?.npcs   || []));
+  tempQuests = JSON.parse(JSON.stringify(loc?.quests || []));
+  renderNPCEditor();
+  renderQuestEditor();
+  switchLocTab('info');
+  document.getElementById('loc-modal').classList.remove('hidden');
+
+  // Auto-generate ID from name
+  document.getElementById('loc-name').addEventListener('input', function() {
+    if (!editingLocId) {
+      document.getElementById('loc-id').value = this.value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+    }
+  }, { once: false });
+}
+
+function closeLocModal() {
+  document.getElementById('loc-modal').classList.add('hidden');
+  editingLocId = null;
+}
+
+function saveLocation() {
+  const name      = document.getElementById('loc-name').value.trim();
+  const id        = document.getElementById('loc-id').value.trim().replace(/[^a-z0-9-]/g,'');
+  if (!name || !id) { alert('Name and ID are required.'); return; }
+
+  const locData = {
+    id, name,
+    type:       document.getElementById('loc-type').value,
+    x:          parseFloat(document.getElementById('loc-x').value) || 50,
+    y:          parseFloat(document.getElementById('loc-y').value) || 50,
+    visible:    document.getElementById('loc-visible').checked,
+    shortDesc:  document.getElementById('loc-shortDesc').value.trim(),
+    lore:       document.getElementById('loc-lore').value.trim(),
+    mapImage:   document.getElementById('loc-mapImage').value.trim(),
+    connected:  document.getElementById('loc-connected').value.split(',').map(s=>s.trim()).filter(Boolean),
+    npcs:       tempNPCs,
+    quests:     tempQuests,
+    dmNotes:    document.getElementById('loc-dmNotes').value.trim(),
+  };
+
+  const idx = data.locations.findIndex(l=>l.id===editingLocId);
+  if (idx >= 0) data.locations[idx] = locData;
+  else data.locations.push(locData);
+
+  selectedLocId = id;
+  saveLocal();
+  renderLocList();
+  buildMap();
+  closeLocModal();
+  setPublishStatus('','Unpublished changes');
+}
+
+function deleteLocation() {
+  if (!editingLocId) return;
+  if (!confirm(`Delete ${data.locations.find(l=>l.id===editingLocId)?.name}?`)) return;
+  data.locations = data.locations.filter(l=>l.id!==editingLocId);
+  selectedLocId = null;
+  saveLocal(); renderLocList(); buildMap(); closeLocModal();
+  setPublishStatus('','Unpublished changes');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  NPC EDITOR
+// ══════════════════════════════════════════════════════════════
+function addNPC() {
+  tempNPCs.push({ name:'', role:'', desc:'' });
+  renderNPCEditor();
+}
+function removeNPC(i) { tempNPCs.splice(i,1); renderNPCEditor(); }
+function renderNPCEditor() {
+  const list = document.getElementById('npc-editor-list');
+  list.innerHTML = '';
+  tempNPCs.forEach((n,i) => {
+    const card = document.createElement('div');
+    card.className='item-card';
+    card.innerHTML=`
+      <div class="item-card-header">
+        <span class="item-card-title">NPC ${i+1}</span>
+        <button class="item-card-del" onclick="removeNPC(${i})">✕</button>
+      </div>
+      <div class="field"><label>NAME</label><input type="text" value="${n.name}" oninput="tempNPCs[${i}].name=this.value" placeholder="Aldric Vane…"></div>
+      <div class="field"><label>ROLE</label><input type="text" value="${n.role}" oninput="tempNPCs[${i}].role=this.value" placeholder="Captain of the Guard…"></div>
+      <div class="field"><label>DESCRIPTION</label><textarea oninput="tempNPCs[${i}].desc=this.value" rows="2" placeholder="Brief player-facing description…">${n.desc}</textarea></div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  QUEST EDITOR
+// ══════════════════════════════════════════════════════════════
+function addQuest() {
+  tempQuests.push({ title:'', desc:'' });
+  renderQuestEditor();
+}
+function removeQuest(i) { tempQuests.splice(i,1); renderQuestEditor(); }
+function renderQuestEditor() {
+  const list = document.getElementById('quest-editor-list');
+  list.innerHTML = '';
+  tempQuests.forEach((q,i) => {
+    const card = document.createElement('div');
+    card.className='item-card';
+    card.innerHTML=`
+      <div class="item-card-header">
+        <span class="item-card-title">Quest hook ${i+1}</span>
+        <button class="item-card-del" onclick="removeQuest(${i})">✕</button>
+      </div>
+      <div class="field"><label>TITLE</label><input type="text" value="${q.title}" oninput="tempQuests[${i}].title=this.value" placeholder="The Missing Shipment…"></div>
+      <div class="field"><label>DESCRIPTION</label><textarea oninput="tempQuests[${i}].desc=this.value" rows="3" placeholder="What the players know or hear…">${q.desc}</textarea></div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  ZONES
+// ══════════════════════════════════════════════════════════════
+function addZone() {
+  const id = 'zone_' + Date.now();
+  const color = ZONE_COLORS[data.zones.length % ZONE_COLORS.length];
+  data.zones.push({ id, name:'New Zone', x:20, y:20, width:30, height:25, color, opacity:0.18, visible:true });
+  saveLocal(); renderZoneList(); buildMap();
+  setPublishStatus('','Unpublished changes');
+}
+
+function selectZone(id) { selectedZoneId = id; selectedLocId = null; buildMap(); renderZoneList(); }
+
+function renderZoneList() {
+  const list = document.getElementById('zone-list');
+  list.innerHTML = '';
+  if (data.zones.length === 0) {
+    list.innerHTML='<div style="color:var(--ink-faint);font-style:italic;font-size:0.82rem;padding:0.5rem 0">No zones yet.</div>';
+    return;
+  }
+  data.zones.forEach((zone,i) => {
+    const card = document.createElement('div');
+    card.className='item-card';
+    card.style.borderLeft=`3px solid ${zone.color}`;
+    card.innerHTML=`
+      <div class="item-card-header">
+        <span class="item-card-title">${zone.name}</span>
+        <button class="item-card-del" onclick="deleteZone('${zone.id}')">✕</button>
+      </div>
+      <div class="field"><label>NAME</label><input type="text" value="${zone.name}" oninput="updateZone('${zone.id}','name',this.value)"></div>
+      <div class="field-row">
+        <div class="field"><label>X %</label><input type="number" value="${zone.x}" min="0" max="100" oninput="updateZone('${zone.id}','x',+this.value)"></div>
+        <div class="field"><label>Y %</label><input type="number" value="${zone.y}" min="0" max="100" oninput="updateZone('${zone.id}','y',+this.value)"></div>
+        <div class="field"><label>W %</label><input type="number" value="${zone.width}" min="1" max="100" oninput="updateZone('${zone.id}','width',+this.value)"></div>
+        <div class="field"><label>H %</label><input type="number" value="${zone.height}" min="1" max="100" oninput="updateZone('${zone.id}','height',+this.value)"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>COLOR</label><input type="color" value="${zone.color}" oninput="updateZone('${zone.id}','color',this.value)" style="height:32px;padding:2px"></div>
+        <div class="field"><label>OPACITY</label><input type="range" min="0.05" max="0.5" step="0.01" value="${zone.opacity}" oninput="updateZone('${zone.id}','opacity',+this.value)"></div>
+      </div>
+      <div class="toggle-row">
+        <input type="checkbox" id="zone-vis-${zone.id}" ${zone.visible!==false?'checked':''} onchange="updateZone('${zone.id}','visible',this.checked)">
+        <label for="zone-vis-${zone.id}">Visible to players</label>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+function updateZone(id, key, val) {
+  const z = data.zones.find(z=>z.id===id); if(!z) return;
+  z[key]=val; saveLocal(); buildMap();
+  setPublishStatus('','Unpublished changes');
+}
+function deleteZone(id) {
+  data.zones=data.zones.filter(z=>z.id!==id);
+  saveLocal(); renderZoneList(); buildMap();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  WORLD SETTINGS
+// ══════════════════════════════════════════════════════════════
+function loadWorldFields() {
+  document.getElementById('world-name').value     = data.world.name||'';
+  document.getElementById('world-mapImage').value = data.world.mapImage||'';
+  document.getElementById('world-mapWidth').value = data.world.mapWidth||1200;
+  document.getElementById('world-mapHeight').value= data.world.mapHeight||800;
+}
+function saveWorldSettings() {
+  data.world.name      = document.getElementById('world-name').value.trim();
+  data.world.mapImage  = document.getElementById('world-mapImage').value.trim();
+  data.world.mapWidth  = parseInt(document.getElementById('world-mapWidth').value)||1200;
+  data.world.mapHeight = parseInt(document.getElementById('world-mapHeight').value)||800;
+  saveLocal(); buildMap();
+  setPublishStatus('','Unpublished changes');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════════════
+loadLocal();
+loadWorldFields();
+buildMap();
+renderLocList();
+renderZoneList();
+updatePlaceModeUI();
+</script>
+</body>
+</html>

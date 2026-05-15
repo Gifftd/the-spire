@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World Map</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0806;--surface:#13100a;--surface2:#1c1810;--border:#2e2510;--border-light:#3e3418;
+  --gold:#b8860b;--gold-light:#d4a820;--gold-faint:#6b4f08;--gold-dim:#4a3606;
+  --ink:#e8dfc0;--ink-dim:#a09070;--ink-faint:#6a5a40;
+  --red:#8b2020;--green:#2d6a3f;--blue:#2e4a7a;
+  --radius:4px;
+  --topbar:48px;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,serif;display:flex;flex-direction:column}
+
+/* ── Topbar ── */
+.topbar{height:var(--topbar);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1rem;gap:1rem;flex-shrink:0;z-index:50}
+.topbar h1{font-family:'Cinzel',serif;font-size:1rem;letter-spacing:0.1em;color:var(--gold);flex:1}
+.breadcrumb{font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.08em;color:var(--ink-faint);display:flex;align-items:center;gap:6px}
+.breadcrumb a{color:var(--ink-dim);text-decoration:none;cursor:pointer}
+.breadcrumb a:hover{color:var(--gold)}
+.breadcrumb .sep{color:var(--border-light)}
+.btn{font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.08em;border:1px solid;border-radius:var(--radius);padding:5px 12px;cursor:pointer;transition:all 0.15s;white-space:nowrap;text-decoration:none;display:inline-block}
+.btn-ghost{background:transparent;border-color:var(--border-light);color:var(--ink-dim)}
+.btn-ghost:hover{border-color:var(--ink-dim);color:var(--ink)}
+.btn-gold{background:var(--gold-dim);border-color:var(--gold);color:var(--gold-light)}
+.btn-gold:hover{background:var(--gold);color:var(--bg)}
+
+/* ── Views ── */
+.view{flex:1;overflow:hidden;display:none;position:relative}
+.view.active{display:flex;flex-direction:column}
+
+/* ── Region map ── */
+#region-view{position:relative}
+.map-container{flex:1;position:relative;overflow:hidden;cursor:grab}
+.map-container:active{cursor:grabbing}
+.map-canvas{position:absolute;top:0;left:0;transform-origin:0 0;user-select:none}
+.map-img{display:block;max-width:none;pointer-events:none}
+.map-placeholder{background:linear-gradient(135deg,#0d1a0d 0%,#0a1a14 40%,#0d1510 100%);display:flex;align-items:center;justify-content:center;color:var(--ink-faint);font-style:italic;font-size:0.9rem;border:1px dashed var(--border)}
+
+/* ── Pins ── */
+.pin{position:absolute;transform:translate(-50%,-100%);cursor:pointer;z-index:10;transition:transform 0.15s}
+.pin:hover{transform:translate(-50%,-100%) scale(1.15)}
+.pin-icon{width:28px;height:36px;position:relative;display:flex;flex-direction:column;align-items:center}
+.pin-marker{width:22px;height:22px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.5)}
+.pin-marker .pin-emoji{transform:rotate(45deg);font-size:10px;line-height:1}
+.pin-tail{width:2px;height:10px;margin-top:1px}
+.pin.type-city    .pin-marker{background:#1a2e4a;border-color:#4a80c0;}.pin.type-city    .pin-tail{background:#4a80c0}
+.pin.type-dungeon .pin-marker{background:#2a1a1a;border-color:#8a3030;}.pin.type-dungeon .pin-tail{background:#8a3030}
+.pin.type-wilderness .pin-marker{background:#1a2e1a;border-color:#4a8a50;}.pin.type-wilderness .pin-tail{background:#4a8a50}
+.pin.type-ruin    .pin-marker{background:#2a2010;border-color:#8a7040;}.pin.type-ruin    .pin-tail{background:#8a7040}
+.pin.type-port    .pin-marker{background:#102030;border-color:#4080a0;}.pin.type-port    .pin-tail{background:#4080a0}
+.pin.type-default .pin-marker{background:#201a10;border-color:#a08040;}.pin.type-default .pin-tail{background:#a08040}
+.pin-label{position:absolute;top:calc(100% + 4px);left:50%;transform:translateX(-50%);white-space:nowrap;font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.06em;color:var(--ink);background:rgba(10,8,6,0.85);padding:2px 6px;border-radius:2px;border:1px solid var(--border);pointer-events:none}
+
+/* ── Zones ── */
+.zone{position:absolute;border-radius:6px;border:2px solid;cursor:pointer;transition:opacity 0.2s,border-color 0.2s;display:flex;align-items:center;justify-content:center}
+.zone:hover{opacity:1!important}
+.zone-label{font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.08em;text-align:center;pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,0.8);padding:2px 6px}
+
+/* Map controls */
+.map-controls{position:absolute;bottom:1rem;right:1rem;display:flex;flex-direction:column;gap:4px;z-index:20}
+.map-btn{width:32px;height:32px;background:rgba(19,16,10,0.9);border:1px solid var(--border-light);border-radius:var(--radius);color:var(--ink-dim);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+.map-btn:hover{border-color:var(--gold);color:var(--gold)}
+
+/* Legend */
+.map-legend{position:absolute;bottom:1rem;left:1rem;background:rgba(19,16,10,0.92);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;z-index:20}
+.legend-title{font-family:'Cinzel',serif;font-size:0.58rem;letter-spacing:0.1em;color:var(--gold-faint);margin-bottom:5px}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:0.72rem;color:var(--ink-dim);margin-bottom:3px}
+.legend-dot{width:10px;height:10px;border-radius:50%;border:1.5px solid;flex-shrink:0}
+
+/* ── Location page ── */
+#location-view{background:var(--bg);flex-direction:row;overflow:hidden}
+.loc-sidebar{width:320px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column}
+.loc-main{flex:1;overflow-y:auto;padding:1.5rem}
+.loc-header{padding:1.2rem 1.2rem 0}
+.loc-type-badge{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.12em;padding:2px 8px;border-radius:10px;border:1px solid;display:inline-block;margin-bottom:0.5rem}
+.loc-name{font-family:'Cinzel',serif;font-size:1.5rem;letter-spacing:0.05em;color:var(--gold-light);margin-bottom:0.8rem;line-height:1.2}
+.loc-desc{font-size:1rem;line-height:1.6;color:var(--ink-dim);padding:0 1.2rem 1rem}
+.loc-section{padding:0 1.2rem 1rem;border-top:1px solid var(--border);margin-top:0.5rem}
+.loc-section-title{font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.12em;color:var(--gold-faint);padding-top:0.8rem;margin-bottom:0.6rem}
+.npc-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;margin-bottom:6px}
+.npc-name{font-family:'Cinzel',serif;font-size:0.82rem;letter-spacing:0.04em;color:var(--ink);margin-bottom:2px}
+.npc-role{font-size:0.72rem;color:var(--gold-faint);font-style:italic;margin-bottom:3px}
+.npc-desc{font-size:0.82rem;color:var(--ink-dim);line-height:1.4}
+.quest-card{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--gold-faint);border-radius:var(--radius);padding:8px 10px;margin-bottom:6px}
+.quest-title{font-family:'Cinzel',serif;font-size:0.8rem;letter-spacing:0.04em;color:var(--gold);margin-bottom:3px}
+.quest-desc{font-size:0.82rem;color:var(--ink-dim);line-height:1.4}
+.connected-list{display:flex;flex-wrap:wrap;gap:6px}
+.connected-chip{font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.06em;padding:3px 10px;border-radius:10px;background:var(--surface2);border:1px solid var(--border-light);color:var(--ink-dim);cursor:pointer;transition:all 0.15s}
+.connected-chip:hover{border-color:var(--gold);color:var(--gold)}
+
+/* Sub-map */
+.sub-map-wrap{width:100%;position:relative;overflow:hidden;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface2);min-height:200px;margin-bottom:1rem}
+.sub-map-wrap img{width:100%;display:block}
+.sub-map-placeholder{width:100%;height:200px;display:flex;align-items:center;justify-content:center;color:var(--ink-faint);font-style:italic;font-size:0.88rem}
+
+/* Location main area */
+.loc-main-content{max-width:680px}
+.loc-main-section-title{font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.12em;color:var(--gold-faint);margin-bottom:0.6rem;margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--border)}
+.loc-lore{font-size:1rem;line-height:1.7;color:var(--ink-dim)}
+.loc-npc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;margin-bottom:0.5rem}
+.loc-quest-list{display:flex;flex-direction:column;gap:8px}
+
+/* Empty / loading */
+.empty-msg{display:flex;align-items:center;justify-content:center;height:100%;color:var(--ink-faint);font-style:italic;font-size:0.95rem}
+
+/* Tooltip */
+.map-tooltip{position:fixed;background:rgba(19,16,10,0.96);border:1px solid var(--gold-faint);border-radius:var(--radius);padding:6px 10px;font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.06em;color:var(--gold-light);pointer-events:none;z-index:100;display:none;max-width:180px;text-align:center}
+
+@media(max-width:700px){
+  #location-view{flex-direction:column}
+  .loc-sidebar{width:100%;max-height:40vh;border-right:none;border-bottom:1px solid var(--border)}
+}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <h1 id="page-title">World Map</h1>
+  <div class="breadcrumb" id="breadcrumb">
+    <span style="color:var(--gold)">Region</span>
+  </div>
+</div>
+
+<!-- REGION VIEW -->
+<div class="view active" id="region-view">
+  <div class="map-container" id="map-container">
+    <div class="map-canvas" id="map-canvas">
+      <!-- map image or placeholder injected here -->
+    </div>
+  </div>
+  <div class="map-controls">
+    <button class="map-btn" onclick="mapZoom(1.2)" title="Zoom in">+</button>
+    <button class="map-btn" onclick="mapZoom(0.8)" title="Zoom out">−</button>
+    <button class="map-btn" onclick="mapReset()" title="Reset view">⌂</button>
+  </div>
+  <div class="map-legend" id="map-legend"></div>
+</div>
+
+<!-- LOCATION VIEW -->
+<div class="view" id="location-view">
+  <div class="loc-sidebar" id="loc-sidebar"></div>
+  <div class="loc-main" id="loc-main">
+    <div class="empty-msg">Select a location from the region map.</div>
+  </div>
+</div>
+
+<div class="map-tooltip" id="map-tooltip"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+//  DATA SOURCE
+//  The player map reads from the Cloudflare Worker (published
+//  by the DM map). Falls back to FALLBACK_DATA if nothing is
+//  published yet.
+// ══════════════════════════════════════════════════════════════
+const WORKER_URL = 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+
+// ── Fallback data (used until DM publishes) ──────────────────
+const FALLBACK_DATA = {
+  world: {
+    name: 'The Realm',
+    mapImage: '', // URL to your region map image, or leave blank for placeholder
+    mapWidth: 1200,
+    mapHeight: 800,
+  },
+  locations: [
+    {
+      id: 'ironhaven',
+      name: 'Ironhaven',
+      type: 'city',
+      x: 38, y: 42,           // percentage positions on the map
+      visible: true,
+      shortDesc: 'A fortified trading city at the crossroads of three roads.',
+      lore: 'Ironhaven has stood for three centuries, built on the bones of an older settlement. Its walls are thick grey stone quarried from the Greymount foothills. The city is governed by a council of five merchant guilds who have squeezed the old noble families into irrelevance. The streets smell of coal smoke and river mud.',
+      mapImage: '',            // URL to local map image, or blank
+      npcs: [
+        { name: 'Aldric Vane', role: 'Captain of the Gate', desc: 'A weathered veteran with a prosthetic left hand. Suspicious of strangers but fair.' },
+        { name: 'Sera Mott', role: 'Fence & information broker', desc: 'Operates out of the Tallow & Wick tavern. Knows everyone\'s business.' },
+      ],
+      quests: [
+        { title: 'The Missing Shipment', desc: 'A merchant guild\'s grain shipment never arrived. The wagons were found abandoned on the East Road with no sign of the drivers.' },
+      ],
+      connected: ['greypass', 'ashfen'],
+      dmNotes: '',
+    },
+    {
+      id: 'greypass',
+      name: 'Greypass',
+      type: 'wilderness',
+      x: 58, y: 28,
+      visible: true,
+      shortDesc: 'A treacherous mountain pass prone to ambushes and rockslides.',
+      lore: 'The only route through the Greymount range, Greypass is narrow enough in places that two carts cannot pass each other. Travellers tell of distant fires on the slopes at night and of traders who started the crossing but never finished it.',
+      mapImage: '',
+      npcs: [],
+      quests: [
+        { title: 'Fire on the Slopes', desc: 'Hunters report campfires on the lower slopes that appear and vanish. No one lives up there.' },
+      ],
+      connected: ['ironhaven'],
+      dmNotes: '',
+    },
+    {
+      id: 'ashfen',
+      name: 'Ashfen',
+      type: 'ruin',
+      x: 24, y: 65,
+      visible: true,
+      shortDesc: 'The blackened remains of a village destroyed a generation ago.',
+      lore: 'Nobody talks about what happened to Ashfen. The locals in surrounding settlements change the subject or leave the room. The ruins are overgrown but structurally sound in places — something has been keeping the weeds back from the central well.',
+      mapImage: '',
+      npcs: [],
+      quests: [],
+      connected: ['ironhaven'],
+      dmNotes: '',
+    },
+  ],
+  zones: [
+    {
+      id: 'greymount',
+      name: 'The Greymount Range',
+      x: 45, y: 15,
+      width: 35, height: 30,
+      color: '#6a5a40',
+      opacity: 0.18,
+      visible: true,
+    },
+    {
+      id: 'ashwood',
+      name: 'Ashwood Forest',
+      x: 8, y: 45,
+      width: 28, height: 35,
+      color: '#2d6a3f',
+      opacity: 0.18,
+      visible: true,
+    },
+  ]
+};
+
+// ══════════════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════════════
+let data = FALLBACK_DATA;
+let mapScale = 1;
+let mapX = 0, mapY = 0;
+let isDragging = false;
+let dragStartX, dragStartY, dragOriginX, dragOriginY;
+
+const TYPE_ICONS = { city:'🏙', dungeon:'⚔', wilderness:'🌲', ruin:'🏚', port:'⚓', default:'📍' };
+const TYPE_LABELS = { city:'City', dungeon:'Dungeon', wilderness:'Wilderness', ruin:'Ruin', port:'Port', default:'Location' };
+const TYPE_COLORS = { city:'#4a80c0', dungeon:'#8a3030', wilderness:'#4a8a50', ruin:'#8a7040', port:'#4080a0', default:'#a08040' };
+
+// ══════════════════════════════════════════════════════════════
+//  LOAD DATA FROM WORKER
+// ══════════════════════════════════════════════════════════════
+async function loadData() {
+  try {
+    const res = await fetch(WORKER_URL + '?type=map_data', { cache: 'no-store' });
+    if (res.ok) {
+      const d = await res.json();
+      if (d && d.locations) { data = d; }
+    }
+  } catch {}
+  buildRegionMap();
+  handleHash();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  REGION MAP
+// ══════════════════════════════════════════════════════════════
+function buildRegionMap() {
+  const canvas = document.getElementById('map-canvas');
+  const container = document.getElementById('map-container');
+  document.getElementById('page-title').textContent = data.world.name;
+  canvas.innerHTML = '';
+
+  const W = data.world.mapWidth  || 1200;
+  const H = data.world.mapHeight || 800;
+
+  // Map background
+  if (data.world.mapImage) {
+    const img = document.createElement('img');
+    img.className = 'map-img';
+    img.src = data.world.mapImage;
+    img.width = W; img.height = H;
+    canvas.appendChild(img);
+  } else {
+    const ph = document.createElement('div');
+    ph.className = 'map-placeholder';
+    ph.style.cssText = `width:${W}px;height:${H}px`;
+    ph.innerHTML = `<span>No map image set — add one via the DM map editor</span>`;
+    canvas.appendChild(ph);
+  }
+
+  // Zones
+  (data.zones || []).filter(z => z.visible !== false).forEach(zone => {
+    const el = document.createElement('div');
+    el.className = 'zone';
+    el.style.cssText = `left:${zone.x}%;top:${zone.y}%;width:${zone.width}%;height:${zone.height}%;background:${zone.color};opacity:${zone.opacity};border-color:${zone.color}`;
+    const label = document.createElement('div');
+    label.className = 'zone-label';
+    label.style.color = zone.color;
+    label.style.opacity = 1 / zone.opacity * 0.7;
+    label.textContent = zone.name;
+    el.appendChild(label);
+    el.addEventListener('mouseenter', e => showTooltip(e, zone.name));
+    el.addEventListener('mouseleave', hideTooltip);
+    canvas.appendChild(el);
+  });
+
+  // Pins
+  (data.locations || []).filter(loc => loc.visible !== false).forEach(loc => {
+    const type = loc.type || 'default';
+    const pin = document.createElement('div');
+    pin.className = `pin type-${type}`;
+    pin.style.cssText = `left:${loc.x}%;top:${loc.y}%`;
+
+    pin.innerHTML = `
+      <div class="pin-icon">
+        <div class="pin-marker"><span class="pin-emoji">${TYPE_ICONS[type] || TYPE_ICONS.default}</span></div>
+        <div class="pin-tail"></div>
+      </div>
+      <div class="pin-label">${loc.name}</div>
+    `;
+    pin.addEventListener('click', () => navigateTo(loc.id));
+    pin.addEventListener('mouseenter', e => showTooltip(e, `${loc.name}\n${loc.shortDesc || ''}`));
+    pin.addEventListener('mouseleave', hideTooltip);
+    canvas.appendChild(pin);
+  });
+
+  // Position canvas in center of container
+  resetMapView(container, W, H);
+  setupMapDrag(container);
+  buildLegend();
+}
+
+function resetMapView(container, W, H) {
+  const cw = container.clientWidth || window.innerWidth;
+  const ch = container.clientHeight || (window.innerHeight - 48);
+  mapScale = Math.min(cw / W, ch / H) * 0.9;
+  mapX = (cw - W * mapScale) / 2;
+  mapY = (ch - H * mapScale) / 2;
+  applyMapTransform();
+}
+
+function mapReset() {
+  const container = document.getElementById('map-container');
+  const W = data.world.mapWidth || 1200;
+  const H = data.world.mapHeight || 800;
+  resetMapView(container, W, H);
+}
+
+function mapZoom(factor) {
+  const container = document.getElementById('map-container');
+  const cx = container.clientWidth / 2;
+  const cy = container.clientHeight / 2;
+  const newScale = Math.min(Math.max(mapScale * factor, 0.2), 4);
+  mapX = cx - (cx - mapX) * (newScale / mapScale);
+  mapY = cy - (cy - mapY) * (newScale / mapScale);
+  mapScale = newScale;
+  applyMapTransform();
+}
+
+function applyMapTransform() {
+  document.getElementById('map-canvas').style.transform = `translate(${mapX}px,${mapY}px) scale(${mapScale})`;
+}
+
+function setupMapDrag(container) {
+  container.onmousedown = e => {
+    if (e.target.closest('.pin') || e.target.closest('.zone')) return;
+    isDragging = true;
+    dragStartX = e.clientX; dragStartY = e.clientY;
+    dragOriginX = mapX; dragOriginY = mapY;
+    container.style.cursor = 'grabbing';
+  };
+  window.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    mapX = dragOriginX + (e.clientX - dragStartX);
+    mapY = dragOriginY + (e.clientY - dragStartY);
+    applyMapTransform();
+  });
+  window.addEventListener('mouseup', () => { isDragging = false; document.getElementById('map-container').style.cursor = 'grab'; });
+  container.addEventListener('wheel', e => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.1 : 0.9;
+    const rect = container.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    const newScale = Math.min(Math.max(mapScale * factor, 0.2), 4);
+    mapX = cx - (cx - mapX) * (newScale / mapScale);
+    mapY = cy - (cy - mapY) * (newScale / mapScale);
+    mapScale = newScale;
+    applyMapTransform();
+  }, { passive: false });
+
+  // Touch support
+  let lastTouchDist = null;
+  container.addEventListener('touchstart', e => {
+    if (e.touches.length === 1) {
+      isDragging = true;
+      dragStartX = e.touches[0].clientX; dragStartY = e.touches[0].clientY;
+      dragOriginX = mapX; dragOriginY = mapY;
+    }
+    if (e.touches.length === 2) {
+      isDragging = false;
+      lastTouchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    }
+  });
+  container.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (e.touches.length === 1 && isDragging) {
+      mapX = dragOriginX + (e.touches[0].clientX - dragStartX);
+      mapY = dragOriginY + (e.touches[0].clientY - dragStartY);
+      applyMapTransform();
+    }
+    if (e.touches.length === 2 && lastTouchDist) {
+      const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      const factor = dist / lastTouchDist;
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const rect = container.getBoundingClientRect();
+      const px = cx - rect.left, py = cy - rect.top;
+      const newScale = Math.min(Math.max(mapScale * factor, 0.2), 4);
+      mapX = px - (px - mapX) * (newScale / mapScale);
+      mapY = py - (py - mapY) * (newScale / mapScale);
+      mapScale = newScale;
+      lastTouchDist = dist;
+      applyMapTransform();
+    }
+  }, { passive: false });
+  container.addEventListener('touchend', () => { isDragging = false; lastTouchDist = null; });
+}
+
+function buildLegend() {
+  const types = [...new Set((data.locations || []).filter(l => l.visible !== false).map(l => l.type || 'default'))];
+  const legend = document.getElementById('map-legend');
+  legend.innerHTML = `<div class="legend-title">LEGEND</div>` +
+    types.map(t => `<div class="legend-item"><div class="legend-dot" style="background:${TYPE_COLORS[t]||TYPE_COLORS.default};border-color:${TYPE_COLORS[t]||TYPE_COLORS.default}"></div>${TYPE_LABELS[t]||t}</div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TOOLTIP
+// ══════════════════════════════════════════════════════════════
+function showTooltip(e, text) {
+  const tt = document.getElementById('map-tooltip');
+  tt.textContent = text; tt.style.display = 'block';
+  positionTooltip(e);
+}
+function hideTooltip() { document.getElementById('map-tooltip').style.display = 'none'; }
+document.addEventListener('mousemove', e => {
+  const tt = document.getElementById('map-tooltip');
+  if (tt.style.display !== 'none') positionTooltip(e);
+});
+function positionTooltip(e) {
+  const tt = document.getElementById('map-tooltip');
+  tt.style.left = (e.clientX + 12) + 'px';
+  tt.style.top  = (e.clientY - 28) + 'px';
+}
+
+// ══════════════════════════════════════════════════════════════
+//  NAVIGATION
+// ══════════════════════════════════════════════════════════════
+function navigateTo(locId) {
+  window.location.hash = locId;
+}
+
+function handleHash() {
+  const hash = window.location.hash.slice(1);
+  if (!hash) {
+    showRegion();
+  } else {
+    const loc = (data.locations || []).find(l => l.id === hash);
+    if (loc) showLocation(loc);
+    else showRegion();
+  }
+}
+
+function showRegion() {
+  document.getElementById('region-view').classList.add('active');
+  document.getElementById('location-view').classList.remove('active');
+  document.getElementById('breadcrumb').innerHTML = `<span style="color:var(--gold)">Region</span>`;
+}
+
+function showLocation(loc) {
+  document.getElementById('region-view').classList.remove('active');
+  document.getElementById('location-view').classList.add('active');
+
+  const type = loc.type || 'default';
+  const color = TYPE_COLORS[type] || TYPE_COLORS.default;
+
+  document.getElementById('breadcrumb').innerHTML = `
+    <a onclick="window.location.hash='';showRegion()">Region</a>
+    <span class="sep">›</span>
+    <span style="color:var(--gold)">${loc.name}</span>
+  `;
+
+  // Sidebar
+  const sidebar = document.getElementById('loc-sidebar');
+  sidebar.innerHTML = `
+    <div class="loc-header">
+      <div class="loc-type-badge" style="border-color:${color};color:${color}">${TYPE_ICONS[type]} ${TYPE_LABELS[type] || type}</div>
+      <div class="loc-name">${loc.name}</div>
+    </div>
+    <div class="loc-desc">${loc.shortDesc || ''}</div>
+    ${loc.connected && loc.connected.length > 0 ? `
+      <div class="loc-section">
+        <div class="loc-section-title">CONNECTED LOCATIONS</div>
+        <div class="connected-list">
+          ${loc.connected.map(cid => {
+            const cl = (data.locations||[]).find(l=>l.id===cid);
+            return cl ? `<div class="connected-chip" onclick="navigateTo('${cl.id}')">${cl.name}</div>` : '';
+          }).join('')}
+        </div>
+      </div>
+    ` : ''}
+    ${loc.npcs && loc.npcs.length > 0 ? `
+      <div class="loc-section">
+        <div class="loc-section-title">NOTABLE FIGURES</div>
+        ${loc.npcs.map(n => `
+          <div class="npc-card">
+            <div class="npc-name">${n.name}</div>
+            <div class="npc-role">${n.role}</div>
+            <div class="npc-desc">${n.desc}</div>
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
+  `;
+
+  // Main area
+  const main = document.getElementById('loc-main');
+  main.innerHTML = `<div class="loc-main-content">
+    ${loc.mapImage ? `
+      <div class="sub-map-wrap"><img src="${loc.mapImage}" alt="${loc.name} map"></div>
+    ` : (loc.mapImage === null ? '' : `
+      <div class="sub-map-wrap"><div class="sub-map-placeholder">No local map available</div></div>
+    `)}
+
+    ${loc.lore ? `
+      <div class="loc-main-section-title">ABOUT ${loc.name.toUpperCase()}</div>
+      <div class="loc-lore">${loc.lore.replace(/\n/g,'<br>')}</div>
+    ` : ''}
+
+    ${loc.quests && loc.quests.length > 0 ? `
+      <div class="loc-main-section-title">RUMOURS & QUEST HOOKS</div>
+      <div class="loc-quest-list">
+        ${loc.quests.map(q => `
+          <div class="quest-card">
+            <div class="quest-title">✦ ${q.title}</div>
+            <div class="quest-desc">${q.desc}</div>
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
+  </div>`;
+}
+
+window.addEventListener('hashchange', handleHash);
+loadData();
+</script>
+</body>
+</html>
