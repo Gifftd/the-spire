@@ -293,6 +293,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 </div>
 
 <script>
+//<![CDATA[
 // ══════════════════════════════════════════════════════════════
 //  CONFIG
 // ══════════════════════════════════════════════════════════════
@@ -411,7 +412,7 @@ function buildMap() {
   svg.style.cssText = `position:absolute;top:0;left:0;width:${W}px;height:${H}px`;
 
   (data.zones||[]).filter(z => z.shape === 'polygon').forEach(zone => {
-    if (!zone.points || zone.points.length < 3) return;
+    if (!zone.points || zone.points.length &lt; 3) return;
     const pts = zone.points.map(p => `${p.x/100*W},${p.y/100*H}`).join(' ');
     const cx  = zone.points.reduce((s,p)=>s+p.x,0)/zone.points.length/100*W;
     const cy  = zone.points.reduce((s,p)=>s+p.y,0)/zone.points.length/100*H;
@@ -523,7 +524,7 @@ function onMapMouseMove(e) {
 function renderPolyPreviewLine() {
   const existing = document.getElementById('poly-preview-svg');
   if (existing) existing.remove();
-  if (!polyDrawMode || polyPoints.length < 1 || !polyMousePos) return;
+  if (!polyDrawMode || polyPoints.length &lt; 1 || !polyMousePos) return;
   const canvas = document.getElementById('map-canvas');
   const W = data.world.mapWidth||1200, H = data.world.mapHeight||800;
   const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
@@ -562,7 +563,7 @@ function onMapClick(e) {
       const first = polyPoints[0];
       const dx = xPct - first.x, dy = yPct - first.y;
       const distPx = Math.sqrt(dx*dx+dy*dy) / 100 * W * mapScale;
-      if (distPx < 14) {
+      if (distPx &lt; 14) {
         finishPolygon();
         return;
       }
@@ -581,7 +582,7 @@ function onMapClick(e) {
 }
 
 function finishPolygon() {
-  if (polyPoints.length < 3) { cancelPolyDraw(); return; }
+  if (polyPoints.length &lt; 3) { cancelPolyDraw(); return; }
   const id    = 'zone_' + Date.now();
   const color = ZONE_COLORS[data.zones.length % ZONE_COLORS.length];
   data.zones.push({ id, name:'New Region', shape:'polygon', points:[...polyPoints], color, opacity:0.18, visible:true });
@@ -641,7 +642,7 @@ function setupMapDrag() {
   window.addEventListener('mouseup', ()=>{ isMapDragging=false; });
   container.addEventListener('wheel', e => {
     e.preventDefault();
-    const f=e.deltaY<0?1.1:0.9, rect=container.getBoundingClientRect();
+    const f=e.deltaY&lt;0?1.1:0.9, rect=container.getBoundingClientRect();
     const cx=e.clientX-rect.left, cy=e.clientY-rect.top;
     const ns=Math.min(Math.max(mapScale*f,0.15),4);
     mapX=cx-(cx-mapX)*(ns/mapScale); mapY=cy-(cy-mapY)*(ns/mapScale); mapScale=ns; applyTransform();
@@ -745,7 +746,7 @@ function rebuildPolySVG() {
   if (!existingSvg) return;
   const W = data.world.mapWidth||1200, H = data.world.mapHeight||800;
   (data.zones||[]).filter(z=>z.shape==='polygon').forEach(zone => {
-    if (!zone.points||zone.points.length<3) return;
+    if (!zone.points||zone.points.length&lt;3) return;
     const g = existingSvg.querySelector(`[data-polyzid="${zone.id}"]`);
     if (!g) return;
     const pts = zone.points.map(p=>`${p.x/100*W},${p.y/100*H}`).join(' ');
@@ -812,7 +813,7 @@ function updateModeUI() {
     const remaining = Math.max(0, 3 - polyPoints.length);
     hint.textContent = polyPoints.length===0
       ? '✏ Click to place polygon points — click near the first point to close'
-      : polyPoints.length < 3
+      : polyPoints.length &lt; 3
         ? `${remaining} more point${remaining>1?'s':''} needed to close`
         : 'Click near the first point (●) to close the polygon';
     hint.style.display='block';
@@ -1050,7 +1051,6 @@ buildMap();
 renderLocList();
 renderZoneList();
 updateModeUI();
-</script>
 
 const TYPE_ICONS  = { city:'🏙',dungeon:'⚔',wilderness:'🌲',ruin:'🏚',port:'⚓',default:'📍' };
 const TYPE_LABELS = { city:'City',dungeon:'Dungeon',wilderness:'Wilderness',ruin:'Ruin',port:'Port',default:'Location' };
@@ -1385,24 +1385,16 @@ function deleteLocation() {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  NPC EDITOR
+//  NPC & QUEST EDITORS
 // ══════════════════════════════════════════════════════════════
-function addNPC() {
-  tempNPCs.push({ name:'', role:'', desc:'' });
-  renderNPCEditor();
-}
+function addNPC() { tempNPCs.push({name:'',role:'',desc:''}); renderNPCEditor(); }
 function removeNPC(i) { tempNPCs.splice(i,1); renderNPCEditor(); }
 function renderNPCEditor() {
-  const list = document.getElementById('npc-editor-list');
-  list.innerHTML = '';
+  const list=document.getElementById('npc-editor-list'); list.innerHTML='';
   tempNPCs.forEach((n,i) => {
-    const card = document.createElement('div');
-    card.className='item-card';
+    const card=document.createElement('div'); card.className='item-card';
     card.innerHTML=`
-      <div class="item-card-header">
-        <span class="item-card-title">NPC ${i+1}</span>
-        <button class="item-card-del" onclick="removeNPC(${i})">✕</button>
-      </div>
+      <div class="item-card-header"><span class="item-card-title">NPC ${i+1}</span><button class="item-card-del" onclick="removeNPC(${i})">✕</button></div>
       <div class="field"><label>NAME</label><input type="text" value="${n.name}" oninput="tempNPCs[${i}].name=this.value" placeholder="Aldric Vane…"></div>
       <div class="field"><label>ROLE</label><input type="text" value="${n.role}" oninput="tempNPCs[${i}].role=this.value" placeholder="Captain of the Guard…"></div>
       <div class="field"><label>DESCRIPTION</label><textarea oninput="tempNPCs[${i}].desc=this.value" rows="2" placeholder="Brief player-facing description…">${n.desc}</textarea></div>
@@ -1410,26 +1402,14 @@ function renderNPCEditor() {
     list.appendChild(card);
   });
 }
-
-// ══════════════════════════════════════════════════════════════
-//  QUEST EDITOR
-// ══════════════════════════════════════════════════════════════
-function addQuest() {
-  tempQuests.push({ title:'', desc:'' });
-  renderQuestEditor();
-}
+function addQuest() { tempQuests.push({title:'',desc:''}); renderQuestEditor(); }
 function removeQuest(i) { tempQuests.splice(i,1); renderQuestEditor(); }
 function renderQuestEditor() {
-  const list = document.getElementById('quest-editor-list');
-  list.innerHTML = '';
+  const list=document.getElementById('quest-editor-list'); list.innerHTML='';
   tempQuests.forEach((q,i) => {
-    const card = document.createElement('div');
-    card.className='item-card';
+    const card=document.createElement('div'); card.className='item-card';
     card.innerHTML=`
-      <div class="item-card-header">
-        <span class="item-card-title">Quest hook ${i+1}</span>
-        <button class="item-card-del" onclick="removeQuest(${i})">✕</button>
-      </div>
+      <div class="item-card-header"><span class="item-card-title">Quest hook ${i+1}</span><button class="item-card-del" onclick="removeQuest(${i})">✕</button></div>
       <div class="field"><label>TITLE</label><input type="text" value="${q.title}" oninput="tempQuests[${i}].title=this.value" placeholder="The Missing Shipment…"></div>
       <div class="field"><label>DESCRIPTION</label><textarea oninput="tempQuests[${i}].desc=this.value" rows="3" placeholder="What the players know or hear…">${q.desc}</textarea></div>
     `;
@@ -1441,38 +1421,38 @@ function renderQuestEditor() {
 //  ZONES
 // ══════════════════════════════════════════════════════════════
 function addZone() {
-  const id = 'zone_' + Date.now();
-  const color = ZONE_COLORS[data.zones.length % ZONE_COLORS.length];
-  data.zones.push({ id, name:'New Zone', x:20, y:20, width:30, height:25, color, opacity:0.18, visible:true });
+  const id='zone_'+Date.now();
+  const color=ZONE_COLORS[data.zones.length%ZONE_COLORS.length];
+  data.zones.push({ id, name:'New Zone', shape:'rect', x:20, y:20, width:30, height:25, color, opacity:0.18, visible:true });
   saveLocal(); renderZoneList(); buildMap();
   setPublishStatus('','Unpublished changes');
 }
-
-function selectZone(id) { selectedZoneId = id; selectedLocId = null; buildMap(); renderZoneList(); }
-
+function selectZone(id) { selectedZoneId=id; selectedLocId=null; buildMap(); renderZoneList(); }
 function renderZoneList() {
-  const list = document.getElementById('zone-list');
-  list.innerHTML = '';
-  if (data.zones.length === 0) {
-    list.innerHTML='<div style="color:var(--ink-faint);font-style:italic;font-size:0.82rem;padding:0.5rem 0">No zones yet.</div>';
+  const list=document.getElementById('zone-list'); list.innerHTML='';
+  if (data.zones.length===0) {
+    list.innerHTML='<div style="color:var(--ink-faint);font-style:italic;font-size:0.82rem;padding:0.5rem 0">No zones yet. Add a rectangle or draw a polygon.</div>';
     return;
   }
-  data.zones.forEach((zone,i) => {
-    const card = document.createElement('div');
-    card.className='item-card';
+  data.zones.forEach((zone) => {
+    const card=document.createElement('div'); card.className='item-card';
     card.style.borderLeft=`3px solid ${zone.color}`;
+    const isPoly=zone.shape==='polygon';
+    const posFields=isPoly
+      ? `<div style="font-size:0.75rem;color:var(--ink-faint);font-style:italic;margin-bottom:0.5rem">${zone.points?.length||0} polygon points — reposition with ✥ Move mode</div>`
+      : `<div class="field-row">
+          <div class="field"><label>X %</label><input type="number" value="${zone.x}" min="0" max="100" oninput="updateZone('${zone.id}','x',+this.value)"></div>
+          <div class="field"><label>Y %</label><input type="number" value="${zone.y}" min="0" max="100" oninput="updateZone('${zone.id}','y',+this.value)"></div>
+          <div class="field"><label>W %</label><input type="number" value="${zone.width}" min="1" max="100" oninput="updateZone('${zone.id}','width',+this.value)"></div>
+          <div class="field"><label>H %</label><input type="number" value="${zone.height}" min="1" max="100" oninput="updateZone('${zone.id}','height',+this.value)"></div>
+        </div>`;
     card.innerHTML=`
       <div class="item-card-header">
-        <span class="item-card-title">${zone.name}</span>
+        <span class="item-card-title">${zone.name} <span style="font-size:0.65rem;color:var(--ink-faint)">${isPoly?'polygon':'rect'}</span></span>
         <button class="item-card-del" onclick="deleteZone('${zone.id}')">✕</button>
       </div>
       <div class="field"><label>NAME</label><input type="text" value="${zone.name}" oninput="updateZone('${zone.id}','name',this.value)"></div>
-      <div class="field-row">
-        <div class="field"><label>X %</label><input type="number" value="${zone.x}" min="0" max="100" oninput="updateZone('${zone.id}','x',+this.value)"></div>
-        <div class="field"><label>Y %</label><input type="number" value="${zone.y}" min="0" max="100" oninput="updateZone('${zone.id}','y',+this.value)"></div>
-        <div class="field"><label>W %</label><input type="number" value="${zone.width}" min="1" max="100" oninput="updateZone('${zone.id}','width',+this.value)"></div>
-        <div class="field"><label>H %</label><input type="number" value="${zone.height}" min="1" max="100" oninput="updateZone('${zone.id}','height',+this.value)"></div>
-      </div>
+      ${posFields}
       <div class="field-row">
         <div class="field"><label>COLOR</label><input type="color" value="${zone.color}" oninput="updateZone('${zone.id}','color',this.value)" style="height:32px;padding:2px"></div>
         <div class="field"><label>OPACITY</label><input type="range" min="0.05" max="0.5" step="0.01" value="${zone.opacity}" oninput="updateZone('${zone.id}','opacity',+this.value)"></div>
@@ -1485,13 +1465,15 @@ function renderZoneList() {
     list.appendChild(card);
   });
 }
-function updateZone(id, key, val) {
-  const z = data.zones.find(z=>z.id===id); if(!z) return;
+function updateZone(id,key,val) {
+  const z=data.zones.find(z=>z.id===id); if(!z) return;
   z[key]=val; saveLocal(); buildMap();
   setPublishStatus('','Unpublished changes');
 }
 function deleteZone(id) {
+  if (!confirm('Delete this zone?')) return;
   data.zones=data.zones.filter(z=>z.id!==id);
+  if (selectedZoneId===id) selectedZoneId=null;
   saveLocal(); renderZoneList(); buildMap();
 }
 
@@ -1499,10 +1481,10 @@ function deleteZone(id) {
 //  WORLD SETTINGS
 // ══════════════════════════════════════════════════════════════
 function loadWorldFields() {
-  document.getElementById('world-name').value     = data.world.name||'';
-  document.getElementById('world-mapImage').value = data.world.mapImage||'';
-  document.getElementById('world-mapWidth').value = data.world.mapWidth||1200;
-  document.getElementById('world-mapHeight').value= data.world.mapHeight||800;
+  document.getElementById('world-name').value      = data.world.name||'';
+  document.getElementById('world-mapImage').value  = data.world.mapImage||'';
+  document.getElementById('world-mapWidth').value  = data.world.mapWidth||1200;
+  document.getElementById('world-mapHeight').value = data.world.mapHeight||800;
 }
 function saveWorldSettings() {
   data.world.name      = document.getElementById('world-name').value.trim();
@@ -1521,7 +1503,8 @@ loadWorldFields();
 buildMap();
 renderLocList();
 renderZoneList();
-updatePlaceModeUI();
+updateModeUI();
+//]]>
 </script>
 </body>
 </html>
