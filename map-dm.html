@@ -292,8 +292,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
   </div>
 </div>
 
-<script>
-//<![CDATA[
+<script>//<![CDATA[
 // ══════════════════════════════════════════════════════════════
 //  CONFIG
 // ══════════════════════════════════════════════════════════════
@@ -412,7 +411,7 @@ function buildMap() {
   svg.style.cssText = `position:absolute;top:0;left:0;width:${W}px;height:${H}px`;
 
   (data.zones||[]).filter(z => z.shape === 'polygon').forEach(zone => {
-    if (!zone.points || zone.points.length &lt; 3) return;
+    if (!zone.points || zone.points.length < 3) return;
     const pts = zone.points.map(p => `${p.x/100*W},${p.y/100*H}`).join(' ');
     const cx  = zone.points.reduce((s,p)=>s+p.x,0)/zone.points.length/100*W;
     const cy  = zone.points.reduce((s,p)=>s+p.y,0)/zone.points.length/100*H;
@@ -524,7 +523,7 @@ function onMapMouseMove(e) {
 function renderPolyPreviewLine() {
   const existing = document.getElementById('poly-preview-svg');
   if (existing) existing.remove();
-  if (!polyDrawMode || polyPoints.length &lt; 1 || !polyMousePos) return;
+  if (!polyDrawMode || polyPoints.length < 1 || !polyMousePos) return;
   const canvas = document.getElementById('map-canvas');
   const W = data.world.mapWidth||1200, H = data.world.mapHeight||800;
   const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
@@ -563,7 +562,7 @@ function onMapClick(e) {
       const first = polyPoints[0];
       const dx = xPct - first.x, dy = yPct - first.y;
       const distPx = Math.sqrt(dx*dx+dy*dy) / 100 * W * mapScale;
-      if (distPx &lt; 14) {
+      if (distPx < 14) {
         finishPolygon();
         return;
       }
@@ -582,7 +581,7 @@ function onMapClick(e) {
 }
 
 function finishPolygon() {
-  if (polyPoints.length &lt; 3) { cancelPolyDraw(); return; }
+  if (polyPoints.length < 3) { cancelPolyDraw(); return; }
   const id    = 'zone_' + Date.now();
   const color = ZONE_COLORS[data.zones.length % ZONE_COLORS.length];
   data.zones.push({ id, name:'New Region', shape:'polygon', points:[...polyPoints], color, opacity:0.18, visible:true });
@@ -642,7 +641,7 @@ function setupMapDrag() {
   window.addEventListener('mouseup', ()=>{ isMapDragging=false; });
   container.addEventListener('wheel', e => {
     e.preventDefault();
-    const f=e.deltaY&lt;0?1.1:0.9, rect=container.getBoundingClientRect();
+    const f=e.deltaY<0?1.1:0.9, rect=container.getBoundingClientRect();
     const cx=e.clientX-rect.left, cy=e.clientY-rect.top;
     const ns=Math.min(Math.max(mapScale*f,0.15),4);
     mapX=cx-(cx-mapX)*(ns/mapScale); mapY=cy-(cy-mapY)*(ns/mapScale); mapScale=ns; applyTransform();
@@ -746,7 +745,7 @@ function rebuildPolySVG() {
   if (!existingSvg) return;
   const W = data.world.mapWidth||1200, H = data.world.mapHeight||800;
   (data.zones||[]).filter(z=>z.shape==='polygon').forEach(zone => {
-    if (!zone.points||zone.points.length&lt;3) return;
+    if (!zone.points||zone.points.length<3) return;
     const g = existingSvg.querySelector(`[data-polyzid="${zone.id}"]`);
     if (!g) return;
     const pts = zone.points.map(p=>`${p.x/100*W},${p.y/100*H}`).join(' ');
@@ -813,7 +812,7 @@ function updateModeUI() {
     const remaining = Math.max(0, 3 - polyPoints.length);
     hint.textContent = polyPoints.length===0
       ? '✏ Click to place polygon points — click near the first point to close'
-      : polyPoints.length &lt; 3
+      : polyPoints.length < 3
         ? `${remaining} more point${remaining>1?'s':''} needed to close`
         : 'Click near the first point (●) to close the polygon';
     hint.style.display='block';
@@ -1051,460 +1050,6 @@ buildMap();
 renderLocList();
 renderZoneList();
 updateModeUI();
-
-const TYPE_ICONS  = { city:'🏙',dungeon:'⚔',wilderness:'🌲',ruin:'🏚',port:'⚓',default:'📍' };
-const TYPE_LABELS = { city:'City',dungeon:'Dungeon',wilderness:'Wilderness',ruin:'Ruin',port:'Port',default:'Location' };
-const TYPE_COLORS = { city:'#4a80c0',dungeon:'#8a3030',wilderness:'#4a8a50',ruin:'#8a7040',port:'#4080a0',default:'#a08040' };
-const ZONE_COLORS = ['#6a5a40','#2d6a3f','#2e4a7a','#8a3030','#5a3e9b','#4a6060'];
-
-// ══════════════════════════════════════════════════════════════
-//  DATA
-// ══════════════════════════════════════════════════════════════
-let data = {
-  world:{ name:'The Realm', mapImage:'', mapWidth:1200, mapHeight:800 },
-  locations:[], zones:[]
-};
-
-let selectedLocId  = null;
-let selectedZoneId = null;
-let placeMode      = false;
-let editingLocId   = null; // id of loc being edited in modal
-let tempNPCs       = [];
-let tempQuests     = [];
-
-// ── Map pan/zoom ──────────────────────────────────────────────
-let mapScale=1, mapX=0, mapY=0;
-let isDragging=false, dragStartX, dragStartY, dragOriginX, dragOriginY;
-
-// ══════════════════════════════════════════════════════════════
-//  PERSISTENCE
-// ══════════════════════════════════════════════════════════════
-function saveLocal() { localStorage.setItem('dm_map_data', JSON.stringify(data)); }
-function loadLocal() {
-  try {
-    const d = JSON.parse(localStorage.getItem('dm_map_data')||'null');
-    if (d && d.locations) data = d;
-  } catch {}
-}
-
-// ══════════════════════════════════════════════════════════════
-//  PUBLISH
-// ══════════════════════════════════════════════════════════════
-async function publishData() {
-  setSyncStatus('ing','⟳ Publishing…');
-  // Strip DM notes from player payload
-  const playerData = {
-    world: data.world,
-    zones: data.zones,
-    locations: data.locations.map(loc => {
-      const { dmNotes, ...rest } = loc;
-      return rest;
-    })
-  };
-  try {
-    const res = await fetch(WORKER_URL, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ type:'map_data', payload: playerData })
-    });
-    if (res.ok) { setSyncStatus('ok','✦ Published'); setPublishStatus('ok','✦ Published to players'); }
-    else { setSyncStatus('fail','⚠ Failed'); setPublishStatus('fail','⚠ Publish failed'); }
-  } catch { setSyncStatus('fail','⚠ Offline'); setPublishStatus('fail','⚠ Could not reach server'); }
-}
-
-function setSyncStatus(type, msg) {
-  const el = document.getElementById('sync-status');
-  el.className = `sync-status ${type}`; el.textContent = msg;
-}
-function setPublishStatus(type, msg) {
-  const el = document.getElementById('publish-status');
-  el.className = `sync-status ${type}`; el.textContent = msg;
-}
-
-// ══════════════════════════════════════════════════════════════
-//  TABS
-// ══════════════════════════════════════════════════════════════
-function switchTab(name) {
-  ['locations','zones','world'].forEach(t => {
-    document.getElementById(`tab-${t}`).classList.toggle('active', t===name);
-    document.getElementById(`pane-${t}`).classList.toggle('active', t===name);
-  });
-  placeMode = name === 'locations';
-  updatePlaceModeUI();
-}
-function switchLocTab(name) {
-  ['info','lore','npcs','quests','dm'].forEach(t => {
-    document.getElementById(`ltab-${t}`).classList.toggle('active', t===name);
-    document.getElementById(`lpane-${t}`).classList.toggle('active', t===name);
-  });
-}
-
-// ══════════════════════════════════════════════════════════════
-//  MAP BUILD & RENDER
-// ══════════════════════════════════════════════════════════════
-function buildMap() {
-  const canvas = document.getElementById('map-canvas');
-  canvas.innerHTML = '';
-  const W = data.world.mapWidth  || 1200;
-  const H = data.world.mapHeight || 800;
-
-  if (data.world.mapImage) {
-    const img = document.createElement('img');
-    img.className='map-img'; img.src=data.world.mapImage; img.width=W; img.height=H;
-    canvas.appendChild(img);
-  } else {
-    const ph = document.createElement('div');
-    ph.className='map-placeholder'; ph.style.cssText=`width:${W}px;height:${H}px`;
-    ph.innerHTML=`<span>📍 Click anywhere to place a location</span><small style="color:var(--ink-faint);font-size:0.75rem">Set a map image in the World tab</small>`;
-    canvas.appendChild(ph);
-  }
-
-  // Zones
-  (data.zones||[]).forEach(zone => {
-    const el = document.createElement('div');
-    el.className = `zone${zone.id===selectedZoneId?' selected-zone':''}`;
-    el.style.cssText=`left:${zone.x}%;top:${zone.y}%;width:${zone.width}%;height:${zone.height}%;background:${zone.color};opacity:${zone.opacity};border-color:${zone.color};position:absolute`;
-    const label = document.createElement('div');
-    label.className='zone-label'; label.style.color=zone.color; label.style.opacity=1/zone.opacity*0.7;
-    label.textContent=zone.name;
-    el.appendChild(label);
-    el.addEventListener('click', e => { e.stopPropagation(); selectZone(zone.id); });
-    canvas.appendChild(el);
-  });
-
-  // Pins (all — DM sees hidden ones)
-  (data.locations||[]).forEach(loc => {
-    const type = loc.type||'default';
-    const pin = document.createElement('div');
-    pin.className = `pin type-${type}${loc.visible===false?' hidden-pin':''}${loc.id===selectedLocId?' selected-pin':''}`;
-    pin.style.cssText=`left:${loc.x}%;top:${loc.y}%`;
-    pin.innerHTML=`
-      <div class="pin-icon">
-        <div class="pin-marker"><span class="pin-emoji">${TYPE_ICONS[type]||TYPE_ICONS.default}</span></div>
-        <div class="pin-tail"></div>
-      </div>
-      <div class="pin-label">${loc.name}${loc.visible===false?' 🙈':''}</div>
-    `;
-    pin.addEventListener('click', e => { e.stopPropagation(); selectLocation(loc.id); });
-    canvas.appendChild(pin);
-  });
-
-  // Click to place
-  canvas.addEventListener('click', onMapClick);
-  resetMapView();
-  setupMapDrag();
-}
-
-function onMapClick(e) {
-  if (!placeMode) return;
-  if (e.target.closest('.pin') || e.target.closest('.zone')) return;
-  const canvas = document.getElementById('map-canvas');
-  const rect = canvas.getBoundingClientRect();
-  const W = data.world.mapWidth || 1200;
-  const H = data.world.mapHeight || 800;
-  const xPct = ((e.clientX - rect.left) / (W * mapScale)) * 100;
-  const yPct = ((e.clientY - rect.top)  / (H * mapScale)) * 100;
-  openLocModal(null, Math.round(xPct*10)/10, Math.round(yPct*10)/10);
-}
-
-function resetMapView() {
-  const container = document.getElementById('map-container');
-  const W = data.world.mapWidth||1200, H = data.world.mapHeight||800;
-  const cw = container.clientWidth||800, ch = container.clientHeight||600;
-  mapScale = Math.min(cw/W, ch/H)*0.88;
-  mapX = (cw - W*mapScale)/2; mapY = (ch - H*mapScale)/2;
-  applyTransform();
-}
-function mapReset() { resetMapView(); }
-function mapZoom(f) {
-  const container = document.getElementById('map-container');
-  const cx=container.clientWidth/2, cy=container.clientHeight/2;
-  const ns = Math.min(Math.max(mapScale*f,0.15),4);
-  mapX=cx-(cx-mapX)*(ns/mapScale); mapY=cy-(cy-mapY)*(ns/mapScale); mapScale=ns;
-  applyTransform();
-}
-function applyTransform() {
-  document.getElementById('map-canvas').style.transform=`translate(${mapX}px,${mapY}px) scale(${mapScale})`;
-}
-
-function setupMapDrag() {
-  const container = document.getElementById('map-container');
-  container.onmousedown = e => {
-    if (e.target.closest('.pin')||e.target.closest('.zone')) return;
-    if (placeMode) return; // let click handle it
-    isDragging=true; dragStartX=e.clientX; dragStartY=e.clientY; dragOriginX=mapX; dragOriginY=mapY;
-  };
-  window.addEventListener('mousemove', e => {
-    if (!isDragging) return;
-    mapX=dragOriginX+(e.clientX-dragStartX); mapY=dragOriginY+(e.clientY-dragStartY); applyTransform();
-  });
-  window.addEventListener('mouseup', ()=>{ isDragging=false; });
-  container.addEventListener('wheel', e => {
-    e.preventDefault();
-    const f=e.deltaY<0?1.1:0.9, rect=container.getBoundingClientRect();
-    const cx=e.clientX-rect.left, cy=e.clientY-rect.top;
-    const ns=Math.min(Math.max(mapScale*f,0.15),4);
-    mapX=cx-(cx-mapX)*(ns/mapScale); mapY=cy-(cy-mapY)*(ns/mapScale); mapScale=ns; applyTransform();
-  },{passive:false});
-}
-
-// ══════════════════════════════════════════════════════════════
-//  PLACE MODE
-// ══════════════════════════════════════════════════════════════
-function togglePlaceMode() {
-  placeMode = !placeMode;
-  updatePlaceModeUI();
-}
-function updatePlaceModeUI() {
-  const btn  = document.getElementById('place-mode-btn');
-  const hint = document.getElementById('map-hint');
-  const container = document.getElementById('map-container');
-  if (placeMode) {
-    btn.style.background='var(--gold-dim)'; btn.style.borderColor='var(--gold)'; btn.style.color='var(--gold-light)';
-    hint.style.display='block'; container.style.cursor='crosshair';
-  } else {
-    btn.style.background=''; btn.style.borderColor=''; btn.style.color='';
-    hint.style.display='none'; container.style.cursor='grab';
-  }
-}
-
-// ══════════════════════════════════════════════════════════════
-//  LOCATION LIST
-// ══════════════════════════════════════════════════════════════
-function renderLocList() {
-  const list = document.getElementById('loc-list');
-  list.innerHTML = '';
-  if (data.locations.length === 0) {
-    list.innerHTML='<div style="color:var(--ink-faint);font-style:italic;font-size:0.82rem;padding:0.5rem 0">No locations yet. Click the map or use + Add location.</div>';
-    return;
-  }
-  data.locations.forEach(loc => {
-    const el = document.createElement('div');
-    el.className = `loc-list-item${loc.id===selectedLocId?' selected':''}`;
-    el.innerHTML = `
-      <span style="font-size:0.85rem">${TYPE_ICONS[loc.type||'default']||'📍'}</span>
-      <span class="loc-list-name">${loc.name}</span>
-      <span class="loc-list-type">${TYPE_LABELS[loc.type||'default']||loc.type}</span>
-      ${loc.visible===false?'<span class="hidden-tag">HIDDEN</span>':''}
-    `;
-    el.addEventListener('click', () => selectLocation(loc.id));
-    list.appendChild(el);
-  });
-}
-
-function selectLocation(id) {
-  selectedLocId = id;
-  selectedZoneId = null;
-  renderLocList();
-  buildMap();
-  openLocModal(id);
-}
-
-// ══════════════════════════════════════════════════════════════
-//  LOCATION MODAL
-// ══════════════════════════════════════════════════════════════
-function addLocation() {
-  openLocModal(null, 50, 50);
-}
-
-function openLocModal(id, defaultX, defaultY) {
-  editingLocId = id;
-  const loc = id ? data.locations.find(l=>l.id===id) : null;
-
-  document.getElementById('loc-modal-title').textContent = loc ? `Edit: ${loc.name}` : 'New Location';
-  document.getElementById('loc-name').value       = loc?.name || '';
-  document.getElementById('loc-id').value         = loc?.id   || '';
-  document.getElementById('loc-type').value       = loc?.type || 'default';
-  document.getElementById('loc-x').value          = loc?.x    ?? defaultX ?? 50;
-  document.getElementById('loc-y').value          = loc?.y    ?? defaultY ?? 50;
-  document.getElementById('loc-shortDesc').value  = loc?.shortDesc || '';
-  document.getElementById('loc-lore').value       = loc?.lore || '';
-  document.getElementById('loc-mapImage').value   = loc?.mapImage || '';
-  document.getElementById('loc-connected').value  = (loc?.connected||[]).join(', ');
-  document.getElementById('loc-visible').checked  = loc?.visible !== false;
-  document.getElementById('loc-dmNotes').value    = loc?.dmNotes || '';
-
-  tempNPCs   = JSON.parse(JSON.stringify(loc?.npcs   || []));
-  tempQuests = JSON.parse(JSON.stringify(loc?.quests || []));
-  renderNPCEditor();
-  renderQuestEditor();
-  switchLocTab('info');
-  document.getElementById('loc-modal').classList.remove('hidden');
-
-  // Auto-generate ID from name
-  document.getElementById('loc-name').addEventListener('input', function() {
-    if (!editingLocId) {
-      document.getElementById('loc-id').value = this.value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-    }
-  }, { once: false });
-}
-
-function closeLocModal() {
-  document.getElementById('loc-modal').classList.add('hidden');
-  editingLocId = null;
-}
-
-function saveLocation() {
-  const name      = document.getElementById('loc-name').value.trim();
-  const id        = document.getElementById('loc-id').value.trim().replace(/[^a-z0-9-]/g,'');
-  if (!name || !id) { alert('Name and ID are required.'); return; }
-
-  const locData = {
-    id, name,
-    type:       document.getElementById('loc-type').value,
-    x:          parseFloat(document.getElementById('loc-x').value) || 50,
-    y:          parseFloat(document.getElementById('loc-y').value) || 50,
-    visible:    document.getElementById('loc-visible').checked,
-    shortDesc:  document.getElementById('loc-shortDesc').value.trim(),
-    lore:       document.getElementById('loc-lore').value.trim(),
-    mapImage:   document.getElementById('loc-mapImage').value.trim(),
-    connected:  document.getElementById('loc-connected').value.split(',').map(s=>s.trim()).filter(Boolean),
-    npcs:       tempNPCs,
-    quests:     tempQuests,
-    dmNotes:    document.getElementById('loc-dmNotes').value.trim(),
-  };
-
-  const idx = data.locations.findIndex(l=>l.id===editingLocId);
-  if (idx >= 0) data.locations[idx] = locData;
-  else data.locations.push(locData);
-
-  selectedLocId = id;
-  saveLocal();
-  renderLocList();
-  buildMap();
-  closeLocModal();
-  setPublishStatus('','Unpublished changes');
-}
-
-function deleteLocation() {
-  if (!editingLocId) return;
-  if (!confirm(`Delete ${data.locations.find(l=>l.id===editingLocId)?.name}?`)) return;
-  data.locations = data.locations.filter(l=>l.id!==editingLocId);
-  selectedLocId = null;
-  saveLocal(); renderLocList(); buildMap(); closeLocModal();
-  setPublishStatus('','Unpublished changes');
-}
-
-// ══════════════════════════════════════════════════════════════
-//  NPC & QUEST EDITORS
-// ══════════════════════════════════════════════════════════════
-function addNPC() { tempNPCs.push({name:'',role:'',desc:''}); renderNPCEditor(); }
-function removeNPC(i) { tempNPCs.splice(i,1); renderNPCEditor(); }
-function renderNPCEditor() {
-  const list=document.getElementById('npc-editor-list'); list.innerHTML='';
-  tempNPCs.forEach((n,i) => {
-    const card=document.createElement('div'); card.className='item-card';
-    card.innerHTML=`
-      <div class="item-card-header"><span class="item-card-title">NPC ${i+1}</span><button class="item-card-del" onclick="removeNPC(${i})">✕</button></div>
-      <div class="field"><label>NAME</label><input type="text" value="${n.name}" oninput="tempNPCs[${i}].name=this.value" placeholder="Aldric Vane…"></div>
-      <div class="field"><label>ROLE</label><input type="text" value="${n.role}" oninput="tempNPCs[${i}].role=this.value" placeholder="Captain of the Guard…"></div>
-      <div class="field"><label>DESCRIPTION</label><textarea oninput="tempNPCs[${i}].desc=this.value" rows="2" placeholder="Brief player-facing description…">${n.desc}</textarea></div>
-    `;
-    list.appendChild(card);
-  });
-}
-function addQuest() { tempQuests.push({title:'',desc:''}); renderQuestEditor(); }
-function removeQuest(i) { tempQuests.splice(i,1); renderQuestEditor(); }
-function renderQuestEditor() {
-  const list=document.getElementById('quest-editor-list'); list.innerHTML='';
-  tempQuests.forEach((q,i) => {
-    const card=document.createElement('div'); card.className='item-card';
-    card.innerHTML=`
-      <div class="item-card-header"><span class="item-card-title">Quest hook ${i+1}</span><button class="item-card-del" onclick="removeQuest(${i})">✕</button></div>
-      <div class="field"><label>TITLE</label><input type="text" value="${q.title}" oninput="tempQuests[${i}].title=this.value" placeholder="The Missing Shipment…"></div>
-      <div class="field"><label>DESCRIPTION</label><textarea oninput="tempQuests[${i}].desc=this.value" rows="3" placeholder="What the players know or hear…">${q.desc}</textarea></div>
-    `;
-    list.appendChild(card);
-  });
-}
-
-// ══════════════════════════════════════════════════════════════
-//  ZONES
-// ══════════════════════════════════════════════════════════════
-function addZone() {
-  const id='zone_'+Date.now();
-  const color=ZONE_COLORS[data.zones.length%ZONE_COLORS.length];
-  data.zones.push({ id, name:'New Zone', shape:'rect', x:20, y:20, width:30, height:25, color, opacity:0.18, visible:true });
-  saveLocal(); renderZoneList(); buildMap();
-  setPublishStatus('','Unpublished changes');
-}
-function selectZone(id) { selectedZoneId=id; selectedLocId=null; buildMap(); renderZoneList(); }
-function renderZoneList() {
-  const list=document.getElementById('zone-list'); list.innerHTML='';
-  if (data.zones.length===0) {
-    list.innerHTML='<div style="color:var(--ink-faint);font-style:italic;font-size:0.82rem;padding:0.5rem 0">No zones yet. Add a rectangle or draw a polygon.</div>';
-    return;
-  }
-  data.zones.forEach((zone) => {
-    const card=document.createElement('div'); card.className='item-card';
-    card.style.borderLeft=`3px solid ${zone.color}`;
-    const isPoly=zone.shape==='polygon';
-    const posFields=isPoly
-      ? `<div style="font-size:0.75rem;color:var(--ink-faint);font-style:italic;margin-bottom:0.5rem">${zone.points?.length||0} polygon points — reposition with ✥ Move mode</div>`
-      : `<div class="field-row">
-          <div class="field"><label>X %</label><input type="number" value="${zone.x}" min="0" max="100" oninput="updateZone('${zone.id}','x',+this.value)"></div>
-          <div class="field"><label>Y %</label><input type="number" value="${zone.y}" min="0" max="100" oninput="updateZone('${zone.id}','y',+this.value)"></div>
-          <div class="field"><label>W %</label><input type="number" value="${zone.width}" min="1" max="100" oninput="updateZone('${zone.id}','width',+this.value)"></div>
-          <div class="field"><label>H %</label><input type="number" value="${zone.height}" min="1" max="100" oninput="updateZone('${zone.id}','height',+this.value)"></div>
-        </div>`;
-    card.innerHTML=`
-      <div class="item-card-header">
-        <span class="item-card-title">${zone.name} <span style="font-size:0.65rem;color:var(--ink-faint)">${isPoly?'polygon':'rect'}</span></span>
-        <button class="item-card-del" onclick="deleteZone('${zone.id}')">✕</button>
-      </div>
-      <div class="field"><label>NAME</label><input type="text" value="${zone.name}" oninput="updateZone('${zone.id}','name',this.value)"></div>
-      ${posFields}
-      <div class="field-row">
-        <div class="field"><label>COLOR</label><input type="color" value="${zone.color}" oninput="updateZone('${zone.id}','color',this.value)" style="height:32px;padding:2px"></div>
-        <div class="field"><label>OPACITY</label><input type="range" min="0.05" max="0.5" step="0.01" value="${zone.opacity}" oninput="updateZone('${zone.id}','opacity',+this.value)"></div>
-      </div>
-      <div class="toggle-row">
-        <input type="checkbox" id="zone-vis-${zone.id}" ${zone.visible!==false?'checked':''} onchange="updateZone('${zone.id}','visible',this.checked)">
-        <label for="zone-vis-${zone.id}">Visible to players</label>
-      </div>
-    `;
-    list.appendChild(card);
-  });
-}
-function updateZone(id,key,val) {
-  const z=data.zones.find(z=>z.id===id); if(!z) return;
-  z[key]=val; saveLocal(); buildMap();
-  setPublishStatus('','Unpublished changes');
-}
-function deleteZone(id) {
-  if (!confirm('Delete this zone?')) return;
-  data.zones=data.zones.filter(z=>z.id!==id);
-  if (selectedZoneId===id) selectedZoneId=null;
-  saveLocal(); renderZoneList(); buildMap();
-}
-
-// ══════════════════════════════════════════════════════════════
-//  WORLD SETTINGS
-// ══════════════════════════════════════════════════════════════
-function loadWorldFields() {
-  document.getElementById('world-name').value      = data.world.name||'';
-  document.getElementById('world-mapImage').value  = data.world.mapImage||'';
-  document.getElementById('world-mapWidth').value  = data.world.mapWidth||1200;
-  document.getElementById('world-mapHeight').value = data.world.mapHeight||800;
-}
-function saveWorldSettings() {
-  data.world.name      = document.getElementById('world-name').value.trim();
-  data.world.mapImage  = document.getElementById('world-mapImage').value.trim();
-  data.world.mapWidth  = parseInt(document.getElementById('world-mapWidth').value)||1200;
-  data.world.mapHeight = parseInt(document.getElementById('world-mapHeight').value)||800;
-  saveLocal(); buildMap();
-  setPublishStatus('','Unpublished changes');
-}
-
-// ══════════════════════════════════════════════════════════════
-//  INIT
-// ══════════════════════════════════════════════════════════════
-loadLocal();
-loadWorldFields();
-buildMap();
-renderLocList();
-renderZoneList();
-updateModeUI();
-//]]>
-</script>
+//]]></script>
 </body>
 </html>
