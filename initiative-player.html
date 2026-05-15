@@ -290,7 +290,7 @@ function render(s) {
             </div>
             <div class="hp-num">${hpLabel(hpPct, c.type, c.hp, c.maxHp)}</div>
           </div>
-          <div class="ac-chip"><small>AC</small>${c.ac}</div>
+          ${isPC ? `<div class="ac-chip"><small>AC</small>${c.ac}</div>` : ''}
         </div>
       </div>
     `;
