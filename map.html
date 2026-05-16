@@ -113,6 +113,10 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 
 /* Tooltip */
 .map-tooltip{position:fixed;background:rgba(19,16,10,0.96);border:1px solid var(--gold-faint);border-radius:var(--radius);padding:6px 10px;font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.06em;color:var(--gold-light);pointer-events:none;z-index:100;display:none;max-width:180px;text-align:center}
+.pin-info-bar{position:absolute;bottom:0;left:0;right:0;background:rgba(10,8,6,0.88);border-top:1px solid var(--border);padding:6px 1rem;display:flex;align-items:baseline;gap:10px;z-index:20;pointer-events:none;opacity:0;transition:opacity 0.15s}
+.pin-info-bar.visible{opacity:1}
+.pin-info-name{font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.08em;color:var(--gold-light);white-space:nowrap;flex-shrink:0}
+.pin-info-desc{font-size:0.78rem;color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 @media(max-width:700px){
   #location-view{flex-direction:column}
@@ -143,6 +147,10 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
     <button class="map-btn" onclick="mapReset()" title="Reset view">⌂</button>
   </div>
   <div class="map-legend" id="map-legend"></div>
+  <div class="pin-info-bar" id="pin-info-bar">
+    <span class="pin-info-name" id="pin-info-name"></span>
+    <span class="pin-info-desc" id="pin-info-desc"></span>
+  </div>
 </div>
 
 <!-- LOCATION VIEW -->
@@ -367,8 +375,8 @@ function buildRegionMap() {
       <div class="pin-label">${loc.name}</div>
     `;
     pin.addEventListener('click', () => navigateTo(loc.id));
-    pin.addEventListener('mouseenter', e => showTooltip(e, `${loc.name}\n${loc.shortDesc || ''}`));
-    pin.addEventListener('mouseleave', hideTooltip);
+    pin.addEventListener('mouseenter', () => showPinInfo(loc.name, loc.shortDesc || ''));
+    pin.addEventListener('mouseleave', hidePinInfo);
     canvas.appendChild(pin);
   });
 
@@ -485,6 +493,17 @@ function buildLegend() {
 // ══════════════════════════════════════════════════════════════
 //  TOOLTIP
 // ══════════════════════════════════════════════════════════════
+// ── Pin info bar (replaces tooltip for pins) ──────────────────
+function showPinInfo(name, desc) {
+  document.getElementById('pin-info-name').textContent = name;
+  document.getElementById('pin-info-desc').textContent = desc;
+  document.getElementById('pin-info-bar').classList.add('visible');
+}
+function hidePinInfo() {
+  document.getElementById('pin-info-bar').classList.remove('visible');
+}
+
+// ── Cursor tooltip (zones only) ───────────────────────────────
 function showTooltip(e, text) {
   const tt = document.getElementById('map-tooltip');
   tt.textContent = text; tt.style.display = 'block';
