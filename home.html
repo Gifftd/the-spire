@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rise of a New Dawn — Player Hub</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --parchment:      #f5eed8;
+      --parchment-dark: #ede3c4;
+      --parchment-deep: #e0d4af;
+      --ink:            #2a1f0e;
+      --ink-light:      #5c4a2a;
+      --ink-faint:      #8a7355;
+      --border:         #c4a96d;
+      --border-light:   #ddd0aa;
+      --red:            #8b1a1a;
+      --gold:           #b8860b;
+      --gold-light:     #d4a520;
+    }
+
+    body {
+      background: #1a1208;
+      background-image:
+        radial-gradient(ellipse at 20% 15%, rgba(60,40,10,0.7) 0%, transparent 55%),
+        radial-gradient(ellipse at 80% 85%, rgba(40,20,5,0.7) 0%, transparent 55%);
+      min-height: 100vh;
+      font-family: 'Crimson Text', Georgia, serif;
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem 4rem;
+    }
+
+    /* ── Scroll container ── */
+    .scroll {
+      background: var(--parchment);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      max-width: 780px;
+      width: 100%;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      box-shadow:
+        0 0 0 4px #1a1208,
+        0 0 0 5px var(--border),
+        0 8px 40px rgba(0,0,0,0.7),
+        inset 0 1px 0 rgba(255,255,255,0.15);
+      padding: 3rem 3rem 3.5rem;
+    }
+
+    /* ── Header ── */
+    .header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+
+    .world-label {
+      font-family: 'Cinzel', serif;
+      font-size: 0.75rem;
+      font-weight: 400;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      margin-bottom: 0.5rem;
+    }
+
+    .campaign-title {
+      font-family: 'Cinzel', serif;
+      font-size: 2.1rem;
+      font-weight: 700;
+      color: var(--ink);
+      line-height: 1.15;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.75rem;
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin: 0 auto 1.1rem;
+      max-width: 360px;
+    }
+    .divider-line {
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(to right, transparent, var(--border));
+    }
+    .divider-line:last-child {
+      background: linear-gradient(to left, transparent, var(--border));
+    }
+    .divider-diamond {
+      width: 6px;
+      height: 6px;
+      background: var(--border);
+      transform: rotate(45deg);
+      flex-shrink: 0;
+    }
+
+    .subtitle {
+      font-family: 'Crimson Text', Georgia, serif;
+      font-style: italic;
+      font-size: 1.05rem;
+      color: var(--ink-light);
+    }
+
+    /* ── Tool cards grid ── */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+      margin-top: 0.5rem;
+    }
+
+    @media (max-width: 600px) {
+      .cards { grid-template-columns: 1fr; }
+      .scroll { padding: 2rem 1.5rem 2.5rem; }
+      .campaign-title { font-size: 1.6rem; }
+    }
+
+    .card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      text-decoration: none;
+      color: var(--ink);
+      background: var(--parchment-dark);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1.75rem 1.25rem 1.5rem;
+      transition: background 0.18s, border-color 0.18s, box-shadow 0.18s, transform 0.15s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(160deg, rgba(255,255,255,0.07) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .card:hover {
+      background: var(--parchment-deep);
+      border-color: var(--gold);
+      box-shadow: 0 4px 18px rgba(0,0,0,0.18), 0 0 0 1px var(--gold);
+      transform: translateY(-2px);
+    }
+
+    .card:active {
+      transform: translateY(0);
+    }
+
+    .card-icon {
+      width: 52px;
+      height: 52px;
+      margin-bottom: 1rem;
+      color: var(--ink-light);
+      transition: color 0.18s;
+    }
+
+    .card:hover .card-icon {
+      color: var(--red);
+    }
+
+    .card-title {
+      font-family: 'Cinzel', serif;
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--ink);
+      margin-bottom: 0.5rem;
+    }
+
+    .card-desc {
+      font-size: 0.92rem;
+      color: var(--ink-light);
+      line-height: 1.45;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      margin-top: 2.25rem;
+      text-align: center;
+    }
+
+    .footer-rule {
+      height: 1px;
+      background: linear-gradient(to right, transparent, var(--border-light), transparent);
+      margin-bottom: 1rem;
+    }
+
+    .footer-text {
+      font-family: 'Cinzel', serif;
+      font-size: 0.68rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="scroll">
+
+    <header class="header">
+      <p class="world-label">Velemere &mdash; 684 SV</p>
+      <h1 class="campaign-title">Rise of a New Dawn</h1>
+      <div class="divider">
+        <div class="divider-line"></div>
+        <div class="divider-diamond"></div>
+        <div class="divider-line"></div>
+      </div>
+      <p class="subtitle">Player Resources</p>
+    </header>
+
+    <div class="cards">
+
+      <!-- Perks -->
+      <a href="index.html" class="card">
+        <svg class="card-icon" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Scroll / perk sheet icon -->
+          <rect x="10" y="8" width="32" height="38" rx="2" stroke="currentColor" stroke-width="2" fill="none"/>
+          <line x1="17" y1="18" x2="35" y2="18" stroke="currentColor" stroke-width="1.8"/>
+          <line x1="17" y1="24" x2="35" y2="24" stroke="currentColor" stroke-width="1.8"/>
+          <line x1="17" y1="30" x2="27" y2="30" stroke="currentColor" stroke-width="1.8"/>
+          <!-- Star accent -->
+          <path d="M33 34 L34.4 37.3 L38 37.6 L35.4 39.8 L36.2 43.3 L33 41.4 L29.8 43.3 L30.6 39.8 L28 37.6 L31.6 37.3 Z"
+                stroke="currentColor" stroke-width="1.5" fill="none" stroke-linejoin="round"/>
+        </svg>
+        <span class="card-title">Campaign Perks</span>
+        <span class="card-desc">Choose your creation bonus and review available perks.</span>
+      </a>
+
+      <!-- Map -->
+      <a href="map.html" class="card">
+        <svg class="card-icon" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Map icon -->
+          <polygon points="6,12 18,8 34,14 46,10 46,40 34,44 18,38 6,42" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/>
+          <line x1="18" y1="8" x2="18" y2="38" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,2"/>
+          <line x1="34" y1="14" x2="34" y2="44" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,2"/>
+          <!-- Location marker -->
+          <circle cx="26" cy="26" r="3" stroke="currentColor" stroke-width="1.8" fill="none"/>
+          <line x1="26" y1="29" x2="26" y2="33" stroke="currentColor" stroke-width="1.8"/>
+        </svg>
+        <span class="card-title">World Map</span>
+        <span class="card-desc">Explore the known regions and locations of Velemere.</span>
+      </a>
+
+      <!-- Initiative -->
+      <a href="initiative-player.html" class="card">
+        <svg class="card-icon" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Crossed swords -->
+          <line x1="12" y1="12" x2="40" y2="40" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          <line x1="40" y1="12" x2="12" y2="40" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          <!-- Sword guards -->
+          <line x1="9" y1="22" x2="22" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="30" y1="43" x2="43" y2="30" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <!-- Pommels -->
+          <circle cx="10" cy="42" r="2.5" stroke="currentColor" stroke-width="1.5" fill="none"/>
+          <circle cx="42" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5" fill="none"/>
+        </svg>
+        <span class="card-title">Initiative</span>
+        <span class="card-desc">Track turn order and see who acts next in combat.</span>
+      </a>
+
+    </div>
+
+    <footer class="footer">
+      <div class="footer-rule"></div>
+      <p class="footer-text">For players of Rise of a New Dawn</p>
+    </footer>
+
+  </div>
+
+</body>
+</html>
