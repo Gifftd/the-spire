@@ -53,12 +53,13 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 .pin-icon{width:28px;height:36px;display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.6))}
 .pin-marker{width:22px;height:22px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid rgba(10,8,6,0.55);box-shadow:inset 0 -2px 4px rgba(0,0,0,0.28),inset 0 2px 3px rgba(255,255,255,0.18)}
 .pin-tail{width:2px;height:10px;margin-top:1px;opacity:0.85}
-.pin.type-city       .pin-marker{background:#4a80c0}.pin.type-city       .pin-tail{background:#4a80c0}
-.pin.type-dungeon    .pin-marker{background:#8a3030}.pin.type-dungeon    .pin-tail{background:#8a3030}
-.pin.type-wilderness .pin-marker{background:#4a8a50}.pin.type-wilderness .pin-tail{background:#4a8a50}
-.pin.type-ruin       .pin-marker{background:#8a7040}.pin.type-ruin       .pin-tail{background:#8a7040}
-.pin.type-port       .pin-marker{background:#4080a0}.pin.type-port       .pin-tail{background:#4080a0}
-.pin.type-default    .pin-marker{background:#a08040}.pin.type-default    .pin-tail{background:#a08040}
+.pin.type-city       .pin-marker{background:#4a90d4}.pin.type-city       .pin-tail{background:#4a90d4}
+.pin.type-dungeon    .pin-marker{background:#c43838}.pin.type-dungeon    .pin-tail{background:#c43838}
+.pin.type-wilderness .pin-marker{background:#4ca050}.pin.type-wilderness .pin-tail{background:#4ca050}
+.pin.type-ruin       .pin-marker{background:#908070}.pin.type-ruin       .pin-tail{background:#908070}
+.pin.type-port       .pin-marker{background:#2cb6c8}.pin.type-port       .pin-tail{background:#2cb6c8}
+.pin.type-fort       .pin-marker{background:#b060d0}.pin.type-fort       .pin-tail{background:#b060d0}
+.pin.type-default    .pin-marker{background:#e0a830}.pin.type-default    .pin-tail{background:#e0a830}
 .pin.hidden-pin   .pin-marker{opacity:0.45;border-style:dashed}
 .pin.selected-pin{filter:drop-shadow(0 0 6px var(--gold))}
 .pin-label{position:absolute;top:calc(100% + 4px);left:50%;transform:translateX(-50%);white-space:nowrap;font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.05em;color:var(--ink);background:rgba(10,8,6,0.88);padding:2px 6px;border-radius:2px;border:1px solid var(--border);pointer-events:none;opacity:0;transition:opacity 0.15s}
@@ -358,6 +359,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
               <option value="wilderness">Wilderness</option>
               <option value="ruin">Ruin</option>
               <option value="port">Port</option>
+              <option value="fort">Fort</option>
               <option value="default">Other</option>
             </select>
           </div>
@@ -415,9 +417,9 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 // ══════════════════════════════════════════════════════════════
 const WORKER_URL = 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
 
-const TYPE_ICONS  = { city:'🏙',dungeon:'⚔',wilderness:'🌲',ruin:'🏚',port:'⚓',default:'📍' };
-const TYPE_LABELS = { city:'City',dungeon:'Dungeon',wilderness:'Wilderness',ruin:'Ruin',port:'Port',default:'Location' };
-const TYPE_COLORS = { city:'#4a80c0',dungeon:'#8a3030',wilderness:'#4a8a50',ruin:'#8a7040',port:'#4080a0',default:'#a08040' };
+const TYPE_ICONS  = { city:'🏙',dungeon:'⚔',wilderness:'🌲',ruin:'🏚',port:'⚓',fort:'🏰',default:'📍' };
+const TYPE_LABELS = { city:'City',dungeon:'Dungeon',wilderness:'Wilderness',ruin:'Ruin',port:'Port',fort:'Fort',default:'Location' };
+const TYPE_COLORS = { city:'#4a90d4',dungeon:'#c43838',wilderness:'#4ca050',ruin:'#908070',port:'#2cb6c8',fort:'#b060d0',default:'#e0a830' };
 const ZONE_COLORS = ['#6a5a40','#2d6a3f','#2e4a7a','#8a3030','#5a3e9b','#4a6060'];
 
 // ══════════════════════════════════════════════════════════════
@@ -1405,10 +1407,10 @@ function parseObsidianNote(filename, content) {
   // Determine note type from frontmatter tags or fields
   const tags = (fm.tags || fm.tag || '').toString().toLowerCase();
   const obsidianType = (fm.type || '').toLowerCase(); // Obsidian data type (place, NPC, faction, shop…)
-  const isExplicitLocation = ['place','location','city','town','village','settlement','dungeon','cave','ruin','ruins','wilderness','forest','port','harbour','harbor'].includes(obsidianType);
+  const isExplicitLocation = ['place','location','city','town','village','settlement','dungeon','cave','ruin','ruins','wilderness','forest','port','harbour','harbor','fort','fortress','castle','keep','stronghold'].includes(obsidianType);
   const isExplicitNPC     = obsidianType === 'npc' || obsidianType === 'character';
   const isExplicitOther   = ['faction','shop'].includes(obsidianType); // skip these
-  const hasLocationType   = fm.type && ['city','dungeon','wilderness','ruin','port','location','settlement','town','village'].includes(obsidianType);
+  const hasLocationType   = fm.type && ['city','dungeon','wilderness','ruin','port','fort','location','settlement','town','village'].includes(obsidianType);
   const isNPCByTag = tags.includes('npc') || tags.includes('character') || tags.includes('person');
   const isLocByTag = tags.includes('location') || tags.includes('place') || tags.includes('settlement');
   const hasRole = !!fm.role;
@@ -1470,7 +1472,7 @@ function parseLocationNote(baseName, fm, body) {
 
   // Map type — prefer explicit map_type field, fall back to type field
   const rawType = (fm.map_type || fm.mapType || fm.type || '').toLowerCase();
-  const typeMap = { city:'city', town:'city', village:'city', settlement:'city', dungeon:'dungeon', cave:'dungeon', ruins:'ruin', ruin:'ruin', wilderness:'wilderness', forest:'wilderness', port:'port', harbour:'port', harbor:'port' };
+  const typeMap = { city:'city', town:'city', village:'city', settlement:'city', dungeon:'dungeon', cave:'dungeon', ruins:'ruin', ruin:'ruin', wilderness:'wilderness', forest:'wilderness', port:'port', harbour:'port', harbor:'port', fort:'fort', fortress:'fort', castle:'fort', keep:'fort', stronghold:'fort' };
   const locType = typeMap[rawType] || 'default';
 
   return {

@@ -1,0 +1,14 @@
+# Local backups taken before edits — not for git history
+backups/
+
+# macOS
+.DS_Store
+
+# Editor / IDE junk
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node (in case any tooling appears later)
+node_modules/
