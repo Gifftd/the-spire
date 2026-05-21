@@ -232,6 +232,9 @@
 <body>
   <div class="scroll">
 
+    <div style="display:flex;justify-content:flex-end;margin-bottom:-0.5rem">
+      <a href="home.html" style="font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.14em;color:#8a7355;text-decoration:none;text-transform:uppercase">⌂ Home</a>
+    </div>
     <div class="ornament">— ✦ —</div>
     <h1>Campaign Creation Bonus</h1>
     <p class="subtitle">Your starting boons, earned before the adventure begins</p>
@@ -312,11 +315,17 @@
     <div class="ornament bottom">— ✦ —</div>
   </div>
 
+  <script src="auth.js"></script>
   <script>
     // ═══════════════════════════════════════════════════════════════════
     //  Cloudflare Worker proxy URL
     // ═══════════════════════════════════════════════════════════════════
-    const WORKER_URL = 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+    const WORKER_URL = (window.Auth && window.Auth.WORKER_URL) || 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+
+    // Campaign Perks requires being signed in (player or DM).
+    if (!window.Auth || !Auth.requireRole('any-login', { reason: 'Sign in to access Campaign Perks.' })) {
+      throw new Error('Unauthorized — redirecting to home.');
+    }
 
     // ═══════════════════════════════════════════════════════════════════
     //  CLASS CONFIGURATION

@@ -268,6 +268,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
   <button class="btn btn-purple btn-sm" onclick="openImport()">⬇ Import</button>
   <button class="btn btn-green" onclick="publishData()">▲ Publish to players</button>
   <button class="btn btn-ghost btn-sm" onclick="window.open('map.html','_blank')">Preview ↗</button>
+  <a class="btn btn-ghost btn-sm" href="home.html" style="text-decoration:none">⌂ Home</a>
   <div class="sync-status" id="sync-status">—</div>
 </div>
 
@@ -520,11 +521,17 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
   </div>
 </div>
 
+<script src="auth.js"></script>
 <script>//<![CDATA[
 // ══════════════════════════════════════════════════════════════
 //  CONFIG
 // ══════════════════════════════════════════════════════════════
-const WORKER_URL = 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+const WORKER_URL = (window.Auth && window.Auth.WORKER_URL) || 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+
+// Page is DM-only — bounce non-DMs to the homepage before doing anything else.
+if (!window.Auth || !Auth.requireRole('dm', { reason: 'The world map editor is for the DM only.' })) {
+  throw new Error('Unauthorized — redirecting to home.');
+}
 
 const TYPE_ICONS  = { city:'🏙',dungeon:'⚔',wilderness:'🌲',ruin:'🏚',port:'⚓',fort:'🏰',default:'📍' };
 const TYPE_LABELS = { city:'City',dungeon:'Dungeon',wilderness:'Wilderness',ruin:'Ruin',port:'Port',fort:'Fort',default:'Location' };
@@ -554,25 +561,16 @@ let journals       = [];      // [{id,characterId,title,body,date,unread}]
 let editingCharId  = null;
 let pendingDMSave  = null;    // queued save retry after token is provided
 
-// ── DM token (stored in this browser only) ───────────────────
-const DM_TOKEN_KEY = 'dm_token';
-function getDMToken() { return localStorage.getItem(DM_TOKEN_KEY) || ''; }
-function setDMTokenLocal(t) { localStorage.setItem(DM_TOKEN_KEY, t); }
-function clearDMToken() { localStorage.removeItem(DM_TOKEN_KEY); }
+// ── DM auth (delegated to shared auth.js) ────────────────────
+function dmHeaders() { return Auth.dmHeaders(); }
 
-function dmHeaders() {
-  const h = { 'Content-Type': 'application/json' };
-  const t = getDMToken();
-  if (t) h['X-DM-Token'] = t;
-  return h;
-}
-
-// Wrapped POST for DM-protected writes. On 401, prompts for token and queues a retry.
-async function dmPost(payload, retryFn) {
+// Wrapped POST for DM-protected writes. On 401, the stored DM creds are invalid
+// (DM was deleted, password changed, etc.) — log out and bounce to home.
+async function dmPost(payload /* , retryFn (unused with shared auth) */) {
   const res = await fetch(WORKER_URL, { method:'POST', headers: dmHeaders(), body: JSON.stringify(payload) });
   if (res.status === 401) {
-    pendingDMSave = retryFn || null;
-    openDMTokenModal('The Worker rejected the save — DM token is missing or wrong.');
+    Auth.logout();
+    window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.'));
     return { ok:false, needsToken:true };
   }
   if (!res.ok) return { ok:false };
@@ -581,26 +579,11 @@ async function dmPost(payload, retryFn) {
   return { ok:true, body };
 }
 
-function openDMTokenModal(errMsg) {
-  document.getElementById('dm-token-input').value = getDMToken() || '';
-  document.getElementById('dm-token-error').textContent = errMsg || '';
-  document.getElementById('dm-token-overlay').classList.add('visible');
-  setTimeout(()=>document.getElementById('dm-token-input').focus(), 50);
-}
-function closeDMTokenModal() {
-  document.getElementById('dm-token-overlay').classList.remove('visible');
-  pendingDMSave = null;
-}
-async function submitDMToken() {
-  const v = document.getElementById('dm-token-input').value.trim();
-  if (!v) { document.getElementById('dm-token-error').textContent = 'Enter a token.'; return; }
-  setDMTokenLocal(v);
-  document.getElementById('dm-token-overlay').classList.remove('visible');
-  if (typeof pendingDMSave === 'function') {
-    const fn = pendingDMSave; pendingDMSave = null;
-    await fn();
-  }
-}
+// Legacy modal kept in the DOM but no longer triggered — these are
+// safe no-ops to avoid breaking any stray references.
+function openDMTokenModal() { /* deprecated — handled by shared auth */ }
+function closeDMTokenModal() { document.getElementById('dm-token-overlay')?.classList.remove('visible'); }
+function submitDMToken() { closeDMTokenModal(); }
 
 // ── Map pan/zoom ──────────────────────────────────────────────
 let mapScale=1, mapX=0, mapY=0;
@@ -635,7 +618,12 @@ async function saveToKV() {
 // Load full DM data from KV on startup
 async function loadFromKV() {
   try {
-    const res = await fetch(WORKER_URL + '?type=map_data_dm', { cache: 'no-store' });
+    const res = await fetch(WORKER_URL + '?type=map_data_dm', { cache: 'no-store', headers: Auth.dmHeaders() });
+    if (res.status === 401) {
+      Auth.logout();
+      window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.'));
+      return false;
+    }
     if (!res.ok) return false;
     const d = await res.json();
     if (d && d.locations && d.locations.length > 0) {
@@ -656,12 +644,15 @@ function saveCharactersLocal() {
 }
 async function loadCharactersKV() {
   try {
-    const t = getDMToken();
     const res = await fetch(WORKER_URL + '?type=characters', {
       cache: 'no-store',
-      headers: t ? { 'X-DM-Token': t } : {}
+      headers: Auth.dmHeaders()
     });
-    if (res.status === 401) { openDMTokenModal('DM token needed to load characters.'); return false; }
+    if (res.status === 401) {
+      Auth.logout();
+      window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.'));
+      return false;
+    }
     if (!res.ok) return false;
     const arr = await res.json();
     if (Array.isArray(arr)) { characters = arr; saveCharactersLocal(); return true; }
@@ -685,12 +676,11 @@ function saveJournalsLocal() {
 }
 async function loadJournalsKV() {
   try {
-    const t = getDMToken();
     const res = await fetch(WORKER_URL + '?type=journals', {
       cache: 'no-store',
-      headers: t ? { 'X-DM-Token': t } : {}
+      headers: Auth.dmHeaders()
     });
-    if (res.status === 401) return false; // already prompted by loadCharactersKV path
+    if (res.status === 401) return false; // already handled by loadCharactersKV path
     if (!res.ok) return false;
     const arr = await res.json();
     if (Array.isArray(arr)) { journals = arr; saveJournalsLocal(); return true; }

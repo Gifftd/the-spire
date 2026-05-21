@@ -138,6 +138,13 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 .login-submit{width:100%;font-family:'Cinzel',serif;font-size:0.78rem;letter-spacing:0.1em;border:1px solid var(--gold);border-radius:var(--radius);padding:8px 14px;cursor:pointer;transition:all 0.15s;background:var(--gold-dim);color:var(--gold-light)}
 .login-submit:hover:not(:disabled){background:var(--gold);color:var(--bg)}
 .login-submit:disabled{opacity:0.5;cursor:not-allowed}
+.login-modal{position:relative}
+.login-close{position:absolute;top:8px;right:10px;background:transparent;border:none;color:var(--ink-faint);font-size:1.5rem;cursor:pointer;line-height:1;padding:2px 6px}
+.login-close:hover{color:var(--gold)}
+.login-skip{display:block;width:100%;margin-top:0.6rem;background:transparent;border:none;font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.08em;color:var(--ink-faint);cursor:pointer;padding:6px;text-decoration:underline}
+.login-skip:hover{color:var(--gold)}
+.btn-pill-gold{border-color:var(--gold-faint);color:var(--gold-light);background:var(--gold-dim)}
+.btn-pill-gold:hover{border-color:var(--gold);color:var(--gold-light);background:var(--gold-faint)}
 
 /* ── Player badge in topbar ── */
 .player-badge{display:none;align-items:center;gap:8px;font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.08em;color:var(--ink-dim)}
@@ -186,6 +193,8 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
     </button>
     <button class="btn-pill" type="button" onclick="logout()">Log out</button>
   </div>
+  <button class="btn-pill btn-pill-gold" id="login-btn" type="button" onclick="showLogin()" style="display:none">Claim a character</button>
+  <a class="btn-pill" href="home.html" style="text-decoration:none">⌂ Home</a>
   <div class="breadcrumb" id="breadcrumb">
     <span style="color:var(--gold)">Region</span>
   </div>
@@ -194,8 +203,9 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 <!-- LOGIN OVERLAY -->
 <div class="login-overlay" id="login-overlay">
   <div class="login-modal">
+    <button class="login-close" type="button" onclick="hideLogin()" aria-label="Close">×</button>
     <div class="login-title">Claim your character</div>
-    <div class="login-desc">Pick your character and enter the code your DM gave you. You'll only see the map and whispers meant for you.</div>
+    <div class="login-desc">Pick your character and enter the code your DM gave you to unlock the secrets meant for you. You can keep browsing without logging in.</div>
     <div class="login-field">
       <label>Character</label>
       <select id="login-character"><option value="">— loading —</option></select>
@@ -206,6 +216,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
     </div>
     <div class="login-error" id="login-error"></div>
     <button class="login-submit" id="login-submit" type="button" onclick="doLogin()">Enter</button>
+    <button class="login-skip" type="button" onclick="hideLogin()">Continue without logging in</button>
   </div>
 </div>
 
@@ -248,6 +259,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 
 <div class="map-tooltip" id="map-tooltip"></div>
 
+<script src="auth.js"></script>
 <script>
 // ══════════════════════════════════════════════════════════════
 //  DATA SOURCE
@@ -255,7 +267,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 //  by the DM map). Falls back to FALLBACK_DATA if nothing is
 //  published yet.
 // ══════════════════════════════════════════════════════════════
-const WORKER_URL = 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+const WORKER_URL = (window.Auth && window.Auth.WORKER_URL) || 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
 
 // ── Fallback data (used until DM publishes) ──────────────────
 const FALLBACK_DATA = {
@@ -354,99 +366,103 @@ const TYPE_COLORS = { city:'#4a90d4', dungeon:'#c43838', wilderness:'#4ca050', r
 // ══════════════════════════════════════════════════════════════
 //  LOGIN + LOAD DATA FROM WORKER
 // ══════════════════════════════════════════════════════════════
-const LOGIN_KEY = 'campaign-perks-login';
 let journals = [];
 
-function readCreds() {
-  try { return JSON.parse(localStorage.getItem(LOGIN_KEY) || 'null'); }
-  catch { return null; }
-}
-function saveCreds(c) { localStorage.setItem(LOGIN_KEY, JSON.stringify(c)); }
-function clearCreds() { localStorage.removeItem(LOGIN_KEY); }
+// Identity helpers delegate to the shared Auth helper so DM / player / anonymous
+// state stays in sync across pages.
+function readCreds() { return Auth.playerCreds(); }
+function clearCreds() { Auth.logout(); }
 
 async function bootstrap() {
-  await fetchCharacterList();
+  // Always load the character list in the background so the login modal is ready
+  // whenever the user decides to open it.
+  fetchCharacterList();
+
   const creds = readCreds();
   if (creds && creds.characterId && creds.code) {
     const ok = await loadPlayerView(creds);
     if (ok) {
       hideLogin();
       showPlayerBadge(creds);
+      hideLoginButton();
       return;
     }
-    // creds rejected by worker — clear and fall through to login
+    // creds rejected by worker (deleted character, code changed, etc.)
     clearCreds();
   }
-  showLogin();
+  // No player creds — load the anonymous (gated-stripped) map.
+  await loadAnonymousView();
+  // Only show the "claim a character" pill for true anonymous viewers. If a DM
+  // is signed in (per shared auth) they already have an identity and shouldn't
+  // be nudged to claim a character.
+  if (Auth.getRole() === 'anonymous') showLoginButton(); else hideLoginButton();
 }
+
+async function loadAnonymousView() {
+  try {
+    const res = await fetch(WORKER_URL + '?type=map_data', { cache: 'no-store' });
+    if (res.ok) {
+      const d = await res.json();
+      if (d && (d.locations || d.world)) data = d;
+    }
+  } catch {}
+  journals = [];
+  buildRegionMap();
+  handleHash();
+  renderWhispers();
+}
+
+function showLoginButton() { document.getElementById('login-btn').style.display = ''; }
+function hideLoginButton() { document.getElementById('login-btn').style.display = 'none'; }
 
 async function fetchCharacterList() {
   const sel = document.getElementById('login-character');
   const submit = document.getElementById('login-submit');
-  try {
-    const res = await fetch(WORKER_URL + '?type=character_list', { cache: 'no-store' });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const list = await res.json();
-    sel.innerHTML = '';
-    if (!Array.isArray(list) || list.length === 0) {
-      sel.innerHTML = '<option value="">— no characters set up yet —</option>';
-      sel.disabled = true;
-      submit.disabled = true;
-      document.getElementById('login-error').textContent = 'Ask your DM to create your character first.';
-      return;
-    }
-    sel.disabled = false;
-    submit.disabled = false;
-    list.forEach(c => {
-      const opt = document.createElement('option');
-      opt.value = c.id;
-      opt.textContent = c.player ? `${c.name}  ·  ${c.player}` : c.name;
-      sel.appendChild(opt);
-    });
-  } catch (e) {
-    sel.innerHTML = '<option value="">— could not reach server —</option>';
+  const list = await Auth.characterList();
+  sel.innerHTML = '';
+  if (!list.length) {
+    sel.innerHTML = '<option value="">— no characters set up yet —</option>';
     sel.disabled = true;
     submit.disabled = true;
-    document.getElementById('login-error').textContent = 'Network error loading characters.';
+    document.getElementById('login-error').textContent = 'Ask your DM to create your character first.';
+    return;
   }
+  sel.disabled = false;
+  submit.disabled = false;
+  list.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.player ? `${c.name}  ·  ${c.player}` : c.name;
+    sel.appendChild(opt);
+  });
 }
 
 async function doLogin() {
   const characterId = document.getElementById('login-character').value;
-  const code = document.getElementById('login-code').value.trim().toUpperCase();
+  const code = document.getElementById('login-code').value;
   const errEl = document.getElementById('login-error');
   errEl.textContent = '';
   if (!characterId) { errEl.textContent = 'Pick a character.'; return; }
-  if (!code) { errEl.textContent = 'Enter your claim code.'; return; }
+  if (!code.trim()) { errEl.textContent = 'Enter your claim code.'; return; }
 
   const submit = document.getElementById('login-submit');
   submit.disabled = true; submit.textContent = '…';
-  try {
-    const res = await fetch(WORKER_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'character_login', characterId, code })
-    });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok || !body.ok) {
-      errEl.textContent = body.error || 'Invalid character or code.';
-      submit.disabled = false; submit.textContent = 'Enter';
-      return;
-    }
-    const creds = { characterId, code, name: body.character.name };
-    saveCreds(creds);
-    const ok = await loadPlayerView(creds);
-    if (!ok) {
-      errEl.textContent = 'Logged in but failed to load data.';
-      submit.disabled = false; submit.textContent = 'Enter';
-      return;
-    }
-    hideLogin();
-    showPlayerBadge(creds);
-  } catch (e) {
-    errEl.textContent = 'Network error — try again.';
+  const res = await Auth.playerLogin(characterId, code);
+  if (!res.ok) {
+    errEl.textContent = res.error;
     submit.disabled = false; submit.textContent = 'Enter';
+    return;
   }
+  const creds = Auth.playerCreds();
+  const loaded = await loadPlayerView(creds);
+  if (!loaded) {
+    errEl.textContent = 'Logged in but failed to load data.';
+    submit.disabled = false; submit.textContent = 'Enter';
+    return;
+  }
+  hideLogin();
+  showPlayerBadge(creds);
+  hideLoginButton();
 }
 
 function logout() {

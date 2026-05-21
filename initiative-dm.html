@@ -284,6 +284,7 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
   <button class="btn btn-teal"  id="btn-start"  onclick="startCombat()">▶ Start Combat</button>
   <button class="btn btn-red btn-sm" id="btn-end" onclick="endCombat()" style="display:none">■ End Combat</button>
   <button class="btn btn-purple btn-sm" id="btn-export" onclick="openExport()" style="display:none">Export Log</button>
+  <a class="btn btn-ghost btn-sm" href="home.html" style="text-decoration:none">⌂ Home</a>
   <div id="sync-status" class="sync-status">—</div>
 </div>
 
@@ -440,11 +441,17 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
   </div>
 </div>
 
+<script src="auth.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════
 //  CONFIG
 // ═══════════════════════════════════════════════════════
-const WORKER_URL = 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+const WORKER_URL = (window.Auth && window.Auth.WORKER_URL) || 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+
+// DM-only — bounce non-DMs to the homepage.
+if (!window.Auth || !Auth.requireRole('dm', { reason: 'The initiative tracker controls are for the DM only.' })) {
+  throw new Error('Unauthorized — redirecting to home.');
+}
 
 const STD_CONDITIONS = [
   'Blinded','Charmed','Deafened','Exhaustion','Frightened',
@@ -910,9 +917,14 @@ async function pushState() {
     };
     try {
       const res = await fetch(WORKER_URL, {
-        method:'POST', headers:{'Content-Type':'application/json'},
+        method:'POST', headers: Auth.dmHeaders(),
         body: JSON.stringify({ type:'initiative_state', payload: playerState })
       });
+      if (res.status === 401) {
+        Auth.logout();
+        window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.'));
+        return;
+      }
       setSyncStatus(res.ok?'ok':'fail', res.ok?'✦ Synced':'⚠ Sync failed');
     } catch { setSyncStatus('fail','⚠ Offline'); }
   }, 600);

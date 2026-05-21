@@ -9,9 +9,62 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-21
 
+### Project-wide auth refactor
+
+A single shared identity model across every page, role-aware homepage, real DM username/password.
+
+#### Added
+- **`auth.js`** — single source of truth for identity. Every page includes it via `<script src="auth.js"></script>`. Exposes `Auth.getRole()`, `Auth.identity()`, `Auth.dmLogin/Setup/Status`, `Auth.playerLogin/playerCreds`, `Auth.dmHeaders()`, `Auth.characterList()`, `Auth.logout()`, `Auth.requireRole(role)`.
+  - Identity is stored under the single key `campaign-perks-auth` (replaces the older `dm_token` + `campaign-perks-login` keys).
+- **DM accounts**: worker now stores a salted SHA-256 hash of the DM password in KV (`dm_account` key). Endpoints:
+  - `GET ?type=dm_status` → `{configured, hasMasterToken}` — used by the homepage to choose setup vs login.
+  - `POST type=dm_setup` `{username, password}` — first-time setup; requires `X-DM-Token` header matching the worker secret if `DM_TOKEN` is set.
+  - `POST type=dm_login` `{username, password}` — validates and returns ok.
+  - DM-protected writes accept either `X-DM-Token: <DM_TOKEN secret>` (master) **or** `X-DM-User:` + `X-DM-Pass:` headers (the new normal).
+- **Role-aware homepage** (`home.html`, rewritten):
+  - Identity bar across the top showing "Signed in as ⟨name⟩" + DM/Player/Visitor pill, plus a Sign in / Sign out button.
+  - Sections of tool cards rendered conditionally by role:
+    - **For Everyone** — World Map, Initiative (player view)
+    - **For Players** — Campaign Perks (and anything else gated to signed-in users)
+    - **For the DM** — World Map Editor, Initiative Tracker (red-tinted DM cards)
+  - Login modal with Player / DM tabs. First-time DM flow asks for `DM_TOKEN` once and uses it to claim the account.
+  - Notice banner triggered by `?notice=…` query param — gated pages redirect here with a friendly reason.
+- **`⌂ Home` link** added to every tool page so signed-in users can hop back without typing the URL.
+
+#### Changed
+- **DM-only pages now redirect on direct access.** `map-dm.html` and `initiative-dm.html` call `Auth.requireRole('dm')` before anything else; non-DMs land on the homepage with an explanation.
+- **`map_data_dm` GET is now DM-gated** by the worker. Previously the full DM map (including `dmNotes`) was readable by anyone who knew the URL.
+- **`initiative-dm.html` now sends DM auth headers** on its sync save (it previously didn't, which would have started 401'ing as soon as DM lockdown was on).
+- **`index.html` (Campaign Perks) requires any signed-in user.** Anonymous visitors get bounced to home.
+- **`map.html`**:
+  - Uses the shared auth helper (`Auth.playerLogin`, `Auth.playerCreds`, `Auth.characterList`). The "claim a character" pill now hides for DM-signed-in viewers (they have an identity already).
+  - Old `campaign-perks-login` localStorage key replaced by the unified `campaign-perks-auth` key.
+
+#### Behavior matrix
+
+| Page                       | Anonymous | Player | DM |
+| -------------------------- | --------- | ------ | -- |
+| `home.html`                | ✓ (visitor view) | ✓ (player cards) | ✓ (DM cards) |
+| `map.html`                 | ✓ (gated content stripped) | ✓ (their scoped view + whispers) | ✓ (as anonymous) |
+| `initiative-player.html`   | ✓ | ✓ | ✓ |
+| `index.html` (Perks)       | redirected | ✓ | ✓ |
+| `map-dm.html`              | redirected | redirected | ✓ |
+| `initiative-dm.html`       | redirected | redirected | ✓ |
+
+#### Action required
+- **Redeploy `cloudflare-worker.js`** (new endpoints).
+- **First DM login**: from `home.html`, click Sign in → DM tab → choose a username + password + paste your existing `DM_TOKEN` worker secret. After this, your normal sign-in is just username + password.
+- The legacy `DM_TOKEN` still works as a master key on any write if you ever need it — it's the recovery escape hatch.
+
+
+
 ### Character login + per-character data
 
-A claim-code login system so players can log in as a character and see only what the DM has shared with them.
+A claim-code login system so players can log in as a character and see only what the DM has shared with them. **Login is optional** — anyone with the URL can still browse the world map; logging in just unlocks character-scoped content.
+
+#### Changed (follow-up)
+- **Anonymous browsing is now allowed.** The login overlay no longer auto-blocks the map; instead a "Claim a character" pill appears in the topbar. The modal is dismissible (× button, "Continue without logging in" link, or Esc).
+- **Worker strips gated content from anonymous `map_data` responses** so an un-authenticated visitor cannot see locations/zones/npcs/quests that have a non-empty `visibleTo`. Logged-in players still get their scoped view via `player_view`.
 
 #### Added — Worker (`cloudflare-worker.js`)
 - New KV keys: `characters` (DM-only, includes claim codes) and `journals` (per-character whisper entries).

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rise of a New Dawn — Player Hub</title>
+  <title>The Spire — Hub</title>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -20,6 +20,8 @@
       --red:            #8b1a1a;
       --gold:           #b8860b;
       --gold-light:     #d4a520;
+      --green:          #3a6a3a;
+      --blue:           #3a5a8a;
     }
 
     body {
@@ -41,7 +43,7 @@
     .scroll {
       background: var(--parchment);
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
-      max-width: 780px;
+      max-width: 860px;
       width: 100%;
       border-radius: 4px;
       border: 1px solid var(--border);
@@ -50,15 +52,75 @@
         0 0 0 5px var(--border),
         0 8px 40px rgba(0,0,0,0.7),
         inset 0 1px 0 rgba(255,255,255,0.15);
-      padding: 3rem 3rem 3.5rem;
+      padding: 2.4rem 3rem 3rem;
     }
+
+    /* ── Identity bar ── */
+    .identity-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding-bottom: 1rem;
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border-light);
+      flex-wrap: wrap;
+    }
+    .identity-text {
+      font-family: 'Cinzel', serif;
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      color: var(--ink-faint);
+      text-transform: uppercase;
+    }
+    .identity-name { color: var(--ink); font-weight: 600; }
+    .role-pill {
+      display: inline-block;
+      font-family: 'Cinzel', serif;
+      font-size: 0.6rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-left: 6px;
+      vertical-align: 0.1em;
+    }
+    .role-pill.dm        { background: rgba(139,26,26,0.12); color: var(--red);   border: 1px solid rgba(139,26,26,0.45); }
+    .role-pill.player    { background: rgba(58,106,58,0.12); color: var(--green); border: 1px solid rgba(58,106,58,0.45); }
+    .role-pill.anonymous { background: rgba(138,115,85,0.15); color: var(--ink-faint); border: 1px solid var(--border-light); }
+    .identity-actions { display: flex; gap: 0.5rem; }
+    .id-btn {
+      font-family: 'Cinzel', serif;
+      font-size: 0.68rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      background: var(--parchment-dark);
+      color: var(--ink-light);
+      border-radius: 3px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .id-btn:hover { border-color: var(--gold); color: var(--ink); }
+    .id-btn.primary { background: var(--ink); color: var(--parchment); border-color: var(--ink); }
+    .id-btn.primary:hover { background: var(--red); border-color: var(--red); color: var(--parchment); }
+
+    /* ── Notice banner ── */
+    .notice {
+      display: none;
+      background: rgba(139,26,26,0.08);
+      border: 1px solid rgba(139,26,26,0.4);
+      border-radius: 3px;
+      padding: 0.7rem 0.9rem;
+      margin-bottom: 1.25rem;
+      color: var(--red);
+      font-size: 0.9rem;
+    }
+    .notice.visible { display: block; }
 
     /* ── Header ── */
-    .header {
-      text-align: center;
-      margin-bottom: 2.5rem;
-    }
-
+    .header { text-align: center; margin-bottom: 2.25rem; }
     .world-label {
       font-family: 'Cinzel', serif;
       font-size: 0.75rem;
@@ -68,7 +130,6 @@
       color: var(--ink-faint);
       margin-bottom: 0.5rem;
     }
-
     .campaign-title {
       font-family: 'Cinzel', serif;
       font-size: 2.1rem;
@@ -78,51 +139,38 @@
       letter-spacing: 0.04em;
       margin-bottom: 0.75rem;
     }
+    .divider { display: flex; align-items: center; gap: 0.75rem; margin: 0 auto 1.1rem; max-width: 360px; }
+    .divider-line { flex: 1; height: 1px; background: linear-gradient(to right, transparent, var(--border)); }
+    .divider-line:last-child { background: linear-gradient(to left, transparent, var(--border)); }
+    .divider-diamond { width: 6px; height: 6px; background: var(--border); transform: rotate(45deg); flex-shrink: 0; }
+    .subtitle { font-family: 'Crimson Text', Georgia, serif; font-style: italic; font-size: 1.05rem; color: var(--ink-light); }
 
-    .divider {
+    /* ── Section heading ── */
+    .section-heading {
+      font-family: 'Cinzel', serif;
+      font-size: 0.72rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      margin: 1.5rem 0 0.9rem;
       display: flex;
       align-items: center;
-      gap: 0.75rem;
-      margin: 0 auto 1.1rem;
-      max-width: 360px;
+      gap: 10px;
     }
-    .divider-line {
-      flex: 1;
-      height: 1px;
-      background: linear-gradient(to right, transparent, var(--border));
-    }
-    .divider-line:last-child {
-      background: linear-gradient(to left, transparent, var(--border));
-    }
-    .divider-diamond {
-      width: 6px;
-      height: 6px;
-      background: var(--border);
-      transform: rotate(45deg);
-      flex-shrink: 0;
-    }
-
-    .subtitle {
-      font-family: 'Crimson Text', Georgia, serif;
-      font-style: italic;
-      font-size: 1.05rem;
-      color: var(--ink-light);
-    }
+    .section-heading::after { content: ''; flex: 1; height: 1px; background: var(--border-light); }
+    .section-heading:first-of-type { margin-top: 0; }
 
     /* ── Tool cards grid ── */
     .cards {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 1.25rem;
-      margin-top: 0.5rem;
+      gap: 1rem;
     }
-
     @media (max-width: 600px) {
       .cards { grid-template-columns: 1fr; }
-      .scroll { padding: 2rem 1.5rem 2.5rem; }
+      .scroll { padding: 1.5rem 1.25rem 2rem; }
       .campaign-title { font-size: 1.6rem; }
     }
-
     .card {
       display: flex;
       flex-direction: column;
@@ -133,83 +181,111 @@
       background: var(--parchment-dark);
       border: 1px solid var(--border);
       border-radius: 3px;
-      padding: 1.75rem 1.25rem 1.5rem;
+      padding: 1.5rem 1rem 1.25rem;
       transition: background 0.18s, border-color 0.18s, box-shadow 0.18s, transform 0.15s;
       position: relative;
       overflow: hidden;
     }
-
-    .card::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(160deg, rgba(255,255,255,0.07) 0%, transparent 60%);
-      pointer-events: none;
+    .card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(160deg, rgba(255,255,255,0.07) 0%, transparent 60%); pointer-events: none; }
+    .card:hover { background: var(--parchment-deep); border-color: var(--gold); box-shadow: 0 4px 18px rgba(0,0,0,0.18), 0 0 0 1px var(--gold); transform: translateY(-2px); }
+    .card:active { transform: translateY(0); }
+    .card.dm    { border-color: rgba(139,26,26,0.5); }
+    .card.dm:hover { border-color: var(--red); box-shadow: 0 4px 18px rgba(0,0,0,0.18), 0 0 0 1px var(--red); }
+    .card-icon { width: 46px; height: 46px; margin-bottom: 0.8rem; color: var(--ink-light); transition: color 0.18s; }
+    .card:hover .card-icon { color: var(--red); }
+    .card-title { font-family: 'Cinzel', serif; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); margin-bottom: 0.4rem; }
+    .card-desc { font-size: 0.85rem; color: var(--ink-light); line-height: 1.4; }
+    .card-badge {
+      position: absolute; top: 8px; right: 8px;
+      background: var(--gold); color: var(--ink);
+      font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.1em;
+      padding: 2px 7px; border-radius: 10px; font-weight: 600;
     }
 
-    .card:hover {
-      background: var(--parchment-deep);
-      border-color: var(--gold);
-      box-shadow: 0 4px 18px rgba(0,0,0,0.18), 0 0 0 1px var(--gold);
-      transform: translateY(-2px);
+    /* ── Login modal ── */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(15,8,3,0.85); backdrop-filter: blur(4px); z-index: 200; display: none; align-items: center; justify-content: center; padding: 1rem; }
+    .modal-overlay.visible { display: flex; }
+    .modal {
+      background: var(--parchment);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      box-shadow: 0 0 0 4px #1a1208, 0 0 0 5px var(--border), 0 12px 40px rgba(0,0,0,0.6);
+      padding: 1.8rem 1.8rem 1.6rem;
+      max-width: 440px;
+      width: 100%;
+      position: relative;
     }
+    .modal-close {
+      position: absolute; top: 8px; right: 12px;
+      background: transparent; border: none; font-size: 1.5rem; cursor: pointer;
+      color: var(--ink-faint); line-height: 1; padding: 4px 8px;
+    }
+    .modal-close:hover { color: var(--red); }
+    .modal-title { font-family: 'Cinzel', serif; font-size: 1.15rem; letter-spacing: 0.1em; color: var(--ink); margin-bottom: 0.3rem; }
+    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 1.1rem; line-height: 1.5; }
 
-    .card:active {
-      transform: translateY(0);
+    .modal-tabs { display: flex; border-bottom: 1px solid var(--border-light); margin-bottom: 1rem; }
+    .modal-tab {
+      flex: 1; padding: 8px;
+      background: transparent; border: none;
+      font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--ink-faint); cursor: pointer; border-bottom: 2px solid transparent;
+      transition: all 0.15s;
     }
+    .modal-tab.active { color: var(--ink); border-bottom-color: var(--red); }
+    .modal-tab:hover:not(.active) { color: var(--ink-light); }
 
-    .card-icon {
-      width: 52px;
-      height: 52px;
-      margin-bottom: 1rem;
-      color: var(--ink-light);
-      transition: color 0.18s;
+    .field { margin-bottom: 0.7rem; }
+    .field label {
+      display: block; font-family: 'Cinzel', serif; font-size: 0.6rem;
+      letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint);
+      margin-bottom: 4px;
     }
+    .field input, .field select {
+      width: 100%;
+      background: rgba(255,255,255,0.5); border: 1px solid var(--border-light);
+      border-radius: 2px; color: var(--ink);
+      font-family: 'Crimson Text', serif; font-size: 0.95rem;
+      padding: 7px 10px; outline: none; transition: border-color 0.15s;
+    }
+    .field input.code-input { font-family: 'Cinzel', serif; letter-spacing: 0.18em; text-transform: uppercase; }
+    .field input:focus, .field select:focus { border-color: var(--gold); }
+    .field-error { font-size: 0.85rem; color: var(--red); min-height: 1.2em; margin-bottom: 0.3rem; }
 
-    .card:hover .card-icon {
-      color: var(--red);
-    }
+    .pane { display: none; }
+    .pane.active { display: block; }
 
-    .card-title {
-      font-family: 'Cinzel', serif;
-      font-size: 0.95rem;
-      font-weight: 600;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--ink);
-      margin-bottom: 0.5rem;
+    .submit-btn {
+      width: 100%;
+      font-family: 'Cinzel', serif; font-size: 0.78rem; letter-spacing: 0.1em;
+      padding: 9px 14px; border-radius: 3px; cursor: pointer; border: 1px solid var(--ink);
+      background: var(--ink); color: var(--parchment); transition: all 0.15s;
     }
+    .submit-btn:hover:not(:disabled) { background: var(--red); border-color: var(--red); }
+    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    .card-desc {
-      font-size: 0.92rem;
-      color: var(--ink-light);
-      line-height: 1.45;
-    }
+    .setup-hint { background: rgba(184,134,11,0.12); border: 1px solid rgba(184,134,11,0.4); padding: 0.6rem 0.7rem; border-radius: 3px; font-size: 0.82rem; color: var(--ink-light); margin-bottom: 0.7rem; line-height: 1.45; }
+    .setup-hint code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 2px; font-size: 0.85em; }
 
     /* ── Footer ── */
-    .footer {
-      margin-top: 2.25rem;
-      text-align: center;
-    }
-
-    .footer-rule {
-      height: 1px;
-      background: linear-gradient(to right, transparent, var(--border-light), transparent);
-      margin-bottom: 1rem;
-    }
-
-    .footer-text {
-      font-family: 'Cinzel', serif;
-      font-size: 0.68rem;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--ink-faint);
-    }
+    .footer { margin-top: 2rem; text-align: center; }
+    .footer-rule { height: 1px; background: linear-gradient(to right, transparent, var(--border-light), transparent); margin-bottom: 1rem; }
+    .footer-text { font-family: 'Cinzel', serif; font-size: 0.68rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-faint); }
   </style>
 </head>
 <body>
 
   <div class="scroll">
+
+    <!-- IDENTITY BAR -->
+    <div class="identity-bar">
+      <div class="identity-text">
+        Signed in as <span class="identity-name" id="id-name">Visitor</span><span id="id-pill"></span>
+      </div>
+      <div class="identity-actions" id="id-actions"></div>
+    </div>
+
+    <div class="notice" id="notice"></div>
 
     <header class="header">
       <p class="world-label">Velemere &mdash; 684 SV</p>
@@ -219,67 +295,272 @@
         <div class="divider-diamond"></div>
         <div class="divider-line"></div>
       </div>
-      <p class="subtitle">Player Resources</p>
+      <p class="subtitle" id="subtitle">A living world, charted by hand</p>
     </header>
 
-    <div class="cards">
-
-      <!-- Perks -->
-      <a href="index.html" class="card">
-        <svg class="card-icon" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <!-- Scroll / perk sheet icon -->
-          <rect x="10" y="8" width="32" height="38" rx="2" stroke="currentColor" stroke-width="2" fill="none"/>
-          <line x1="17" y1="18" x2="35" y2="18" stroke="currentColor" stroke-width="1.8"/>
-          <line x1="17" y1="24" x2="35" y2="24" stroke="currentColor" stroke-width="1.8"/>
-          <line x1="17" y1="30" x2="27" y2="30" stroke="currentColor" stroke-width="1.8"/>
-          <!-- Star accent -->
-          <path d="M33 34 L34.4 37.3 L38 37.6 L35.4 39.8 L36.2 43.3 L33 41.4 L29.8 43.3 L30.6 39.8 L28 37.6 L31.6 37.3 Z"
-                stroke="currentColor" stroke-width="1.5" fill="none" stroke-linejoin="round"/>
-        </svg>
-        <span class="card-title">Campaign Perks</span>
-        <span class="card-desc">Choose your creation bonus and review available perks.</span>
-      </a>
-
-      <!-- Map -->
-      <a href="map.html" class="card">
-        <svg class="card-icon" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <!-- Map icon -->
-          <polygon points="6,12 18,8 34,14 46,10 46,40 34,44 18,38 6,42" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/>
-          <line x1="18" y1="8" x2="18" y2="38" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,2"/>
-          <line x1="34" y1="14" x2="34" y2="44" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,2"/>
-          <!-- Location marker -->
-          <circle cx="26" cy="26" r="3" stroke="currentColor" stroke-width="1.8" fill="none"/>
-          <line x1="26" y1="29" x2="26" y2="33" stroke="currentColor" stroke-width="1.8"/>
-        </svg>
-        <span class="card-title">World Map</span>
-        <span class="card-desc">Explore the known regions and locations of Velemere.</span>
-      </a>
-
-      <!-- Initiative -->
-      <a href="initiative-player.html" class="card">
-        <svg class="card-icon" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <!-- Crossed swords -->
-          <line x1="12" y1="12" x2="40" y2="40" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-          <line x1="40" y1="12" x2="12" y2="40" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-          <!-- Sword guards -->
-          <line x1="9" y1="22" x2="22" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          <line x1="30" y1="43" x2="43" y2="30" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          <!-- Pommels -->
-          <circle cx="10" cy="42" r="2.5" stroke="currentColor" stroke-width="1.5" fill="none"/>
-          <circle cx="42" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5" fill="none"/>
-        </svg>
-        <span class="card-title">Initiative</span>
-        <span class="card-desc">Track turn order and see who acts next in combat.</span>
-      </a>
-
-    </div>
+    <!-- TOOL CARDS — populated by JS based on role -->
+    <div id="card-sections"></div>
 
     <footer class="footer">
       <div class="footer-rule"></div>
-      <p class="footer-text">For players of Rise of a New Dawn</p>
+      <p class="footer-text">Rise of a New Dawn</p>
     </footer>
-
   </div>
 
+  <!-- LOGIN MODAL -->
+  <div class="modal-overlay" id="login-overlay" onclick="if(event.target===this)closeLogin()">
+    <div class="modal">
+      <button class="modal-close" type="button" onclick="closeLogin()" aria-label="Close">×</button>
+      <div class="modal-title">Sign in</div>
+      <div class="modal-sub">DMs use a username and password. Players claim a character with the code their DM gave them.</div>
+
+      <div class="modal-tabs">
+        <button class="modal-tab active" id="tab-player" type="button" onclick="switchPane('player')">Player</button>
+        <button class="modal-tab" id="tab-dm" type="button" onclick="switchPane('dm')">DM</button>
+      </div>
+
+      <!-- PLAYER PANE -->
+      <div class="pane active" id="pane-player">
+        <div class="field">
+          <label>Character</label>
+          <select id="char-select"><option value="">— loading —</option></select>
+        </div>
+        <div class="field">
+          <label>Claim code</label>
+          <input type="text" id="char-code" class="code-input" maxlength="10" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="XXXXXX">
+        </div>
+        <div class="field-error" id="player-error"></div>
+        <button class="submit-btn" type="button" onclick="doPlayerLogin()">Claim character</button>
+      </div>
+
+      <!-- DM PANE -->
+      <div class="pane" id="pane-dm">
+        <div id="dm-setup-hint" class="setup-hint" style="display:none">
+          <strong>First-time setup.</strong> No DM account exists yet. Pick a username + password and provide the worker's <code>DM_TOKEN</code> secret to claim it.
+        </div>
+        <div class="field">
+          <label>Username</label>
+          <input type="text" id="dm-username" autocomplete="username" spellcheck="false">
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="dm-password" autocomplete="current-password">
+        </div>
+        <div class="field" id="dm-master-field" style="display:none">
+          <label>DM_TOKEN (one-time setup)</label>
+          <input type="password" id="dm-master" autocomplete="off">
+        </div>
+        <div class="field-error" id="dm-error"></div>
+        <button class="submit-btn" type="button" id="dm-submit" onclick="doDMSubmit()">Sign in as DM</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="auth.js"></script>
+  <script>
+    // ─── Notice from ?notice=… (redirect from gated page) ───
+    (function showNotice() {
+      const params = new URLSearchParams(location.search);
+      const msg = params.get('notice');
+      if (msg) {
+        const el = document.getElementById('notice');
+        el.textContent = msg;
+        el.classList.add('visible');
+        // Clear the URL param without reloading
+        history.replaceState(null, '', location.pathname);
+      }
+    })();
+
+    // ─── Identity bar ───
+    function renderIdentity() {
+      const ident = Auth.identity();
+      document.getElementById('id-name').textContent = ident.name || 'Visitor';
+      const pill = document.getElementById('id-pill');
+      const cls = ident.role === 'dm' ? 'dm' : ident.role === 'player' ? 'player' : 'anonymous';
+      const label = ident.role === 'dm' ? 'DM' : ident.role === 'player' ? 'Player' : 'Visitor';
+      pill.innerHTML = `<span class="role-pill ${cls}">${label}</span>`;
+
+      const actions = document.getElementById('id-actions');
+      if (ident.role === 'anonymous') {
+        actions.innerHTML = `<button class="id-btn primary" type="button" onclick="openLogin()">Sign in</button>`;
+      } else {
+        actions.innerHTML = `<button class="id-btn" type="button" onclick="doLogout()">Sign out</button>`;
+      }
+
+      const subtitle = document.getElementById('subtitle');
+      subtitle.textContent =
+        ident.role === 'dm'    ? `Welcome back, DM.`
+      : ident.role === 'player'? `Welcome back, ${ident.name}.`
+      :                          `A living world, charted by hand`;
+    }
+
+    function doLogout() {
+      if (!confirm('Sign out?')) return;
+      Auth.logout();
+      location.reload();
+    }
+
+    // ─── Card definitions ───
+    const ICONS = {
+      perks: `<svg class="card-icon" viewBox="0 0 52 52" fill="none"><rect x="10" y="8" width="32" height="38" rx="2" stroke="currentColor" stroke-width="2"/><line x1="17" y1="18" x2="35" y2="18" stroke="currentColor" stroke-width="1.8"/><line x1="17" y1="24" x2="35" y2="24" stroke="currentColor" stroke-width="1.8"/><line x1="17" y1="30" x2="27" y2="30" stroke="currentColor" stroke-width="1.8"/><path d="M33 34 L34.4 37.3 L38 37.6 L35.4 39.8 L36.2 43.3 L33 41.4 L29.8 43.3 L30.6 39.8 L28 37.6 L31.6 37.3 Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
+      map: `<svg class="card-icon" viewBox="0 0 52 52" fill="none"><polygon points="6,12 18,8 34,14 46,10 46,40 34,44 18,38 6,42" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><line x1="18" y1="8" x2="18" y2="38" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,2"/><line x1="34" y1="14" x2="34" y2="44" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2,2"/><circle cx="26" cy="26" r="3" stroke="currentColor" stroke-width="1.8"/><line x1="26" y1="29" x2="26" y2="33" stroke="currentColor" stroke-width="1.8"/></svg>`,
+      init: `<svg class="card-icon" viewBox="0 0 52 52" fill="none"><line x1="12" y1="12" x2="40" y2="40" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><line x1="40" y1="12" x2="12" y2="40" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><line x1="9" y1="22" x2="22" y2="9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="30" y1="43" x2="43" y2="30" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="42" r="2.5" stroke="currentColor" stroke-width="1.5"/><circle cx="42" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>`,
+      mapdm: `<svg class="card-icon" viewBox="0 0 52 52" fill="none"><polygon points="6,12 18,8 34,14 46,10 46,40 34,44 18,38 6,42" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M22 22 L28 22 L28 28 L34 28 L34 34 L22 34 Z" stroke="currentColor" stroke-width="1.8" fill="none"/><circle cx="36" cy="20" r="2.5" fill="currentColor"/></svg>`,
+      initdm: `<svg class="card-icon" viewBox="0 0 52 52" fill="none"><circle cx="26" cy="26" r="18" stroke="currentColor" stroke-width="2"/><path d="M26 14 V26 L34 30" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="26" cy="26" r="1.8" fill="currentColor"/></svg>`,
+    };
+
+    function makeCard({ href, icon, title, desc, dm = false, badge = '' }) {
+      return `<a href="${href}" class="card ${dm?'dm':''}">${badge?`<span class="card-badge">${badge}</span>`:''}${icon}<span class="card-title">${title}</span><span class="card-desc">${desc}</span></a>`;
+    }
+
+    function renderCards() {
+      const role = Auth.getRole();
+      const sections = [];
+
+      // Public tools (everyone)
+      const publicCards = [
+        makeCard({ href: 'map.html',                icon: ICONS.map,  title: 'World Map',  desc: 'Explore the known regions and locations of Velemere.' }),
+        makeCard({ href: 'initiative-player.html',  icon: ICONS.init, title: 'Initiative', desc: 'Live turn order during combat.' }),
+      ];
+      sections.push(`<div class="section-heading">For Everyone</div><div class="cards">${publicCards.join('')}</div>`);
+
+      // Player-only (any signed-in user — gates by login, not specifically player vs DM)
+      if (role === 'player' || role === 'dm') {
+        const playerCards = [
+          makeCard({ href: 'index.html', icon: ICONS.perks, title: 'Campaign Perks', desc: 'Your creation bonus and the perks ledger.' }),
+        ];
+        sections.push(`<div class="section-heading">For Players</div><div class="cards">${playerCards.join('')}</div>`);
+      }
+
+      // DM-only
+      if (role === 'dm') {
+        const dmCards = [
+          makeCard({ href: 'map-dm.html',        icon: ICONS.mapdm,  title: 'World Map Editor', desc: 'Place pins, write lore, run player characters and whispers.', dm: true }),
+          makeCard({ href: 'initiative-dm.html', icon: ICONS.initdm, title: 'Initiative Tracker', desc: 'Run combat — order, HP, conditions, broadcast to players.', dm: true }),
+        ];
+        sections.push(`<div class="section-heading">For the DM</div><div class="cards">${dmCards.join('')}</div>`);
+      }
+
+      // Prompt for anonymous
+      if (role === 'anonymous') {
+        sections.push(`
+          <div class="section-heading">Sign in for more</div>
+          <div style="text-align:center;padding:0.5rem 0 0.25rem;color:var(--ink-light);font-size:0.95rem;line-height:1.5">
+            Players get access to the Campaign Perks and whispers from the DM.<br>
+            DMs unlock the world editor and the combat tracker.
+            <div style="margin-top:0.9rem"><button class="id-btn primary" type="button" onclick="openLogin()">Sign in</button></div>
+          </div>
+        `);
+      }
+
+      document.getElementById('card-sections').innerHTML = sections.join('');
+    }
+
+    // ─── Login modal ───
+    let dmIsConfigured = false;
+
+    function openLogin() {
+      document.getElementById('login-overlay').classList.add('visible');
+      // Decide default tab — DM is more sensitive, default to player
+      switchPane('player');
+      populateCharacters();
+      refreshDMStatus();
+    }
+    function closeLogin() {
+      document.getElementById('login-overlay').classList.remove('visible');
+      document.getElementById('player-error').textContent = '';
+      document.getElementById('dm-error').textContent = '';
+    }
+    function switchPane(name) {
+      document.getElementById('tab-player').classList.toggle('active', name === 'player');
+      document.getElementById('tab-dm').classList.toggle('active', name === 'dm');
+      document.getElementById('pane-player').classList.toggle('active', name === 'player');
+      document.getElementById('pane-dm').classList.toggle('active', name === 'dm');
+    }
+
+    async function populateCharacters() {
+      const sel = document.getElementById('char-select');
+      sel.innerHTML = '<option value="">— loading —</option>';
+      const list = await Auth.characterList();
+      if (!list.length) {
+        sel.innerHTML = '<option value="">— no characters yet —</option>';
+        sel.disabled = true;
+        return;
+      }
+      sel.disabled = false;
+      sel.innerHTML = list.map(c => `<option value="${c.id}">${c.player ? c.name + '  ·  ' + c.player : c.name}</option>`).join('');
+    }
+
+    async function refreshDMStatus() {
+      const status = await Auth.dmStatus();
+      dmIsConfigured = !!status.configured;
+      const hint = document.getElementById('dm-setup-hint');
+      const masterField = document.getElementById('dm-master-field');
+      const submitBtn = document.getElementById('dm-submit');
+      if (!dmIsConfigured) {
+        hint.style.display = 'block';
+        masterField.style.display = status.hasMasterToken ? 'block' : 'none';
+        submitBtn.textContent = 'Create DM account';
+      } else {
+        hint.style.display = 'none';
+        masterField.style.display = 'none';
+        submitBtn.textContent = 'Sign in as DM';
+      }
+    }
+
+    async function doPlayerLogin() {
+      const characterId = document.getElementById('char-select').value;
+      const code = document.getElementById('char-code').value.trim().toUpperCase();
+      const errEl = document.getElementById('player-error');
+      errEl.textContent = '';
+      if (!characterId) { errEl.textContent = 'Pick a character.'; return; }
+      if (!code) { errEl.textContent = 'Enter your claim code.'; return; }
+
+      const res = await Auth.playerLogin(characterId, code);
+      if (!res.ok) { errEl.textContent = res.error; return; }
+      closeLogin();
+      renderIdentity();
+      renderCards();
+    }
+
+    async function doDMSubmit() {
+      const u = document.getElementById('dm-username').value.trim();
+      const p = document.getElementById('dm-password').value;
+      const errEl = document.getElementById('dm-error');
+      errEl.textContent = '';
+      if (!u || !p) { errEl.textContent = 'Username and password are required.'; return; }
+
+      if (!dmIsConfigured) {
+        const master = document.getElementById('dm-master').value;
+        const setup = await Auth.dmSetup(u, p, master);
+        if (!setup.ok) { errEl.textContent = setup.error; return; }
+        // Account created — now log in to populate stored creds
+        const login = await Auth.dmLogin(u, p);
+        if (!login.ok) { errEl.textContent = 'Account created but login failed: ' + login.error; return; }
+      } else {
+        const login = await Auth.dmLogin(u, p);
+        if (!login.ok) { errEl.textContent = login.error; return; }
+      }
+      closeLogin();
+      renderIdentity();
+      renderCards();
+    }
+
+    // Allow Enter to submit the active pane
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && document.getElementById('login-overlay').classList.contains('visible')) {
+        closeLogin();
+        return;
+      }
+      if (e.key !== 'Enter') return;
+      if (!document.getElementById('login-overlay').classList.contains('visible')) return;
+      if (document.getElementById('pane-player').classList.contains('active')) doPlayerLogin();
+      else doDMSubmit();
+    });
+
+    // ─── Boot ───
+    renderIdentity();
+    renderCards();
+  </script>
 </body>
 </html>
