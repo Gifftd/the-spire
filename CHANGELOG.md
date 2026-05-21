@@ -9,6 +9,20 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-21
 
+### Restored the `maps/` folder
+
+The original GitHub repo had a `maps/` folder with `Alden.png`, `Numira'Bad.png`, `Velmere.jpeg`, and a placeholder `readme`. It was removed from `origin/main` during the auth refactor commit (when staging deletions of files that weren't in the local working tree). The blobs were still in git's object database, so we restored them by hash.
+
+#### Restored
+- `maps/Alden.png` (PNG 4080×4080)
+- `maps/Numira'Bad.png` (PNG 3345×3345)
+- `maps/Velmere.jpeg`
+- `maps/readme`
+
+#### Changed
+- `map.html` and `map-dm.html` default `mapImage` now points to `./maps/Velmere.jpeg` (was `./Velmere.jpeg`). The root-level duplicates of `Alden.png` and `Velmere.jpeg` are gone — `maps/` is the canonical location.
+- **You should also update the World tab → "REGION MAP IMAGE URL" in `map-dm.html`** to `./maps/Velmere.jpeg` and click Publish, so the live (KV-stored) data matches and players see the map.
+
 ### Storage key renamed → `spire-auth`
 
 - `auth.js` now stores identity under `localStorage['spire-auth']` (was `campaign-perks-auth`).
