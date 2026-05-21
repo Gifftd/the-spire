@@ -7,7 +7,7 @@
 //    'player'    — claimed a character with their code
 //    'anonymous' — no creds; can still view public pages
 //
-//  Storage shape (localStorage 'campaign-perks-auth'):
+//  Storage shape (localStorage 'spire-auth'):
 //    {
 //      role: 'dm' | 'player' | null,
 //      dm:     { username, password }       (when role='dm')
@@ -19,7 +19,30 @@
 //  re-validates the player code on every fetch.
 // ═══════════════════════════════════════════════════════════════
 (function () {
-  const KEY = 'campaign-perks-auth';
+  const KEY = 'spire-auth';
+  // One-shot migration: pre-rebrand the key was 'campaign-perks-auth'.
+  // Even earlier (before the auth refactor) the player creds lived under
+  // 'campaign-perks-login'. Carry either forward if the new key is empty.
+  try {
+    if (!localStorage.getItem(KEY)) {
+      const legacyAuth = localStorage.getItem('campaign-perks-auth');
+      if (legacyAuth) {
+        localStorage.setItem(KEY, legacyAuth);
+        localStorage.removeItem('campaign-perks-auth');
+      } else {
+        const legacyPlayer = localStorage.getItem('campaign-perks-login');
+        if (legacyPlayer) {
+          try {
+            const p = JSON.parse(legacyPlayer);
+            if (p && p.characterId && p.code) {
+              localStorage.setItem(KEY, JSON.stringify({ role: 'player', player: p }));
+            }
+          } catch {}
+          localStorage.removeItem('campaign-perks-login');
+        }
+      }
+    }
+  } catch {}
   // Pages can override window.WORKER_URL before including auth.js;
   // otherwise we point at the deployed default.
   const WORKER_URL = (typeof window !== 'undefined' && window.WORKER_URL)

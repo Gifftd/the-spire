@@ -9,26 +9,31 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --parchment:      #f5eed8;
-      --parchment-dark: #ede3c4;
-      --parchment-deep: #e0d4af;
-      --ink:            #2a1f0e;
-      --ink-light:      #5c4a2a;
-      --ink-faint:      #8a7355;
-      --border:         #c4a96d;
-      --border-light:   #ddd0aa;
-      --red:            #8b1a1a;
-      --gold:           #b8860b;
-      --gold-light:     #d4a520;
-      --green:          #3a6a3a;
-      --blue:           #3a5a8a;
+      /* Slate + teal — "tower of knowledge" */
+      --bg:             #080c10;
+      --panel:          #131c22;
+      --panel-deep:     #0d141a;
+      --panel-light:    #1c2730;
+      --border:         #2c4048;
+      --border-light:   #3e5862;
+      --teal:           #4a9595;
+      --teal-bright:    #7ec5c5;
+      --teal-deep:      #2a5454;
+      --teal-faint:     #1b3838;
+      --ink:            #dde3e5;
+      --ink-light:      #a3adb3;
+      --ink-faint:      #6c787f;
+      --brass:          #b88a5a;       /* DM accent */
+      --brass-deep:     #6b4d2e;
+      --rust:           #a85d4a;       /* notices / errors */
     }
 
     body {
-      background: #1a1208;
+      background: var(--bg);
       background-image:
-        radial-gradient(ellipse at 20% 15%, rgba(60,40,10,0.7) 0%, transparent 55%),
-        radial-gradient(ellipse at 80% 85%, rgba(40,20,5,0.7) 0%, transparent 55%);
+        radial-gradient(ellipse at 20% 15%, rgba(74,149,149,0.10) 0%, transparent 55%),
+        radial-gradient(ellipse at 80% 90%, rgba(184,138,90,0.06) 0%, transparent 55%),
+        radial-gradient(circle at 50% 0%, rgba(126,197,197,0.06) 0%, transparent 35%);
       min-height: 100vh;
       font-family: 'Crimson Text', Georgia, serif;
       color: var(--ink);
@@ -39,19 +44,19 @@
       padding: 2rem 1rem 4rem;
     }
 
-    /* ── Scroll container ── */
+    /* ── Panel ── */
     .scroll {
-      background: var(--parchment);
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      background: var(--panel);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
       max-width: 860px;
       width: 100%;
       border-radius: 4px;
       border: 1px solid var(--border);
       box-shadow:
-        0 0 0 4px #1a1208,
-        0 0 0 5px var(--border),
-        0 8px 40px rgba(0,0,0,0.7),
-        inset 0 1px 0 rgba(255,255,255,0.15);
+        0 0 0 1px rgba(74,149,149,0.18),
+        0 0 30px rgba(74,149,149,0.06),
+        0 12px 48px rgba(0,0,0,0.75),
+        inset 0 1px 0 rgba(126,197,197,0.08);
       padding: 2.4rem 3rem 3rem;
     }
 
@@ -63,13 +68,13 @@
       gap: 1rem;
       padding-bottom: 1rem;
       margin-bottom: 1.5rem;
-      border-bottom: 1px solid var(--border-light);
+      border-bottom: 1px solid var(--border);
       flex-wrap: wrap;
     }
     .identity-text {
       font-family: 'Cinzel', serif;
-      font-size: 0.75rem;
-      letter-spacing: 0.12em;
+      font-size: 0.72rem;
+      letter-spacing: 0.14em;
       color: var(--ink-faint);
       text-transform: uppercase;
     }
@@ -77,87 +82,95 @@
     .role-pill {
       display: inline-block;
       font-family: 'Cinzel', serif;
-      font-size: 0.6rem;
-      letter-spacing: 0.14em;
+      font-size: 0.58rem;
+      letter-spacing: 0.16em;
       text-transform: uppercase;
       padding: 2px 8px;
       border-radius: 10px;
-      margin-left: 6px;
+      margin-left: 8px;
       vertical-align: 0.1em;
     }
-    .role-pill.dm        { background: rgba(139,26,26,0.12); color: var(--red);   border: 1px solid rgba(139,26,26,0.45); }
-    .role-pill.player    { background: rgba(58,106,58,0.12); color: var(--green); border: 1px solid rgba(58,106,58,0.45); }
-    .role-pill.anonymous { background: rgba(138,115,85,0.15); color: var(--ink-faint); border: 1px solid var(--border-light); }
+    .role-pill.dm        { background: rgba(184,138,90,0.12);  color: var(--brass);      border: 1px solid rgba(184,138,90,0.45); }
+    .role-pill.player    { background: rgba(74,149,149,0.15);  color: var(--teal-bright);border: 1px solid rgba(74,149,149,0.45); }
+    .role-pill.anonymous { background: rgba(108,120,127,0.15); color: var(--ink-faint);  border: 1px solid var(--border); }
     .identity-actions { display: flex; gap: 0.5rem; }
     .id-btn {
       font-family: 'Cinzel', serif;
-      font-size: 0.68rem;
-      letter-spacing: 0.1em;
+      font-size: 0.66rem;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
       padding: 6px 12px;
-      border: 1px solid var(--border);
-      background: var(--parchment-dark);
+      border: 1px solid var(--border-light);
+      background: var(--panel-light);
       color: var(--ink-light);
       border-radius: 3px;
       cursor: pointer;
       transition: all 0.15s;
     }
-    .id-btn:hover { border-color: var(--gold); color: var(--ink); }
-    .id-btn.primary { background: var(--ink); color: var(--parchment); border-color: var(--ink); }
-    .id-btn.primary:hover { background: var(--red); border-color: var(--red); color: var(--parchment); }
+    .id-btn:hover { border-color: var(--teal); color: var(--ink); }
+    .id-btn.primary { background: var(--teal-deep); color: var(--teal-bright); border-color: var(--teal); }
+    .id-btn.primary:hover { background: var(--teal); color: var(--bg); border-color: var(--teal-bright); }
 
     /* ── Notice banner ── */
     .notice {
       display: none;
-      background: rgba(139,26,26,0.08);
-      border: 1px solid rgba(139,26,26,0.4);
+      background: rgba(168,93,74,0.10);
+      border: 1px solid rgba(168,93,74,0.45);
       border-radius: 3px;
       padding: 0.7rem 0.9rem;
       margin-bottom: 1.25rem;
-      color: var(--red);
+      color: var(--rust);
       font-size: 0.9rem;
     }
     .notice.visible { display: block; }
 
     /* ── Header ── */
     .header { text-align: center; margin-bottom: 2.25rem; }
+    .tower-mark {
+      display: block; margin: 0 auto 0.5rem; width: 42px; height: 56px; color: var(--teal);
+      filter: drop-shadow(0 0 8px rgba(126,197,197,0.25));
+    }
     .world-label {
       font-family: 'Cinzel', serif;
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       font-weight: 400;
-      letter-spacing: 0.25em;
+      letter-spacing: 0.32em;
       text-transform: uppercase;
-      color: var(--ink-faint);
-      margin-bottom: 0.5rem;
+      color: var(--teal);
+      opacity: 0.85;
+      margin-bottom: 0.55rem;
     }
     .campaign-title {
       font-family: 'Cinzel', serif;
-      font-size: 2.1rem;
+      font-size: 2.3rem;
       font-weight: 700;
       color: var(--ink);
-      line-height: 1.15;
-      letter-spacing: 0.04em;
+      line-height: 1.1;
+      letter-spacing: 0.12em;
       margin-bottom: 0.75rem;
+      text-transform: uppercase;
     }
     .divider { display: flex; align-items: center; gap: 0.75rem; margin: 0 auto 1.1rem; max-width: 360px; }
-    .divider-line { flex: 1; height: 1px; background: linear-gradient(to right, transparent, var(--border)); }
-    .divider-line:last-child { background: linear-gradient(to left, transparent, var(--border)); }
-    .divider-diamond { width: 6px; height: 6px; background: var(--border); transform: rotate(45deg); flex-shrink: 0; }
-    .subtitle { font-family: 'Crimson Text', Georgia, serif; font-style: italic; font-size: 1.05rem; color: var(--ink-light); }
+    .divider-line { flex: 1; height: 1px; background: linear-gradient(to right, transparent, var(--teal)); }
+    .divider-line:last-child { background: linear-gradient(to left, transparent, var(--teal)); }
+    .divider-diamond { width: 6px; height: 6px; background: var(--teal); transform: rotate(45deg); flex-shrink: 0; box-shadow: 0 0 6px rgba(126,197,197,0.5); }
+    .subtitle { font-family: 'Crimson Text', Georgia, serif; font-style: italic; font-size: 1.02rem; color: var(--ink-light); }
 
     /* ── Section heading ── */
     .section-heading {
       font-family: 'Cinzel', serif;
-      font-size: 0.72rem;
-      letter-spacing: 0.18em;
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
       text-transform: uppercase;
-      color: var(--ink-faint);
-      margin: 1.5rem 0 0.9rem;
+      color: var(--teal);
+      margin: 1.6rem 0 0.9rem;
       display: flex;
       align-items: center;
       gap: 10px;
     }
-    .section-heading::after { content: ''; flex: 1; height: 1px; background: var(--border-light); }
+    .section-heading::before, .section-heading::after { content: ''; height: 1px; background: var(--border); }
+    .section-heading::before { width: 14px; }
+    .section-heading::after  { flex: 1; }
     .section-heading:first-of-type { margin-top: 0; }
 
     /* ── Tool cards grid ── */
@@ -178,7 +191,7 @@
       text-align: center;
       text-decoration: none;
       color: var(--ink);
-      background: var(--parchment-dark);
+      background: var(--panel-light);
       border: 1px solid var(--border);
       border-radius: 3px;
       padding: 1.5rem 1rem 1.25rem;
@@ -186,30 +199,34 @@
       position: relative;
       overflow: hidden;
     }
-    .card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(160deg, rgba(255,255,255,0.07) 0%, transparent 60%); pointer-events: none; }
-    .card:hover { background: var(--parchment-deep); border-color: var(--gold); box-shadow: 0 4px 18px rgba(0,0,0,0.18), 0 0 0 1px var(--gold); transform: translateY(-2px); }
+    .card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(165deg, rgba(126,197,197,0.05) 0%, transparent 70%); pointer-events: none; }
+    .card:hover { background: var(--panel-deep); border-color: var(--teal); box-shadow: 0 6px 20px rgba(0,0,0,0.4), 0 0 0 1px var(--teal), 0 0 18px rgba(74,149,149,0.18); transform: translateY(-2px); }
     .card:active { transform: translateY(0); }
-    .card.dm    { border-color: rgba(139,26,26,0.5); }
-    .card.dm:hover { border-color: var(--red); box-shadow: 0 4px 18px rgba(0,0,0,0.18), 0 0 0 1px var(--red); }
+    .card.dm    { border-color: rgba(184,138,90,0.45); }
+    .card.dm:hover { border-color: var(--brass); box-shadow: 0 6px 20px rgba(0,0,0,0.4), 0 0 0 1px var(--brass), 0 0 18px rgba(184,138,90,0.15); }
+    .card.dm:hover .card-icon { color: var(--brass); }
     .card-icon { width: 46px; height: 46px; margin-bottom: 0.8rem; color: var(--ink-light); transition: color 0.18s; }
-    .card:hover .card-icon { color: var(--red); }
-    .card-title { font-family: 'Cinzel', serif; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); margin-bottom: 0.4rem; }
+    .card:hover .card-icon { color: var(--teal-bright); }
+    .card-title { font-family: 'Cinzel', serif; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); margin-bottom: 0.4rem; }
     .card-desc { font-size: 0.85rem; color: var(--ink-light); line-height: 1.4; }
     .card-badge {
       position: absolute; top: 8px; right: 8px;
-      background: var(--gold); color: var(--ink);
-      font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.1em;
+      background: var(--teal); color: var(--bg);
+      font-family: 'Cinzel', serif; font-size: 0.58rem; letter-spacing: 0.1em;
       padding: 2px 7px; border-radius: 10px; font-weight: 600;
     }
 
     /* ── Login modal ── */
-    .modal-overlay { position: fixed; inset: 0; background: rgba(15,8,3,0.85); backdrop-filter: blur(4px); z-index: 200; display: none; align-items: center; justify-content: center; padding: 1rem; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(5,8,12,0.85); backdrop-filter: blur(4px); z-index: 200; display: none; align-items: center; justify-content: center; padding: 1rem; }
     .modal-overlay.visible { display: flex; }
     .modal {
-      background: var(--parchment);
-      border: 1px solid var(--border);
+      background: var(--panel);
+      border: 1px solid var(--teal-deep);
       border-radius: 4px;
-      box-shadow: 0 0 0 4px #1a1208, 0 0 0 5px var(--border), 0 12px 40px rgba(0,0,0,0.6);
+      box-shadow:
+        0 0 0 1px rgba(74,149,149,0.2),
+        0 0 30px rgba(74,149,149,0.1),
+        0 16px 48px rgba(0,0,0,0.7);
       padding: 1.8rem 1.8rem 1.6rem;
       max-width: 440px;
       width: 100%;
@@ -220,57 +237,58 @@
       background: transparent; border: none; font-size: 1.5rem; cursor: pointer;
       color: var(--ink-faint); line-height: 1; padding: 4px 8px;
     }
-    .modal-close:hover { color: var(--red); }
-    .modal-title { font-family: 'Cinzel', serif; font-size: 1.15rem; letter-spacing: 0.1em; color: var(--ink); margin-bottom: 0.3rem; }
+    .modal-close:hover { color: var(--teal-bright); }
+    .modal-title { font-family: 'Cinzel', serif; font-size: 1.1rem; letter-spacing: 0.16em; color: var(--ink); margin-bottom: 0.3rem; text-transform: uppercase; }
     .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 1.1rem; line-height: 1.5; }
 
-    .modal-tabs { display: flex; border-bottom: 1px solid var(--border-light); margin-bottom: 1rem; }
+    .modal-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 1rem; }
     .modal-tab {
-      flex: 1; padding: 8px;
+      flex: 1; padding: 9px;
       background: transparent; border: none;
-      font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase;
+      font-family: 'Cinzel', serif; font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase;
       color: var(--ink-faint); cursor: pointer; border-bottom: 2px solid transparent;
       transition: all 0.15s;
     }
-    .modal-tab.active { color: var(--ink); border-bottom-color: var(--red); }
+    .modal-tab.active { color: var(--teal-bright); border-bottom-color: var(--teal); }
     .modal-tab:hover:not(.active) { color: var(--ink-light); }
 
     .field { margin-bottom: 0.7rem; }
     .field label {
       display: block; font-family: 'Cinzel', serif; font-size: 0.6rem;
-      letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint);
+      letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-faint);
       margin-bottom: 4px;
     }
     .field input, .field select {
       width: 100%;
-      background: rgba(255,255,255,0.5); border: 1px solid var(--border-light);
+      background: var(--panel-deep); border: 1px solid var(--border);
       border-radius: 2px; color: var(--ink);
       font-family: 'Crimson Text', serif; font-size: 0.95rem;
       padding: 7px 10px; outline: none; transition: border-color 0.15s;
     }
-    .field input.code-input { font-family: 'Cinzel', serif; letter-spacing: 0.18em; text-transform: uppercase; }
-    .field input:focus, .field select:focus { border-color: var(--gold); }
-    .field-error { font-size: 0.85rem; color: var(--red); min-height: 1.2em; margin-bottom: 0.3rem; }
+    .field input.code-input { font-family: 'Cinzel', serif; letter-spacing: 0.2em; text-transform: uppercase; color: var(--teal-bright); }
+    .field input:focus, .field select:focus { border-color: var(--teal); }
+    .field-error { font-size: 0.85rem; color: var(--rust); min-height: 1.2em; margin-bottom: 0.3rem; }
 
     .pane { display: none; }
     .pane.active { display: block; }
 
     .submit-btn {
       width: 100%;
-      font-family: 'Cinzel', serif; font-size: 0.78rem; letter-spacing: 0.1em;
-      padding: 9px 14px; border-radius: 3px; cursor: pointer; border: 1px solid var(--ink);
-      background: var(--ink); color: var(--parchment); transition: all 0.15s;
+      font-family: 'Cinzel', serif; font-size: 0.78rem; letter-spacing: 0.12em;
+      padding: 9px 14px; border-radius: 3px; cursor: pointer; border: 1px solid var(--teal);
+      background: var(--teal-deep); color: var(--teal-bright); transition: all 0.15s;
+      text-transform: uppercase;
     }
-    .submit-btn:hover:not(:disabled) { background: var(--red); border-color: var(--red); }
+    .submit-btn:hover:not(:disabled) { background: var(--teal); color: var(--bg); border-color: var(--teal-bright); }
     .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    .setup-hint { background: rgba(184,134,11,0.12); border: 1px solid rgba(184,134,11,0.4); padding: 0.6rem 0.7rem; border-radius: 3px; font-size: 0.82rem; color: var(--ink-light); margin-bottom: 0.7rem; line-height: 1.45; }
-    .setup-hint code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 2px; font-size: 0.85em; }
+    .setup-hint { background: rgba(184,138,90,0.10); border: 1px solid rgba(184,138,90,0.35); padding: 0.6rem 0.7rem; border-radius: 3px; font-size: 0.82rem; color: var(--ink-light); margin-bottom: 0.7rem; line-height: 1.45; }
+    .setup-hint code { background: rgba(0,0,0,0.4); padding: 1px 5px; border-radius: 2px; font-size: 0.85em; color: var(--brass); }
 
     /* ── Footer ── */
     .footer { margin-top: 2rem; text-align: center; }
-    .footer-rule { height: 1px; background: linear-gradient(to right, transparent, var(--border-light), transparent); margin-bottom: 1rem; }
-    .footer-text { font-family: 'Cinzel', serif; font-size: 0.68rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-faint); }
+    .footer-rule { height: 1px; background: linear-gradient(to right, transparent, var(--border), transparent); margin-bottom: 1rem; }
+    .footer-text { font-family: 'Cinzel', serif; font-size: 0.65rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--ink-faint); }
   </style>
 </head>
 <body>
@@ -288,14 +306,27 @@
     <div class="notice" id="notice"></div>
 
     <header class="header">
-      <p class="world-label">Velemere &mdash; 684 SV</p>
-      <h1 class="campaign-title">Rise of a New Dawn</h1>
+      <svg class="tower-mark" viewBox="0 0 42 56" fill="none" aria-hidden="true">
+        <!-- Spire body -->
+        <path d="M16 14 L26 14 L28 50 L14 50 Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+        <!-- Crenellations -->
+        <path d="M14 14 V8 H17 V11 H20 V8 H22 V11 H25 V8 H28 V14"
+              stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" fill="none"/>
+        <!-- Window -->
+        <rect x="19" y="26" width="4" height="8" rx="2" fill="currentColor" opacity="0.7"/>
+        <!-- Beacon star above -->
+        <path d="M21 2 L22 4.5 L24.5 5 L22 6 L21 8.5 L20 6 L17.5 5 L20 4.5 Z" fill="currentColor"/>
+        <!-- Base step -->
+        <path d="M12 50 L30 50 L32 55 L10 55 Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+      </svg>
+      <p class="world-label">Archive &middot; Chronicle &middot; War</p>
+      <h1 class="campaign-title">The Spire</h1>
       <div class="divider">
         <div class="divider-line"></div>
         <div class="divider-diamond"></div>
         <div class="divider-line"></div>
       </div>
-      <p class="subtitle" id="subtitle">A living world, charted by hand</p>
+      <p class="subtitle" id="subtitle">A tower of maps, lore, and combat &mdash; for whatever world you keep.</p>
     </header>
 
     <!-- TOOL CARDS — populated by JS based on role -->
@@ -303,7 +334,7 @@
 
     <footer class="footer">
       <div class="footer-rule"></div>
-      <p class="footer-text">Rise of a New Dawn</p>
+      <p class="footer-text">The Spire</p>
     </footer>
   </div>
 
@@ -311,7 +342,7 @@
   <div class="modal-overlay" id="login-overlay" onclick="if(event.target===this)closeLogin()">
     <div class="modal">
       <button class="modal-close" type="button" onclick="closeLogin()" aria-label="Close">×</button>
-      <div class="modal-title">Sign in</div>
+      <div class="modal-title">Enter the Spire</div>
       <div class="modal-sub">DMs use a username and password. Players claim a character with the code their DM gave them.</div>
 
       <div class="modal-tabs">
@@ -389,9 +420,9 @@
 
       const subtitle = document.getElementById('subtitle');
       subtitle.textContent =
-        ident.role === 'dm'    ? `Welcome back, DM.`
+        ident.role === 'dm'    ? `Welcome back, Keeper.`
       : ident.role === 'player'? `Welcome back, ${ident.name}.`
-      :                          `A living world, charted by hand`;
+      :                          `A tower of maps, lore, and combat — for whatever world you keep.`;
     }
 
     function doLogout() {
@@ -419,26 +450,26 @@
 
       // Public tools (everyone)
       const publicCards = [
-        makeCard({ href: 'map.html',                icon: ICONS.map,  title: 'World Map',  desc: 'Explore the known regions and locations of Velemere.' }),
-        makeCard({ href: 'initiative-player.html',  icon: ICONS.init, title: 'Initiative', desc: 'Live turn order during combat.' }),
+        makeCard({ href: 'map.html',                icon: ICONS.map,  title: 'The Atlas',     desc: 'Walk the map. See what the world allows you to see.' }),
+        makeCard({ href: 'initiative-player.html',  icon: ICONS.init, title: 'The Round',     desc: 'Live turn order during combat.' }),
       ];
-      sections.push(`<div class="section-heading">For Everyone</div><div class="cards">${publicCards.join('')}</div>`);
+      sections.push(`<div class="section-heading">Open to All</div><div class="cards">${publicCards.join('')}</div>`);
 
       // Player-only (any signed-in user — gates by login, not specifically player vs DM)
       if (role === 'player' || role === 'dm') {
         const playerCards = [
-          makeCard({ href: 'index.html', icon: ICONS.perks, title: 'Campaign Perks', desc: 'Your creation bonus and the perks ledger.' }),
+          makeCard({ href: 'index.html', icon: ICONS.perks, title: 'The Ledger', desc: 'Your creation bonus and the perks granted to you.' }),
         ];
-        sections.push(`<div class="section-heading">For Players</div><div class="cards">${playerCards.join('')}</div>`);
+        sections.push(`<div class="section-heading">For the Sworn</div><div class="cards">${playerCards.join('')}</div>`);
       }
 
       // DM-only
       if (role === 'dm') {
         const dmCards = [
-          makeCard({ href: 'map-dm.html',        icon: ICONS.mapdm,  title: 'World Map Editor', desc: 'Place pins, write lore, run player characters and whispers.', dm: true }),
-          makeCard({ href: 'initiative-dm.html', icon: ICONS.initdm, title: 'Initiative Tracker', desc: 'Run combat — order, HP, conditions, broadcast to players.', dm: true }),
+          makeCard({ href: 'map-dm.html',        icon: ICONS.mapdm,  title: 'Atlas Workshop', desc: 'Place pins, write lore, manage characters and whispers.', dm: true }),
+          makeCard({ href: 'initiative-dm.html', icon: ICONS.initdm, title: 'War Table',      desc: 'Order, HP, conditions, broadcast to players.',           dm: true }),
         ];
-        sections.push(`<div class="section-heading">For the DM</div><div class="cards">${dmCards.join('')}</div>`);
+        sections.push(`<div class="section-heading">Keeper's Wing</div><div class="cards">${dmCards.join('')}</div>`);
       }
 
       // Prompt for anonymous
@@ -446,8 +477,8 @@
         sections.push(`
           <div class="section-heading">Sign in for more</div>
           <div style="text-align:center;padding:0.5rem 0 0.25rem;color:var(--ink-light);font-size:0.95rem;line-height:1.5">
-            Players get access to the Campaign Perks and whispers from the DM.<br>
-            DMs unlock the world editor and the combat tracker.
+            Sworn players unlock their ledger and the whispers meant for them.<br>
+            Keepers unlock the workshop and the war table.
             <div style="margin-top:0.9rem"><button class="id-btn primary" type="button" onclick="openLogin()">Sign in</button></div>
           </div>
         `);

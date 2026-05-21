@@ -9,6 +9,30 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-21
 
+### Storage key renamed → `spire-auth`
+
+- `auth.js` now stores identity under `localStorage['spire-auth']` (was `campaign-perks-auth`).
+- One-shot **migration on load**: if the new key is empty and an old key exists (`campaign-perks-auth` from the auth refactor, or `campaign-perks-login` from the original player login), the value is copied across and the old key removed. Existing sessions keep working without re-login.
+
+### Homepage rebrand → "The Spire"
+
+Made the homepage campaign-agnostic so the same hub can front multiple games.
+
+#### Changed (`home.html` only)
+- **Name:** "Rise of a New Dawn — Hub" → **"The Spire — Hub"**. Page title, header, footer, and modal text all updated.
+- **Palette:** parchment + gold + red → slate + teal + brass. New `:root` tokens (`--bg`, `--panel`, `--panel-light`, `--panel-deep`, `--border`, `--teal`, `--teal-bright`, `--teal-deep`, `--ink`, `--ink-light`, `--ink-faint`, `--brass`, `--rust`). Body background gets teal/brass radial glows instead of the old warm vignette.
+- **Tower mark:** new inline SVG (spire silhouette with a beacon star) above the title.
+- **Removed campaign-specific copy:** "Velemere — 684 SV" → "Archive · Chronicle · War". Footer "Rise of a New Dawn" → "The Spire". Card description "Explore the known regions and locations of Velemere" replaced with a generic line.
+- **Card section names** lean into the tower metaphor:
+  - "For Everyone" → **Open to All** (World Map → **The Atlas**, Initiative → **The Round**)
+  - "For Players" → **For the Sworn** (Campaign Perks → **The Ledger**)
+  - "For the DM" → **Keeper's Wing** (World Map Editor → **Atlas Workshop**, Initiative Tracker → **War Table**)
+- **DM accent** shifted from red to brass; teal handles the "primary" accent everywhere else.
+- **Role pill** colors retuned: DM = brass, Player = teal, Visitor = neutral grey.
+- **Welcome subtitle** when signed in: "Welcome back, Keeper." for DMs.
+
+All other pages, the worker, and the auth flow are untouched — only `home.html` changed.
+
 ### Project-wide auth refactor
 
 A single shared identity model across every page, role-aware homepage, real DM username/password.
