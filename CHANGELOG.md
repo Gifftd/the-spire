@@ -9,6 +9,38 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-21
 
+### Character login + per-character data
+
+A claim-code login system so players can log in as a character and see only what the DM has shared with them.
+
+#### Added — Worker (`cloudflare-worker.js`)
+- New KV keys: `characters` (DM-only, includes claim codes) and `journals` (per-character whisper entries).
+- `GET ?type=character_list` — public, returns sanitized `{id,name,player}` only (never codes).
+- `POST type=character_login` — `{characterId, code}` → validates and returns ok.
+- `GET ?type=player_view&characterId=…&code=…` — re-validates the code each call and returns a **server-side filtered** map (`locations`/`zones`/`npcs`/`quests` with a `visibleTo` array are stripped if the caller isn't in that list) plus this character's journal entries.
+- `GET ?type=characters` and `GET ?type=journals` — DM-only (gated by token).
+- **DM lockdown**: new optional `DM_TOKEN` worker secret. When set, every write endpoint (`map_data`, `map_data_dm`, `characters`, `journals`, `initiative_state`) requires header `X-DM-Token: <value>`. When unset, writes still work (legacy mode) but the worker returns a warning so the DM notices the open door.
+- CORS now allows the `X-DM-Token` request header.
+- **Action required to enable lockdown:** in the Cloudflare Worker dashboard, Settings → Variables → add a Secret named `DM_TOKEN` with a long random value. Re-deploy the worker. The DM map will prompt for that token on first save.
+
+#### Added — DM map (`map-dm.html`)
+- New **Players** tab (next to Locations / Zones / World) with:
+  - Add character: name, optional player name, auto-generated 6-char claim code (using a confusable-safe alphabet — no `O/0`, `I/1`), copy-to-clipboard, regenerate.
+  - Per-character DM notes.
+  - Inline **whisper composer**: post a title + body addressed to that character; their player sees it on login.
+  - **Whispers sent** history per character, with delete.
+- **"Visible to"** chip selector inside every location's INFO tab. Empty = visible to all logged-in players; selecting one or more characters scopes the location to just them.
+- Deleting a character also removes their journal entries and strips their id from any location's `visibleTo`.
+- **DM token modal** shown automatically the first time a write returns 401, with the queued save retried after the token is saved.
+- Token persists in `localStorage['dm_token']` for this browser only.
+
+#### Added — Player map (`map.html`)
+- **Login overlay** on first visit: character dropdown (fetched from `character_list`) + claim-code input. Friendly empty/error states for "no characters yet" and "could not reach server".
+- After login: small "Playing as ⟨name⟩" badge in the topbar, plus **Log out** and **Whispers** buttons.
+- **Whispers panel** slides in from the right, lists journal entries (newest first), unread items get a gold left border + "new" tag. Opening the panel marks unread as read client-side.
+- Map fetches use `player_view` so hidden locations never enter the browser — opening dev tools won't reveal pins meant for someone else.
+- Login persists in `localStorage['campaign-perks-login']`. Pressing Enter submits the login form; Esc closes the whispers panel.
+
 ### Maps (`map.html` + `map-dm.html`)
 
 #### Changed

@@ -123,6 +123,49 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 .pin-info-desc{font-size:0.98rem;line-height:1.5;color:var(--ink)}
 .pin-info-desc.empty{color:var(--ink-faint);font-style:italic;font-size:0.9rem}
 
+/* ── Login overlay ── */
+.login-overlay{position:fixed;inset:0;background:rgba(5,4,3,0.86);backdrop-filter:blur(4px);z-index:200;display:none;align-items:center;justify-content:center;padding:1rem}
+.login-overlay.visible{display:flex}
+.login-modal{background:var(--surface);border:1px solid var(--gold-faint);border-radius:var(--radius);padding:1.5rem 1.4rem;max-width:380px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,0.65)}
+.login-title{font-family:'Cinzel',serif;font-size:1.15rem;letter-spacing:0.1em;color:var(--gold-light);margin-bottom:0.4rem}
+.login-desc{font-size:0.92rem;color:var(--ink-dim);line-height:1.5;margin-bottom:1rem}
+.login-field{margin-bottom:0.8rem}
+.login-field label{display:block;font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.14em;color:var(--gold-faint);margin-bottom:4px;text-transform:uppercase}
+.login-field select,.login-field input{width:100%;background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.95rem;padding:6px 9px;outline:none;transition:border-color 0.15s}
+.login-field input{font-family:'Cinzel',serif;letter-spacing:0.18em;text-transform:uppercase}
+.login-field select:focus,.login-field input:focus{border-color:var(--gold)}
+.login-error{font-size:0.85rem;color:var(--red);min-height:1.2em;margin-bottom:0.6rem}
+.login-submit{width:100%;font-family:'Cinzel',serif;font-size:0.78rem;letter-spacing:0.1em;border:1px solid var(--gold);border-radius:var(--radius);padding:8px 14px;cursor:pointer;transition:all 0.15s;background:var(--gold-dim);color:var(--gold-light)}
+.login-submit:hover:not(:disabled){background:var(--gold);color:var(--bg)}
+.login-submit:disabled{opacity:0.5;cursor:not-allowed}
+
+/* ── Player badge in topbar ── */
+.player-badge{display:none;align-items:center;gap:8px;font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.08em;color:var(--ink-dim)}
+.player-badge.visible{display:flex}
+.player-badge-label{color:var(--ink-faint);text-transform:uppercase}
+.player-badge-name{color:var(--gold-light);font-size:0.78rem;letter-spacing:0.05em}
+.btn-pill{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.08em;border:1px solid var(--border-light);border-radius:var(--radius);padding:4px 9px;background:transparent;color:var(--ink-dim);cursor:pointer;transition:all 0.15s;position:relative;display:inline-flex;align-items:center;gap:4px}
+.btn-pill:hover{border-color:var(--gold);color:var(--gold)}
+.whispers-count{display:none;background:var(--gold);color:var(--bg);font-size:0.6rem;border-radius:8px;padding:1px 6px;font-weight:600;min-width:14px;text-align:center;line-height:1.2}
+.whispers-count.visible{display:inline-block}
+
+/* ── Whispers panel (slides in from right) ── */
+.whispers-panel{position:fixed;top:0;right:-380px;width:380px;max-width:92vw;height:100%;background:var(--surface);border-left:1px solid var(--gold-faint);box-shadow:-8px 0 24px rgba(0,0,0,0.55);z-index:150;transition:right 0.2s ease-out;display:flex;flex-direction:column}
+.whispers-panel.open{right:0}
+.whispers-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.2rem;border-bottom:1px solid var(--border);flex-shrink:0}
+.whispers-title{font-family:'Cinzel',serif;font-size:0.95rem;letter-spacing:0.14em;color:var(--gold)}
+.whispers-close{background:transparent;border:none;color:var(--ink-dim);font-size:1.5rem;cursor:pointer;padding:0 6px;line-height:1}
+.whispers-close:hover{color:var(--gold)}
+.whispers-list{flex:1;overflow-y:auto;padding:0.8rem 1rem}
+.whispers-empty{font-style:italic;color:var(--ink-faint);text-align:center;padding:2rem 0}
+.whisper-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem 0.9rem;margin-bottom:0.6rem;border-left:3px solid var(--border-light)}
+.whisper-card.unread{border-left-color:var(--gold)}
+.whisper-meta{display:flex;align-items:center;gap:8px;font-size:0.72rem;color:var(--ink-faint);margin-bottom:5px}
+.whisper-date{font-family:'Cinzel',serif;letter-spacing:0.08em}
+.whisper-unread{background:var(--gold-dim);color:var(--gold-light);padding:1px 6px;border-radius:8px;font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase}
+.whisper-title{font-family:'Cinzel',serif;font-size:0.92rem;letter-spacing:0.04em;color:var(--ink);margin-bottom:5px;line-height:1.3}
+.whisper-body{font-size:0.92rem;line-height:1.55;color:var(--ink-dim);white-space:pre-wrap}
+
 @media(max-width:700px){
   #location-view{flex-direction:column}
   .loc-sidebar{width:100%;max-height:40vh;border-right:none;border-bottom:1px solid var(--border)}
@@ -134,9 +177,45 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 <!-- TOPBAR -->
 <div class="topbar">
   <h1 id="page-title">World Map</h1>
+  <div class="player-badge" id="player-badge">
+    <span class="player-badge-label">Playing as</span>
+    <span class="player-badge-name" id="player-badge-name"></span>
+    <button class="btn-pill" type="button" onclick="toggleWhispers()">
+      Whispers
+      <span class="whispers-count" id="whispers-count">0</span>
+    </button>
+    <button class="btn-pill" type="button" onclick="logout()">Log out</button>
+  </div>
   <div class="breadcrumb" id="breadcrumb">
     <span style="color:var(--gold)">Region</span>
   </div>
+</div>
+
+<!-- LOGIN OVERLAY -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-modal">
+    <div class="login-title">Claim your character</div>
+    <div class="login-desc">Pick your character and enter the code your DM gave you. You'll only see the map and whispers meant for you.</div>
+    <div class="login-field">
+      <label>Character</label>
+      <select id="login-character"><option value="">— loading —</option></select>
+    </div>
+    <div class="login-field">
+      <label>Claim code</label>
+      <input type="text" id="login-code" maxlength="10" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="XXXXXX" />
+    </div>
+    <div class="login-error" id="login-error"></div>
+    <button class="login-submit" id="login-submit" type="button" onclick="doLogin()">Enter</button>
+  </div>
+</div>
+
+<!-- WHISPERS PANEL -->
+<div class="whispers-panel" id="whispers-panel" aria-hidden="true">
+  <div class="whispers-header">
+    <span class="whispers-title">WHISPERS</span>
+    <button class="whispers-close" type="button" onclick="toggleWhispers()" aria-label="Close">×</button>
+  </div>
+  <div class="whispers-list" id="whispers-list"></div>
 </div>
 
 <!-- REGION VIEW -->
@@ -273,19 +352,176 @@ const TYPE_LABELS = { city:'City', dungeon:'Dungeon', wilderness:'Wilderness', r
 const TYPE_COLORS = { city:'#4a90d4', dungeon:'#c43838', wilderness:'#4ca050', ruin:'#908070', port:'#2cb6c8', fort:'#b060d0', default:'#e0a830' };
 
 // ══════════════════════════════════════════════════════════════
-//  LOAD DATA FROM WORKER
+//  LOGIN + LOAD DATA FROM WORKER
 // ══════════════════════════════════════════════════════════════
-async function loadData() {
-  try {
-    const res = await fetch(WORKER_URL + '?type=map_data', { cache: 'no-store' });
-    if (res.ok) {
-      const d = await res.json();
-      if (d && d.locations) { data = d; }
-    }
-  } catch {}
-  buildRegionMap();
-  handleHash();
+const LOGIN_KEY = 'campaign-perks-login';
+let journals = [];
+
+function readCreds() {
+  try { return JSON.parse(localStorage.getItem(LOGIN_KEY) || 'null'); }
+  catch { return null; }
 }
+function saveCreds(c) { localStorage.setItem(LOGIN_KEY, JSON.stringify(c)); }
+function clearCreds() { localStorage.removeItem(LOGIN_KEY); }
+
+async function bootstrap() {
+  await fetchCharacterList();
+  const creds = readCreds();
+  if (creds && creds.characterId && creds.code) {
+    const ok = await loadPlayerView(creds);
+    if (ok) {
+      hideLogin();
+      showPlayerBadge(creds);
+      return;
+    }
+    // creds rejected by worker — clear and fall through to login
+    clearCreds();
+  }
+  showLogin();
+}
+
+async function fetchCharacterList() {
+  const sel = document.getElementById('login-character');
+  const submit = document.getElementById('login-submit');
+  try {
+    const res = await fetch(WORKER_URL + '?type=character_list', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const list = await res.json();
+    sel.innerHTML = '';
+    if (!Array.isArray(list) || list.length === 0) {
+      sel.innerHTML = '<option value="">— no characters set up yet —</option>';
+      sel.disabled = true;
+      submit.disabled = true;
+      document.getElementById('login-error').textContent = 'Ask your DM to create your character first.';
+      return;
+    }
+    sel.disabled = false;
+    submit.disabled = false;
+    list.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.player ? `${c.name}  ·  ${c.player}` : c.name;
+      sel.appendChild(opt);
+    });
+  } catch (e) {
+    sel.innerHTML = '<option value="">— could not reach server —</option>';
+    sel.disabled = true;
+    submit.disabled = true;
+    document.getElementById('login-error').textContent = 'Network error loading characters.';
+  }
+}
+
+async function doLogin() {
+  const characterId = document.getElementById('login-character').value;
+  const code = document.getElementById('login-code').value.trim().toUpperCase();
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  if (!characterId) { errEl.textContent = 'Pick a character.'; return; }
+  if (!code) { errEl.textContent = 'Enter your claim code.'; return; }
+
+  const submit = document.getElementById('login-submit');
+  submit.disabled = true; submit.textContent = '…';
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'character_login', characterId, code })
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || !body.ok) {
+      errEl.textContent = body.error || 'Invalid character or code.';
+      submit.disabled = false; submit.textContent = 'Enter';
+      return;
+    }
+    const creds = { characterId, code, name: body.character.name };
+    saveCreds(creds);
+    const ok = await loadPlayerView(creds);
+    if (!ok) {
+      errEl.textContent = 'Logged in but failed to load data.';
+      submit.disabled = false; submit.textContent = 'Enter';
+      return;
+    }
+    hideLogin();
+    showPlayerBadge(creds);
+  } catch (e) {
+    errEl.textContent = 'Network error — try again.';
+    submit.disabled = false; submit.textContent = 'Enter';
+  }
+}
+
+function logout() {
+  if (!confirm('Log out of this character?')) return;
+  clearCreds();
+  location.reload();
+}
+
+async function loadPlayerView(creds) {
+  try {
+    const url = `${WORKER_URL}?type=player_view&characterId=${encodeURIComponent(creds.characterId)}&code=${encodeURIComponent(creds.code)}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return false;
+    const d = await res.json();
+    if (!d || !d.map) return false;
+    data = d.map;
+    journals = Array.isArray(d.journals) ? d.journals.slice().sort((a,b) => (b.date||'').localeCompare(a.date||'')) : [];
+    buildRegionMap();
+    handleHash();
+    renderWhispers();
+    return true;
+  } catch { return false; }
+}
+
+function showLogin() { document.getElementById('login-overlay').classList.add('visible'); }
+function hideLogin() { document.getElementById('login-overlay').classList.remove('visible'); }
+function showPlayerBadge(creds) {
+  document.getElementById('player-badge-name').textContent = creds.name || creds.characterId;
+  document.getElementById('player-badge').classList.add('visible');
+}
+
+function renderWhispers() {
+  const list  = document.getElementById('whispers-list');
+  const count = document.getElementById('whispers-count');
+  const unread = journals.filter(j => j.unread).length;
+  count.textContent = unread;
+  count.classList.toggle('visible', unread > 0);
+  if (!journals.length) {
+    list.innerHTML = '<div class="whispers-empty">No whispers yet.<br>The DM hasn\'t sent you anything.</div>';
+    return;
+  }
+  const esc = s => (s || '').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  list.innerHTML = journals.map(j => `
+    <div class="whisper-card ${j.unread ? 'unread' : ''}">
+      <div class="whisper-meta">
+        <span class="whisper-date">${esc(j.date)}</span>
+        ${j.unread ? '<span class="whisper-unread">new</span>' : ''}
+      </div>
+      <div class="whisper-title">${esc(j.title) || '(no title)'}</div>
+      <div class="whisper-body">${esc(j.body)}</div>
+    </div>
+  `).join('');
+}
+
+function toggleWhispers() {
+  const panel = document.getElementById('whispers-panel');
+  const opening = !panel.classList.contains('open');
+  panel.classList.toggle('open', opening);
+  panel.setAttribute('aria-hidden', opening ? 'false' : 'true');
+  if (opening && journals.some(j => j.unread)) {
+    // Mark as read client-side. (Read state is not persisted to the worker yet.)
+    journals.forEach(j => j.unread = false);
+    renderWhispers();
+  }
+}
+
+// Allow Enter to submit the login form
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('login-overlay').classList.contains('visible')) {
+    doLogin();
+  }
+  if (e.key === 'Escape' && document.getElementById('whispers-panel').classList.contains('open')) {
+    toggleWhispers();
+  }
+});
 
 // ══════════════════════════════════════════════════════════════
 //  REGION MAP
@@ -643,7 +879,7 @@ function showLocation(loc) {
 }
 
 window.addEventListener('hashchange', handleHash);
-loadData();
+bootstrap();
 </script>
 </body>
 </html>

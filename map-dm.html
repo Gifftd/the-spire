@@ -141,6 +141,49 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 
 .publish-section{padding:0.8rem;border-top:1px solid var(--border);flex-shrink:0}
 
+/* ── Characters tab ── */
+.char-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:9px 10px;margin-bottom:6px}
+.char-card.selected{border-color:var(--gold)}
+.char-card-row{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.char-card-name{font-family:'Cinzel',serif;font-size:0.84rem;letter-spacing:0.04em;color:var(--ink);flex:1}
+.char-card-player{font-size:0.7rem;color:var(--ink-faint);font-style:italic}
+.char-code-pill{font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.18em;background:var(--bg);border:1px solid var(--gold-faint);color:var(--gold-light);padding:3px 9px;border-radius:3px;cursor:pointer;text-transform:uppercase;user-select:all;transition:all 0.15s}
+.char-code-pill:hover{border-color:var(--gold);color:var(--gold)}
+.char-actions{display:flex;gap:4px;margin-left:auto}
+.char-action-btn{background:transparent;border:1px solid var(--border-light);color:var(--ink-faint);border-radius:2px;padding:2px 6px;font-size:0.7rem;cursor:pointer;font-family:'Cinzel',serif;letter-spacing:0.06em}
+.char-action-btn:hover{border-color:var(--gold);color:var(--gold)}
+.char-action-btn.danger:hover{border-color:var(--red);color:var(--red)}
+
+/* visibleTo chips (location modal) */
+.visibleto-chips{display:flex;flex-wrap:wrap;gap:5px;padding:6px 4px}
+.visibleto-chip{font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.06em;padding:3px 10px;border-radius:10px;border:1px solid var(--border-light);color:var(--ink-faint);background:var(--surface2);cursor:pointer;transition:all 0.15s;user-select:none}
+.visibleto-chip:hover{border-color:var(--ink-dim);color:var(--ink-dim)}
+.visibleto-chip.on{border-color:var(--gold);color:var(--gold);background:var(--gold-dim)}
+.visibleto-empty{font-size:0.78rem;color:var(--ink-faint);font-style:italic;padding:4px 0}
+.visibleto-hint{font-size:0.72rem;color:var(--ink-faint);font-style:italic;margin-top:2px}
+
+/* Whispers composer */
+.whisper-composer{background:#181020;border:1px solid #3a2a6a;border-radius:var(--radius);padding:0.7rem 0.8rem;margin-top:0.6rem}
+.whisper-composer-title{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.14em;color:#a080d0;margin-bottom:6px}
+.whisper-history{margin-top:0.6rem;display:flex;flex-direction:column;gap:5px}
+.whisper-history-card{background:var(--surface2);border:1px solid var(--border);border-left:3px solid #6a4ec0;border-radius:var(--radius);padding:6px 8px;font-size:0.82rem}
+.whisper-history-meta{font-size:0.65rem;color:var(--ink-faint);font-family:'Cinzel',serif;letter-spacing:0.08em;margin-bottom:3px;display:flex;justify-content:space-between;align-items:center}
+.whisper-history-title{font-family:'Cinzel',serif;color:var(--ink);font-size:0.78rem;margin-bottom:2px}
+.whisper-history-body{color:var(--ink-dim);font-size:0.8rem;line-height:1.4;white-space:pre-wrap}
+.whisper-del-btn{background:transparent;border:none;color:var(--ink-faint);cursor:pointer;font-size:0.8rem;padding:0 3px}
+.whisper-del-btn:hover{color:var(--red)}
+
+/* DM Token modal */
+.dm-token-overlay{position:fixed;inset:0;background:rgba(5,4,3,0.86);backdrop-filter:blur(4px);z-index:300;display:none;align-items:center;justify-content:center;padding:1rem}
+.dm-token-overlay.visible{display:flex}
+.dm-token-modal{background:var(--surface);border:1px solid var(--gold-faint);border-radius:var(--radius);padding:1.5rem 1.4rem;max-width:440px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,0.65)}
+.dm-token-title{font-family:'Cinzel',serif;font-size:1.1rem;letter-spacing:0.1em;color:var(--gold-light);margin-bottom:0.4rem}
+.dm-token-desc{font-size:0.9rem;color:var(--ink-dim);line-height:1.5;margin-bottom:1rem}
+.dm-token-desc code{background:var(--bg);padding:1px 5px;border-radius:2px;color:var(--gold-light);font-size:0.85rem}
+.dm-token-input{width:100%;background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.95rem;padding:7px 10px;outline:none;margin-bottom:0.8rem}
+.dm-token-input:focus{border-color:var(--gold)}
+.dm-token-actions{display:flex;gap:8px;justify-content:flex-end}
+
 /* ── Import modal ── */
 .import-drop-zone {
   border: 2px dashed var(--border-light);
@@ -219,6 +262,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
   <h1>⚔ World Map — DM Editor</h1>
   <button class="btn btn-ghost btn-sm" onclick="switchTab('locations')">Locations</button>
   <button class="btn btn-ghost btn-sm" onclick="switchTab('zones')">Zones</button>
+  <button class="btn btn-ghost btn-sm" onclick="switchTab('characters')">Characters</button>
   <button class="btn btn-ghost btn-sm" onclick="switchTab('world')">World</button>
   <button class="btn btn-ghost btn-sm" id="move-mode-btn" onclick="toggleMoveMode()">✥ Move mode</button>
   <button class="btn btn-purple btn-sm" onclick="openImport()">⬇ Import</button>
@@ -252,6 +296,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
     <div class="editor-tabs">
       <button class="editor-tab active" id="tab-locations" onclick="switchTab('locations')">LOCATIONS</button>
       <button class="editor-tab" id="tab-zones" onclick="switchTab('zones')">ZONES</button>
+      <button class="editor-tab" id="tab-characters" onclick="switchTab('characters')">PLAYERS</button>
       <button class="editor-tab" id="tab-world" onclick="switchTab('world')">WORLD</button>
     </div>
 
@@ -271,6 +316,49 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
         <button class="btn btn-ghost btn-sm" id="poly-draw-btn" onclick="togglePolyDraw()">✏ Draw polygon</button>
       </div>
       <div id="zone-list"></div>
+    </div>
+
+    <!-- CHARACTERS TAB -->
+    <div class="editor-pane" id="pane-characters">
+      <div style="display:flex;gap:6px;margin-bottom:0.6rem;flex-wrap:wrap">
+        <button class="btn btn-gold btn-sm" onclick="addCharacter()">+ Add character</button>
+        <button class="btn btn-ghost btn-sm" onclick="reloadCharacters()" title="Refetch from cloud">↻ Refresh</button>
+      </div>
+      <div class="section-header" style="margin-top:0.2rem">CHARACTERS</div>
+      <div id="char-list"></div>
+
+      <div id="char-detail" style="display:none;margin-top:0.8rem">
+        <div class="section-header" id="char-detail-header">EDIT CHARACTER</div>
+        <div class="field"><label>NAME</label><input type="text" id="char-name" placeholder="Aldric Stoneveil"></div>
+        <div class="field-row">
+          <div class="field"><label>PLAYER (optional)</label><input type="text" id="char-player" placeholder="Bob"></div>
+          <div class="field"><label>ID (auto)</label><input type="text" id="char-id" readonly style="opacity:0.6"></div>
+        </div>
+        <div class="field">
+          <label>CLAIM CODE</label>
+          <div style="display:flex;gap:5px">
+            <input type="text" id="char-code" style="flex:1;letter-spacing:0.2em;text-transform:uppercase;font-family:'Cinzel',serif">
+            <button class="btn btn-ghost btn-sm" onclick="regenCharCode()" title="Generate new code">⟳</button>
+            <button class="btn btn-ghost btn-sm" onclick="copyCharCode()" title="Copy">⧉</button>
+          </div>
+        </div>
+        <div class="field"><label>DM NOTES</label><textarea id="char-dmNotes" rows="3" placeholder="Anything you want to remember about this character"></textarea></div>
+        <div style="display:flex;gap:5px;margin-bottom:0.8rem">
+          <button class="btn btn-gold btn-sm" onclick="saveCharacter()">Save</button>
+          <button class="btn btn-ghost btn-sm" onclick="cancelCharEdit()">Cancel</button>
+          <button class="btn btn-red btn-sm" style="margin-left:auto" onclick="deleteCharacter()">Delete</button>
+        </div>
+
+        <div class="whisper-composer">
+          <div class="whisper-composer-title">⬑ SEND WHISPER (only this character sees it)</div>
+          <div class="field"><label>TITLE</label><input type="text" id="whisper-title" placeholder="A note in your pocket…"></div>
+          <div class="field"><label>BODY</label><textarea id="whisper-body" rows="4" placeholder="The whisper text…"></textarea></div>
+          <button class="btn btn-purple btn-sm" onclick="postWhisper()">Post whisper</button>
+        </div>
+
+        <div class="section-header" style="margin-top:0.8rem">WHISPERS SENT</div>
+        <div class="whisper-history" id="whisper-history"></div>
+      </div>
     </div>
 
     <!-- WORLD TAB -->
@@ -376,6 +464,11 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
           <input type="checkbox" id="loc-visible" checked>
           <label for="loc-visible">Visible to players</label>
         </div>
+        <div class="field">
+          <label>VISIBLE TO (leave empty = everyone)</label>
+          <div class="visibleto-chips" id="loc-visibleto-chips"></div>
+          <div class="visibleto-hint">Click to toggle. If no chips are selected, every logged-in player sees this location.</div>
+        </div>
       </div>
 
       <!-- LORE -->
@@ -411,6 +504,22 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
   </div>
 </div>
 
+<!-- DM TOKEN MODAL -->
+<div class="dm-token-overlay" id="dm-token-overlay">
+  <div class="dm-token-modal">
+    <div class="dm-token-title">DM Token Required</div>
+    <div class="dm-token-desc" id="dm-token-desc">
+      The Worker is configured with a <code>DM_TOKEN</code> secret. Paste it here so the DM tools can save data. It'll be remembered in this browser only (localStorage).
+    </div>
+    <input class="dm-token-input" id="dm-token-input" type="password" placeholder="Paste DM token…" autocomplete="off" onkeydown="if(event.key==='Enter')submitDMToken()">
+    <div id="dm-token-error" style="color:var(--red);font-size:0.85rem;min-height:1.1em;margin-bottom:0.5rem"></div>
+    <div class="dm-token-actions">
+      <button class="btn btn-ghost btn-sm" onclick="closeDMTokenModal()">Cancel</button>
+      <button class="btn btn-gold btn-sm" onclick="submitDMToken()">Save token</button>
+    </div>
+  </div>
+</div>
+
 <script>//<![CDATA[
 // ══════════════════════════════════════════════════════════════
 //  CONFIG
@@ -439,6 +548,59 @@ let polyPoints     = [];      // [{x,y}] percentage points being drawn
 let editingLocId   = null;
 let tempNPCs       = [];
 let tempQuests     = [];
+let tempVisibleTo  = [];      // ids of characters who can see the location currently being edited
+let characters     = [];      // [{id,name,player,code,dmNotes}]
+let journals       = [];      // [{id,characterId,title,body,date,unread}]
+let editingCharId  = null;
+let pendingDMSave  = null;    // queued save retry after token is provided
+
+// ── DM token (stored in this browser only) ───────────────────
+const DM_TOKEN_KEY = 'dm_token';
+function getDMToken() { return localStorage.getItem(DM_TOKEN_KEY) || ''; }
+function setDMTokenLocal(t) { localStorage.setItem(DM_TOKEN_KEY, t); }
+function clearDMToken() { localStorage.removeItem(DM_TOKEN_KEY); }
+
+function dmHeaders() {
+  const h = { 'Content-Type': 'application/json' };
+  const t = getDMToken();
+  if (t) h['X-DM-Token'] = t;
+  return h;
+}
+
+// Wrapped POST for DM-protected writes. On 401, prompts for token and queues a retry.
+async function dmPost(payload, retryFn) {
+  const res = await fetch(WORKER_URL, { method:'POST', headers: dmHeaders(), body: JSON.stringify(payload) });
+  if (res.status === 401) {
+    pendingDMSave = retryFn || null;
+    openDMTokenModal('The Worker rejected the save — DM token is missing or wrong.');
+    return { ok:false, needsToken:true };
+  }
+  if (!res.ok) return { ok:false };
+  let body = {};
+  try { body = await res.json(); } catch {}
+  return { ok:true, body };
+}
+
+function openDMTokenModal(errMsg) {
+  document.getElementById('dm-token-input').value = getDMToken() || '';
+  document.getElementById('dm-token-error').textContent = errMsg || '';
+  document.getElementById('dm-token-overlay').classList.add('visible');
+  setTimeout(()=>document.getElementById('dm-token-input').focus(), 50);
+}
+function closeDMTokenModal() {
+  document.getElementById('dm-token-overlay').classList.remove('visible');
+  pendingDMSave = null;
+}
+async function submitDMToken() {
+  const v = document.getElementById('dm-token-input').value.trim();
+  if (!v) { document.getElementById('dm-token-error').textContent = 'Enter a token.'; return; }
+  setDMTokenLocal(v);
+  document.getElementById('dm-token-overlay').classList.remove('visible');
+  if (typeof pendingDMSave === 'function') {
+    const fn = pendingDMSave; pendingDMSave = null;
+    await fn();
+  }
+}
 
 // ── Map pan/zoom ──────────────────────────────────────────────
 let mapScale=1, mapX=0, mapY=0;
@@ -464,11 +626,7 @@ function loadLocal() {
 // Save full DM data (including notes) to KV via the Worker
 async function saveToKV() {
   try {
-    await fetch(WORKER_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'map_data_dm', payload: data })
-    });
+    await dmPost({ type: 'map_data_dm', payload: data }, saveToKV);
   } catch {
     // Silently fail — localStorage is the fallback
   }
@@ -486,6 +644,71 @@ async function loadFromKV() {
     }
   } catch {}
   return false;
+}
+
+// Characters: save + load
+async function saveCharactersKV() {
+  await dmPost({ type: 'characters', payload: characters }, saveCharactersKV);
+  saveCharactersLocal();
+}
+function saveCharactersLocal() {
+  localStorage.setItem('dm_characters', JSON.stringify(characters));
+}
+async function loadCharactersKV() {
+  try {
+    const t = getDMToken();
+    const res = await fetch(WORKER_URL + '?type=characters', {
+      cache: 'no-store',
+      headers: t ? { 'X-DM-Token': t } : {}
+    });
+    if (res.status === 401) { openDMTokenModal('DM token needed to load characters.'); return false; }
+    if (!res.ok) return false;
+    const arr = await res.json();
+    if (Array.isArray(arr)) { characters = arr; saveCharactersLocal(); return true; }
+  } catch {}
+  return false;
+}
+function loadCharactersLocal() {
+  try {
+    const arr = JSON.parse(localStorage.getItem('dm_characters') || 'null');
+    if (Array.isArray(arr)) characters = arr;
+  } catch {}
+}
+
+// Journals: save + load
+async function saveJournalsKV() {
+  await dmPost({ type: 'journals', payload: journals }, saveJournalsKV);
+  saveJournalsLocal();
+}
+function saveJournalsLocal() {
+  localStorage.setItem('dm_journals', JSON.stringify(journals));
+}
+async function loadJournalsKV() {
+  try {
+    const t = getDMToken();
+    const res = await fetch(WORKER_URL + '?type=journals', {
+      cache: 'no-store',
+      headers: t ? { 'X-DM-Token': t } : {}
+    });
+    if (res.status === 401) return false; // already prompted by loadCharactersKV path
+    if (!res.ok) return false;
+    const arr = await res.json();
+    if (Array.isArray(arr)) { journals = arr; saveJournalsLocal(); return true; }
+  } catch {}
+  return false;
+}
+function loadJournalsLocal() {
+  try {
+    const arr = JSON.parse(localStorage.getItem('dm_journals') || 'null');
+    if (Array.isArray(arr)) journals = arr;
+  } catch {}
+}
+
+async function reloadCharacters() {
+  await loadCharactersKV();
+  await loadJournalsKV();
+  renderCharacterList();
+  if (editingCharId) renderWhisperHistory(editingCharId);
 }
 
 // Called after every edit — saves locally immediately, queues KV save
@@ -508,12 +731,9 @@ async function publishData() {
     locations: data.locations.map(loc => { const { dmNotes, ...rest } = loc; return rest; })
   };
   try {
-    const res = await fetch(WORKER_URL, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ type:'map_data', payload: playerData })
-    });
+    const res = await dmPost({ type:'map_data', payload: playerData }, publishData);
     if (res.ok) { setSyncStatus('ok','✦ Published'); setPublishStatus('ok','✦ Published to players'); }
-    else        { setSyncStatus('fail','⚠ Failed'); setPublishStatus('fail','⚠ Publish failed'); }
+    else if (!res.needsToken) { setSyncStatus('fail','⚠ Failed'); setPublishStatus('fail','⚠ Publish failed'); }
   } catch { setSyncStatus('fail','⚠ Offline'); setPublishStatus('fail','⚠ Could not reach server'); }
 }
 function setSyncStatus(type, msg) { const el=document.getElementById('sync-status'); el.className=`sync-status ${type}`; el.textContent=msg; }
@@ -523,13 +743,14 @@ function setPublishStatus(type, msg) { const el=document.getElementById('publish
 //  TABS
 // ══════════════════════════════════════════════════════════════
 function switchTab(name) {
-  ['locations','zones','world'].forEach(t => {
+  ['locations','zones','characters','world'].forEach(t => {
     document.getElementById(`tab-${t}`).classList.toggle('active', t===name);
     document.getElementById(`pane-${t}`).classList.toggle('active', t===name);
   });
   // Leaving zones tab cancels polygon draw
   if (name !== 'zones' && polyDrawMode) cancelPolyDraw();
   placeMode = (name === 'locations') && !moveMode;
+  if (name === 'characters') renderCharacterList();
   updateModeUI();
 }
 function switchLocTab(name) {
@@ -1085,7 +1306,8 @@ function openLocModal(id, defaultX, defaultY) {
   document.getElementById('loc-dmNotes').value    = loc?.dmNotes || '';
   tempNPCs   = JSON.parse(JSON.stringify(loc?.npcs   || []));
   tempQuests = JSON.parse(JSON.stringify(loc?.quests || []));
-  renderNPCEditor(); renderQuestEditor();
+  tempVisibleTo = Array.isArray(loc?.visibleTo) ? loc.visibleTo.slice() : [];
+  renderNPCEditor(); renderQuestEditor(); renderVisibleToChips();
   switchLocTab('info');
   document.getElementById('loc-modal').classList.remove('hidden');
   document.getElementById('loc-name').addEventListener('input', function() {
@@ -1111,6 +1333,7 @@ function saveLocation() {
     connected: document.getElementById('loc-connected').value.split(',').map(s=>s.trim()).filter(Boolean),
     npcs:      tempNPCs, quests:tempQuests,
     dmNotes:   document.getElementById('loc-dmNotes').value.trim(),
+    visibleTo: tempVisibleTo.slice(),
   };
   const idx = data.locations.findIndex(l=>l.id===editingLocId);
   if (idx>=0) data.locations[idx]=locData; else data.locations.push(locData);
@@ -1261,11 +1484,222 @@ async function init() {
     setTimeout(() => setSyncStatus('', ''), 3000);
   }
 
+  // Characters + journals (cached locally first, then refreshed from KV)
+  loadCharactersLocal();
+  loadJournalsLocal();
+  await loadCharactersKV();
+  await loadJournalsKV();
+
   loadWorldFields();
   buildMap();
   renderLocList();
   renderZoneList();
+  renderCharacterList();
   updateModeUI();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CHARACTERS TAB
+// ══════════════════════════════════════════════════════════════
+function genCode(len = 6) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I/O/0/1 — easier to read
+  let out = '';
+  for (let i = 0; i < len; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  return out;
+}
+function slugify(s) { return (s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); }
+
+function renderCharacterList() {
+  const list = document.getElementById('char-list');
+  if (!list) return;
+  if (characters.length === 0) {
+    list.innerHTML = '<div class="visibleto-empty">No characters yet. Add one to give a player a claim code.</div>';
+    return;
+  }
+  list.innerHTML = characters.map(c => `
+    <div class="char-card ${c.id===editingCharId?'selected':''}">
+      <div class="char-card-row">
+        <span class="char-card-name">${escapeHtml(c.name)}</span>
+        ${c.player ? `<span class="char-card-player">${escapeHtml(c.player)}</span>` : ''}
+      </div>
+      <div class="char-card-row">
+        <span class="char-code-pill" title="Click to select" onclick="event.stopPropagation();selectText(this)">${escapeHtml(c.code || '—')}</span>
+        <div class="char-actions">
+          <button class="char-action-btn" onclick="editCharacter('${c.id}')">Edit</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function escapeHtml(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function selectText(el) {
+  const r = document.createRange(); r.selectNodeContents(el);
+  const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+}
+
+function addCharacter() {
+  editingCharId = '__new__';
+  document.getElementById('char-detail-header').textContent = 'NEW CHARACTER';
+  document.getElementById('char-name').value = '';
+  document.getElementById('char-player').value = '';
+  document.getElementById('char-id').value = '';
+  document.getElementById('char-code').value = genCode();
+  document.getElementById('char-dmNotes').value = '';
+  document.getElementById('whisper-title').value = '';
+  document.getElementById('whisper-body').value = '';
+  document.getElementById('whisper-history').innerHTML = '<div class="visibleto-empty">Save the character first to enable whispers.</div>';
+  document.getElementById('char-detail').style.display = 'block';
+  document.getElementById('char-name').focus();
+  // Auto-fill id on name change
+  document.getElementById('char-name').oninput = function() {
+    if (editingCharId === '__new__') document.getElementById('char-id').value = slugify(this.value);
+  };
+}
+
+function editCharacter(id) {
+  const c = characters.find(x => x.id === id);
+  if (!c) return;
+  editingCharId = id;
+  document.getElementById('char-detail-header').textContent = 'EDIT CHARACTER';
+  document.getElementById('char-name').value = c.name || '';
+  document.getElementById('char-player').value = c.player || '';
+  document.getElementById('char-id').value = c.id;
+  document.getElementById('char-code').value = c.code || '';
+  document.getElementById('char-dmNotes').value = c.dmNotes || '';
+  document.getElementById('whisper-title').value = '';
+  document.getElementById('whisper-body').value = '';
+  renderWhisperHistory(id);
+  document.getElementById('char-detail').style.display = 'block';
+  renderCharacterList();
+}
+
+async function saveCharacter() {
+  const name = document.getElementById('char-name').value.trim();
+  if (!name) { alert('Character needs a name.'); return; }
+  const player = document.getElementById('char-player').value.trim();
+  const code = document.getElementById('char-code').value.trim().toUpperCase();
+  const dmNotes = document.getElementById('char-dmNotes').value.trim();
+  if (!code) { alert('Need a claim code (click ⟳ to generate one).'); return; }
+
+  if (editingCharId === '__new__') {
+    let id = slugify(document.getElementById('char-id').value) || slugify(name);
+    // ensure uniqueness
+    let base = id, n = 1;
+    while (characters.some(c => c.id === id)) { id = `${base}-${++n}`; }
+    characters.push({ id, name, player, code, dmNotes });
+    editingCharId = id;
+  } else {
+    const idx = characters.findIndex(c => c.id === editingCharId);
+    if (idx < 0) return;
+    characters[idx] = { ...characters[idx], name, player, code, dmNotes };
+  }
+  await saveCharactersKV();
+  renderCharacterList();
+  document.getElementById('char-detail-header').textContent = 'EDIT CHARACTER';
+  renderWhisperHistory(editingCharId);
+  setSyncStatus('ok','✦ Character saved');
+  setTimeout(()=>setSyncStatus('',''), 2000);
+}
+
+function cancelCharEdit() {
+  editingCharId = null;
+  document.getElementById('char-detail').style.display = 'none';
+  renderCharacterList();
+}
+
+async function deleteCharacter() {
+  if (!editingCharId || editingCharId === '__new__') { cancelCharEdit(); return; }
+  const c = characters.find(x => x.id === editingCharId);
+  if (!c) return;
+  if (!confirm(`Delete ${c.name}? Their claim code will stop working and their whispers will also be removed.`)) return;
+  characters = characters.filter(x => x.id !== editingCharId);
+  // also drop their journal entries
+  journals = journals.filter(j => j.characterId !== editingCharId);
+  // also strip from any location.visibleTo
+  data.locations.forEach(loc => {
+    if (Array.isArray(loc.visibleTo)) loc.visibleTo = loc.visibleTo.filter(id => id !== editingCharId);
+  });
+  editingCharId = null;
+  document.getElementById('char-detail').style.display = 'none';
+  await saveCharactersKV();
+  await saveJournalsKV();
+  saveAll();
+  renderCharacterList();
+}
+
+function regenCharCode() { document.getElementById('char-code').value = genCode(); }
+function copyCharCode() {
+  const v = document.getElementById('char-code').value;
+  if (!v) return;
+  navigator.clipboard?.writeText(v);
+  setSyncStatus('ok','Code copied');
+  setTimeout(()=>setSyncStatus('',''), 1500);
+}
+
+// Whispers composer
+async function postWhisper() {
+  if (!editingCharId || editingCharId === '__new__') { alert('Save the character first.'); return; }
+  const title = document.getElementById('whisper-title').value.trim();
+  const body  = document.getElementById('whisper-body').value.trim();
+  if (!title && !body) { alert('Whisper needs a title or body.'); return; }
+  const entry = {
+    id: 'w' + Date.now() + Math.floor(Math.random()*1000),
+    characterId: editingCharId,
+    title, body,
+    date: new Date().toISOString().slice(0,10),
+    unread: true
+  };
+  journals.push(entry);
+  await saveJournalsKV();
+  document.getElementById('whisper-title').value = '';
+  document.getElementById('whisper-body').value = '';
+  renderWhisperHistory(editingCharId);
+  setSyncStatus('ok','✦ Whisper posted');
+  setTimeout(()=>setSyncStatus('',''), 2000);
+}
+
+function renderWhisperHistory(charId) {
+  const list = document.getElementById('whisper-history');
+  if (!charId || charId === '__new__') { list.innerHTML = ''; return; }
+  const items = journals.filter(j => j.characterId === charId).sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  if (items.length === 0) { list.innerHTML = '<div class="visibleto-empty">No whispers sent yet.</div>'; return; }
+  list.innerHTML = items.map(j => `
+    <div class="whisper-history-card">
+      <div class="whisper-history-meta">
+        <span>${escapeHtml(j.date)} ${j.unread ? '· unread' : ''}</span>
+        <button class="whisper-del-btn" onclick="deleteWhisper('${j.id}')" title="Delete">✕</button>
+      </div>
+      <div class="whisper-history-title">${escapeHtml(j.title) || '(no title)'}</div>
+      <div class="whisper-history-body">${escapeHtml(j.body)}</div>
+    </div>
+  `).join('');
+}
+
+async function deleteWhisper(jid) {
+  if (!confirm('Delete this whisper? The player will no longer see it.')) return;
+  journals = journals.filter(j => j.id !== jid);
+  await saveJournalsKV();
+  if (editingCharId) renderWhisperHistory(editingCharId);
+}
+
+// VisibleTo chips inside location modal
+function renderVisibleToChips() {
+  const wrap = document.getElementById('loc-visibleto-chips');
+  if (!wrap) return;
+  if (characters.length === 0) {
+    wrap.innerHTML = '<div class="visibleto-empty">No characters created yet — set them up in the Players tab.</div>';
+    return;
+  }
+  wrap.innerHTML = characters.map(c => {
+    const on = tempVisibleTo.includes(c.id);
+    return `<span class="visibleto-chip ${on?'on':''}" onclick="toggleVisibleTo('${c.id}')">${escapeHtml(c.name)}</span>`;
+  }).join('');
+}
+function toggleVisibleTo(id) {
+  const i = tempVisibleTo.indexOf(id);
+  if (i >= 0) tempVisibleTo.splice(i,1); else tempVisibleTo.push(id);
+  renderVisibleToChips();
 }
 
 init();
