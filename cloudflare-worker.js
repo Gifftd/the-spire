@@ -19,7 +19,7 @@
 //  DM_TOKEN; after that you log in with the username + password you chose.
 // ═══════════════════════════════════════════════════════════════
 
-const DISCORD_WEBHOOK_URL = '';
+const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1504520226270609550/-RUnyG2HYV2N0gTDMPjzZgnd3y18vivVhSwyzwnV3wU6Aqv0ZFOMcfkoHh6vgP2UbEgw';
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -134,10 +134,24 @@ function filterForCharacter(mapData, characterId) {
     if (!entry || !Array.isArray(entry.visibleTo) || entry.visibleTo.length === 0) return true;
     return entry.visibleTo.includes(characterId);
   };
+  // Strip DM-only fields from a sub-map pin / zone before serving to a player.
+  // dmNotes never leaves the worker for player_view.
+  const sanitizeSubPin = p => { const { dmNotes, ...rest } = p; return rest; };
+
   out.locations = (mapData.locations || []).filter(visibleTo).map(loc => {
     const npcs   = (loc.npcs   || []).filter(visibleTo);
     const quests = (loc.quests || []).filter(visibleTo);
-    return { ...loc, npcs, quests };
+    let subMap = loc.subMap || null;
+    if (subMap && typeof subMap === 'object') {
+      const pins  = Array.isArray(subMap.locations) ? subMap.locations.filter(visibleTo).map(sanitizeSubPin)
+                  : Array.isArray(subMap.pins)      ? subMap.pins.filter(visibleTo).map(sanitizeSubPin)
+                  : [];
+      const zones = Array.isArray(subMap.zones)     ? subMap.zones.filter(visibleTo) : [];
+      subMap = { ...subMap, locations: pins, zones };
+    }
+    // dmNotes never leaves the worker for any non-DM caller.
+    const { dmNotes, ...locRest } = loc;
+    return { ...locRest, npcs, quests, subMap };
   });
   out.zones = (mapData.zones || []).filter(visibleTo);
   return out;
