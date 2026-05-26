@@ -9,6 +9,18 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-21
 
+### Pin color + outline refresh
+
+Better at-a-glance distinction between pins and improved visibility on busy maps.
+
+#### Changed (`map.html` + `map-dm.html`)
+- **City and port pulled apart in hue** — they used to be two adjacent blues (city `#4a90d4`, port `#2cb6c8`). Now: city → **royal blue `#3a6fd0`**, port → **teal-green `#16b5a0`**. Clearly different at a glance.
+- **Pin outline is now a light off-white ring** (`rgba(248,245,238,0.92)`) instead of the old dark semi-transparent edge. Combined with the existing drop-shadow, every pin now pops on any map background.
+- **Ruin pin** specifically — the dark border used to let the stone-gray pin (`#908070`) vanish into earthy terrain. The new light ring + a slightly brighter fill (`#a89478`) make it easy to spot.
+- Applied everywhere the palette lives: world pins, sub-map pins, the legend's SVG swatches, and the `TYPE_COLORS` map (which also feeds the location/sub-pin type badges and info panel).
+
+Full palette now: city `#3a6fd0`, dungeon `#c43838`, wilderness `#4ca050`, ruin `#a89478`, port `#16b5a0`, fort `#b060d0`, default `#e0a830`.
+
 ### Editable loot + combats in the timeline editor
 
 Follow-up to the combat→chronicle integration: loot is now fully editable directly on an existing timeline entry (no re-export needed).
