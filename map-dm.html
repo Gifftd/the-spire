@@ -30,6 +30,11 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 .btn-ghost{border-color:var(--border-light);color:var(--ink-dim)}.btn-ghost:hover{border-color:var(--ink-dim);color:var(--ink)}
 .btn-sm{font-size:0.6rem;padding:3px 7px}
 .sync-status{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.08em;color:var(--ink-faint)}
+.dm-breadcrumb{display:flex;align-items:center;gap:8px;font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.1em;color:var(--ink-dim);padding:4px 10px;background:rgba(80,50,15,0.18);border:1px solid var(--gold-faint);border-radius:var(--radius)}
+.dm-breadcrumb a{color:var(--gold-light);text-decoration:none;cursor:pointer}
+.dm-breadcrumb a:hover{color:var(--gold)}
+.dm-breadcrumb .sep{color:var(--ink-faint)}
+.in-submap-banner{background:linear-gradient(90deg,rgba(180,134,11,0.15),transparent);border-bottom:1px solid var(--gold-faint)}
 .sync-status.ok{color:var(--green-light)}.sync-status.fail{color:var(--red)}.sync-status.ing{color:var(--amber)}
 
 /* ── Layout ── */
@@ -284,7 +289,12 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 
 <!-- TOPBAR -->
 <div class="topbar">
-  <h1>⚔ World Map — DM Editor</h1>
+  <h1 id="topbar-title">⚔ World Map — DM Editor</h1>
+  <div class="dm-breadcrumb" id="dm-breadcrumb" style="display:none">
+    <a href="#" onclick="exitToWorld();return false">⌫ Back to World</a>
+    <span class="sep">›</span>
+    <span id="dm-breadcrumb-loc">—</span>
+  </div>
   <button class="btn btn-ghost btn-sm" onclick="switchTab('locations')">Locations</button>
   <button class="btn btn-ghost btn-sm" onclick="switchTab('zones')">Zones</button>
   <button class="btn btn-ghost btn-sm" onclick="switchTab('characters')">Characters</button>
@@ -532,6 +542,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
         <button class="editor-tab" id="ltab-lore"   onclick="switchLocTab('lore')">LORE</button>
         <button class="editor-tab" id="ltab-npcs"   onclick="switchLocTab('npcs')">NPCs</button>
         <button class="editor-tab" id="ltab-quests" onclick="switchLocTab('quests')">QUESTS</button>
+        <button class="editor-tab" id="ltab-submap" onclick="switchLocTab('submap')">SUB-MAP</button>
         <button class="editor-tab" id="ltab-dm"     onclick="switchLocTab('dm')">DM NOTES</button>
       </div>
 
@@ -593,6 +604,23 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
         <div id="quest-editor-list"></div>
       </div>
 
+      <!-- SUB-MAP -->
+      <div class="editor-pane" id="lpane-submap">
+        <div style="font-size:0.82rem;color:var(--ink-dim);line-height:1.5;margin-bottom:0.6rem">
+          Attach a detail map to this location (a city plan, a dungeon level, a tavern floor). After saving the image + dimensions, click <strong style="color:var(--gold-light)">Open editor</strong> to place pins, draw zones, and write secrets that follow the same visibility rules as the world map.
+        </div>
+        <div class="field"><label>SUB-MAP IMAGE URL</label><input type="text" id="loc-subMap-image" placeholder="./maps/ironhaven-streets.png"></div>
+        <div class="field-row">
+          <div class="field"><label>WIDTH (px)</label><input type="number" id="loc-subMap-width" value="1200" min="200"></div>
+          <div class="field"><label>HEIGHT (px)</label><input type="number" id="loc-subMap-height" value="800" min="200"></div>
+        </div>
+        <div style="display:flex;gap:5px;align-items:center;margin-top:0.6rem">
+          <button class="btn btn-gold btn-sm" type="button" onclick="openSubMapEditor()">Open editor ↗</button>
+          <button class="btn btn-ghost btn-sm" type="button" onclick="resetSubMap()" id="reset-submap-btn" style="display:none">Reset sub-map</button>
+          <span id="submap-stat" style="margin-left:auto;font-size:0.7rem;color:var(--ink-faint)"></span>
+        </div>
+      </div>
+
       <!-- DM NOTES -->
       <div class="editor-pane" id="lpane-dm">
         <div class="dm-note-area">
@@ -644,11 +672,24 @@ const ZONE_COLORS = ['#6a5a40','#2d6a3f','#2e4a7a','#8a3030','#5a3e9b','#4a6060'
 
 // ══════════════════════════════════════════════════════════════
 //  DATA
+//  worldData = canonical root persisted to KV.
+//  data      = currently-edited scope. When at the world level,
+//              `data === worldData`. When the DM drills into a
+//              location's sub-map, `data` points at that location's
+//              `subMap` object embedded inside worldData. Mutations
+//              to `data.locations` / `data.zones` therefore land in
+//              the right place without any copying.
 // ══════════════════════════════════════════════════════════════
-let data = {
+let worldData = {
   world:{ name:'Velemere', mapImage:'./maps/Velmere.jpeg', mapWidth:1456, mapHeight:816 },
   locations:[], zones:[]
 };
+let data = worldData;
+let subMapStack = [];   // [{parentLocationId, prevData}] — supports nested entry/exit
+function inSubMap() { return subMapStack.length > 0; }
+function currentParentLocation() {
+  return subMapStack.length ? worldData.locations.find(l => l.id === subMapStack[subMapStack.length-1].parentLocationId) : null;
+}
 
 let selectedLocId  = null;
 let selectedZoneId = null;
@@ -703,20 +744,20 @@ let moveDragTarget=null;   // { type:'pin'|'rectzone'|'polyzone', id, origX, ori
 //  PERSISTENCE — localStorage (fast cache) + KV (persistent backup)
 // ══════════════════════════════════════════════════════════════
 function saveLocal() {
-  localStorage.setItem('dm_map_data', JSON.stringify(data));
+  localStorage.setItem('dm_map_data', JSON.stringify(worldData));
 }
 
 function loadLocal() {
   try {
     const d = JSON.parse(localStorage.getItem('dm_map_data') || 'null');
-    if (d && d.locations) data = d;
+    if (d && d.locations) { worldData = d; if (!inSubMap()) data = worldData; }
   } catch {}
 }
 
 // Save full DM data (including notes) to KV via the Worker
 async function saveToKV() {
   try {
-    await dmPost({ type: 'map_data_dm', payload: data }, saveToKV);
+    await dmPost({ type: 'map_data_dm', payload: worldData }, saveToKV);
   } catch {
     // Silently fail — localStorage is the fallback
   }
@@ -734,7 +775,8 @@ async function loadFromKV() {
     if (!res.ok) return false;
     const d = await res.json();
     if (d && d.locations && d.locations.length > 0) {
-      data = d;
+      worldData = d;
+      if (!inSubMap()) data = worldData;
       return true;
     }
   } catch {}
@@ -840,7 +882,7 @@ function loadNPCsLocal() {
 // npcs[]. Sets currentLocationId on the new NPC, leaves knownTo empty (DM grants).
 async function migrateNestedNPCs() {
   if (npcs.length > 0) return false;
-  const locsWithNested = (data.locations || []).filter(l => Array.isArray(l.npcs) && l.npcs.length > 0);
+  const locsWithNested = (worldData.locations || []).filter(l => Array.isArray(l.npcs) && l.npcs.length > 0);
   if (locsWithNested.length === 0) return false;
 
   const used = new Set();
@@ -901,10 +943,23 @@ function saveAll() {
 // ══════════════════════════════════════════════════════════════
 async function publishData() {
   setSyncStatus('ing','⟳ Publishing…');
+  // Always publish the world root, regardless of whether we're currently
+  // editing a sub-map. Strip dmNotes from every location AND from every
+  // sub-map pin so private notes never reach the player payload.
+  const sanitizeLoc = loc => {
+    const { dmNotes, subMap, ...rest } = loc;
+    let cleanSubMap = subMap;
+    if (subMap && typeof subMap === 'object') {
+      const pins  = Array.isArray(subMap.locations) ? subMap.locations.map(p => { const { dmNotes, ...r } = p; return r; }) : [];
+      const zones = Array.isArray(subMap.zones)     ? subMap.zones                                                          : [];
+      cleanSubMap = { ...subMap, locations: pins, zones };
+    }
+    return { ...rest, subMap: cleanSubMap };
+  };
   const playerData = {
-    world: data.world,
-    zones: data.zones,
-    locations: data.locations.map(loc => { const { dmNotes, ...rest } = loc; return rest; })
+    world: worldData.world,
+    zones: worldData.zones,
+    locations: (worldData.locations || []).map(sanitizeLoc)
   };
   try {
     const res = await dmPost({ type:'map_data', payload: playerData }, publishData);
@@ -931,11 +986,118 @@ function switchTab(name) {
   updateModeUI();
 }
 function switchLocTab(name) {
-  ['info','lore','npcs','quests','dm'].forEach(t => {
+  ['info','lore','npcs','quests','submap','dm'].forEach(t => {
     document.getElementById(`ltab-${t}`).classList.toggle('active', t===name);
     document.getElementById(`lpane-${t}`).classList.toggle('active', t===name);
   });
 }
+
+// ══════════════════════════════════════════════════════════════
+//  SUB-MAP MODE
+//  Swap `data` to point at a location's subMap embedded in worldData.
+//  All editor functions (place mode, move mode, zones, polygon draw)
+//  then operate against the sub-map's pins/zones by reference. Saving
+//  still writes worldData.
+// ══════════════════════════════════════════════════════════════
+function enterSubMap(locationId) {
+  // First make sure the location form's pending changes are flushed.
+  if (editingLocId) { try { saveLocation(); } catch {} }
+  closeLocModal();
+
+  const loc = worldData.locations.find(l => l.id === locationId);
+  if (!loc) { alert('Location not found.'); return; }
+  if (!loc.subMap) {
+    alert('Set a sub-map image first.');
+    return;
+  }
+  // Ensure shape — locations[] and zones[] are the arrays the editor mutates.
+  if (!Array.isArray(loc.subMap.locations)) loc.subMap.locations = [];
+  if (!Array.isArray(loc.subMap.zones))     loc.subMap.zones     = [];
+
+  subMapStack.push({ parentLocationId: locationId, prevData: data });
+  data = loc.subMap;
+  selectedLocId = null; selectedZoneId = null;
+  if (polyDrawMode) cancelPolyDraw();
+  if (moveMode)     toggleMoveMode();
+  refreshSubMapUI();
+  switchTab('locations');
+  buildMap();
+  renderLocList();
+  renderZoneList();
+  loadWorldFields();
+  saveAll();
+}
+
+function exitToWorld() {
+  if (!inSubMap()) return;
+  const ctx = subMapStack.pop();
+  data = ctx.prevData;
+  selectedLocId = null; selectedZoneId = null;
+  if (polyDrawMode) cancelPolyDraw();
+  if (moveMode)     toggleMoveMode();
+  refreshSubMapUI();
+  switchTab('locations');
+  buildMap();
+  renderLocList();
+  renderZoneList();
+  loadWorldFields();
+  saveAll();
+}
+
+function refreshSubMapUI() {
+  const breadcrumb = document.getElementById('dm-breadcrumb');
+  const title = document.getElementById('topbar-title');
+  const hint = document.getElementById('map-hint');
+  document.body.classList.toggle('in-submap', inSubMap());
+  if (inSubMap()) {
+    const parent = currentParentLocation();
+    breadcrumb.style.display = '';
+    document.getElementById('dm-breadcrumb-loc').textContent = parent?.name || 'Sub-map';
+    title.innerHTML = `⚔ Sub-map — <span style="color:var(--gold-light)">${escapeHtml(parent?.name||'')}</span>`;
+    if (hint) hint.textContent = 'Click to place a pin on this sub-map · Esc returns to World';
+  } else {
+    breadcrumb.style.display = 'none';
+    title.innerHTML = '⚔ World Map — DM Editor';
+    if (hint) hint.textContent = 'Click map to place a new location pin';
+  }
+}
+
+function openSubMapEditor() {
+  // Persist whatever's currently in the form, then enter sub-map mode for this location.
+  const id = editingLocId;
+  if (!id) {
+    alert('Save the location first, then open its sub-map.');
+    return;
+  }
+  const subImage = document.getElementById('loc-subMap-image').value.trim();
+  if (!subImage) {
+    alert('Set a sub-map image URL first.');
+    return;
+  }
+  saveLocation();
+  enterSubMap(id);
+}
+
+function resetSubMap() {
+  if (!editingLocId) return;
+  if (!confirm('Delete this location\'s entire sub-map (image + pins + zones)? Cannot be undone.')) return;
+  const loc = worldData.locations.find(l => l.id === editingLocId);
+  if (!loc) return;
+  loc.subMap = null;
+  document.getElementById('loc-subMap-image').value = '';
+  document.getElementById('submap-stat').textContent = 'No sub-map yet';
+  document.getElementById('reset-submap-btn').style.display = 'none';
+  saveAll();
+}
+
+// Esc returns to world (only when no modal is in the way).
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || !inSubMap()) return;
+  const locModalOpen    = !document.getElementById('loc-modal').classList.contains('hidden');
+  const importModalOpen = !document.getElementById('import-modal')?.classList.contains('hidden');
+  if (locModalOpen || importModalOpen) return;
+  exitToWorld();
+});
 
 // ══════════════════════════════════════════════════════════════
 //  MAP BUILD & RENDER
@@ -1484,6 +1646,22 @@ function openLocModal(id, defaultX, defaultY) {
   tempNPCs   = JSON.parse(JSON.stringify(loc?.npcs   || []));
   tempQuests = JSON.parse(JSON.stringify(loc?.quests || []));
   tempVisibleTo = Array.isArray(loc?.visibleTo) ? loc.visibleTo.slice() : [];
+  // Sub-map fields
+  const sub = loc?.subMap || null;
+  document.getElementById('loc-subMap-image').value  = sub?.world?.mapImage || sub?.image || '';
+  document.getElementById('loc-subMap-width').value  = sub?.world?.mapWidth  || sub?.width  || 1200;
+  document.getElementById('loc-subMap-height').value = sub?.world?.mapHeight || sub?.height || 800;
+  const stat = document.getElementById('submap-stat');
+  if (sub && Array.isArray(sub.locations)) {
+    stat.textContent = `${sub.locations.length} pin${sub.locations.length===1?'':'s'} · ${(sub.zones||[]).length} zone${(sub.zones||[]).length===1?'':'s'}`;
+    document.getElementById('reset-submap-btn').style.display = '';
+  } else {
+    stat.textContent = 'No sub-map yet';
+    document.getElementById('reset-submap-btn').style.display = 'none';
+  }
+  // The sub-map tab is meaningless when editing a sub-pin (no recursive sub-maps).
+  document.getElementById('ltab-submap').style.display = inSubMap() ? 'none' : '';
+  document.getElementById('ltab-npcs').style.display   = inSubMap() ? 'none' : '';
   renderNPCEditor(); renderQuestEditor(); renderVisibleToChips();
   renderLocationNPCsHere(loc?.id);
   switchLocTab('info');
@@ -1499,6 +1677,26 @@ function saveLocation() {
   const name = document.getElementById('loc-name').value.trim();
   const id   = document.getElementById('loc-id').value.trim().replace(/[^a-z0-9-]/g,'');
   if (!name||!id) { alert('Name and ID are required.'); return; }
+  // Preserve existing sub-map data (pins, zones) — read sub-map fields from the
+  // form only when at the world level. Pin records (inside a sub-map) can't have
+  // sub-maps themselves in this phase.
+  const existing = data.locations.find(l => l.id === editingLocId) || {};
+  let subMap = existing.subMap || null;
+  if (!inSubMap()) {
+    const subImage  = document.getElementById('loc-subMap-image').value.trim();
+    const subWidth  = parseInt(document.getElementById('loc-subMap-width').value, 10) || 1200;
+    const subHeight = parseInt(document.getElementById('loc-subMap-height').value, 10) || 800;
+    if (subImage || (subMap && (subMap.locations?.length || subMap.zones?.length))) {
+      // Persist sub-map structure. Keep existing pins/zones; just update world meta.
+      subMap = {
+        world: { name: name + ' (sub-map)', mapImage: subImage, mapWidth: subWidth, mapHeight: subHeight },
+        locations: subMap?.locations || [],
+        zones:     subMap?.zones     || []
+      };
+    } else {
+      subMap = null;
+    }
+  }
   const locData = {
     id, name,
     type:      document.getElementById('loc-type').value,
@@ -1513,6 +1711,7 @@ function saveLocation() {
     quests:    tempQuests,
     dmNotes:   document.getElementById('loc-dmNotes').value.trim(),
     visibleTo: tempVisibleTo.slice(),
+    subMap:    subMap,
   };
   const idx = data.locations.findIndex(l=>l.id===editingLocId);
   if (idx>=0) data.locations[idx]=locData; else data.locations.push(locData);
@@ -1872,7 +2071,8 @@ async function deleteWhisper(jid) {
 //  NPCs TAB
 // ══════════════════════════════════════════════════════════════
 function locationName(id) {
-  const loc = (data.locations || []).find(l => l.id === id);
+  // NPCs reference top-level world locations only.
+  const loc = (worldData.locations || []).find(l => l.id === id);
   return loc ? loc.name : '';
 }
 
@@ -1882,7 +2082,7 @@ function populateNPCLocationFilters() {
   const moveLoc = document.getElementById('npce-move-location');
   if (!filter) return;
 
-  const opts = (data.locations || [])
+  const opts = (worldData.locations || [])
     .slice()
     .sort((a,b) => (a.name||'').localeCompare(b.name||''))
     .map(l => `<option value="${l.id}">${escapeHtml(l.name)}</option>`)
@@ -2136,8 +2336,10 @@ async function deleteNPCHistoryEntry(hId) {
 function renderLocationNPCsHere(locId) {
   const wrap = document.getElementById('loc-npcs-here');
   if (!wrap) return;
-  if (!locId) {
-    wrap.innerHTML = '<div class="visibleto-empty">Save this location first, then add NPCs here.</div>';
+  if (!locId || inSubMap()) {
+    wrap.innerHTML = inSubMap()
+      ? '<div class="visibleto-empty">NPCs attach to world locations, not sub-map pins. Exit the sub-map editor to manage NPCs here.</div>'
+      : '<div class="visibleto-empty">Save this location first, then add NPCs here.</div>';
     return;
   }
   const here = npcs.filter(n => n.currentLocationId === locId);

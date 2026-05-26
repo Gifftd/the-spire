@@ -100,6 +100,35 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 /* Sub-map */
 .sub-map-wrap{width:100%;position:relative;overflow:hidden;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface2);min-height:200px;margin-bottom:1rem}
 .sub-map-wrap img{width:100%;display:block}
+
+/* Interactive sub-map (location detail page) */
+.submap-stage{position:relative;width:100%;overflow:hidden;border-radius:var(--radius);border:1px solid var(--border-light);background:var(--bg);margin-bottom:1rem;box-shadow:inset 0 0 24px rgba(0,0,0,0.45)}
+.submap-frame{position:relative;width:100%;height:0;padding-bottom:60%}  /* aspect ratio set inline */
+.submap-img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;pointer-events:none;user-select:none}
+.submap-pin{position:absolute;transform:translate(-50%,-100%);cursor:pointer;z-index:5;transition:transform 0.15s;width:0;height:0}
+.submap-pin:hover{transform:translate(-50%,-100%) scale(1.18);z-index:6}
+.submap-pin .pin-icon{width:22px;height:28px;display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.6))}
+.submap-pin .pin-marker{width:17px;height:17px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid rgba(10,8,6,0.55);box-shadow:inset 0 -2px 4px rgba(0,0,0,0.28),inset 0 2px 3px rgba(255,255,255,0.18)}
+.submap-pin .pin-tail{width:2px;height:8px;margin-top:1px;opacity:0.85}
+.submap-pin.type-city       .pin-marker, .submap-pin.type-city       .pin-tail{background:#4a90d4}
+.submap-pin.type-dungeon    .pin-marker, .submap-pin.type-dungeon    .pin-tail{background:#c43838}
+.submap-pin.type-wilderness .pin-marker, .submap-pin.type-wilderness .pin-tail{background:#4ca050}
+.submap-pin.type-ruin       .pin-marker, .submap-pin.type-ruin       .pin-tail{background:#908070}
+.submap-pin.type-port       .pin-marker, .submap-pin.type-port       .pin-tail{background:#2cb6c8}
+.submap-pin.type-fort       .pin-marker, .submap-pin.type-fort       .pin-tail{background:#b060d0}
+.submap-pin.type-default    .pin-marker, .submap-pin.type-default    .pin-tail{background:#e0a830}
+.submap-pin-label{position:absolute;top:calc(100% + 3px);left:50%;transform:translateX(-50%);white-space:nowrap;font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.05em;color:var(--ink);background:rgba(10,8,6,0.88);padding:2px 5px;border-radius:2px;border:1px solid var(--border);pointer-events:none;opacity:0;transition:opacity 0.15s}
+.submap-pin:hover .submap-pin-label{opacity:1}
+.submap-zone{position:absolute;border-radius:6px;border:2px solid;pointer-events:none}
+.submap-info{background:var(--surface);border:1px solid var(--gold-faint);border-radius:var(--radius);padding:1rem 1.1rem;margin-bottom:1rem;display:none}
+.submap-info.visible{display:block;animation:fade-in 0.15s}
+.submap-info-name{font-family:'Cinzel',serif;font-size:1.05rem;letter-spacing:0.06em;color:var(--gold-light);margin-bottom:5px}
+.submap-info-type{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.14em;color:var(--gold-faint);text-transform:uppercase;margin-bottom:7px}
+.submap-info-desc{font-size:0.95rem;line-height:1.55;color:var(--ink);margin-bottom:0.6rem}
+.submap-info-lore{font-size:0.92rem;line-height:1.6;color:var(--ink-dim);white-space:pre-wrap}
+.submap-info-close{float:right;background:transparent;border:none;color:var(--ink-faint);cursor:pointer;font-size:1.1rem;line-height:1;padding:0 4px;margin:-4px -4px 0 0}
+.submap-info-close:hover{color:var(--gold)}
+@keyframes fade-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
 .sub-map-placeholder{width:100%;height:200px;display:flex;align-items:center;justify-content:center;color:var(--ink-faint);font-style:italic;font-size:0.88rem}
 
 /* Location main area */
@@ -1011,11 +1040,7 @@ function showLocation(loc) {
   // Main area
   const main = document.getElementById('loc-main');
   main.innerHTML = `<div class="loc-main-content">
-    ${loc.mapImage ? `
-      <div class="sub-map-wrap"><img src="${loc.mapImage}" alt="${loc.name} map"></div>
-    ` : (loc.mapImage === null ? '' : `
-      <div class="sub-map-wrap"><div class="sub-map-placeholder">No local map available</div></div>
-    `)}
+    ${renderLocationSubMap(loc)}
 
     ${loc.lore ? `
       <div class="loc-main-section-title">ABOUT ${loc.name.toUpperCase()}</div>
@@ -1034,6 +1059,72 @@ function showLocation(loc) {
       </div>
     ` : ''}
   </div>`;
+}
+
+// ── Interactive sub-map (location detail) ────────────────────
+function renderLocationSubMap(loc) {
+  const sub = loc.subMap;
+  const hasSub = sub && (sub.world?.mapImage || sub.image) && Array.isArray(sub.locations);
+  if (!hasSub) {
+    // Legacy / no-sub-map fallback — keep the old static image / placeholder.
+    if (loc.mapImage) return `<div class="sub-map-wrap"><img src="${esc(loc.mapImage)}" alt="${esc(loc.name)} map"></div>`;
+    if (loc.mapImage === null) return '';
+    return `<div class="sub-map-wrap"><div class="sub-map-placeholder">No local map available</div></div>`;
+  }
+  const img = sub.world?.mapImage || sub.image;
+  const W   = sub.world?.mapWidth  || sub.width  || 1200;
+  const H   = sub.world?.mapHeight || sub.height || 800;
+  const pad = (H / W * 100).toFixed(2) + '%';
+
+  const zonesHtml = (sub.zones || []).filter(z => z.visible !== false).map(z => {
+    if (z.shape === 'polygon') return ''; // polygons are world-only for now
+    return `<div class="submap-zone" style="left:${z.x}%;top:${z.y}%;width:${z.width}%;height:${z.height}%;background:${esc(z.color||'#888')};opacity:${z.opacity||0.18};border-color:${esc(z.color||'#888')}"></div>`;
+  }).join('');
+
+  const pinsHtml = (sub.locations || []).filter(p => p.visible !== false).map(p => {
+    const t = p.type || 'default';
+    return `<div class="submap-pin type-${esc(t)}" style="left:${p.x}%;top:${p.y}%" onclick="openSubPinInfo('${esc(loc.id)}','${esc(p.id)}')" data-pin-id="${esc(p.id)}">
+      <div class="pin-icon"><div class="pin-marker"></div><div class="pin-tail"></div></div>
+      <div class="submap-pin-label">${esc(p.name||'')}</div>
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="submap-stage">
+      <div class="submap-frame" style="padding-bottom:${pad}">
+        <img class="submap-img" src="${esc(img)}" alt="${esc(loc.name)} sub-map">
+        ${zonesHtml}
+        ${pinsHtml}
+      </div>
+    </div>
+    <div class="submap-info" id="submap-info"></div>
+  `;
+}
+
+function esc(s) {
+  return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function openSubPinInfo(parentLocId, pinId) {
+  const loc = (data.locations || []).find(l => l.id === parentLocId);
+  if (!loc || !loc.subMap) return;
+  const pin = (loc.subMap.locations || []).find(p => p.id === pinId);
+  if (!pin) return;
+  const info = document.getElementById('submap-info');
+  if (!info) return;
+  const typeLabel = TYPE_LABELS[pin.type || 'default'] || (pin.type || 'Location');
+  info.innerHTML = `
+    <button class="submap-info-close" type="button" onclick="closeSubPinInfo()" aria-label="Close">×</button>
+    <div class="submap-info-type">${esc(typeLabel)}</div>
+    <div class="submap-info-name">${esc(pin.name||'(Unnamed)')}</div>
+    ${pin.shortDesc ? `<div class="submap-info-desc">${esc(pin.shortDesc)}</div>` : ''}
+    ${pin.lore      ? `<div class="submap-info-lore">${esc(pin.lore)}</div>` : ''}
+  `;
+  info.classList.add('visible');
+  info.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+function closeSubPinInfo() {
+  document.getElementById('submap-info')?.classList.remove('visible');
 }
 
 window.addEventListener('hashchange', handleHash);

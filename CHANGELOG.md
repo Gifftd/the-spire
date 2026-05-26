@@ -9,6 +9,39 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-21
 
+### Sub-map pins (Phase 2 of 3-feature set)
+
+Each Location can now have its own detail map with the same pin/zone/visibility system as the world map. Phase 2 of: NPC tracker → sub-map pins → campaign timeline.
+
+#### Added — Worker (`cloudflare-worker.js`)
+- `filterForCharacter()` now recurses into every `Location.subMap.pins` (also accepts `subMap.locations` from the DM side) and `subMap.zones`, applying the same `visibleTo` rules.
+- Sub-map pins have `dmNotes` stripped via a new `sanitizeSubPin` helper before reaching any non-DM caller.
+- **Hardened**: the top-level location's `dmNotes` is now explicitly stripped by `filterForCharacter` too (it previously leaked if `player_view` fell back to `map_data_dm` when the DM had never published).
+
+#### Added — DM map (`map-dm.html`)
+- **New `worldData` / `data` split**: `worldData` is the canonical root persisted to KV. `data` is the active editing scope — equals `worldData` at the world level, points at a Location's `subMap` when inside one. Mutations flow naturally because `data.locations` / `data.zones` are array references shared with the right slot in worldData.
+- **Sub-map mode**: `enterSubMap(locationId)` pushes a scope frame, swaps `data` to the embedded sub-map, rebuilds the canvas, location list and zone list against it. `exitToWorld()` (or **Esc**) pops back. Supports nested entry/exit via a stack.
+- **Topbar breadcrumb** appears when in sub-map mode: `⌫ Back to World › Ironhaven` (clickable). Topbar title flips to "Sub-map — Ironhaven" with a gold accent. Map hint changes too.
+- **Location modal → SUB-MAP tab**: image URL + width + height fields, **Open editor ↗** button, pin/zone count, and **Reset sub-map** button.
+- All existing editor functionality (place mode, move mode, polygon zones, rect zones, visibility chips, location modal) works in sub-map context. Sub-pins can't have their own sub-maps (no recursion in this phase) — the SUB-MAP and NPCs tabs are hidden when editing a sub-pin.
+- **Publish** and **Save to cloud** always operate on `worldData` regardless of mode, so you can publish while inside a sub-map editor.
+- **`saveLocation`** preserves an existing sub-map's pins/zones when re-saving the parent location and strips sub-pin `dmNotes` during publish.
+
+#### Added — Player map (`map.html`)
+- Location detail page now renders an **interactive sub-map** when one is published:
+  - Background image scaled to the sub-map's aspect ratio.
+  - Pins as colored teardrops (same palette as the world map, slightly smaller).
+  - Rectangle zones rendered as colored overlays.
+  - Hover a pin → name label.
+  - Click a pin → **detail card** below the map with type, name, short description, lore. `dmNotes` never reaches the player.
+- Static `mapImage` URLs still work as a fallback for locations that haven't been promoted to interactive sub-maps.
+- Anonymous viewers see only sub-pins with empty `visibleTo`; logged-in players see those plus pins where their character is in `visibleTo`. Server-side filtering, so dev-tools snooping won't reveal hidden sub-pins.
+
+#### Known limitations
+- Sub-map view is **fit-to-container**, no pan/zoom (the world map's pan/zoom is preserved). Flag for a polish pass if needed for big floor plans.
+- Sub-pin polygon zones aren't drawn on the player side yet (rect zones work). DM polygon-zone editing on sub-maps is supported — they just don't render on the player's sub-map view.
+- No recursive sub-maps (a sub-pin can't itself have a sub-map). Same intentional limit as Phase 2 scope.
+
 ### NPC tracker (Phase 1 of 3-feature set)
 
 NPCs promoted from anonymous arrays inside locations to first-class entities with current location, current activity, status, a movement/event history, and per-character visibility. Phase 1 of: NPC tracker → sub-map pins → campaign timeline.
