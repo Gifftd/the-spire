@@ -56,13 +56,13 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 .pin{position:absolute;transform:translate(-50%,-100%);cursor:pointer;z-index:10;transition:transform 0.15s}
 .pin:hover{transform:translate(-50%,-100%) scale(1.18);z-index:11}
 .pin-icon{width:28px;height:36px;display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.6))}
-.pin-marker{width:22px;height:22px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid rgba(10,8,6,0.55);box-shadow:inset 0 -2px 4px rgba(0,0,0,0.28),inset 0 2px 3px rgba(255,255,255,0.18)}
+.pin-marker{width:22px;height:22px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid rgba(248,245,238,0.92);box-shadow:inset 0 -2px 4px rgba(0,0,0,0.28),inset 0 2px 3px rgba(255,255,255,0.18)}
 .pin-tail{width:2px;height:10px;margin-top:1px;opacity:0.85}
-.pin.type-city       .pin-marker{background:#4a90d4}.pin.type-city       .pin-tail{background:#4a90d4}
+.pin.type-city       .pin-marker{background:#3a6fd0}.pin.type-city       .pin-tail{background:#3a6fd0}
 .pin.type-dungeon    .pin-marker{background:#c43838}.pin.type-dungeon    .pin-tail{background:#c43838}
 .pin.type-wilderness .pin-marker{background:#4ca050}.pin.type-wilderness .pin-tail{background:#4ca050}
-.pin.type-ruin       .pin-marker{background:#908070}.pin.type-ruin       .pin-tail{background:#908070}
-.pin.type-port       .pin-marker{background:#2cb6c8}.pin.type-port       .pin-tail{background:#2cb6c8}
+.pin.type-ruin       .pin-marker{background:#a89478}.pin.type-ruin       .pin-tail{background:#a89478}
+.pin.type-port       .pin-marker{background:#16b5a0}.pin.type-port       .pin-tail{background:#16b5a0}
 .pin.type-fort       .pin-marker{background:#b060d0}.pin.type-fort       .pin-tail{background:#b060d0}
 .pin.type-default    .pin-marker{background:#e0a830}.pin.type-default    .pin-tail{background:#e0a830}
 .pin.hidden-pin   .pin-marker{opacity:0.45;border-style:dashed}
@@ -784,7 +784,7 @@ if (!window.Auth || !Auth.requireRole('dm', { reason: 'The world map editor is f
 
 const TYPE_ICONS  = { city:'🏙',dungeon:'⚔',wilderness:'🌲',ruin:'🏚',port:'⚓',fort:'🏰',default:'📍' };
 const TYPE_LABELS = { city:'City',dungeon:'Dungeon',wilderness:'Wilderness',ruin:'Ruin',port:'Port',fort:'Fort',default:'Location' };
-const TYPE_COLORS = { city:'#4a90d4',dungeon:'#c43838',wilderness:'#4ca050',ruin:'#908070',port:'#2cb6c8',fort:'#b060d0',default:'#e0a830' };
+const TYPE_COLORS = { city:'#3a6fd0',dungeon:'#c43838',wilderness:'#4ca050',ruin:'#a89478',port:'#16b5a0',fort:'#b060d0',default:'#e0a830' };
 const ZONE_COLORS = ['#6a5a40','#2d6a3f','#2e4a7a','#8a3030','#5a3e9b','#4a6060'];
 
 // ══════════════════════════════════════════════════════════════
@@ -1368,7 +1368,7 @@ function buildMap() {
 function legendPinSVG(color) {
   return `<svg class="legend-pin" viewBox="0 0 16 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <path d="M8 1 C4.1 1 1 4.1 1 8 C1 13 8 19 8 19 C8 19 15 13 15 8 C15 4.1 11.9 1 8 1 Z"
-      fill="${color}" stroke="rgba(10,8,6,0.55)" stroke-width="1.2"/>
+      fill="${color}" stroke="rgba(248,245,238,0.9)" stroke-width="1.4"/>
   </svg>`;
 }
 function buildLegend() {
