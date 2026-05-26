@@ -100,6 +100,25 @@ function sanitizeCharacters(chars) {
   return (chars || []).map(c => ({ id: c.id, name: c.name, player: c.player || '' }));
 }
 
+// Return timeline entries visible to a given audience.
+//   characterId === null  → anonymous (public, ungated, non-planned only)
+//   characterId === 'id'  → that character (public + entries with them in visibleTo, non-planned)
+// Always strips dmNotes from the result.
+function timelineForCharacter(entries, characterId) {
+  if (!Array.isArray(entries)) return [];
+  return entries
+    .filter(e => e && e.kind !== 'planned')
+    .filter(e => {
+      if (!Array.isArray(e.visibleTo) || e.visibleTo.length === 0) return true;
+      if (!characterId) return false;
+      return e.visibleTo.includes(characterId);
+    })
+    .map(e => {
+      const { dmNotes, ...rest } = e;
+      return rest;
+    });
+}
+
 // Return the NPCs a given character knows about, with DM-only fields stripped.
 // characterId === null means anonymous — never returns NPCs (visibility is opt-in only).
 function npcsForCharacter(allNpcs, characterId) {
@@ -219,6 +238,31 @@ export default {
         return json(await kvGet(env, 'npcs', []));
       }
 
+      // Anonymous-safe campaign timeline (public, non-planned, dmNotes stripped).
+      if (type === 'timeline') {
+        const entries = await kvGet(env, 'timeline', []);
+        return json(timelineForCharacter(entries, null));
+      }
+
+      // Per-character timeline view (public + their gated, non-planned, dmNotes stripped).
+      if (type === 'timeline_view') {
+        const characterId = url.searchParams.get('characterId') || '';
+        const code        = url.searchParams.get('code') || '';
+        if (!characterId || !code) return json({ error: 'characterId and code required' }, 400);
+        const chars = await kvGet(env, 'characters', []);
+        const me = chars.find(c => c.id === characterId);
+        if (!me || me.code !== code) return json({ error: 'invalid character or code' }, 401);
+        const entries = await kvGet(env, 'timeline', []);
+        return json(timelineForCharacter(entries, characterId));
+      }
+
+      // DM-only: full timeline (includes planned entries + dmNotes).
+      if (type === 'timeline_dm') {
+        const auth = await verifyDMAuth(request, env);
+        if (!auth.ok) return json({ error: 'DM auth required' }, 401);
+        return json(await kvGet(env, 'timeline', []));
+      }
+
       // Player NPC roster — only NPCs the character has been marked as knowing,
       // with DM-only fields stripped server-side.
       if (type === 'npc_roster') {
@@ -334,7 +378,7 @@ export default {
     }
 
     // ── DM-only writes ────────────────────────────────────────
-    const DM_WRITE_TYPES = ['initiative_state','map_data','map_data_dm','characters','journals','npcs'];
+    const DM_WRITE_TYPES = ['initiative_state','map_data','map_data_dm','characters','journals','npcs','timeline'];
     if (DM_WRITE_TYPES.includes(body?.type)) {
       const auth = await verifyDMAuth(request, env);
       if (!auth.ok) return json({ error: 'DM auth required' }, 401);

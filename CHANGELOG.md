@@ -9,6 +9,54 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-21
 
+### Campaign timeline / Chronicle (Phase 3 of 3-feature set)
+
+Closes out the trio: NPC tracker → sub-map pins → **campaign timeline**. A chronological log of sessions, events, and milestones, with planned (DM-only) entries for the future.
+
+#### Added — Worker (`cloudflare-worker.js`)
+- New KV key `timeline` (DM-only canonical store).
+- `GET ?type=timeline` — anonymous-safe (returns entries with empty `visibleTo` and `kind != 'planned'`; `dmNotes` stripped).
+- `GET ?type=timeline_view&characterId=…&code=…` — per-character (returns public + entries whose `visibleTo` includes them, non-planned, `dmNotes` stripped).
+- `GET ?type=timeline_dm` — DM auth required, full data including planned entries and `dmNotes`.
+- `POST type=timeline` — DM-only write.
+- `timeline` added to `DM_WRITE_TYPES`.
+- New `timelineForCharacter()` helper centralizes the filter logic.
+
+#### Added — DM map (`map-dm.html`)
+- **New `TIMELINE` tab** beside Locations / Zones / Players / NPCs / World.
+  - Roster with search + kind filter (sessions / events / milestones / planned).
+  - Entry editor: title, body, kind, in-game date (free text), sort key (YYYY-MM-DD), real-world date (auto-filled).
+  - **Linked entities**: chip multi-selects for locations, characters, NPCs — chips show on the player chronicle as clickable links into the atlas.
+  - **`visibleTo` chips** scope an entry to specific characters (same pattern as locations/NPCs). Planned entries are DM-only regardless.
+  - Per-entry **DM notes** (never published).
+- Loads / saves via worker with the standard DM-auth flow. Local cache mirror under `dm_timeline`.
+
+#### Added — New page `timeline.html` (The Chronicle)
+- Spire-themed standalone page (slate + teal, brass for DM/planned accents).
+- Reads the appropriate endpoint based on `Auth.getRole()`:
+  - Anonymous → `?type=timeline`
+  - Player → `?type=timeline_view` with creds
+  - DM → `?type=timeline_dm` with DM headers (sees planned entries in a separate "Planned" section below the past entries, with `dmNotes` shown)
+- Filter bar: search box, kind dropdown, sort (newest/oldest first).
+- Entry cards: kind pill (color-coded), title, in-game date, multi-line body, linked-entity chips (📍 location, ★ character, ☉ NPC). Location chips deep-link to `map.html#<id>` so a click jumps to the atlas.
+- Linked-entity names are resolved by fetching `character_list` + `map_data` + (`npcs` for DM / `npc_roster` for players) on bootstrap — best-effort, falls back to the raw id if a name isn't known.
+
+#### Added — Homepage (`home.html`)
+- **The Chronicle** card added to the **Open to All** section (third card alongside The Atlas and The Round). Inline tower-of-scrolls SVG icon to match the Spire's other marks.
+
+#### Visibility matrix
+
+| Entry kind / setting        | Anonymous | Player | DM |
+|---|---|---|---|
+| Public (empty `visibleTo`)  | ✓ | ✓ | ✓ |
+| Gated (`visibleTo: [id]`)   | hidden | ✓ if their character is in the list | ✓ |
+| Planned (`kind: 'planned'`) | hidden | hidden | ✓ (own section + `dmNotes` shown) |
+| `dmNotes` field             | stripped | stripped | shown |
+
+#### Action required
+- **Redeploy `cloudflare-worker.js`** (new endpoints).
+- After redeploy, open `map-dm.html` → **TIMELINE** tab → **+ Add entry** to start the chronicle.
+
 ### Sub-map pins (Phase 2 of 3-feature set)
 
 Each Location can now have its own detail map with the same pin/zone/visibility system as the world map. Phase 2 of: NPC tracker → sub-map pins → campaign timeline.
