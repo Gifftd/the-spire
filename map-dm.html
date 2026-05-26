@@ -173,6 +173,31 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 .whisper-del-btn{background:transparent;border:none;color:var(--ink-faint);cursor:pointer;font-size:0.8rem;padding:0 3px}
 .whisper-del-btn:hover{color:var(--red)}
 
+/* NPC roster cards */
+.npc-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:9px 10px;margin-bottom:6px;cursor:pointer;transition:border-color 0.15s}
+.npc-card:hover{border-color:var(--border-light)}
+.npc-card.selected{border-color:var(--gold)}
+.npc-card-row{display:flex;align-items:center;gap:8px}
+.npc-card-name{font-family:'Cinzel',serif;font-size:0.84rem;letter-spacing:0.04em;color:var(--ink);flex:1}
+.npc-card-role{font-size:0.7rem;color:var(--ink-faint);font-style:italic}
+.npc-card-meta{display:flex;align-items:center;gap:8px;margin-top:3px;font-size:0.72rem;color:var(--ink-dim)}
+.npc-status{font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid}
+.npc-status.alive   {color:var(--green-light);border-color:var(--green);background:var(--green-bg)}
+.npc-status.dead    {color:#e88;border-color:var(--red);background:var(--red-bg)}
+.npc-status.missing {color:#c0a0f0;border-color:var(--purple);background:var(--purple-bg)}
+.npc-status.unknown {color:var(--ink-faint);border-color:var(--border-light)}
+.npc-card-loc{font-size:0.72rem;color:var(--ink-dim);display:flex;align-items:center;gap:4px}
+.npc-card-loc::before{content:'📍';font-size:0.85em}
+.npc-card-activity{font-size:0.78rem;color:var(--ink-dim);margin-top:4px;font-style:italic;line-height:1.35}
+
+.npc-history-card{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--gold-faint);border-radius:var(--radius);padding:7px 9px;margin-bottom:5px;font-size:0.82rem}
+.npc-history-card.dm-only{border-left-color:var(--purple)}
+.npc-history-meta{font-size:0.65rem;color:var(--ink-faint);font-family:'Cinzel',serif;letter-spacing:0.08em;margin-bottom:3px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.npc-history-loc{font-family:'Cinzel',serif;color:var(--ink);font-size:0.76rem;margin-bottom:2px}
+.npc-history-body{color:var(--ink-dim);font-size:0.8rem;line-height:1.4}
+.npc-history-del{background:transparent;border:none;color:var(--ink-faint);cursor:pointer;font-size:0.8rem;padding:0 3px}
+.npc-history-del:hover{color:var(--red)}
+
 /* DM Token modal */
 .dm-token-overlay{position:fixed;inset:0;background:rgba(5,4,3,0.86);backdrop-filter:blur(4px);z-index:300;display:none;align-items:center;justify-content:center;padding:1rem}
 .dm-token-overlay.visible{display:flex}
@@ -263,6 +288,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
   <button class="btn btn-ghost btn-sm" onclick="switchTab('locations')">Locations</button>
   <button class="btn btn-ghost btn-sm" onclick="switchTab('zones')">Zones</button>
   <button class="btn btn-ghost btn-sm" onclick="switchTab('characters')">Characters</button>
+  <button class="btn btn-ghost btn-sm" onclick="switchTab('npcs')">NPCs</button>
   <button class="btn btn-ghost btn-sm" onclick="switchTab('world')">World</button>
   <button class="btn btn-ghost btn-sm" id="move-mode-btn" onclick="toggleMoveMode()">✥ Move mode</button>
   <button class="btn btn-purple btn-sm" onclick="openImport()">⬇ Import</button>
@@ -298,6 +324,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
       <button class="editor-tab active" id="tab-locations" onclick="switchTab('locations')">LOCATIONS</button>
       <button class="editor-tab" id="tab-zones" onclick="switchTab('zones')">ZONES</button>
       <button class="editor-tab" id="tab-characters" onclick="switchTab('characters')">PLAYERS</button>
+      <button class="editor-tab" id="tab-npcs" onclick="switchTab('npcs')">NPCs</button>
       <button class="editor-tab" id="tab-world" onclick="switchTab('world')">WORLD</button>
     </div>
 
@@ -359,6 +386,77 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 
         <div class="section-header" style="margin-top:0.8rem">WHISPERS SENT</div>
         <div class="whisper-history" id="whisper-history"></div>
+      </div>
+    </div>
+
+    <!-- NPCs TAB -->
+    <div class="editor-pane" id="pane-npcs">
+      <div style="display:flex;gap:6px;margin-bottom:0.6rem;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-gold btn-sm" onclick="addNPCEntity()">+ Add NPC</button>
+        <input type="text" id="npc-search" placeholder="Search…" style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:4px 7px;font-family:'Crimson Text',serif;font-size:0.82rem" oninput="renderNPCList()">
+        <select id="npc-filter-location" onchange="renderNPCList()" style="background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:4px 7px;font-size:0.78rem">
+          <option value="">All locations</option>
+        </select>
+      </div>
+      <div class="section-header" style="margin-top:0.2rem">ROSTER <span id="npc-count" style="color:var(--ink-faint);font-weight:normal">(0)</span></div>
+      <div id="npc-list"></div>
+
+      <div id="npc-detail" style="display:none;margin-top:0.8rem">
+        <div class="section-header" id="npc-detail-header">EDIT NPC</div>
+        <div class="field"><label>NAME</label><input type="text" id="npce-name" placeholder="Sera Mott"></div>
+        <div class="field-row">
+          <div class="field"><label>ROLE</label><input type="text" id="npce-role" placeholder="Fence & broker"></div>
+          <div class="field"><label>STATUS</label>
+            <select id="npce-status">
+              <option value="alive">Alive</option>
+              <option value="dead">Dead</option>
+              <option value="missing">Missing</option>
+              <option value="unknown">Unknown</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>CURRENT LOCATION</label>
+          <select id="npce-location"><option value="">— unknown / off-map —</option></select>
+        </div>
+        <div class="field"><label>CURRENT ACTIVITY</label><input type="text" id="npce-activity" placeholder="Working the Tallow & Wick most evenings"></div>
+        <div class="field"><label>PUBLIC DESCRIPTION (visible to players who know them)</label><textarea id="npce-description" rows="3"></textarea></div>
+        <div class="field"><label>PUBLIC NOTES (visible to players)</label><textarea id="npce-notes" rows="3" placeholder="Mannerisms, anything players might recall"></textarea></div>
+
+        <div class="field">
+          <label>KNOWN TO (which characters have encountered them)</label>
+          <div class="visibleto-chips" id="npce-knownto-chips"></div>
+          <div class="visibleto-hint">Click to toggle. Only the selected characters see this NPC on their roster.</div>
+        </div>
+
+        <div class="dm-note-area">
+          <div class="dm-note-label">🔒 DM ONLY — NOT SHOWN TO PLAYERS</div>
+          <textarea id="npce-dmNotes" rows="3" style="width:100%;background:transparent;border:none;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.9rem;outline:none;resize:vertical;line-height:1.5" placeholder="True motives, stat block, plot hooks…"></textarea>
+        </div>
+
+        <div style="display:flex;gap:5px;margin-top:0.8rem;margin-bottom:0.8rem">
+          <button class="btn btn-gold btn-sm" onclick="saveNPCEntity()">Save</button>
+          <button class="btn btn-ghost btn-sm" onclick="cancelNPCEdit()">Cancel</button>
+          <button class="btn btn-red btn-sm" style="margin-left:auto" onclick="deleteNPCEntity()">Delete</button>
+        </div>
+
+        <div class="whisper-composer">
+          <div class="whisper-composer-title">⇄ MOVE / LOG ACTIVITY (appends to history)</div>
+          <div class="field-row">
+            <div class="field"><label>NEW LOCATION (optional)</label>
+              <select id="npce-move-location"><option value="">— keep current —</option></select>
+            </div>
+            <div class="field"><label>DATE</label><input type="date" id="npce-move-date"></div>
+          </div>
+          <div class="field"><label>NEW ACTIVITY (optional)</label><input type="text" id="npce-move-activity" placeholder="Spotted in the docks at midnight"></div>
+          <div class="field"><label>NOTE</label><input type="text" id="npce-move-note" placeholder="Witnessed by Aldric"></div>
+          <div style="display:flex;gap:5px;align-items:center">
+            <button class="btn btn-purple btn-sm" onclick="logNPCMovement()">Log entry</button>
+            <label style="font-size:0.72rem;color:var(--ink-faint);display:flex;align-items:center;gap:4px"><input type="checkbox" id="npce-move-dmOnly" style="accent-color:var(--purple)"> DM-only entry</label>
+          </div>
+        </div>
+
+        <div class="section-header" style="margin-top:0.8rem">HISTORY</div>
+        <div id="npce-history-list"></div>
       </div>
     </div>
 
@@ -477,10 +575,16 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
         <div class="field"><label>PLAYER-FACING LORE</label><textarea id="loc-lore" rows="12" placeholder="What the players know or can learn about this place…"></textarea></div>
       </div>
 
-      <!-- NPCs -->
+      <!-- NPCs (first-class — managed in the NPCs tab) -->
       <div class="editor-pane" id="lpane-npcs">
-        <button class="btn btn-gold btn-sm" style="margin-bottom:0.6rem" onclick="addNPC()">+ Add NPC</button>
-        <div id="npc-editor-list"></div>
+        <div style="font-size:0.8rem;color:var(--ink-dim);line-height:1.5;margin-bottom:0.6rem">
+          NPCs are tracked separately now — see the <strong style="color:var(--gold-light)">NPCs</strong> tab. This list shows everyone currently here.
+        </div>
+        <div style="display:flex;gap:5px;margin-bottom:0.6rem">
+          <button class="btn btn-gold btn-sm" type="button" onclick="quickAddNPCAtLocation()">+ New NPC here</button>
+          <button class="btn btn-ghost btn-sm" type="button" onclick="switchTab('npcs')">Open NPCs tab ↗</button>
+        </div>
+        <div id="loc-npcs-here"></div>
       </div>
 
       <!-- QUESTS -->
@@ -558,7 +662,10 @@ let tempQuests     = [];
 let tempVisibleTo  = [];      // ids of characters who can see the location currently being edited
 let characters     = [];      // [{id,name,player,code,dmNotes}]
 let journals       = [];      // [{id,characterId,title,body,date,unread}]
+let npcs           = [];      // [{id,name,role,description,currentLocationId,currentActivity,status,notes,dmNotes,knownTo,history,tags}]
 let editingCharId  = null;
+let editingNPCId   = null;
+let tempNPCKnownTo = [];      // ids of characters who know the NPC being edited
 let pendingDMSave  = null;    // queued save retry after token is provided
 
 // ── DM auth (delegated to shared auth.js) ────────────────────
@@ -701,6 +808,85 @@ async function reloadCharacters() {
   if (editingCharId) renderWhisperHistory(editingCharId);
 }
 
+// ── NPCs: load + save ────────────────────────────────────────
+async function saveNPCsKV() {
+  await dmPost({ type: 'npcs', payload: npcs }, saveNPCsKV);
+  saveNPCsLocal();
+}
+function saveNPCsLocal() { localStorage.setItem('dm_npcs', JSON.stringify(npcs)); }
+async function loadNPCsKV() {
+  try {
+    const res = await fetch(WORKER_URL + '?type=npcs', { cache: 'no-store', headers: Auth.dmHeaders() });
+    if (res.status === 401) {
+      Auth.logout();
+      window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.'));
+      return false;
+    }
+    if (!res.ok) return false;
+    const arr = await res.json();
+    if (Array.isArray(arr)) { npcs = arr; saveNPCsLocal(); return true; }
+  } catch {}
+  return false;
+}
+function loadNPCsLocal() {
+  try {
+    const arr = JSON.parse(localStorage.getItem('dm_npcs') || 'null');
+    if (Array.isArray(arr)) npcs = arr;
+  } catch {}
+}
+
+// One-time migration: promote nested Location.npcs into first-class records.
+// Idempotent: only runs if global npcs[] is empty AND any location has nested
+// npcs[]. Sets currentLocationId on the new NPC, leaves knownTo empty (DM grants).
+async function migrateNestedNPCs() {
+  if (npcs.length > 0) return false;
+  const locsWithNested = (data.locations || []).filter(l => Array.isArray(l.npcs) && l.npcs.length > 0);
+  if (locsWithNested.length === 0) return false;
+
+  const used = new Set();
+  function uniqueId(base) {
+    let id = base, n = 1;
+    while (used.has(id)) id = `${base}-${++n}`;
+    used.add(id);
+    return id;
+  }
+
+  const newNpcs = [];
+  locsWithNested.forEach(loc => {
+    loc.npcs.forEach(n => {
+      const baseId = slugify(n.name || 'npc');
+      const id = uniqueId(baseId);
+      newNpcs.push({
+        id,
+        name: n.name || '(Unnamed)',
+        role: n.role || '',
+        description: n.desc || n.description || '',
+        currentLocationId: loc.id,
+        currentActivity: '',
+        status: 'alive',
+        notes: '',
+        dmNotes: '',
+        knownTo: [],
+        history: [{
+          id: 'h' + Date.now() + Math.floor(Math.random()*1000),
+          locationId: loc.id,
+          activity: 'First recorded here',
+          date: new Date().toISOString().slice(0,10),
+          note: 'Auto-migrated from nested location data.',
+          dmOnly: true
+        }],
+        tags: []
+      });
+    });
+    loc.npcs = []; // clear nested array
+  });
+  npcs = newNpcs;
+  console.info(`[NPC migration] Promoted ${newNpcs.length} nested NPCs from ${locsWithNested.length} locations to first-class.`);
+  await saveNPCsKV();
+  saveAll();
+  return true;
+}
+
 // Called after every edit — saves locally immediately, queues KV save
 let kvSaveTimer = null;
 function saveAll() {
@@ -733,7 +919,7 @@ function setPublishStatus(type, msg) { const el=document.getElementById('publish
 //  TABS
 // ══════════════════════════════════════════════════════════════
 function switchTab(name) {
-  ['locations','zones','characters','world'].forEach(t => {
+  ['locations','zones','characters','npcs','world'].forEach(t => {
     document.getElementById(`tab-${t}`).classList.toggle('active', t===name);
     document.getElementById(`pane-${t}`).classList.toggle('active', t===name);
   });
@@ -741,6 +927,7 @@ function switchTab(name) {
   if (name !== 'zones' && polyDrawMode) cancelPolyDraw();
   placeMode = (name === 'locations') && !moveMode;
   if (name === 'characters') renderCharacterList();
+  if (name === 'npcs')       { populateNPCLocationFilters(); renderNPCList(); }
   updateModeUI();
 }
 function switchLocTab(name) {
@@ -1298,6 +1485,7 @@ function openLocModal(id, defaultX, defaultY) {
   tempQuests = JSON.parse(JSON.stringify(loc?.quests || []));
   tempVisibleTo = Array.isArray(loc?.visibleTo) ? loc.visibleTo.slice() : [];
   renderNPCEditor(); renderQuestEditor(); renderVisibleToChips();
+  renderLocationNPCsHere(loc?.id);
   switchLocTab('info');
   document.getElementById('loc-modal').classList.remove('hidden');
   document.getElementById('loc-name').addEventListener('input', function() {
@@ -1321,7 +1509,8 @@ function saveLocation() {
     lore:      document.getElementById('loc-lore').value.trim(),
     mapImage:  document.getElementById('loc-mapImage').value.trim(),
     connected: document.getElementById('loc-connected').value.split(',').map(s=>s.trim()).filter(Boolean),
-    npcs:      tempNPCs, quests:tempQuests,
+    npcs:      [],                 // NPCs are first-class now; managed in the NPCs tab
+    quests:    tempQuests,
     dmNotes:   document.getElementById('loc-dmNotes').value.trim(),
     visibleTo: tempVisibleTo.slice(),
   };
@@ -1474,17 +1663,23 @@ async function init() {
     setTimeout(() => setSyncStatus('', ''), 3000);
   }
 
-  // Characters + journals (cached locally first, then refreshed from KV)
+  // Characters + journals + NPCs (cached locally first, then refreshed from KV)
   loadCharactersLocal();
   loadJournalsLocal();
+  loadNPCsLocal();
   await loadCharactersKV();
   await loadJournalsKV();
+  await loadNPCsKV();
+
+  // One-shot migration of nested NPCs → first-class records.
+  await migrateNestedNPCs();
 
   loadWorldFields();
   buildMap();
   renderLocList();
   renderZoneList();
   renderCharacterList();
+  renderNPCList();
   updateModeUI();
 }
 
@@ -1671,6 +1866,309 @@ async function deleteWhisper(jid) {
   journals = journals.filter(j => j.id !== jid);
   await saveJournalsKV();
   if (editingCharId) renderWhisperHistory(editingCharId);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  NPCs TAB
+// ══════════════════════════════════════════════════════════════
+function locationName(id) {
+  const loc = (data.locations || []).find(l => l.id === id);
+  return loc ? loc.name : '';
+}
+
+function populateNPCLocationFilters() {
+  const filter = document.getElementById('npc-filter-location');
+  const editLoc = document.getElementById('npce-location');
+  const moveLoc = document.getElementById('npce-move-location');
+  if (!filter) return;
+
+  const opts = (data.locations || [])
+    .slice()
+    .sort((a,b) => (a.name||'').localeCompare(b.name||''))
+    .map(l => `<option value="${l.id}">${escapeHtml(l.name)}</option>`)
+    .join('');
+
+  // Preserve current selection where possible
+  const curFilter = filter.value;
+  filter.innerHTML = '<option value="">All locations</option>' + opts;
+  filter.value = curFilter;
+
+  if (editLoc) {
+    const curEdit = editLoc.value;
+    editLoc.innerHTML = '<option value="">— unknown / off-map —</option>' + opts;
+    editLoc.value = curEdit;
+  }
+  if (moveLoc) {
+    const curMove = moveLoc.value;
+    moveLoc.innerHTML = '<option value="">— keep current —</option>' + opts;
+    moveLoc.value = curMove;
+  }
+}
+
+function renderNPCList() {
+  const list = document.getElementById('npc-list');
+  const count = document.getElementById('npc-count');
+  if (!list) return;
+  const query = (document.getElementById('npc-search')?.value || '').trim().toLowerCase();
+  const locFilter = document.getElementById('npc-filter-location')?.value || '';
+
+  const filtered = npcs.filter(n => {
+    if (locFilter && (n.currentLocationId || '') !== locFilter) return false;
+    if (!query) return true;
+    return (n.name||'').toLowerCase().includes(query)
+        || (n.role||'').toLowerCase().includes(query)
+        || (n.currentActivity||'').toLowerCase().includes(query)
+        || (n.tags||[]).some(t => (t||'').toLowerCase().includes(query));
+  });
+  count.textContent = `(${filtered.length}${filtered.length !== npcs.length ? ` / ${npcs.length}` : ''})`;
+
+  if (filtered.length === 0) {
+    list.innerHTML = npcs.length === 0
+      ? '<div class="visibleto-empty">No NPCs yet. Add one to start tracking.</div>'
+      : '<div class="visibleto-empty">No NPCs match those filters.</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(n => {
+    const loc = n.currentLocationId ? escapeHtml(locationName(n.currentLocationId)) : '—';
+    const status = (n.status || 'alive').toLowerCase();
+    return `<div class="npc-card ${n.id===editingNPCId?'selected':''}" onclick="editNPCEntity('${n.id}')">
+      <div class="npc-card-row">
+        <span class="npc-card-name">${escapeHtml(n.name)}</span>
+        ${n.role ? `<span class="npc-card-role">${escapeHtml(n.role)}</span>` : ''}
+        <span class="npc-status ${status}">${status}</span>
+      </div>
+      <div class="npc-card-meta">
+        <span class="npc-card-loc">${loc}</span>
+        <span style="color:var(--ink-faint)">·</span>
+        <span>known to ${(n.knownTo||[]).length}/${characters.length}</span>
+      </div>
+      ${n.currentActivity ? `<div class="npc-card-activity">${escapeHtml(n.currentActivity)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function addNPCEntity() {
+  editingNPCId = '__new__';
+  tempNPCKnownTo = [];
+  populateNPCLocationFilters();
+  document.getElementById('npc-detail-header').textContent = 'NEW NPC';
+  document.getElementById('npce-name').value = '';
+  document.getElementById('npce-role').value = '';
+  document.getElementById('npce-status').value = 'alive';
+  document.getElementById('npce-location').value = '';
+  document.getElementById('npce-activity').value = '';
+  document.getElementById('npce-description').value = '';
+  document.getElementById('npce-notes').value = '';
+  document.getElementById('npce-dmNotes').value = '';
+  document.getElementById('npce-move-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('npce-move-activity').value = '';
+  document.getElementById('npce-move-note').value = '';
+  document.getElementById('npce-move-dmOnly').checked = false;
+  document.getElementById('npce-history-list').innerHTML = '<div class="visibleto-empty">Save the NPC first to log history.</div>';
+  renderNPCKnownToChips();
+  document.getElementById('npc-detail').style.display = 'block';
+  document.getElementById('npce-name').focus();
+}
+
+function editNPCEntity(id) {
+  const n = npcs.find(x => x.id === id);
+  if (!n) return;
+  editingNPCId = id;
+  tempNPCKnownTo = Array.isArray(n.knownTo) ? n.knownTo.slice() : [];
+  populateNPCLocationFilters();
+  document.getElementById('npc-detail-header').textContent = 'EDIT NPC';
+  document.getElementById('npce-name').value = n.name || '';
+  document.getElementById('npce-role').value = n.role || '';
+  document.getElementById('npce-status').value = n.status || 'alive';
+  document.getElementById('npce-location').value = n.currentLocationId || '';
+  document.getElementById('npce-activity').value = n.currentActivity || '';
+  document.getElementById('npce-description').value = n.description || '';
+  document.getElementById('npce-notes').value = n.notes || '';
+  document.getElementById('npce-dmNotes').value = n.dmNotes || '';
+  document.getElementById('npce-move-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('npce-move-activity').value = '';
+  document.getElementById('npce-move-note').value = '';
+  document.getElementById('npce-move-dmOnly').checked = false;
+  renderNPCKnownToChips();
+  renderNPCHistory(id);
+  document.getElementById('npc-detail').style.display = 'block';
+  renderNPCList();
+}
+
+async function saveNPCEntity() {
+  const name = document.getElementById('npce-name').value.trim();
+  if (!name) { alert('NPC needs a name.'); return; }
+  const fields = {
+    name,
+    role: document.getElementById('npce-role').value.trim(),
+    status: document.getElementById('npce-status').value,
+    currentLocationId: document.getElementById('npce-location').value || null,
+    currentActivity: document.getElementById('npce-activity').value.trim(),
+    description: document.getElementById('npce-description').value.trim(),
+    notes: document.getElementById('npce-notes').value.trim(),
+    dmNotes: document.getElementById('npce-dmNotes').value.trim(),
+    knownTo: tempNPCKnownTo.slice(),
+  };
+
+  if (editingNPCId === '__new__') {
+    const used = new Set(npcs.map(n => n.id));
+    let id = slugify(name) || 'npc';
+    let base = id, n = 1;
+    while (used.has(id)) id = `${base}-${++n}`;
+    npcs.push({ id, ...fields, history: [], tags: [] });
+    editingNPCId = id;
+  } else {
+    const idx = npcs.findIndex(n => n.id === editingNPCId);
+    if (idx < 0) return;
+    npcs[idx] = { ...npcs[idx], ...fields };
+  }
+  await saveNPCsKV();
+  renderNPCList();
+  renderNPCHistory(editingNPCId);
+  document.getElementById('npc-detail-header').textContent = 'EDIT NPC';
+  setSyncStatus('ok','✦ NPC saved');
+  setTimeout(()=>setSyncStatus('',''), 2000);
+}
+
+function cancelNPCEdit() {
+  editingNPCId = null;
+  document.getElementById('npc-detail').style.display = 'none';
+  renderNPCList();
+}
+
+async function deleteNPCEntity() {
+  if (!editingNPCId || editingNPCId === '__new__') { cancelNPCEdit(); return; }
+  const n = npcs.find(x => x.id === editingNPCId);
+  if (!n) return;
+  if (!confirm(`Delete ${n.name}? Their history will be lost and players who knew them will no longer see them.`)) return;
+  npcs = npcs.filter(x => x.id !== editingNPCId);
+  editingNPCId = null;
+  document.getElementById('npc-detail').style.display = 'none';
+  await saveNPCsKV();
+  renderNPCList();
+}
+
+function renderNPCKnownToChips() {
+  const wrap = document.getElementById('npce-knownto-chips');
+  if (!wrap) return;
+  if (characters.length === 0) {
+    wrap.innerHTML = '<div class="visibleto-empty">No characters yet — set them up in the Players tab.</div>';
+    return;
+  }
+  wrap.innerHTML = characters.map(c => {
+    const on = tempNPCKnownTo.includes(c.id);
+    return `<span class="visibleto-chip ${on?'on':''}" onclick="toggleNPCKnownTo('${c.id}')">${escapeHtml(c.name)}</span>`;
+  }).join('');
+}
+function toggleNPCKnownTo(id) {
+  const i = tempNPCKnownTo.indexOf(id);
+  if (i >= 0) tempNPCKnownTo.splice(i,1); else tempNPCKnownTo.push(id);
+  renderNPCKnownToChips();
+}
+
+async function logNPCMovement() {
+  if (!editingNPCId || editingNPCId === '__new__') { alert('Save the NPC first.'); return; }
+  const idx = npcs.findIndex(n => n.id === editingNPCId);
+  if (idx < 0) return;
+  const newLoc      = document.getElementById('npce-move-location').value;
+  const newActivity = document.getElementById('npce-move-activity').value.trim();
+  const note        = document.getElementById('npce-move-note').value.trim();
+  const date        = document.getElementById('npce-move-date').value || new Date().toISOString().slice(0,10);
+  const dmOnly      = document.getElementById('npce-move-dmOnly').checked;
+  if (!newLoc && !newActivity && !note) { alert('Add at least one of: new location, new activity, or a note.'); return; }
+
+  const entry = {
+    id: 'h' + Date.now() + Math.floor(Math.random()*1000),
+    locationId: newLoc || npcs[idx].currentLocationId || null,
+    activity: newActivity || npcs[idx].currentActivity || '',
+    date, note, dmOnly
+  };
+  npcs[idx].history = npcs[idx].history || [];
+  npcs[idx].history.push(entry);
+  // Apply changes as the current state too
+  if (newLoc)      npcs[idx].currentLocationId = newLoc;
+  if (newActivity) npcs[idx].currentActivity   = newActivity;
+
+  await saveNPCsKV();
+  // Update form display
+  document.getElementById('npce-location').value = npcs[idx].currentLocationId || '';
+  document.getElementById('npce-activity').value = npcs[idx].currentActivity || '';
+  document.getElementById('npce-move-location').value = '';
+  document.getElementById('npce-move-activity').value = '';
+  document.getElementById('npce-move-note').value = '';
+  document.getElementById('npce-move-dmOnly').checked = false;
+  renderNPCHistory(editingNPCId);
+  renderNPCList();
+  setSyncStatus('ok','✦ History entry logged');
+  setTimeout(()=>setSyncStatus('',''), 2000);
+}
+
+function renderNPCHistory(npcId) {
+  const list = document.getElementById('npce-history-list');
+  if (!list) return;
+  const n = npcs.find(x => x.id === npcId);
+  if (!n) { list.innerHTML = ''; return; }
+  const items = (n.history || []).slice().sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  if (items.length === 0) { list.innerHTML = '<div class="visibleto-empty">No history yet.</div>'; return; }
+  list.innerHTML = items.map(h => `
+    <div class="npc-history-card ${h.dmOnly?'dm-only':''}">
+      <div class="npc-history-meta">
+        <span>${escapeHtml(h.date)}${h.dmOnly?' · DM only':''}</span>
+        <button class="npc-history-del" onclick="deleteNPCHistoryEntry('${h.id}')" title="Delete">✕</button>
+      </div>
+      ${h.locationId ? `<div class="npc-history-loc">📍 ${escapeHtml(locationName(h.locationId))}</div>` : ''}
+      ${h.activity   ? `<div class="npc-history-body" style="font-style:italic">${escapeHtml(h.activity)}</div>` : ''}
+      ${h.note       ? `<div class="npc-history-body">${escapeHtml(h.note)}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+async function deleteNPCHistoryEntry(hId) {
+  if (!editingNPCId) return;
+  if (!confirm('Delete this history entry?')) return;
+  const idx = npcs.findIndex(n => n.id === editingNPCId);
+  if (idx < 0) return;
+  npcs[idx].history = (npcs[idx].history || []).filter(h => h.id !== hId);
+  await saveNPCsKV();
+  renderNPCHistory(editingNPCId);
+}
+
+function renderLocationNPCsHere(locId) {
+  const wrap = document.getElementById('loc-npcs-here');
+  if (!wrap) return;
+  if (!locId) {
+    wrap.innerHTML = '<div class="visibleto-empty">Save this location first, then add NPCs here.</div>';
+    return;
+  }
+  const here = npcs.filter(n => n.currentLocationId === locId);
+  if (here.length === 0) {
+    wrap.innerHTML = '<div class="visibleto-empty">No NPCs currently here.</div>';
+    return;
+  }
+  wrap.innerHTML = here.map(n => `
+    <div class="npc-card" onclick="closeLocModal();switchTab('npcs');editNPCEntity('${n.id}')">
+      <div class="npc-card-row">
+        <span class="npc-card-name">${escapeHtml(n.name)}</span>
+        ${n.role ? `<span class="npc-card-role">${escapeHtml(n.role)}</span>` : ''}
+        <span class="npc-status ${(n.status||'alive').toLowerCase()}">${(n.status||'alive').toLowerCase()}</span>
+      </div>
+      ${n.currentActivity ? `<div class="npc-card-activity">${escapeHtml(n.currentActivity)}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function quickAddNPCAtLocation() {
+  const locId = editingLocId;
+  if (!locId) {
+    alert('Save this location first, then add NPCs here.');
+    return;
+  }
+  // Close the location modal and jump to the NPCs tab with currentLocation pre-filled
+  closeLocModal();
+  switchTab('npcs');
+  addNPCEntity();
+  const select = document.getElementById('npce-location');
+  if (select) select.value = locId;
 }
 
 // VisibleTo chips inside location modal

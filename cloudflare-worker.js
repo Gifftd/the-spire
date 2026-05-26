@@ -100,6 +100,33 @@ function sanitizeCharacters(chars) {
   return (chars || []).map(c => ({ id: c.id, name: c.name, player: c.player || '' }));
 }
 
+// Return the NPCs a given character knows about, with DM-only fields stripped.
+// characterId === null means anonymous — never returns NPCs (visibility is opt-in only).
+function npcsForCharacter(allNpcs, characterId) {
+  if (!Array.isArray(allNpcs) || !characterId) return [];
+  return allNpcs
+    .filter(n => Array.isArray(n.knownTo) && n.knownTo.includes(characterId))
+    .map(n => ({
+      id: n.id,
+      name: n.name,
+      role: n.role || '',
+      description: n.description || '',
+      portrait: n.portrait || '',
+      currentLocationId: n.currentLocationId || null,
+      currentActivity: n.currentActivity || '',
+      status: n.status || 'alive',
+      notes: n.notes || '',
+      tags: Array.isArray(n.tags) ? n.tags : [],
+      // History stripped of any "dmOnly" entries
+      history: (n.history || []).filter(h => !h.dmOnly).map(h => ({
+        id: h.id, locationId: h.locationId || null,
+        activity: h.activity || '', date: h.date || '',
+        note: h.note || ''
+      }))
+      // dmNotes deliberately omitted
+    }));
+}
+
 function filterForCharacter(mapData, characterId) {
   if (!mapData || typeof mapData !== 'object') return mapData;
   const out = { ...mapData };
@@ -171,6 +198,26 @@ export default {
         return json(await kvGet(env, 'journals', []));
       }
 
+      // DM-only: all NPCs (full data including dmNotes + everyone's knownTo)
+      if (type === 'npcs') {
+        const auth = await verifyDMAuth(request, env);
+        if (!auth.ok) return json({ error: 'DM auth required' }, 401);
+        return json(await kvGet(env, 'npcs', []));
+      }
+
+      // Player NPC roster — only NPCs the character has been marked as knowing,
+      // with DM-only fields stripped server-side.
+      if (type === 'npc_roster') {
+        const characterId = url.searchParams.get('characterId') || '';
+        const code        = url.searchParams.get('code') || '';
+        if (!characterId || !code) return json({ error: 'characterId and code required' }, 400);
+        const chars = await kvGet(env, 'characters', []);
+        const me = chars.find(c => c.id === characterId);
+        if (!me || me.code !== code) return json({ error: 'invalid character or code' }, 401);
+        const all = await kvGet(env, 'npcs', []);
+        return json(npcsForCharacter(all, characterId));
+      }
+
       // Whether the DM account has been configured (used by homepage to decide
       // between setup and login flows).
       if (type === 'dm_status') {
@@ -196,10 +243,14 @@ export default {
         const allJournals = await kvGet(env, 'journals', []);
         const myJournals  = allJournals.filter(j => j.characterId === characterId);
 
+        const allNpcs   = await kvGet(env, 'npcs', []);
+        const knownNpcs = npcsForCharacter(allNpcs, characterId);
+
         return json({
           character: { id: me.id, name: me.name, player: me.player || '' },
           map: filteredMap,
-          journals: myJournals
+          journals: myJournals,
+          npcs: knownNpcs
         });
       }
 
@@ -269,7 +320,7 @@ export default {
     }
 
     // ── DM-only writes ────────────────────────────────────────
-    const DM_WRITE_TYPES = ['initiative_state','map_data','map_data_dm','characters','journals'];
+    const DM_WRITE_TYPES = ['initiative_state','map_data','map_data_dm','characters','journals','npcs'];
     if (DM_WRITE_TYPES.includes(body?.type)) {
       const auth = await verifyDMAuth(request, env);
       if (!auth.ok) return json({ error: 'DM auth required' }, 401);
