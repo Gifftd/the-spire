@@ -9,6 +9,34 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-21
 
+### Combat + loot → Chronicle integration
+
+The initiative tracker's combat export can now push the encounter and its loot straight into a timeline session.
+
+#### Added — Initiative tracker (`initiative-dm.html`)
+- Export modal gains an **"Add this combat to the campaign timeline"** section:
+  - **Session picker** — dropdown of existing `session` timeline entries (loaded from `timeline_dm` when the box is ticked) plus **"➕ New session…"**. New uses a title (defaults to the combat title) + optional in-game date.
+  - **Loot rows** — repeatable item / qty / who-got-it. The "who" field autocompletes from the current PCs + "Party".
+  - **"Add to Chronicle"** button POSTs the updated timeline. The existing **Download .md** button is unchanged, so you can do both.
+- Builds a structured combat object: player-safe summary (title, outcome, rounds, location, PCs downed, enemies defeated) plus `dmDetail` (the full markdown HP tables + combat notes).
+- New session entries are created with `kind: 'session'`; existing ones get the combat appended to `combats[]` and loot concatenated onto `loot[]`.
+
+#### Added — Worker (`cloudflare-worker.js`)
+- `timelineForCharacter()` now strips each combat's `dmDetail` for non-DM callers. Combat summaries and the loot table remain player-visible; full HP tables + combat DM notes are DM-only.
+
+#### Added — Chronicle (`timeline.html`)
+- Session entries render attached **combats** (title, outcome, rounds, location, defeated, downed) with a collapsible **"Full combat log (DM only)"** `<details>` block shown to the DM.
+- Attached **loot** renders as an item / qty / who table.
+
+#### Added — DM map (`map-dm.html`)
+- The TIMELINE entry editor shows a read-only banner when an entry has combats/loot attached from the tracker, noting they're preserved on save and edited by re-exporting.
+
+#### Data model
+- `TimelineEntry` gains optional `combats: [{id,title,date,location,outcome,rounds,summary,pcsDowned,enemiesDefeated,dmDetail}]` and `loot: [{id,item,qty,recipient}]`.
+
+#### Action required
+- **Redeploy `cloudflare-worker.js`** for the `dmDetail` stripping (otherwise full combat logs would reach players).
+
 ### Campaign timeline / Chronicle (Phase 3 of 3-feature set)
 
 Closes out the trio: NPC tracker → sub-map pins → **campaign timeline**. A chronological log of sessions, events, and milestones, with planned (DM-only) entries for the future.

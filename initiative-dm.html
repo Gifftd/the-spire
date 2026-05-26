@@ -154,6 +154,18 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
 /* ── Expanded ── */
 .card-expanded { display: none; border-top: 1px solid var(--border); padding: 10px 12px; background: var(--surface2); }
 .combatant-card.expanded .card-expanded { display: block; }
+.exp-chronicle { border: 1px solid var(--purple); background: var(--purple-bg); border-radius: var(--radius); padding: 10px 12px; margin: 0.6rem 0; }
+.exp-chronicle-toggle { display: flex; align-items: center; gap: 8px; font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.06em; color: #c0a0f0; cursor: pointer; }
+.exp-chronicle-toggle input { accent-color: var(--purple); width: 15px; height: 15px; cursor: pointer; }
+.exp-chronicle-note { font-size: 0.78rem; color: var(--ink-faint); font-style: italic; line-height: 1.45; margin-top: 6px; }
+.loot-row { display: flex; gap: 6px; align-items: center; margin-bottom: 5px; }
+.loot-row input { background: var(--bg); border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink); font-family: 'Crimson Text', serif; font-size: 0.86rem; padding: 4px 7px; outline: none; }
+.loot-row input:focus { border-color: var(--gold); }
+.loot-row .loot-item { flex: 1; min-width: 0; }
+.loot-row .loot-qty { width: 52px; flex-shrink: 0; }
+.loot-row .loot-recipient { width: 120px; flex-shrink: 0; }
+.loot-row .loot-del { background: none; border: none; color: var(--ink-faint); cursor: pointer; font-size: 0.9rem; padding: 0 3px; flex-shrink: 0; }
+.loot-row .loot-del:hover { color: var(--red); }
 .exp-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .exp-label { font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.1em; color: var(--ink-faint); white-space: nowrap; }
 .exp-input { background: var(--bg); border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink); font-family: 'Crimson Text', serif; font-size: 0.88rem; padding: 2px 6px; outline: none; transition: border-color 0.15s; }
@@ -428,6 +440,45 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
         <label>SUMMARY NOTES</label>
         <textarea id="exp-summary" placeholder="Brief description of what happened…"></textarea>
       </div>
+
+      <!-- ADD TO CHRONICLE -->
+      <div class="exp-chronicle">
+        <label class="exp-chronicle-toggle">
+          <input type="checkbox" id="exp-to-chronicle" onchange="toggleChronicleSection()">
+          <span>📜 Add this combat to the campaign timeline</span>
+        </label>
+        <div id="exp-chronicle-body" style="display:none">
+          <div class="modal-row">
+            <div class="modal-field">
+              <label>SESSION</label>
+              <select id="exp-session-select" onchange="onSessionSelectChange()">
+                <option value="__new__">➕ New session…</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-row" id="exp-new-session-fields">
+            <div class="modal-field">
+              <label>NEW SESSION TITLE</label>
+              <input type="text" id="exp-new-session-title" placeholder="e.g. Session 4 — The King's Road">
+            </div>
+            <div class="modal-field" style="max-width:170px">
+              <label>IN-GAME DATE (optional)</label>
+              <input type="text" id="exp-new-session-date" placeholder="12 Mirtul, 1492 DR">
+            </div>
+          </div>
+
+          <div class="modal-field">
+            <label>LOOT (item · qty · who got it)</label>
+            <div id="loot-rows"></div>
+            <button class="btn btn-ghost btn-sm" type="button" onclick="addLootRow()" style="margin-top:4px">+ Add loot</button>
+          </div>
+
+          <div class="exp-chronicle-note">
+            Players who can see this session will get the combat summary (outcome, rounds, downed/defeated) and the loot table. The full HP tables and DM notes stay DM-only.
+          </div>
+        </div>
+      </div>
+
       <div class="modal-field">
         <label>MARKDOWN PREVIEW</label>
         <div class="modal-preview" id="exp-preview"></div>
@@ -437,6 +488,7 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
       <button class="btn btn-ghost" onclick="closeExport()">Cancel</button>
       <button class="btn btn-ghost btn-sm" onclick="updatePreview()">Refresh</button>
       <button class="btn btn-purple" onclick="downloadLog()">Download .md</button>
+      <button class="btn btn-gold" id="exp-chronicle-btn" onclick="exportToChronicle()" style="display:none">Add to Chronicle</button>
     </div>
   </div>
 </div>
@@ -937,6 +989,13 @@ function openExport() {
   state.combatants.forEach(snapshotCombatant);
   const today = new Date();
   document.getElementById('exp-date').value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  // Reset the chronicle section each time the modal opens.
+  document.getElementById('exp-to-chronicle').checked = false;
+  document.getElementById('exp-chronicle-body').style.display = 'none';
+  document.getElementById('exp-chronicle-btn').style.display  = 'none';
+  document.getElementById('loot-rows').innerHTML = '';
+  document.getElementById('exp-new-session-title').value = '';
+  document.getElementById('exp-new-session-date').value = '';
   updatePreview();
   document.getElementById('export-modal').classList.remove('hidden');
 }
@@ -1004,6 +1063,151 @@ function downloadLog() {
   const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([md],{type:'text/markdown'})), download: filename });
   a.click(); URL.revokeObjectURL(a.href);
   closeExport();
+}
+
+// ═══════════════════════════════════════════════════════
+//  SEND COMBAT + LOOT TO THE CHRONICLE (timeline)
+// ═══════════════════════════════════════════════════════
+let chronicleAll = [];   // full timeline (DM view), loaded lazily when export opens
+
+async function loadChronicle() {
+  try {
+    const r = await fetch(WORKER_URL + '?type=timeline_dm', { cache:'no-store', headers: Auth.dmHeaders() });
+    if (r.status === 401) {
+      Auth.logout();
+      window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.'));
+      return;
+    }
+    if (!r.ok) return;
+    const arr = await r.json();
+    if (Array.isArray(arr)) chronicleAll = arr;
+  } catch {}
+  populateSessionSelect();
+}
+
+function populateSessionSelect() {
+  const sel = document.getElementById('exp-session-select');
+  if (!sel) return;
+  const sessions = chronicleAll
+    .filter(e => e.kind === 'session')
+    .sort((a,b) => ((b.dateSort||'')+'~'+(b.id||'')).localeCompare((a.dateSort||'')+'~'+(a.id||'')));
+  sel.innerHTML = '<option value="__new__">➕ New session…</option>' +
+    sessions.map(s => `<option value="${s.id}">${(s.title||'(untitled)').replace(/</g,'&lt;')}${s.dateInGame?' — '+s.dateInGame.replace(/</g,'&lt;'):''}</option>`).join('');
+  onSessionSelectChange();
+}
+
+function toggleChronicleSection() {
+  const on = document.getElementById('exp-to-chronicle').checked;
+  document.getElementById('exp-chronicle-body').style.display = on ? '' : 'none';
+  document.getElementById('exp-chronicle-btn').style.display  = on ? '' : 'none';
+  if (on && chronicleAll.length === 0) loadChronicle();
+  if (on) {
+    // default the new-session title to the combat title
+    const t = document.getElementById('exp-new-session-title');
+    if (t && !t.value) t.value = (document.getElementById('exp-title').value.trim() || '');
+    if (document.querySelectorAll('#loot-rows .loot-row').length === 0) addLootRow();
+  }
+}
+
+function onSessionSelectChange() {
+  const isNew = document.getElementById('exp-session-select').value === '__new__';
+  document.getElementById('exp-new-session-fields').style.display = isNew ? '' : 'none';
+}
+
+function addLootRow(item = '', qty = '1', recipient = '') {
+  const rows = document.getElementById('loot-rows');
+  const div = document.createElement('div');
+  div.className = 'loot-row';
+  const pcNames = state.combatants.filter(c => c.type === 'pc').map(c => c.name);
+  div.innerHTML = `
+    <input class="loot-item" type="text" placeholder="Item" value="${item.replace(/"/g,'&quot;')}">
+    <input class="loot-qty" type="text" placeholder="Qty" value="${qty.replace(/"/g,'&quot;')}">
+    <input class="loot-recipient" type="text" placeholder="Who" value="${recipient.replace(/"/g,'&quot;')}" list="loot-recipient-suggestions">
+    <button class="loot-del" type="button" onclick="this.parentElement.remove()" title="Remove">✕</button>
+  `;
+  rows.appendChild(div);
+  // (Re)build the recipient datalist from current PCs + Party.
+  let dl = document.getElementById('loot-recipient-suggestions');
+  if (!dl) { dl = document.createElement('datalist'); dl.id = 'loot-recipient-suggestions'; document.body.appendChild(dl); }
+  dl.innerHTML = ['Party', ...pcNames].map(n => `<option value="${n.replace(/"/g,'&quot;')}">`).join('');
+}
+
+function collectLoot() {
+  const loot = [];
+  document.querySelectorAll('#loot-rows .loot-row').forEach(row => {
+    const item = row.querySelector('.loot-item').value.trim();
+    if (!item) return;
+    loot.push({
+      id: 'lt_' + Date.now() + Math.floor(Math.random()*100000),
+      item,
+      qty: row.querySelector('.loot-qty').value.trim() || '1',
+      recipient: row.querySelector('.loot-recipient').value.trim() || 'Party'
+    });
+  });
+  return loot;
+}
+
+function buildCombatObject() {
+  state.combatants.forEach(snapshotCombatant);
+  const pcs     = Object.values(combatLog).filter(e=>e.type==='pc');
+  const enemies = Object.values(combatLog).filter(e=>e.type==='enemy');
+  return {
+    id: 'cb_' + Date.now() + Math.floor(Math.random()*1000),
+    title:    document.getElementById('exp-title').value.trim()    || 'Combat',
+    date:     document.getElementById('exp-date').value.trim()      || '',
+    location: document.getElementById('exp-location').value.trim()  || '',
+    outcome:  document.getElementById('exp-outcome').value,
+    rounds:   state.round,
+    summary:  document.getElementById('exp-summary').value.trim()   || '',
+    pcsDowned:       pcs.filter(e=>e.endHp<=0).map(e=>e.name),
+    enemiesDefeated: enemies.filter(e=>e.endHp<=0).map(e=>e.name),
+    dmDetail: buildMarkdown()   // full markdown — DM-only (stripped by the worker for players)
+  };
+}
+
+async function exportToChronicle() {
+  const combat = buildCombatObject();
+  const loot   = collectLoot();
+  const sel    = document.getElementById('exp-session-select').value;
+
+  if (sel === '__new__') {
+    const title      = document.getElementById('exp-new-session-title').value.trim() || combat.title;
+    const dateInGame = document.getElementById('exp-new-session-date').value.trim();
+    chronicleAll.push({
+      id: 'tl_' + Date.now() + Math.floor(Math.random()*1000),
+      title, kind: 'session',
+      dateInGame, dateSort: '', dateReal: new Date().toISOString().slice(0,10),
+      body: combat.summary || '',
+      locationIds: [], characterIds: [], npcIds: [], visibleTo: [],
+      dmNotes: '',
+      combats: [combat], loot
+    });
+  } else {
+    const entry = chronicleAll.find(e => e.id === sel);
+    if (!entry) { alert('That session is gone — reopen the export to refresh.'); return; }
+    entry.combats = Array.isArray(entry.combats) ? entry.combats : [];
+    entry.loot    = Array.isArray(entry.loot)    ? entry.loot    : [];
+    entry.combats.push(combat);
+    entry.loot = entry.loot.concat(loot);
+  }
+
+  const btn = document.getElementById('exp-chronicle-btn');
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    const r = await fetch(WORKER_URL, { method:'POST', headers: Auth.dmHeaders(), body: JSON.stringify({ type:'timeline', payload: chronicleAll }) });
+    if (r.status === 401) {
+      Auth.logout();
+      window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.'));
+      return;
+    }
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    setSyncStatus('ok', '✦ Added to Chronicle');
+    setTimeout(() => setSyncStatus('', ''), 3000);
+    closeExport();
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Add to Chronicle';
+    alert('Could not reach the Chronicle. Try again.');
+  }
 }
 
 ['exp-title','exp-date','exp-location','exp-outcome','exp-session','exp-summary'].forEach(id => {
