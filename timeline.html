@@ -111,6 +111,23 @@
     .entry-chip.char::before {content:'★ '}
     .entry-chip.npc::before  {content:'☉ '}
 
+    /* Combats + loot on a session entry */
+    .entry-combat{background:var(--panel-deep);border:1px solid var(--border);border-left:3px solid #4a90d4;border-radius:var(--radius);padding:0.6rem 0.8rem;margin-top:0.7rem}
+    .entry-combat-head{font-family:'Cinzel',serif;font-size:0.82rem;letter-spacing:0.04em;color:var(--ink);margin-bottom:0.35rem}
+    .entry-combat-head .outcome{color:var(--teal-bright)}
+    .entry-combat-line{font-size:0.86rem;color:var(--ink-light);line-height:1.5}
+    .entry-combat-line .lbl{color:var(--ink-faint)}
+    .entry-combat-detail{margin-top:0.5rem}
+    .entry-combat-detail summary{cursor:pointer;font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--brass)}
+    .entry-combat-detail pre{margin-top:0.5rem;background:var(--bg);border:1px solid var(--border);border-radius:2px;padding:0.7rem;font-size:0.78rem;line-height:1.45;color:var(--ink-light);white-space:pre-wrap;overflow-x:auto;font-family:'SFMono-Regular',ui-monospace,Menlo,monospace}
+    .entry-loot{margin-top:0.7rem}
+    .entry-loot-title{font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass);margin-bottom:0.4rem}
+    .loot-table{width:100%;border-collapse:collapse;font-size:0.88rem}
+    .loot-table th{text-align:left;font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint);padding:3px 8px;border-bottom:1px solid var(--border)}
+    .loot-table td{padding:4px 8px;border-bottom:1px solid var(--border);color:var(--ink-light)}
+    .loot-table td.qty{width:48px;color:var(--teal-bright);font-family:'Cinzel',serif}
+    .loot-table td.who{width:130px;color:var(--ink-faint)}
+
     /* DM-only divider before planned entries */
     .planned-divider{
       display:flex;align-items:center;gap:10px;margin:2rem 0 1rem;
@@ -296,9 +313,51 @@
             ${date ? `<span class="entry-date">${esc(date)}</span>` : ''}
           </div>
           ${e.body ? `<div class="entry-body">${esc(e.body)}</div>` : ''}
+          ${renderCombats(e.combats)}
+          ${renderLoot(e.loot)}
           ${isDM && e.dmNotes ? `<div class="entry-dmnotes"><div class="entry-dmnotes-label">DM Notes</div>${esc(e.dmNotes)}</div>` : ''}
           ${allChips ? `<div class="entry-meta">${allChips}</div>` : ''}
         </article>
+      `;
+    }
+
+    function renderCombats(combats) {
+      if (!Array.isArray(combats) || combats.length === 0) return '';
+      return combats.map(c => {
+        const downed   = (c.pcsDowned||[]).map(esc).join(', ');
+        const defeated = (c.enemiesDefeated||[]).map(esc).join(', ');
+        return `
+          <div class="entry-combat">
+            <div class="entry-combat-head">⚔ ${esc(c.title||'Combat')} — <span class="outcome">${esc(c.outcome||'')}</span></div>
+            <div class="entry-combat-line">
+              ${c.rounds ? `<span class="lbl">Rounds:</span> ${esc(String(c.rounds))} ` : ''}
+              ${c.location ? `&nbsp;·&nbsp; <span class="lbl">Where:</span> ${esc(c.location)}` : ''}
+            </div>
+            ${defeated ? `<div class="entry-combat-line"><span class="lbl">Defeated:</span> ${defeated}</div>` : ''}
+            ${downed   ? `<div class="entry-combat-line"><span class="lbl">Downed:</span> ${downed}</div>` : ''}
+            ${isDM && c.dmDetail ? `<details class="entry-combat-detail"><summary>Full combat log (DM only)</summary><pre>${esc(c.dmDetail)}</pre></details>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderLoot(loot) {
+      if (!Array.isArray(loot) || loot.length === 0) return '';
+      const rows = loot.map(l => `
+        <tr>
+          <td>${esc(l.item||'')}</td>
+          <td class="qty">${esc(String(l.qty||'1'))}</td>
+          <td class="who">${esc(l.recipient||'Party')}</td>
+        </tr>
+      `).join('');
+      return `
+        <div class="entry-loot">
+          <div class="entry-loot-title">⬥ Loot</div>
+          <table class="loot-table">
+            <thead><tr><th>Item</th><th>Qty</th><th>Who</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
       `;
     }
 

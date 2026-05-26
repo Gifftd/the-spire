@@ -528,6 +528,8 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
         </div>
         <div class="field"><label>BODY (player-facing)</label><textarea id="tle-body" rows="6" placeholder="What happened…"></textarea></div>
 
+        <div id="tle-attached" style="display:none;font-size:0.78rem;color:var(--ink-dim);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:7px 9px;margin-bottom:0.7rem;line-height:1.5"></div>
+
         <div class="field">
           <label>LINKED LOCATIONS</label>
           <div class="visibleto-chips" id="tle-loc-chips"></div>
@@ -2550,6 +2552,7 @@ function addTimelineEntry() {
   document.getElementById('tle-body').value = '';
   document.getElementById('tle-dmNotes').value = '';
   renderTLChips();
+  renderTLAttached(null);
   document.getElementById('tl-detail').style.display = 'block';
   document.getElementById('tle-title').focus();
 }
@@ -2571,8 +2574,20 @@ function editTimelineEntry(id) {
   document.getElementById('tle-body').value       = e.body || '';
   document.getElementById('tle-dmNotes').value    = e.dmNotes || '';
   renderTLChips();
+  renderTLAttached(e);
   document.getElementById('tl-detail').style.display = 'block';
   renderTimelineList();
+}
+
+function renderTLAttached(e) {
+  const box = document.getElementById('tle-attached');
+  if (!box) return;
+  const nC = Array.isArray(e?.combats) ? e.combats.length : 0;
+  const nL = Array.isArray(e?.loot) ? e.loot.length : 0;
+  if (nC === 0 && nL === 0) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  const combatTitles = (e.combats||[]).map(c => escapeHtml(c.title||'Combat')).join(', ');
+  box.style.display = '';
+  box.innerHTML = `⚔ <strong>${nC} combat${nC===1?'':'s'}</strong>${combatTitles?` (${combatTitles})`:''} and <strong>${nL} loot item${nL===1?'':'s'}</strong> attached from the initiative tracker. These are preserved when you save and shown on the Chronicle. Edit them by re-exporting from the tracker.`;
 }
 
 function renderTLChips() {

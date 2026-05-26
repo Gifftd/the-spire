@@ -115,6 +115,11 @@ function timelineForCharacter(entries, characterId) {
     })
     .map(e => {
       const { dmNotes, ...rest } = e;
+      // Combats carry a DM-only `dmDetail` (full HP tables + combat notes).
+      // Strip it; keep the player-safe summary fields and the loot table.
+      if (Array.isArray(rest.combats)) {
+        rest.combats = rest.combats.map(c => { const { dmDetail, ...cr } = c; return cr; });
+      }
       return rest;
     });
 }
