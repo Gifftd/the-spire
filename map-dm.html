@@ -178,6 +178,26 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 .whisper-del-btn{background:transparent;border:none;color:var(--ink-faint);cursor:pointer;font-size:0.8rem;padding:0 3px}
 .whisper-del-btn:hover{color:var(--red)}
 
+/* Timeline cards (DM list) */
+.tl-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;margin-bottom:6px;cursor:pointer;transition:border-color 0.15s;border-left:3px solid var(--border-light)}
+.tl-card:hover{border-color:var(--border-light)}
+.tl-card.selected{border-color:var(--gold)}
+.tl-card.kind-session   {border-left-color:#4a80c0}
+.tl-card.kind-event     {border-left-color:#c87800}
+.tl-card.kind-milestone {border-left-color:var(--gold)}
+.tl-card.kind-planned   {border-left-color:var(--purple);background:linear-gradient(90deg,rgba(90,62,155,0.08),var(--surface2))}
+.tl-card-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.tl-card-kind{font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.16em;text-transform:uppercase;padding:1px 6px;border-radius:8px;color:var(--ink-dim);border:1px solid var(--border-light)}
+.tl-card.kind-session   .tl-card-kind{color:#8fbceb;border-color:#4a80c0}
+.tl-card.kind-event     .tl-card-kind{color:#f0b076;border-color:#c87800}
+.tl-card.kind-milestone .tl-card-kind{color:var(--gold-light);border-color:var(--gold)}
+.tl-card.kind-planned   .tl-card-kind{color:#c0a0f0;border-color:var(--purple)}
+.tl-card-title{font-family:'Cinzel',serif;font-size:0.86rem;letter-spacing:0.04em;color:var(--ink);flex:1}
+.tl-card-date{font-size:0.7rem;color:var(--ink-faint);font-family:'Cinzel',serif;letter-spacing:0.08em}
+.tl-card-body{font-size:0.78rem;color:var(--ink-dim);margin-top:5px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tl-card-meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;font-size:0.7rem;color:var(--ink-faint)}
+.tl-card-meta-chip{background:rgba(0,0,0,0.25);border:1px solid var(--border-light);padding:1px 6px;border-radius:8px}
+
 /* NPC roster cards */
 .npc-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:9px 10px;margin-bottom:6px;cursor:pointer;transition:border-color 0.15s}
 .npc-card:hover{border-color:var(--border-light)}
@@ -299,6 +319,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
   <button class="btn btn-ghost btn-sm" onclick="switchTab('zones')">Zones</button>
   <button class="btn btn-ghost btn-sm" onclick="switchTab('characters')">Characters</button>
   <button class="btn btn-ghost btn-sm" onclick="switchTab('npcs')">NPCs</button>
+  <button class="btn btn-ghost btn-sm" onclick="switchTab('timeline')">Timeline</button>
   <button class="btn btn-ghost btn-sm" onclick="switchTab('world')">World</button>
   <button class="btn btn-ghost btn-sm" id="move-mode-btn" onclick="toggleMoveMode()">✥ Move mode</button>
   <button class="btn btn-purple btn-sm" onclick="openImport()">⬇ Import</button>
@@ -335,6 +356,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
       <button class="editor-tab" id="tab-zones" onclick="switchTab('zones')">ZONES</button>
       <button class="editor-tab" id="tab-characters" onclick="switchTab('characters')">PLAYERS</button>
       <button class="editor-tab" id="tab-npcs" onclick="switchTab('npcs')">NPCs</button>
+      <button class="editor-tab" id="tab-timeline" onclick="switchTab('timeline')">TIMELINE</button>
       <button class="editor-tab" id="tab-world" onclick="switchTab('world')">WORLD</button>
     </div>
 
@@ -467,6 +489,73 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 
         <div class="section-header" style="margin-top:0.8rem">HISTORY</div>
         <div id="npce-history-list"></div>
+      </div>
+    </div>
+
+    <!-- TIMELINE TAB -->
+    <div class="editor-pane" id="pane-timeline">
+      <div style="display:flex;gap:6px;margin-bottom:0.6rem;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-gold btn-sm" onclick="addTimelineEntry()">+ Add entry</button>
+        <input type="text" id="tl-search" placeholder="Search…" style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:4px 7px;font-family:'Crimson Text',serif;font-size:0.82rem" oninput="renderTimelineList()">
+        <select id="tl-filter-kind" onchange="renderTimelineList()" style="background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:4px 7px;font-size:0.78rem">
+          <option value="">All kinds</option>
+          <option value="session">Sessions</option>
+          <option value="event">Events</option>
+          <option value="milestone">Milestones</option>
+          <option value="planned">Planned (DM)</option>
+        </select>
+      </div>
+      <div class="section-header" style="margin-top:0.2rem">CHRONICLE <span id="tl-count" style="color:var(--ink-faint);font-weight:normal">(0)</span></div>
+      <div id="tl-list"></div>
+
+      <div id="tl-detail" style="display:none;margin-top:0.8rem">
+        <div class="section-header" id="tl-detail-header">EDIT ENTRY</div>
+        <div class="field"><label>TITLE</label><input type="text" id="tle-title" placeholder="The duke's banquet"></div>
+        <div class="field-row">
+          <div class="field"><label>KIND</label>
+            <select id="tle-kind">
+              <option value="session">Session</option>
+              <option value="event">Event</option>
+              <option value="milestone">Milestone</option>
+              <option value="planned">Planned (DM-only)</option>
+            </select>
+          </div>
+          <div class="field"><label>IN-GAME DATE (free text)</label><input type="text" id="tle-dateInGame" placeholder="12 Mirtul, 1492 DR"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>SORT KEY (YYYY-MM-DD, optional)</label><input type="date" id="tle-dateSort"></div>
+          <div class="field"><label>REAL-WORLD DATE</label><input type="date" id="tle-dateReal"></div>
+        </div>
+        <div class="field"><label>BODY (player-facing)</label><textarea id="tle-body" rows="6" placeholder="What happened…"></textarea></div>
+
+        <div class="field">
+          <label>LINKED LOCATIONS</label>
+          <div class="visibleto-chips" id="tle-loc-chips"></div>
+        </div>
+        <div class="field">
+          <label>LINKED CHARACTERS</label>
+          <div class="visibleto-chips" id="tle-char-chips"></div>
+        </div>
+        <div class="field">
+          <label>LINKED NPCs</label>
+          <div class="visibleto-chips" id="tle-npc-chips"></div>
+        </div>
+        <div class="field">
+          <label>VISIBLE TO (leave empty = all players who can read the chronicle)</label>
+          <div class="visibleto-chips" id="tle-visibleto-chips"></div>
+          <div class="visibleto-hint">Planned entries are DM-only regardless of this setting.</div>
+        </div>
+
+        <div class="dm-note-area">
+          <div class="dm-note-label">🔒 DM ONLY — NOT SHOWN TO PLAYERS</div>
+          <textarea id="tle-dmNotes" rows="3" style="width:100%;background:transparent;border:none;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.9rem;outline:none;resize:vertical;line-height:1.5" placeholder="Planning notes, intended outcomes, what's behind the scenes…"></textarea>
+        </div>
+
+        <div style="display:flex;gap:5px;margin-top:0.8rem">
+          <button class="btn btn-gold btn-sm" onclick="saveTimelineEntry()">Save</button>
+          <button class="btn btn-ghost btn-sm" onclick="cancelTimelineEdit()">Cancel</button>
+          <button class="btn btn-red btn-sm" style="margin-left:auto" onclick="deleteTimelineEntry()">Delete</button>
+        </div>
       </div>
     </div>
 
@@ -704,8 +793,14 @@ let tempVisibleTo  = [];      // ids of characters who can see the location curr
 let characters     = [];      // [{id,name,player,code,dmNotes}]
 let journals       = [];      // [{id,characterId,title,body,date,unread}]
 let npcs           = [];      // [{id,name,role,description,currentLocationId,currentActivity,status,notes,dmNotes,knownTo,history,tags}]
+let timeline       = [];      // [{id,title,body,kind,dateInGame,dateSort,dateReal,locationIds,characterIds,npcIds,visibleTo,dmNotes}]
 let editingCharId  = null;
 let editingNPCId   = null;
+let editingTLId    = null;
+let tempTLLocs     = [];
+let tempTLChars    = [];
+let tempTLNpcs     = [];
+let tempTLVisibleTo= [];
 let tempNPCKnownTo = [];      // ids of characters who know the NPC being edited
 let pendingDMSave  = null;    // queued save retry after token is provided
 
@@ -850,6 +945,29 @@ async function reloadCharacters() {
   if (editingCharId) renderWhisperHistory(editingCharId);
 }
 
+// ── Timeline: load + save ────────────────────────────────────
+async function saveTimelineKV() {
+  await dmPost({ type: 'timeline', payload: timeline }, saveTimelineKV);
+  saveTimelineLocal();
+}
+function saveTimelineLocal() { localStorage.setItem('dm_timeline', JSON.stringify(timeline)); }
+async function loadTimelineKV() {
+  try {
+    const res = await fetch(WORKER_URL + '?type=timeline_dm', { cache: 'no-store', headers: Auth.dmHeaders() });
+    if (res.status === 401) return false;
+    if (!res.ok) return false;
+    const arr = await res.json();
+    if (Array.isArray(arr)) { timeline = arr; saveTimelineLocal(); return true; }
+  } catch {}
+  return false;
+}
+function loadTimelineLocal() {
+  try {
+    const arr = JSON.parse(localStorage.getItem('dm_timeline') || 'null');
+    if (Array.isArray(arr)) timeline = arr;
+  } catch {}
+}
+
 // ── NPCs: load + save ────────────────────────────────────────
 async function saveNPCsKV() {
   await dmPost({ type: 'npcs', payload: npcs }, saveNPCsKV);
@@ -974,7 +1092,7 @@ function setPublishStatus(type, msg) { const el=document.getElementById('publish
 //  TABS
 // ══════════════════════════════════════════════════════════════
 function switchTab(name) {
-  ['locations','zones','characters','npcs','world'].forEach(t => {
+  ['locations','zones','characters','npcs','timeline','world'].forEach(t => {
     document.getElementById(`tab-${t}`).classList.toggle('active', t===name);
     document.getElementById(`pane-${t}`).classList.toggle('active', t===name);
   });
@@ -983,6 +1101,7 @@ function switchTab(name) {
   placeMode = (name === 'locations') && !moveMode;
   if (name === 'characters') renderCharacterList();
   if (name === 'npcs')       { populateNPCLocationFilters(); renderNPCList(); }
+  if (name === 'timeline')   renderTimelineList();
   updateModeUI();
 }
 function switchLocTab(name) {
@@ -1868,13 +1987,15 @@ async function init() {
     setTimeout(() => setSyncStatus('', ''), 3000);
   }
 
-  // Characters + journals + NPCs (cached locally first, then refreshed from KV)
+  // Characters + journals + NPCs + timeline (cached locally first, then refreshed from KV)
   loadCharactersLocal();
   loadJournalsLocal();
   loadNPCsLocal();
+  loadTimelineLocal();
   await loadCharactersKV();
   await loadJournalsKV();
   await loadNPCsKV();
+  await loadTimelineKV();
 
   // One-shot migration of nested NPCs → first-class records.
   await migrateNestedNPCs();
@@ -1885,6 +2006,7 @@ async function init() {
   renderZoneList();
   renderCharacterList();
   renderNPCList();
+  renderTimelineList();
   updateModeUI();
 }
 
@@ -2363,6 +2485,187 @@ function renderLocationNPCsHere(locId) {
       ${n.currentActivity ? `<div class="npc-card-activity">${escapeHtml(n.currentActivity)}</div>` : ''}
     </div>
   `).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TIMELINE TAB
+// ══════════════════════════════════════════════════════════════
+const TL_KIND_LABELS = { session:'Session', event:'Event', milestone:'Milestone', planned:'Planned' };
+
+function tlSortKey(e) { return (e.dateSort || '') + '~' + (e.id || ''); }
+function timelineSorted() {
+  return timeline.slice().sort((a,b) => tlSortKey(b).localeCompare(tlSortKey(a)));
+}
+
+function renderTimelineList() {
+  const list = document.getElementById('tl-list');
+  if (!list) return;
+  const query = (document.getElementById('tl-search')?.value || '').trim().toLowerCase();
+  const kindFilter = document.getElementById('tl-filter-kind')?.value || '';
+
+  const filtered = timelineSorted().filter(e => {
+    if (kindFilter && e.kind !== kindFilter) return false;
+    if (!query) return true;
+    return (e.title||'').toLowerCase().includes(query)
+        || (e.body||'').toLowerCase().includes(query)
+        || (e.dateInGame||'').toLowerCase().includes(query);
+  });
+
+  document.getElementById('tl-count').textContent = `(${filtered.length}${filtered.length !== timeline.length ? ` / ${timeline.length}` : ''})`;
+
+  if (filtered.length === 0) {
+    list.innerHTML = timeline.length === 0
+      ? '<div class="visibleto-empty">No timeline entries yet. Add one to start the chronicle.</div>'
+      : '<div class="visibleto-empty">No entries match those filters.</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(e => {
+    const kind = e.kind || 'event';
+    const kindLabel = TL_KIND_LABELS[kind] || kind;
+    const metaChips = [];
+    (e.locationIds||[]).forEach(id => { const l = worldData.locations.find(x => x.id === id); if (l) metaChips.push('📍 ' + escapeHtml(l.name)); });
+    (e.characterIds||[]).forEach(id => { const c = characters.find(x => x.id === id); if (c) metaChips.push('★ ' + escapeHtml(c.name)); });
+    (e.npcIds||[]).forEach(id => { const n = npcs.find(x => x.id === id); if (n) metaChips.push('☉ ' + escapeHtml(n.name)); });
+    return `<div class="tl-card kind-${kind} ${e.id===editingTLId?'selected':''}" onclick="editTimelineEntry('${e.id}')">
+      <div class="tl-card-row">
+        <span class="tl-card-kind">${escapeHtml(kindLabel)}</span>
+        <span class="tl-card-title">${escapeHtml(e.title||'(Untitled)')}</span>
+        <span class="tl-card-date">${escapeHtml(e.dateInGame||e.dateSort||'')}</span>
+      </div>
+      ${e.body ? `<div class="tl-card-body">${escapeHtml(e.body)}</div>` : ''}
+      ${metaChips.length ? `<div class="tl-card-meta">${metaChips.map(c => `<span class="tl-card-meta-chip">${c}</span>`).join('')}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function addTimelineEntry() {
+  editingTLId = '__new__';
+  tempTLLocs = []; tempTLChars = []; tempTLNpcs = []; tempTLVisibleTo = [];
+  document.getElementById('tl-detail-header').textContent = 'NEW ENTRY';
+  document.getElementById('tle-title').value = '';
+  document.getElementById('tle-kind').value = 'session';
+  document.getElementById('tle-dateInGame').value = '';
+  document.getElementById('tle-dateSort').value = '';
+  document.getElementById('tle-dateReal').value = new Date().toISOString().slice(0,10);
+  document.getElementById('tle-body').value = '';
+  document.getElementById('tle-dmNotes').value = '';
+  renderTLChips();
+  document.getElementById('tl-detail').style.display = 'block';
+  document.getElementById('tle-title').focus();
+}
+
+function editTimelineEntry(id) {
+  const e = timeline.find(x => x.id === id);
+  if (!e) return;
+  editingTLId = id;
+  tempTLLocs      = Array.isArray(e.locationIds)  ? e.locationIds.slice()  : [];
+  tempTLChars     = Array.isArray(e.characterIds) ? e.characterIds.slice() : [];
+  tempTLNpcs      = Array.isArray(e.npcIds)       ? e.npcIds.slice()       : [];
+  tempTLVisibleTo = Array.isArray(e.visibleTo)    ? e.visibleTo.slice()    : [];
+  document.getElementById('tl-detail-header').textContent = 'EDIT ENTRY';
+  document.getElementById('tle-title').value      = e.title || '';
+  document.getElementById('tle-kind').value       = e.kind || 'session';
+  document.getElementById('tle-dateInGame').value = e.dateInGame || '';
+  document.getElementById('tle-dateSort').value   = e.dateSort || '';
+  document.getElementById('tle-dateReal').value   = e.dateReal || new Date().toISOString().slice(0,10);
+  document.getElementById('tle-body').value       = e.body || '';
+  document.getElementById('tle-dmNotes').value    = e.dmNotes || '';
+  renderTLChips();
+  document.getElementById('tl-detail').style.display = 'block';
+  renderTimelineList();
+}
+
+function renderTLChips() {
+  const locWrap  = document.getElementById('tle-loc-chips');
+  const charWrap = document.getElementById('tle-char-chips');
+  const npcWrap  = document.getElementById('tle-npc-chips');
+  const visWrap  = document.getElementById('tle-visibleto-chips');
+
+  if (locWrap) {
+    const locs = (worldData.locations || []).slice().sort((a,b) => (a.name||'').localeCompare(b.name||''));
+    locWrap.innerHTML = locs.length === 0
+      ? '<div class="visibleto-empty">No locations yet.</div>'
+      : locs.map(l => `<span class="visibleto-chip ${tempTLLocs.includes(l.id)?'on':''}" onclick="toggleTLChip('loc','${l.id}')">${escapeHtml(l.name)}</span>`).join('');
+  }
+  if (charWrap) {
+    charWrap.innerHTML = characters.length === 0
+      ? '<div class="visibleto-empty">No characters yet.</div>'
+      : characters.map(c => `<span class="visibleto-chip ${tempTLChars.includes(c.id)?'on':''}" onclick="toggleTLChip('char','${c.id}')">${escapeHtml(c.name)}</span>`).join('');
+  }
+  if (npcWrap) {
+    npcWrap.innerHTML = npcs.length === 0
+      ? '<div class="visibleto-empty">No NPCs yet.</div>'
+      : npcs.slice().sort((a,b) => (a.name||'').localeCompare(b.name||''))
+          .map(n => `<span class="visibleto-chip ${tempTLNpcs.includes(n.id)?'on':''}" onclick="toggleTLChip('npc','${n.id}')">${escapeHtml(n.name)}</span>`).join('');
+  }
+  if (visWrap) {
+    visWrap.innerHTML = characters.length === 0
+      ? '<div class="visibleto-empty">No characters to grant visibility to.</div>'
+      : characters.map(c => `<span class="visibleto-chip ${tempTLVisibleTo.includes(c.id)?'on':''}" onclick="toggleTLChip('vis','${c.id}')">${escapeHtml(c.name)}</span>`).join('');
+  }
+}
+
+function toggleTLChip(which, id) {
+  const arr = which==='loc' ? tempTLLocs
+            : which==='char'? tempTLChars
+            : which==='npc' ? tempTLNpcs
+            : which==='vis' ? tempTLVisibleTo
+            : null;
+  if (!arr) return;
+  const i = arr.indexOf(id);
+  if (i >= 0) arr.splice(i,1); else arr.push(id);
+  renderTLChips();
+}
+
+async function saveTimelineEntry() {
+  const title = document.getElementById('tle-title').value.trim();
+  if (!title) { alert('Entry needs a title.'); return; }
+  const fields = {
+    title,
+    kind:        document.getElementById('tle-kind').value || 'event',
+    dateInGame:  document.getElementById('tle-dateInGame').value.trim(),
+    dateSort:    document.getElementById('tle-dateSort').value || '',
+    dateReal:    document.getElementById('tle-dateReal').value || new Date().toISOString().slice(0,10),
+    body:        document.getElementById('tle-body').value.trim(),
+    dmNotes:     document.getElementById('tle-dmNotes').value.trim(),
+    locationIds: tempTLLocs.slice(),
+    characterIds:tempTLChars.slice(),
+    npcIds:      tempTLNpcs.slice(),
+    visibleTo:   tempTLVisibleTo.slice(),
+  };
+
+  if (editingTLId === '__new__') {
+    const id = 'tl_' + Date.now() + Math.floor(Math.random()*1000);
+    timeline.push({ id, ...fields });
+    editingTLId = id;
+  } else {
+    const idx = timeline.findIndex(e => e.id === editingTLId);
+    if (idx < 0) return;
+    timeline[idx] = { ...timeline[idx], ...fields };
+  }
+  await saveTimelineKV();
+  renderTimelineList();
+  document.getElementById('tl-detail-header').textContent = 'EDIT ENTRY';
+  setSyncStatus('ok','✦ Entry saved');
+  setTimeout(()=>setSyncStatus('',''), 2000);
+}
+
+function cancelTimelineEdit() {
+  editingTLId = null;
+  document.getElementById('tl-detail').style.display = 'none';
+  renderTimelineList();
+}
+
+async function deleteTimelineEntry() {
+  if (!editingTLId || editingTLId === '__new__') { cancelTimelineEdit(); return; }
+  const e = timeline.find(x => x.id === editingTLId);
+  if (!e) return;
+  if (!confirm(`Delete entry "${e.title}"? Cannot be undone.`)) return;
+  timeline = timeline.filter(x => x.id !== editingTLId);
+  editingTLId = null;
+  document.getElementById('tl-detail').style.display = 'none';
+  await saveTimelineKV();
+  renderTimelineList();
 }
 
 function quickAddNPCAtLocation() {
