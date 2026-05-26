@@ -1733,7 +1733,13 @@ function deleteLocation() {
 function addNPC() { tempNPCs.push({name:'',role:'',desc:''}); renderNPCEditor(); }
 function removeNPC(i) { tempNPCs.splice(i,1); renderNPCEditor(); }
 function renderNPCEditor() {
-  const list=document.getElementById('npc-editor-list'); list.innerHTML='';
+  // The location modal's old inline NPC editor was replaced by the "NPCs
+  // currently here" read-only view when NPCs were promoted to first-class.
+  // The #npc-editor-list element no longer exists; bail out so callers that
+  // still try to render here don't blow up the whole modal.
+  const list=document.getElementById('npc-editor-list');
+  if (!list) return;
+  list.innerHTML='';
   tempNPCs.forEach((n,i) => {
     const card=document.createElement('div'); card.className='item-card';
     card.innerHTML=`
