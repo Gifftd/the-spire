@@ -173,6 +173,29 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 .whisper-title{font-family:'Cinzel',serif;font-size:0.92rem;letter-spacing:0.04em;color:var(--ink);margin-bottom:5px;line-height:1.3}
 .whisper-body{font-size:0.92rem;line-height:1.55;color:var(--ink-dim);white-space:pre-wrap}
 
+/* NPC roster cards (player view) */
+.npc-roster-panel{border-left-color:var(--gold-faint)}
+.npc-rcard{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:0.7rem 0.85rem;margin-bottom:0.55rem;cursor:pointer;transition:border-color 0.15s}
+.npc-rcard:hover{border-color:var(--gold-faint)}
+.npc-rcard.expanded{border-color:var(--gold)}
+.npc-rcard-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.npc-rcard-name{font-family:'Cinzel',serif;font-size:0.95rem;letter-spacing:0.04em;color:var(--ink);flex:1}
+.npc-rcard-role{font-size:0.78rem;color:var(--ink-faint);font-style:italic}
+.npc-rcard-status{font-family:'Cinzel',serif;font-size:0.56rem;letter-spacing:0.14em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid}
+.npc-rcard-status.alive   {color:#8fc8a4;border-color:#3a6a3f;background:rgba(45,106,63,0.18)}
+.npc-rcard-status.dead    {color:#e88;border-color:#8a3030;background:rgba(139,32,32,0.18)}
+.npc-rcard-status.missing {color:#c0a0f0;border-color:#5a3e9b;background:rgba(90,62,155,0.2)}
+.npc-rcard-status.unknown {color:var(--ink-faint);border-color:var(--border)}
+.npc-rcard-meta{display:flex;align-items:center;gap:8px;margin-top:5px;font-size:0.78rem;color:var(--ink-dim)}
+.npc-rcard-loc{display:inline-flex;align-items:center;gap:4px}
+.npc-rcard-activity{font-style:italic;font-size:0.85rem;color:var(--ink-dim);margin-top:5px;line-height:1.4}
+.npc-rcard-details{border-top:1px solid var(--border);margin-top:0.6rem;padding-top:0.6rem;font-size:0.88rem;line-height:1.5;color:var(--ink-dim)}
+.npc-rcard-section{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.12em;color:var(--gold-faint);margin:0.55rem 0 0.3rem;text-transform:uppercase}
+.npc-rcard-section:first-child{margin-top:0}
+.npc-rcard-history-entry{background:var(--bg);border:1px solid var(--border);border-radius:2px;padding:0.4rem 0.55rem;margin-bottom:0.35rem;font-size:0.82rem;color:var(--ink-dim);line-height:1.4}
+.npc-rcard-history-date{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.1em;color:var(--ink-faint);margin-bottom:3px}
+.whispers-empty{font-style:italic;color:var(--ink-faint);text-align:center;padding:2rem 0}
+
 @media(max-width:700px){
   #location-view{flex-direction:column}
   .loc-sidebar{width:100%;max-height:40vh;border-right:none;border-bottom:1px solid var(--border)}
@@ -187,6 +210,10 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
   <div class="player-badge" id="player-badge">
     <span class="player-badge-label">Playing as</span>
     <span class="player-badge-name" id="player-badge-name"></span>
+    <button class="btn-pill" type="button" onclick="toggleNPCRoster()">
+      NPCs
+      <span class="whispers-count" id="npc-count-pill">0</span>
+    </button>
     <button class="btn-pill" type="button" onclick="toggleWhispers()">
       Whispers
       <span class="whispers-count" id="whispers-count">0</span>
@@ -227,6 +254,16 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
     <button class="whispers-close" type="button" onclick="toggleWhispers()" aria-label="Close">×</button>
   </div>
   <div class="whispers-list" id="whispers-list"></div>
+</div>
+
+<!-- NPC ROSTER PANEL -->
+<div class="whispers-panel npc-roster-panel" id="npc-roster-panel" aria-hidden="true">
+  <div class="whispers-header">
+    <span class="whispers-title">KNOWN NPCs</span>
+    <button class="whispers-close" type="button" onclick="toggleNPCRoster()" aria-label="Close">×</button>
+  </div>
+  <input type="text" id="npc-roster-search" placeholder="Search…" oninput="renderNPCRoster()" style="margin:0.4rem 1rem 0.6rem;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:2px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.92rem;outline:none">
+  <div class="whispers-list" id="npc-roster-list"></div>
 </div>
 
 <!-- REGION VIEW -->
@@ -367,6 +404,8 @@ const TYPE_COLORS = { city:'#4a90d4', dungeon:'#c43838', wilderness:'#4ca050', r
 //  LOGIN + LOAD DATA FROM WORKER
 // ══════════════════════════════════════════════════════════════
 let journals = [];
+let knownNpcs = [];           // NPCs this character has been marked as knowing (filtered by worker)
+let expandedNPCId = null;     // currently expanded NPC card in the roster panel
 
 // Identity helpers delegate to the shared Auth helper so DM / player / anonymous
 // state stays in sync across pages.
@@ -407,6 +446,7 @@ async function loadAnonymousView() {
     }
   } catch {}
   journals = [];
+  knownNpcs = [];
   buildRegionMap();
   handleHash();
   renderWhispers();
@@ -479,10 +519,12 @@ async function loadPlayerView(creds) {
     const d = await res.json();
     if (!d || !d.map) return false;
     data = d.map;
-    journals = Array.isArray(d.journals) ? d.journals.slice().sort((a,b) => (b.date||'').localeCompare(a.date||'')) : [];
+    journals  = Array.isArray(d.journals) ? d.journals.slice().sort((a,b) => (b.date||'').localeCompare(a.date||'')) : [];
+    knownNpcs = Array.isArray(d.npcs) ? d.npcs : [];
     buildRegionMap();
     handleHash();
     renderWhispers();
+    renderNPCRoster();
     return true;
   } catch { return false; }
 }
@@ -520,12 +562,103 @@ function renderWhispers() {
 function toggleWhispers() {
   const panel = document.getElementById('whispers-panel');
   const opening = !panel.classList.contains('open');
+  // Close the NPC roster if it's open
+  if (opening) document.getElementById('npc-roster-panel').classList.remove('open');
   panel.classList.toggle('open', opening);
   panel.setAttribute('aria-hidden', opening ? 'false' : 'true');
   if (opening && journals.some(j => j.unread)) {
     // Mark as read client-side. (Read state is not persisted to the worker yet.)
     journals.forEach(j => j.unread = false);
     renderWhispers();
+  }
+}
+
+// ── Known NPCs roster panel ──────────────────────────────────
+function locationNameById(id) {
+  if (!id) return '';
+  const loc = (data && Array.isArray(data.locations)) ? data.locations.find(l => l.id === id) : null;
+  return loc ? loc.name : '';
+}
+
+function renderNPCRoster() {
+  const list = document.getElementById('npc-roster-list');
+  const pill = document.getElementById('npc-count-pill');
+  if (!list) return;
+
+  pill.textContent = knownNpcs.length;
+  pill.classList.toggle('visible', knownNpcs.length > 0);
+
+  const query = (document.getElementById('npc-roster-search')?.value || '').trim().toLowerCase();
+  const filtered = !query ? knownNpcs : knownNpcs.filter(n =>
+    (n.name||'').toLowerCase().includes(query) ||
+    (n.role||'').toLowerCase().includes(query) ||
+    (n.currentActivity||'').toLowerCase().includes(query) ||
+    locationNameById(n.currentLocationId).toLowerCase().includes(query)
+  );
+
+  if (filtered.length === 0) {
+    list.innerHTML = knownNpcs.length === 0
+      ? '<div class="whispers-empty">You haven\'t met anyone yet.<br>The DM grants access as you encounter people.</div>'
+      : '<div class="whispers-empty">No matches.</div>';
+    return;
+  }
+
+  const esc = s => (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  list.innerHTML = filtered.map(n => {
+    const status = (n.status || 'alive').toLowerCase();
+    const loc = locationNameById(n.currentLocationId);
+    const expanded = n.id === expandedNPCId;
+    const history = (n.history || []).slice().sort((a,b) => (b.date||'').localeCompare(a.date||''));
+    return `
+      <div class="npc-rcard ${expanded?'expanded':''}" onclick="toggleNPCExpanded('${n.id}')">
+        <div class="npc-rcard-row">
+          <span class="npc-rcard-name">${esc(n.name)}</span>
+          ${n.role ? `<span class="npc-rcard-role">${esc(n.role)}</span>` : ''}
+          <span class="npc-rcard-status ${status}">${status}</span>
+        </div>
+        ${loc ? `<div class="npc-rcard-meta"><span class="npc-rcard-loc">📍 ${esc(loc)}</span></div>` : ''}
+        ${n.currentActivity ? `<div class="npc-rcard-activity">${esc(n.currentActivity)}</div>` : ''}
+        ${expanded ? `
+          <div class="npc-rcard-details">
+            ${n.description ? `<div class="npc-rcard-section">About</div><div>${esc(n.description)}</div>` : ''}
+            ${n.notes       ? `<div class="npc-rcard-section">Notes</div><div>${esc(n.notes)}</div>` : ''}
+            ${history.length ? `<div class="npc-rcard-section">History</div>${history.map(h => `
+              <div class="npc-rcard-history-entry">
+                <div class="npc-rcard-history-date">${esc(h.date)}${h.locationId ? ' · 📍 ' + esc(locationNameById(h.locationId)) : ''}</div>
+                ${h.activity ? `<div style="font-style:italic">${esc(h.activity)}</div>` : ''}
+                ${h.note     ? `<div>${esc(h.note)}</div>` : ''}
+              </div>
+            `).join('')}` : ''}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleNPCExpanded(id) {
+  expandedNPCId = (expandedNPCId === id) ? null : id;
+  renderNPCRoster();
+}
+
+function toggleNPCRoster() {
+  const panel = document.getElementById('npc-roster-panel');
+  const opening = !panel.classList.contains('open');
+  // Close whispers if open
+  if (opening) document.getElementById('whispers-panel').classList.remove('open');
+  panel.classList.toggle('open', opening);
+  panel.setAttribute('aria-hidden', opening ? 'false' : 'true');
+  if (opening) renderNPCRoster();
+}
+
+// Called from a location-detail NPC card — open the roster panel and expand
+// the matching NPC card.
+function openNPCRosterToCard(id) {
+  expandedNPCId = id;
+  if (!document.getElementById('npc-roster-panel').classList.contains('open')) {
+    toggleNPCRoster();
+  } else {
+    renderNPCRoster();
   }
 }
 
@@ -536,6 +669,9 @@ document.addEventListener('keydown', e => {
   }
   if (e.key === 'Escape' && document.getElementById('whispers-panel').classList.contains('open')) {
     toggleWhispers();
+  }
+  if (e.key === 'Escape' && document.getElementById('npc-roster-panel').classList.contains('open')) {
+    toggleNPCRoster();
   }
 });
 
@@ -852,18 +988,24 @@ function showLocation(loc) {
         </div>
       </div>
     ` : ''}
-    ${loc.npcs && loc.npcs.length > 0 ? `
-      <div class="loc-section">
-        <div class="loc-section-title">NOTABLE FIGURES</div>
-        ${loc.npcs.map(n => `
-          <div class="npc-card">
-            <div class="npc-name">${n.name}</div>
-            <div class="npc-role">${n.role}</div>
-            <div class="npc-desc">${n.desc}</div>
-          </div>
-        `).join('')}
-      </div>
-    ` : ''}
+    ${(() => {
+      // First-class NPCs the player knows AND who are currently here.
+      const npcsHere = (knownNpcs || []).filter(n => n.currentLocationId === loc.id);
+      if (!npcsHere.length) return '';
+      return `
+        <div class="loc-section">
+          <div class="loc-section-title">NOTABLE FIGURES</div>
+          ${npcsHere.map(n => `
+            <div class="npc-card" onclick="openNPCRosterToCard('${n.id}')" style="cursor:pointer">
+              <div class="npc-name">${(n.name||'').replace(/</g,'&lt;')}</div>
+              ${n.role           ? `<div class="npc-role">${(n.role||'').replace(/</g,'&lt;')}</div>` : ''}
+              ${n.currentActivity? `<div class="npc-desc" style="font-style:italic">${(n.currentActivity||'').replace(/</g,'&lt;')}</div>` : ''}
+              ${n.description    ? `<div class="npc-desc">${(n.description||'').replace(/</g,'&lt;')}</div>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      `;
+    })()}
   `;
 
   // Main area

@@ -9,6 +9,33 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-21
 
+### NPC tracker (Phase 1 of 3-feature set)
+
+NPCs promoted from anonymous arrays inside locations to first-class entities with current location, current activity, status, a movement/event history, and per-character visibility. Phase 1 of: NPC tracker → sub-map pins → campaign timeline.
+
+#### Added — Worker (`cloudflare-worker.js`)
+- New KV key `npcs` (DM-only canonical store).
+- `GET ?type=npcs` (DM auth) — full data.
+- `GET ?type=npc_roster&characterId=…&code=…` — server-side filtered, returns only NPCs whose `knownTo` includes the character, with `dmNotes` and any `dmOnly:true` history entries stripped.
+- `player_view` now also returns the character's known NPCs in `body.npcs`.
+- `npcs` added to `DM_WRITE_TYPES` so saves are gated.
+- New `npcsForCharacter()` helper centralizes the server-side filtering.
+
+#### Added — DM map (`map-dm.html`)
+- **New `NPCs` tab** beside Locations / Zones / Players / World.
+  - Roster with status pill (alive / dead / missing / unknown), current location, current activity. Search + per-location filter.
+  - Detail editor: name, role, status, current location (dropdown of locations), current activity, public description, public notes, DM notes, `knownTo` chips (which characters have encountered them).
+  - **Move / Log activity composer**: append a history entry with new location, new activity, free-form note, date, and an optional `DM-only` checkbox. Updates the current state and writes a timestamped history row in one click.
+  - History display sorted newest first, deletable, DM-only rows highlighted purple.
+- **Auto-migration on first run**: walks every `Location.npcs[]` array, promotes each nested NPC to a first-class record with `currentLocationId` set, adds a "first recorded here" DM-only history entry, and clears the nested arrays. Idempotent — runs only when `npcs[]` is empty and at least one location still has nested data.
+- **Location editor's NPC sub-tab** rewritten as a read-only "NPCs currently here" list with a "+ New NPC here" button that jumps to the NPCs tab pre-filled with this location.
+
+#### Added — Player map (`map.html`)
+- **`NPCs` button** in the topbar (next to Whispers) with an unread-style count badge of known NPCs.
+- **NPC roster slide-in panel** from the right, search box, click any card to expand and see full description, public notes, and player-visible history. Esc to close.
+- **Location detail page** now joins from the first-class roster: shows NPCs whose `currentLocationId` matches AND whom the character knows. Cards are clickable and pop the roster open to that NPC.
+- Anonymous viewers see no NPCs anywhere — `npcs` is opt-in only.
+
 ### Restored the `maps/` folder
 
 The original GitHub repo had a `maps/` folder with `Alden.png`, `Numira'Bad.png`, `Velmere.jpeg`, and a placeholder `readme`. It was removed from `origin/main` during the auth refactor commit (when staging deletions of files that weren't in the local working tree). The blobs were still in git's object database, so we restored them by hash.
