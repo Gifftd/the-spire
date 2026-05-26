@@ -9,6 +9,17 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-21
 
+### Editable loot + combats in the timeline editor
+
+Follow-up to the combat→chronicle integration: loot is now fully editable directly on an existing timeline entry (no re-export needed).
+
+#### Added — DM map (`map-dm.html`)
+- The TIMELINE entry editor's read-only "attached" banner is replaced with:
+  - **Editable loot rows** — item / qty / who, with add (+ Add loot) and remove (✕) per row. The "who" field autocompletes from the campaign's characters + "Party". Blank rows are dropped on save.
+  - **Attached combats list** — each combat shows title + outcome + rounds with a ✕ to **detach** it (removes its summary and DM log from the entry).
+- `saveTimelineEntry` now writes `loot[]` and `combats[]` from the editor, so manual edits and initiative-export attachments converge on the same data. Editing an entry no longer relies on a passive spread to preserve them.
+- You can now add loot to **any** session entry (even one created by hand, with no combat attached).
+
 ### Combat + loot → Chronicle integration
 
 The initiative tracker's combat export can now push the encounter and its loot straight into a timeline session.

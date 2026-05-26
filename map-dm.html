@@ -197,6 +197,20 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 .tl-card-body{font-size:0.78rem;color:var(--ink-dim);margin-top:5px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .tl-card-meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;font-size:0.7rem;color:var(--ink-faint)}
 .tl-card-meta-chip{background:rgba(0,0,0,0.25);border:1px solid var(--border-light);padding:1px 6px;border-radius:8px}
+/* Timeline editor: loot rows + attached combats */
+.tl-loot-row{display:flex;gap:5px;align-items:center;margin-bottom:5px}
+.tl-loot-row input{background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.84rem;padding:4px 7px;outline:none}
+.tl-loot-row input:focus{border-color:var(--gold)}
+.tl-loot-row .tl-loot-item{flex:1;min-width:0}
+.tl-loot-row .tl-loot-qty{width:48px;flex-shrink:0}
+.tl-loot-row .tl-loot-who{width:110px;flex-shrink:0}
+.tl-loot-row .tl-loot-del{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:0.85rem;padding:0 3px;flex-shrink:0}
+.tl-loot-row .tl-loot-del:hover{color:var(--red)}
+.tl-combat-item{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-left:3px solid #4a80c0;border-radius:var(--radius);padding:6px 9px;margin-bottom:5px;font-size:0.82rem}
+.tl-combat-item .tl-combat-name{flex:1;font-family:'Cinzel',serif;color:var(--ink);font-size:0.78rem}
+.tl-combat-item .tl-combat-sub{color:var(--ink-faint);font-size:0.72rem}
+.tl-combat-item .tl-combat-del{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:0.85rem;padding:0 3px}
+.tl-combat-item .tl-combat-del:hover{color:var(--red)}
 
 /* NPC roster cards */
 .npc-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:9px 10px;margin-bottom:6px;cursor:pointer;transition:border-color 0.15s}
@@ -528,7 +542,19 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
         </div>
         <div class="field"><label>BODY (player-facing)</label><textarea id="tle-body" rows="6" placeholder="What happened…"></textarea></div>
 
-        <div id="tle-attached" style="display:none;font-size:0.78rem;color:var(--ink-dim);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:7px 9px;margin-bottom:0.7rem;line-height:1.5"></div>
+        <!-- Attached combats (from initiative exports) -->
+        <div id="tle-combats-box" class="field" style="display:none">
+          <label>ATTACHED COMBATS</label>
+          <div id="tle-combats-list"></div>
+        </div>
+
+        <!-- Editable loot -->
+        <div class="field">
+          <label>LOOT (item · qty · who got it)</label>
+          <div id="tle-loot-rows"></div>
+          <button class="btn btn-ghost btn-sm" type="button" onclick="addTLLootRow()" style="margin-top:4px">+ Add loot</button>
+          <datalist id="tle-loot-recipients"></datalist>
+        </div>
 
         <div class="field">
           <label>LINKED LOCATIONS</label>
@@ -803,6 +829,8 @@ let tempTLLocs     = [];
 let tempTLChars    = [];
 let tempTLNpcs     = [];
 let tempTLVisibleTo= [];
+let tempTLLoot     = [];      // working copy of loot rows being edited
+let tempTLCombats  = [];      // working copy of attached combats (editable: removal)
 let tempNPCKnownTo = [];      // ids of characters who know the NPC being edited
 let pendingDMSave  = null;    // queued save retry after token is provided
 
@@ -2543,6 +2571,7 @@ function renderTimelineList() {
 function addTimelineEntry() {
   editingTLId = '__new__';
   tempTLLocs = []; tempTLChars = []; tempTLNpcs = []; tempTLVisibleTo = [];
+  tempTLLoot = []; tempTLCombats = [];
   document.getElementById('tl-detail-header').textContent = 'NEW ENTRY';
   document.getElementById('tle-title').value = '';
   document.getElementById('tle-kind').value = 'session';
@@ -2552,7 +2581,8 @@ function addTimelineEntry() {
   document.getElementById('tle-body').value = '';
   document.getElementById('tle-dmNotes').value = '';
   renderTLChips();
-  renderTLAttached(null);
+  renderTLLoot();
+  renderTLCombats();
   document.getElementById('tl-detail').style.display = 'block';
   document.getElementById('tle-title').focus();
 }
@@ -2573,21 +2603,75 @@ function editTimelineEntry(id) {
   document.getElementById('tle-dateReal').value   = e.dateReal || new Date().toISOString().slice(0,10);
   document.getElementById('tle-body').value       = e.body || '';
   document.getElementById('tle-dmNotes').value    = e.dmNotes || '';
+  tempTLLoot    = Array.isArray(e.loot)    ? JSON.parse(JSON.stringify(e.loot))    : [];
+  tempTLCombats = Array.isArray(e.combats) ? JSON.parse(JSON.stringify(e.combats)) : [];
   renderTLChips();
-  renderTLAttached(e);
+  renderTLLoot();
+  renderTLCombats();
   document.getElementById('tl-detail').style.display = 'block';
   renderTimelineList();
 }
 
-function renderTLAttached(e) {
-  const box = document.getElementById('tle-attached');
-  if (!box) return;
-  const nC = Array.isArray(e?.combats) ? e.combats.length : 0;
-  const nL = Array.isArray(e?.loot) ? e.loot.length : 0;
-  if (nC === 0 && nL === 0) { box.style.display = 'none'; box.innerHTML = ''; return; }
-  const combatTitles = (e.combats||[]).map(c => escapeHtml(c.title||'Combat')).join(', ');
+// ── Editable loot rows in the timeline editor ────────────────
+function tlLootRecipientOptions() {
+  const dl = document.getElementById('tle-loot-recipients');
+  if (!dl) return;
+  const names = ['Party', ...characters.map(c => c.name)];
+  dl.innerHTML = names.map(n => `<option value="${escapeHtml(n)}">`).join('');
+}
+
+function renderTLLoot() {
+  const wrap = document.getElementById('tle-loot-rows');
+  if (!wrap) return;
+  tlLootRecipientOptions();
+  if (tempTLLoot.length === 0) {
+    wrap.innerHTML = '<div class="visibleto-empty">No loot recorded. Add rows below or attach from the initiative tracker.</div>';
+    return;
+  }
+  wrap.innerHTML = tempTLLoot.map((l, i) => `
+    <div class="tl-loot-row">
+      <input class="tl-loot-item" type="text" placeholder="Item" value="${escapeHtml(l.item||'')}" oninput="tempTLLoot[${i}].item=this.value">
+      <input class="tl-loot-qty"  type="text" placeholder="Qty"  value="${escapeHtml(String(l.qty||'1'))}" oninput="tempTLLoot[${i}].qty=this.value">
+      <input class="tl-loot-who"  type="text" placeholder="Who" list="tle-loot-recipients" value="${escapeHtml(l.recipient||'')}" oninput="tempTLLoot[${i}].recipient=this.value">
+      <button class="tl-loot-del" type="button" onclick="removeTLLootRow(${i})" title="Remove">✕</button>
+    </div>
+  `).join('');
+}
+
+function addTLLootRow() {
+  tempTLLoot.push({ id: 'lt_' + Date.now() + Math.floor(Math.random()*100000), item: '', qty: '1', recipient: '' });
+  renderTLLoot();
+  // focus the new item input
+  const rows = document.querySelectorAll('#tle-loot-rows .tl-loot-row .tl-loot-item');
+  if (rows.length) rows[rows.length-1].focus();
+}
+
+function removeTLLootRow(i) {
+  tempTLLoot.splice(i, 1);
+  renderTLLoot();
+}
+
+// ── Attached combats (removable) ─────────────────────────────
+function renderTLCombats() {
+  const box  = document.getElementById('tle-combats-box');
+  const list = document.getElementById('tle-combats-list');
+  if (!box || !list) return;
+  if (tempTLCombats.length === 0) { box.style.display = 'none'; list.innerHTML = ''; return; }
   box.style.display = '';
-  box.innerHTML = `⚔ <strong>${nC} combat${nC===1?'':'s'}</strong>${combatTitles?` (${combatTitles})`:''} and <strong>${nL} loot item${nL===1?'':'s'}</strong> attached from the initiative tracker. These are preserved when you save and shown on the Chronicle. Edit them by re-exporting from the tracker.`;
+  list.innerHTML = tempTLCombats.map((c, i) => `
+    <div class="tl-combat-item">
+      <span class="tl-combat-name">⚔ ${escapeHtml(c.title||'Combat')}</span>
+      <span class="tl-combat-sub">${escapeHtml(c.outcome||'')}${c.rounds?` · ${escapeHtml(String(c.rounds))} rds`:''}</span>
+      <button class="tl-combat-del" type="button" onclick="removeTLCombat(${i})" title="Detach this combat">✕</button>
+    </div>
+  `).join('');
+}
+
+function removeTLCombat(i) {
+  const c = tempTLCombats[i];
+  if (!confirm(`Detach combat "${c?.title||'Combat'}" from this entry? Its log and summary are removed from the Chronicle.`)) return;
+  tempTLCombats.splice(i, 1);
+  renderTLCombats();
 }
 
 function renderTLChips() {
@@ -2647,6 +2731,14 @@ async function saveTimelineEntry() {
     characterIds:tempTLChars.slice(),
     npcIds:      tempTLNpcs.slice(),
     visibleTo:   tempTLVisibleTo.slice(),
+    // Drop blank loot rows; preserve attached combats (minus any detached).
+    loot:        tempTLLoot.filter(l => (l.item||'').trim()).map(l => ({
+                   id: l.id || ('lt_'+Date.now()+Math.floor(Math.random()*100000)),
+                   item: (l.item||'').trim(),
+                   qty: (l.qty||'1').toString().trim() || '1',
+                   recipient: (l.recipient||'').trim() || 'Party'
+                 })),
+    combats:     tempTLCombats.slice(),
   };
 
   if (editingTLId === '__new__') {
