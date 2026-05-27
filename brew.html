@@ -144,6 +144,23 @@
     .state.error{color:var(--rust)}
     .footer{margin-top:2rem;text-align:center;padding-top:1.5rem;border-top:1px solid var(--border)}
     .footer-text{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--ink-faint)}
+
+    /* Known recipes */
+    .recipes-panel{margin-bottom:1rem}
+    .rec-list{max-height:210px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--panel-deep)}
+    .rec-row{display:flex;flex-direction:column;gap:2px;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.12s}
+    .rec-row:last-child{border-bottom:none}
+    .rec-row:hover{background:var(--panel-light)}
+    .rec-row.missing{opacity:0.5}
+    .rec-top{display:flex;align-items:baseline;gap:8px}
+    .rec-name{font-family:'Cinzel',serif;font-size:0.82rem;color:var(--teal-bright);letter-spacing:0.03em;flex:1}
+    .rec-slot{font-family:'Cinzel',serif;font-size:0.56rem;letter-spacing:0.06em;color:var(--ink-faint);text-transform:uppercase}
+    .rec-ings{font-size:0.84rem;color:var(--ink-light)}
+    .rec-missing{font-family:'Cinzel',serif;font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--rust)}
+    .empty-rec{padding:0.9rem 1rem;text-align:center;color:var(--ink-faint);font-style:italic;font-size:0.86rem}
+
+    .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel-light);border:1px solid var(--teal);border-radius:var(--radius);padding:10px 18px;color:var(--ink);font-size:0.9rem;box-shadow:0 4px 16px rgba(0,0,0,0.5);opacity:0;transition:opacity 0.2s;pointer-events:none;z-index:50}
+    .toast.show{opacity:1}
   </style>
 </head>
 <body>
@@ -167,6 +184,10 @@
 
       <div class="grid">
         <div>
+          <div class="recipes-panel" id="recipes-panel" style="display:none">
+            <div class="col-head">Known recipes (<span id="rec-count">0</span>)</div>
+            <div class="rec-list" id="rec-list"></div>
+          </div>
           <div class="col-head" id="picker-head">Your ingredients</div>
           <input type="text" class="search" id="search" placeholder="Search ingredients…" oninput="renderList()">
           <div class="ing-list" id="ing-list"></div>
@@ -188,6 +209,7 @@
 
     <div class="footer"><p class="footer-text">The Spire · The Cauldron</p></div>
   </div>
+  <div class="toast" id="toast"></div>
 
   <script src="auth.js"></script>
   <script>
@@ -198,10 +220,17 @@
     let catalog = [];           // all ingredients [{id,name,rarity,combat,utility,whimsy,description}]
     let byId = {};
     let inventory = [];         // [{ingredientId, qty}] (players only)
+    let recipes = [];           // known recipes for this character
     let mode = 'craft';
     let selected = [];          // up to 3 ingredient ids
     let chosenCategory = null;  // tie-break choice
     let lastRoll = null;        // {d20, bonus, total}
+
+    function toast(msg){
+      const t = document.getElementById('toast');
+      t.textContent = msg; t.className = 'toast show';
+      clearTimeout(t._t); t._t = setTimeout(()=>{ t.className='toast'; }, 3000);
+    }
 
     async function bootstrap(){
       const ident = Auth.identity();
@@ -228,6 +257,7 @@
           const d = await r.json();
           catalog = Array.isArray(d.ingredients) ? d.ingredients : [];
           inventory = Array.isArray(d.inventory) ? d.inventory : [];
+          recipes = Array.isArray(d.recipes) ? d.recipes : [];
         }
       } catch(e){
         stateEl.textContent = 'Could not reach the brewing stores.';
@@ -263,7 +293,32 @@
         hint.textContent = 'Plan a recipe against the full ingredient list. Shows the slot it hits, but the potion stays a mystery until you actually brew it.';
       }
       document.getElementById('search').value = '';
-      renderList(); renderRecipe();
+      renderList(); renderRecipe(); renderRecipes();
+    }
+
+    function renderRecipes(){
+      const panel = document.getElementById('recipes-panel');
+      if (isDM || recipes.length === 0){ panel.style.display = 'none'; return; }
+      panel.style.display = '';
+      document.getElementById('rec-count').textContent = recipes.length;
+      const nm = id => { const i = byId[id]; return i ? i.name : id; };
+      const sorted = recipes.slice().sort((a,b)=>(a.potionName||'').localeCompare(b.potionName||''));
+      document.getElementById('rec-list').innerHTML = sorted.map(r => {
+        const ings = (r.ingredientIds||[]).map(nm).join(' + ');
+        const missing = (mode === 'craft' && !isDM) && (r.ingredientIds||[]).some(id => qtyOf(id) <= 0);
+        const slot = (r.category||'').charAt(0).toUpperCase()+(r.category||'').slice(1)+' #'+r.number;
+        return `<div class="rec-row ${missing?'missing':''}" onclick="loadRecipe('${esc(r.id)}')">
+          <div class="rec-top"><span class="rec-name">${esc(r.potionName||'(unknown)')}</span><span class="rec-slot">${esc(slot)}</span>${missing?'<span class="rec-missing">missing</span>':''}</div>
+          <span class="rec-ings">${esc(ings)}</span>
+        </div>`;
+      }).join('');
+    }
+
+    function loadRecipe(id){
+      const r = recipes.find(x => x.id === id); if (!r) return;
+      selected = (r.ingredientIds||[]).filter(x => byId[x]).slice(0,3);
+      chosenCategory = null; lastRoll = null;
+      renderList(); renderRecipe(); renderRecipes();
     }
 
     function available(){
@@ -430,11 +485,13 @@
         return;
       }
 
-      // update inventory on consume
+      // update inventory + recipe book from the response
       if (res.consumed && Array.isArray(res.inventory)) inventory = res.inventory;
+      if (Array.isArray(res.recipes)) recipes = res.recipes;
       renderResult(res);
-      // refresh picker (inventory may have changed)
-      renderList();
+      // refresh picker + recipes (inventory and book may have changed)
+      renderList(); renderRecipes();
+      if (res.learned && res.potion) toast('✦ Recipe learned: ' + res.potion.name);
       btn.disabled = false; btn.textContent = isDM?'Test Brew':'Brew Potion';
     }
 
@@ -478,13 +535,23 @@
       zone.innerHTML = `<div class="brew-result ${esc(o)}">${inner}</div>`;
     }
 
-    function chooseOpt(i){
+    async function chooseOpt(i){
       const p = (window._chooseOpts||[])[i];
       if (!p) return;
       const zone = document.getElementById('result-zone');
       zone.innerHTML = `<div class="brew-result success"><div class="brew-outcome">You crafted</div>
         <div class="potion-name">${esc(p.name)}</div>
         <div class="potion-effect">${esc(p.effect)}</div></div>`;
+      // Record the chosen potion as a known recipe (players only).
+      if (!isDM){
+        try {
+          const c = Auth.playerCreds();
+          const r = await fetch(WORKER_URL, { method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ type:'record_recipe', characterId:c.characterId, code:c.code, ingredientIds: selected.slice(), potionId: p.id }) });
+          const d = await r.json();
+          if (r.ok && Array.isArray(d.recipes)){ recipes = d.recipes; renderRecipes(); if (d.learned) toast('✦ Recipe learned: ' + p.name); }
+        } catch {}
+      }
     }
 
     bootstrap();

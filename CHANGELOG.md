@@ -9,6 +9,34 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-27
 
+### Recipe book — per-character known recipes
+
+Players now keep a recipe book in The Cauldron and grow it as they discover combos.
+
+A recipe is a **3-ingredient combo → the potion it makes**, stored per character in
+a new `potion_recipes` KV key (deduped by ingredient set + potion, so a combo that
+can make more than one potion via a masterful "choose" keeps an entry per potion).
+
+#### Added — `brew.html` (player)
+- **Known recipes** panel: lists the character's recipes (potion name + ingredients
+  + slot). Tapping one loads its three ingredients into the recipe slots (greyed when
+  the player doesn't currently hold them all). Pre-fill only — you still roll the brew.
+- New recipes are learned automatically on a **clean success** (the intended/official
+  potion), and on a **masterful "choose"** once the player picks which potion they
+  made. A toast announces each newly learned recipe.
+
+#### Added — `brew-dm.html` (DM)
+- **Recipes** tab: pick a character, see their known recipes (with remove), and grant
+  one by choosing three ingredients — the editor computes the slot (with a tie picker)
+  and lets you select which potion in that slot the recipe yields (default: official).
+
+#### Worker (`cloudflare-worker.js`)
+- `brew_player` and `potion_data_dm` now return `recipes`. POST `brew` auto-records a
+  recipe on a clean success and returns the updated book. New POST `record_recipe`
+  (player) validates that the combo can actually brew the chosen potion before saving
+  (used by the "choose" pick). `potion_recipes` added to the DM write types + KV keys.
+- ⚠️ **Requires another manual worker redeploy** for recipes to work.
+
 ### Potion brewing tool — The Cauldron (player) + The Apothecary (DM)
 
 A new campaign tool based on Obojima: Tales from the Tall Grass potion brewing,
