@@ -8,6 +8,7 @@ CLAUDE.md
 # never committed to the public repo. Imported into the worker by the DM.
 obojima-seed.json
 obojima-potions.json
+dnd-potions-seed.json
 *.seed.json
 
 # macOS

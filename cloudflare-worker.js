@@ -436,6 +436,7 @@ export default {
           negatives:   await kvGet(env, 'negative_potions', []),
           inventories: await kvGet(env, 'potion_inventories', {}) || {},
           recipes:     await kvGet(env, 'potion_recipes', {}) || {},
+          library:     await kvGet(env, 'potion_library', []),
           characters:  sanitizeCharacters(await kvGet(env, 'characters', []))
         });
       }
@@ -592,7 +593,7 @@ export default {
     }
 
     // ── DM-only writes ────────────────────────────────────────
-    const DM_WRITE_TYPES = ['initiative_state','map_data','map_data_dm','characters','journals','npcs','timeline','potion_ingredients','potions','negative_potions','potion_inventories','potion_recipes'];
+    const DM_WRITE_TYPES = ['initiative_state','map_data','map_data_dm','characters','journals','npcs','timeline','potion_ingredients','potions','negative_potions','potion_inventories','potion_recipes','potion_library'];
     if (DM_WRITE_TYPES.includes(body?.type)) {
       const auth = await verifyDMAuth(request, env);
       if (!auth.ok) return json({ error: 'DM auth required' }, 401);

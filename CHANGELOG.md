@@ -9,6 +9,33 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-27
 
+### Potion library — standard 5e potions, assignable to slots
+
+A reference shelf of standard D&D potions the DM can drop onto Obojima brew slots.
+Imported the 28 potions from the 2024 Dungeon Master's Guide (Magic Items A–Z):
+Healing, Fire Breath, Flying, Giant Strength, Invisibility, the Oils, etc.
+
+A library potion is `{id,name,rarity,attunement,effect,source}` in a new
+`potion_library` KV key. It is **not** brewable on its own — the brew math is
+untouched. Instead the DM places one onto a slot, after which it brews and grants
+as a recipe like any other potion.
+
+#### Added — `brew-dm.html` (DM)
+- **Library** tab: manage the standard potions (search / edit / delete) and
+  **Import seed** (`dnd-potions-seed.json`, merge by id — re-import skips dupes).
+- **Slot it** on a library potion jumps to the Potions tab with the name + effect
+  pre-filled; the DM sets the list + number and saves it as a real slotted potion.
+
+#### Worker (`cloudflare-worker.js`)
+- `potion_data_dm` now returns `library`; `potion_library` added to the DM write
+  types + KV keys. (Players don't fetch the library directly — it only reaches them
+  once a library potion has been slotted into `potions`.)
+- ⚠️ **Requires another manual worker redeploy.**
+
+#### Data / privacy
+- DMG potion text is third-party copyrighted content: `dnd-potions-seed.json` is
+  gitignored and lives in KV only, same as the Obojima data.
+
 ### Recipe book — per-character known recipes
 
 Players now keep a recipe book in The Cauldron and grow it as they discover combos.
