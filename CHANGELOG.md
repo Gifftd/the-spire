@@ -7,7 +7,57 @@ Dates are YYYY-MM-DD.
 
 ---
 
-## [Unreleased] — 2026-05-21
+## [Unreleased] — 2026-05-27
+
+### Potion brewing tool — The Cauldron (player) + The Apothecary (DM)
+
+A new campaign tool based on Obojima: Tales from the Tall Grass potion brewing,
+with a homebrew check-and-margin layer on top. Players combine three ingredients
+to brew a potion; the DM stocks the ingredient/potion lists and grants inventory.
+
+**The mechanic.** Each ingredient has Combat / Utility / Whimsy values. A recipe is
+3 unique ingredients; the highest summed attribute picks the list and *is* the
+potion number (1–60). Rarity comes from the number band (1–30 common, 31–50
+uncommon, 51–60 rare); brewing DC is 10 / 15 / 20 by rarity. Outcome by margin
+(roll − DC): **+10** choose any potion in the slot · **0..+9** the official potion ·
+**−1..−5** a random potion from the slot · **−6..−9** sludge (nothing) ·
+**−10 or worse** a random negative potion. Brewing consumes the 3 ingredients
+(even on a botch). Ties let the brewer pick the list.
+
+#### Added — `brew.html` (player "The Cauldron")
+- Craft mode (brew from granted inventory, consumes ingredients) and Experiment
+  mode (plan against the full ingredient list; shows the slot but keeps the potion
+  hidden until actually brewed). Live attribute sums, slot/rarity/DC readout, and a
+  d20 roller (or type your own roll + alchemy bonus). DM can test-brew without
+  consuming.
+
+#### Added — `brew-dm.html` (DM "The Apothecary")
+- Tabs: Ingredients / Potions / Negatives / Inventory / Import. Full CRUD for
+  ingredients (values + description + DM notes), potions (multiple per slot, with an
+  *official* flag), and negative potions. Per-character ingredient inventory with
+  quantities. One-time **Import** reads `obojima-seed.json` and seeds KV.
+
+#### Added — Worker (`cloudflare-worker.js`)
+- GET `brew_player` (player creds → ingredient catalogue + that character's
+  inventory) and `potion_data_dm` (DM → everything for the editor).
+- POST `brew` — resolves the recipe + margin **server-side** and consumes
+  ingredients, so the potion and negative lists never reach the browser except as
+  the resolved result (snoop-safe, like the map's player_view).
+- New DM write types: `potion_ingredients`, `potions`, `negative_potions`,
+  `potion_inventories`. New KV keys of the same names.
+- ⚠️ **Requires the manual worker redeploy** (paste into the Cloudflare dashboard).
+  Until redeployed, the tool can't load or brew.
+
+#### Added — Hub (`home.html`)
+- "The Cauldron" card (players) and "The Apothecary" card (DM).
+
+#### Data / privacy
+- Obojima ingredient/potion text is third-party copyrighted content and lives in
+  KV only. `obojima-seed.json` / `obojima-potions.json` are gitignored so they
+  never reach the public repo. The tool *code* is in the repo; the book *data* is not.
+- Seeded from the book: 135 ingredients (69 common / 45 uncommon / 21 rare),
+  180 potions (60 each Combat/Utility/Whimsy), and 10 negative potions adapted
+  from the Potion Mishaps table.
 
 ### Pin color + outline refresh
 

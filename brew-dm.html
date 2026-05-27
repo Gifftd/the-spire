@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Spire — The Apothecary (DM)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#080c10;--panel:#131c22;--panel-deep:#0d141a;--panel-light:#1c2730;
+      --border:#2c4048;--border-light:#3e5862;
+      --teal:#4a9595;--teal-bright:#7ec5c5;--teal-deep:#2a5454;--teal-faint:#1b3838;
+      --ink:#dde3e5;--ink-light:#a3adb3;--ink-faint:#6c787f;
+      --brass:#b88a5a;--brass-bright:#d8b888;--rust:#a85d4a;
+      --combat:#c43838;--utility:#3a6fd0;--whimsy:#b060d0;
+      --radius:4px;
+    }
+    body{background:var(--bg);background-image:radial-gradient(ellipse at 20% 10%, rgba(184,138,90,0.08) 0%, transparent 55%),radial-gradient(ellipse at 80% 90%, rgba(74,149,149,0.06) 0%, transparent 55%);min-height:100vh;color:var(--ink);font-family:'Crimson Text',Georgia,serif;padding:1.5rem 1rem 4rem}
+    .wrap{max-width:1040px;margin:0 auto}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding-bottom:1rem;margin-bottom:1.25rem;border-bottom:1px solid var(--border);flex-wrap:wrap}
+    .topbar h1{font-family:'Cinzel',serif;font-size:1.4rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--ink)}
+    .topbar h1 .accent{color:var(--brass-bright);font-weight:400}
+    .topbar-meta{display:flex;align-items:center;gap:8px;font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-faint)}
+    .role.dm{padding:2px 8px;border-radius:10px;border:1px solid rgba(184,138,90,0.45);background:rgba(184,138,90,0.10);color:var(--brass);font-size:0.55rem}
+    .home-link{font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-light);text-decoration:none;padding:6px 12px;border:1px solid var(--border-light);border-radius:var(--radius)}
+    .home-link:hover{border-color:var(--brass);color:var(--brass-bright)}
+
+    .tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:1.25rem;border-bottom:1px solid var(--border)}
+    .tab{font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-light);background:none;border:none;border-bottom:2px solid transparent;padding:9px 15px;cursor:pointer}
+    .tab:hover{color:var(--brass-bright)}
+    .tab.active{color:var(--brass-bright);border-bottom-color:var(--brass)}
+
+    .layout{display:grid;grid-template-columns:1fr 1.1fr;gap:1.25rem;align-items:start}
+    @media (max-width:820px){.layout{grid-template-columns:1fr}}
+    .col-head{font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--brass);margin-bottom:0.6rem;display:flex;justify-content:space-between;align-items:center}
+
+    .toolbar{display:flex;gap:6px;margin-bottom:0.6rem;flex-wrap:wrap}
+    input,select,textarea{background:var(--panel-deep);border:1px solid var(--border);border-radius:2px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.95rem;padding:7px 10px;outline:none}
+    input:focus,select:focus,textarea:focus{border-color:var(--teal)}
+    textarea{width:100%;resize:vertical;min-height:80px;line-height:1.5}
+    .toolbar input{flex:1;min-width:140px}
+
+    .list{max-height:520px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--panel-deep)}
+    .row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer}
+    .row:last-child{border-bottom:none}
+    .row:hover{background:var(--panel-light)}
+    .row.active{background:var(--teal-faint)}
+    .row .nm{flex:1;font-size:0.95rem;color:var(--ink)}
+    .row .sub{font-family:'Cinzel',serif;font-size:0.6rem;color:var(--ink-faint);letter-spacing:0.04em}
+    .rarity{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid}
+    .rarity.common{color:var(--ink-light);border-color:var(--border-light)}
+    .rarity.uncommon{color:var(--teal-bright);border-color:var(--teal)}
+    .rarity.rare{color:var(--brass);border-color:rgba(184,138,90,0.6)}
+    .vals{display:flex;gap:5px;font-family:'Cinzel',serif;font-size:0.62rem}
+    .v-c{color:var(--combat)}.v-u{color:var(--utility)}.v-w{color:var(--whimsy)}
+    .badge-official{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--teal-bright)}
+
+    .form{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem}
+    .form h3{font-family:'Cinzel',serif;font-size:0.78rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--brass-bright);margin-bottom:0.8rem}
+    .fg{margin-bottom:0.7rem;display:flex;flex-direction:column;gap:4px}
+    .fg label{font-family:'Cinzel',serif;font-size:0.56rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint)}
+    .frow{display:flex;gap:8px}
+    .frow .fg{flex:1}
+    .form-actions{display:flex;gap:8px;margin-top:0.8rem;flex-wrap:wrap}
+    .btn{font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;padding:9px 16px;border-radius:var(--radius);border:1px solid var(--teal);background:var(--teal-deep);color:#eafafa;cursor:pointer;transition:all 0.15s}
+    .btn:hover{background:var(--teal)}
+    .btn:disabled{opacity:0.4;cursor:not-allowed}
+    .btn.brass{border-color:var(--brass);background:rgba(184,138,90,0.18);color:var(--brass-bright)}
+    .btn.brass:hover{background:rgba(184,138,90,0.32)}
+    .btn.ghost{background:none;border-color:var(--border-light);color:var(--ink-light)}
+    .btn.ghost:hover{border-color:var(--teal);color:var(--teal-bright)}
+    .btn.danger{border-color:var(--rust);background:rgba(168,93,74,0.15);color:#e3a08e}
+    .btn.danger:hover{background:rgba(168,93,74,0.3)}
+    .btn.sm{padding:4px 10px;font-size:0.6rem}
+
+    .empty-note{padding:1.5rem 1rem;text-align:center;color:var(--ink-faint);font-style:italic;font-size:0.92rem}
+    .hint{font-size:0.9rem;color:var(--ink-faint);font-style:italic;line-height:1.5;margin-bottom:0.8rem}
+    .warn{border:1px solid rgba(168,93,74,0.5);background:rgba(168,93,74,0.08);border-radius:var(--radius);padding:0.8rem 0.9rem;color:#e3a08e;font-size:0.92rem;line-height:1.5;margin-bottom:0.9rem}
+
+    /* inventory rows */
+    .inv-row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border)}
+    .inv-row:last-child{border-bottom:none}
+    .inv-row .nm{flex:1}
+    .qstep{display:flex;align-items:center;gap:6px}
+    .qstep button{width:26px;height:26px;border-radius:4px;border:1px solid var(--border-light);background:var(--panel-deep);color:var(--ink);cursor:pointer;font-size:1rem;line-height:1}
+    .qstep button:hover{border-color:var(--teal)}
+    .qstep .q{font-family:'Cinzel',serif;min-width:24px;text-align:center;color:var(--teal-bright)}
+
+    .state{text-align:center;padding:3rem 1rem;color:var(--ink-faint);font-style:italic}
+    .state.error{color:var(--rust)}
+    .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel-light);border:1px solid var(--teal);border-radius:var(--radius);padding:10px 18px;color:var(--ink);font-size:0.9rem;box-shadow:0 4px 16px rgba(0,0,0,0.5);opacity:0;transition:opacity 0.2s;pointer-events:none;z-index:50}
+    .toast.show{opacity:1}
+    .toast.err{border-color:var(--rust);color:#e3a08e}
+    .footer{margin-top:2rem;text-align:center;padding-top:1.5rem;border-top:1px solid var(--border)}
+    .footer-text{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--ink-faint)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <h1>The <span class="accent">Apothecary</span></h1>
+      <div class="topbar-meta">
+        <span id="role-line">— loading —</span>
+        <a href="home.html" class="home-link">⌂ Home</a>
+      </div>
+    </div>
+
+    <div id="state" class="state">Unlocking the stores…</div>
+
+    <div id="tool" style="display:none">
+      <div class="tabs">
+        <button class="tab active" data-tab="ingredients" onclick="switchTab('ingredients')">Ingredients</button>
+        <button class="tab" data-tab="potions" onclick="switchTab('potions')">Potions</button>
+        <button class="tab" data-tab="negatives" onclick="switchTab('negatives')">Negatives</button>
+        <button class="tab" data-tab="inventory" onclick="switchTab('inventory')">Inventory</button>
+        <button class="tab" data-tab="import" onclick="switchTab('import')">Import</button>
+      </div>
+
+      <!-- INGREDIENTS -->
+      <div class="tab-panel" id="panel-ingredients">
+        <div class="layout">
+          <div>
+            <div class="col-head"><span>Ingredients (<span id="ing-count">0</span>)</span><button class="btn ghost sm" onclick="newIng()">+ New</button></div>
+            <div class="toolbar">
+              <input type="text" id="ing-search" placeholder="Search…" oninput="renderIngList()">
+              <select id="ing-rarity-filter" onchange="renderIngList()">
+                <option value="">All rarities</option><option value="common">Common</option><option value="uncommon">Uncommon</option><option value="rare">Rare</option>
+              </select>
+            </div>
+            <div class="list" id="ing-list"></div>
+          </div>
+          <div class="form">
+            <h3 id="ing-form-title">New ingredient</h3>
+            <input type="hidden" id="ing-id">
+            <div class="fg"><label>Name</label><input type="text" id="ing-name"></div>
+            <div class="frow">
+              <div class="fg"><label>Rarity</label><select id="ing-rarity"><option value="common">Common</option><option value="uncommon">Uncommon</option><option value="rare">Rare</option></select></div>
+              <div class="fg"><label>Combat</label><input type="number" id="ing-combat" value="0"></div>
+              <div class="fg"><label>Utility</label><input type="number" id="ing-utility" value="0"></div>
+              <div class="fg"><label>Whimsy</label><input type="number" id="ing-whimsy" value="0"></div>
+            </div>
+            <div class="fg"><label>Description (player-visible)</label><textarea id="ing-desc"></textarea></div>
+            <div class="fg"><label>DM notes (private)</label><textarea id="ing-dmnotes" style="min-height:50px"></textarea></div>
+            <div class="form-actions">
+              <button class="btn" onclick="saveIng()">Save ingredient</button>
+              <button class="btn danger" id="ing-del" onclick="deleteIng()" style="display:none">Delete</button>
+              <button class="btn ghost" onclick="newIng()">Clear</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- POTIONS -->
+      <div class="tab-panel" id="panel-potions" style="display:none">
+        <div class="layout">
+          <div>
+            <div class="col-head"><span>Potions (<span id="pot-count">0</span>)</span><button class="btn ghost sm" onclick="newPot()">+ New</button></div>
+            <div class="toolbar">
+              <input type="text" id="pot-search" placeholder="Search name/effect…" oninput="renderPotList()">
+              <select id="pot-cat-filter" onchange="renderPotList()">
+                <option value="">All lists</option><option value="combat">Combat</option><option value="utility">Utility</option><option value="whimsy">Whimsy</option>
+              </select>
+            </div>
+            <div class="hint">Multiple potions can share a slot (e.g. Combat #21). On a plain success the player gets the <b>official</b> one; alternates surface on a 10+ beat (their choice) or a near-miss (random).</div>
+            <div class="list" id="pot-list"></div>
+          </div>
+          <div class="form">
+            <h3 id="pot-form-title">New potion</h3>
+            <input type="hidden" id="pot-id">
+            <div class="frow">
+              <div class="fg"><label>List</label><select id="pot-category" onchange="potRarityPreview()"><option value="combat">Combat</option><option value="utility">Utility</option><option value="whimsy">Whimsy</option></select></div>
+              <div class="fg"><label>Number (1–60)</label><input type="number" id="pot-number" min="1" max="60" value="1" oninput="potRarityPreview()"></div>
+              <div class="fg"><label>Rarity</label><input type="text" id="pot-rarity" readonly style="opacity:0.8"></div>
+            </div>
+            <div class="fg"><label><input type="checkbox" id="pot-official" style="width:auto;vertical-align:middle"> Official (the default result on a plain success)</label></div>
+            <div class="fg"><label>Name</label><input type="text" id="pot-name"></div>
+            <div class="fg"><label>Effect</label><textarea id="pot-effect"></textarea></div>
+            <div class="fg"><label>DM notes (private)</label><textarea id="pot-dmnotes" style="min-height:50px"></textarea></div>
+            <div class="form-actions">
+              <button class="btn" onclick="savePot()">Save potion</button>
+              <button class="btn danger" id="pot-del" onclick="deletePot()" style="display:none">Delete</button>
+              <button class="btn ghost" onclick="newPot()">Clear</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- NEGATIVES -->
+      <div class="tab-panel" id="panel-negatives" style="display:none">
+        <div class="layout">
+          <div>
+            <div class="col-head"><span>Negative potions (<span id="neg-count">0</span>)</span><button class="btn ghost sm" onclick="newNeg()">+ New</button></div>
+            <div class="hint">Drawn at random when a brew fails by 10 or more.</div>
+            <div class="list" id="neg-list"></div>
+          </div>
+          <div class="form">
+            <h3 id="neg-form-title">New negative potion</h3>
+            <input type="hidden" id="neg-id">
+            <div class="fg"><label>Name</label><input type="text" id="neg-name"></div>
+            <div class="fg"><label>Effect</label><textarea id="neg-effect"></textarea></div>
+            <div class="form-actions">
+              <button class="btn" onclick="saveNeg()">Save</button>
+              <button class="btn danger" id="neg-del" onclick="deleteNeg()" style="display:none">Delete</button>
+              <button class="btn ghost" onclick="newNeg()">Clear</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- INVENTORY -->
+      <div class="tab-panel" id="panel-inventory" style="display:none">
+        <div class="hint">Grant ingredients to a character. They brew from this in the Cauldron, and brewing consumes them.</div>
+        <div class="toolbar">
+          <select id="inv-char" onchange="renderInv()" style="flex:1"></select>
+        </div>
+        <div class="layout">
+          <div>
+            <div class="col-head">Held by this character</div>
+            <div class="list" id="inv-list"></div>
+          </div>
+          <div class="form">
+            <h3>Grant an ingredient</h3>
+            <div class="fg"><label>Ingredient</label><select id="inv-add-ing"></select></div>
+            <div class="frow">
+              <div class="fg" style="flex:0 0 90px"><label>Quantity</label><input type="number" id="inv-add-qty" value="1" min="1"></div>
+              <div class="fg" style="justify-content:flex-end"><button class="btn" onclick="grantIng()">Grant</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- IMPORT -->
+      <div class="tab-panel" id="panel-import" style="display:none">
+        <div class="form" style="max-width:640px">
+          <h3>Import Obojima seed</h3>
+          <div class="warn"><b>Overwrites</b> the ingredient, potion, and negative lists with the contents of the seed file. Inventories are left untouched. Use once to stock the tool, then manage everything in the tabs.</div>
+          <div class="hint">Pick the <code>obojima-seed.json</code> file (it sits in your project folder). Nothing uploads anywhere except your own worker's KV store.</div>
+          <div class="fg"><label>Seed file</label><input type="file" id="import-file" accept="application/json,.json" onchange="loadSeed(event)"></div>
+          <div id="import-preview" class="hint"></div>
+          <div class="form-actions">
+            <button class="btn brass" id="import-btn" onclick="doImport()" disabled>Import to KV</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer"><p class="footer-text">The Spire · The Apothecary</p></div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script src="auth.js"></script>
+  <script>
+    const WORKER_URL = (window.Auth && window.Auth.WORKER_URL) || 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+    function esc(s){return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+    function slug(s){return (s||'').toLowerCase().replace(/['’]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');}
+    function genId(prefix){return prefix+'-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+    function bandOf(n){return n<=30?'common':n<=50?'uncommon':'rare';}
+
+    let data = { ingredients:[], potions:[], negatives:[], inventories:{}, characters:[] };
+    let seedData = null;
+
+    function toast(msg, isErr){
+      const t = document.getElementById('toast');
+      t.textContent = msg; t.className = 'toast show' + (isErr?' err':'');
+      clearTimeout(t._t); t._t = setTimeout(()=>{ t.className='toast'; }, 2600);
+    }
+
+    async function bootstrap(){
+      const ident = Auth.identity();
+      document.getElementById('role-line').innerHTML = `${esc(ident.display||'DM')} <span class="role dm">DM</span>`;
+      if (!Auth.requireRole('dm', { reason:'The Apothecary is for the DM only.' })) return;
+      const stateEl = document.getElementById('state');
+      try {
+        const r = await fetch(WORKER_URL + '?type=potion_data_dm', { cache:'no-store', headers: Auth.dmHeaders() });
+        if (r.status === 401){ stateEl.textContent='Your DM session expired — sign in again on the home page.'; stateEl.classList.add('error'); return; }
+        if (!r.ok) throw new Error('HTTP '+r.status);
+        const d = await r.json();
+        data.ingredients = Array.isArray(d.ingredients)?d.ingredients:[];
+        data.potions     = Array.isArray(d.potions)?d.potions:[];
+        data.negatives   = Array.isArray(d.negatives)?d.negatives:[];
+        data.inventories = (d.inventories && typeof d.inventories==='object')?d.inventories:{};
+        data.characters  = Array.isArray(d.characters)?d.characters:[];
+      } catch(e){
+        stateEl.textContent = 'Could not reach the worker. (If you just added the brew endpoints, redeploy the worker first.)';
+        stateEl.classList.add('error');
+        return;
+      }
+      stateEl.style.display='none';
+      document.getElementById('tool').style.display='';
+      renderIngList(); newIng();
+      renderPotList(); newPot();
+      renderNegList(); newNeg();
+      populateCharSelect(); populateInvIngSelect(); renderInv();
+      switchTab('ingredients');
+    }
+
+    function switchTab(name){
+      document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+      document.querySelectorAll('.tab-panel').forEach(p=>p.style.display='none');
+      document.getElementById('panel-'+name).style.display='';
+    }
+
+    async function saveKey(type, payload){
+      const r = await fetch(WORKER_URL, { method:'POST', headers: Auth.dmHeaders(), body: JSON.stringify({ type, payload }) });
+      if (r.status === 401){ toast('DM session expired — sign in again.', true); return false; }
+      let b={}; try{ b=await r.json(); }catch{}
+      if (!r.ok || b.error){ toast(b.error||('Save failed (HTTP '+r.status+')'), true); return false; }
+      return true;
+    }
+
+    /* ── Ingredients ── */
+    function renderIngList(){
+      const q=(document.getElementById('ing-search').value||'').trim().toLowerCase();
+      const rf=document.getElementById('ing-rarity-filter').value;
+      let items=data.ingredients.slice().sort((a,b)=>a.name.localeCompare(b.name));
+      if(rf) items=items.filter(i=>i.rarity===rf);
+      if(q) items=items.filter(i=>i.name.toLowerCase().includes(q));
+      document.getElementById('ing-count').textContent=data.ingredients.length;
+      const cur=document.getElementById('ing-id').value;
+      document.getElementById('ing-list').innerHTML = items.length? items.map(i=>`
+        <div class="row ${i.id===cur?'active':''}" onclick="editIng('${esc(i.id)}')">
+          <span class="nm">${esc(i.name)}</span>
+          <span class="vals"><span class="v-c">${i.combat}</span><span class="v-u">${i.utility}</span><span class="v-w">${i.whimsy}</span></span>
+          <span class="rarity ${esc(i.rarity)}">${esc(i.rarity)}</span>
+        </div>`).join('') : '<div class="empty-note">No ingredients.</div>';
+    }
+    function newIng(){
+      document.getElementById('ing-form-title').textContent='New ingredient';
+      ['ing-id','ing-name','ing-desc','ing-dmnotes'].forEach(id=>document.getElementById(id).value='');
+      document.getElementById('ing-rarity').value='common';
+      ['ing-combat','ing-utility','ing-whimsy'].forEach(id=>document.getElementById(id).value='0');
+      document.getElementById('ing-del').style.display='none';
+      renderIngList();
+    }
+    function editIng(id){
+      const i=data.ingredients.find(x=>x.id===id); if(!i) return;
+      document.getElementById('ing-form-title').textContent='Edit ingredient';
+      document.getElementById('ing-id').value=i.id;
+      document.getElementById('ing-name').value=i.name||'';
+      document.getElementById('ing-rarity').value=i.rarity||'common';
+      document.getElementById('ing-combat').value=i.combat||0;
+      document.getElementById('ing-utility').value=i.utility||0;
+      document.getElementById('ing-whimsy').value=i.whimsy||0;
+      document.getElementById('ing-desc').value=i.description||'';
+      document.getElementById('ing-dmnotes').value=i.dmNotes||'';
+      document.getElementById('ing-del').style.display='';
+      renderIngList();
+    }
+    async function saveIng(){
+      const name=document.getElementById('ing-name').value.trim();
+      if(!name){ toast('Name is required.', true); return; }
+      let id=document.getElementById('ing-id').value;
+      const obj={
+        id: id || (data.ingredients.some(x=>x.id===slug(name))? genId('ing') : slug(name)),
+        name, rarity: document.getElementById('ing-rarity').value,
+        combat: parseInt(document.getElementById('ing-combat').value||'0',10)||0,
+        utility: parseInt(document.getElementById('ing-utility').value||'0',10)||0,
+        whimsy: parseInt(document.getElementById('ing-whimsy').value||'0',10)||0,
+        description: document.getElementById('ing-desc').value,
+        regions: [], dmNotes: document.getElementById('ing-dmnotes').value
+      };
+      const idx=data.ingredients.findIndex(x=>x.id===obj.id);
+      if(idx>=0) data.ingredients[idx]=obj; else data.ingredients.push(obj);
+      if(await saveKey('potion_ingredients', data.ingredients)){ toast('Ingredient saved.'); document.getElementById('ing-id').value=obj.id; editIng(obj.id); populateInvIngSelect(); }
+    }
+    async function deleteIng(){
+      const id=document.getElementById('ing-id').value; if(!id) return;
+      if(!confirm('Delete this ingredient?')) return;
+      data.ingredients=data.ingredients.filter(x=>x.id!==id);
+      if(await saveKey('potion_ingredients', data.ingredients)){ toast('Deleted.'); newIng(); populateInvIngSelect(); }
+    }
+
+    /* ── Potions ── */
+    function potRarityPreview(){
+      const n=parseInt(document.getElementById('pot-number').value||'1',10)||1;
+      document.getElementById('pot-rarity').value=bandOf(n);
+    }
+    function renderPotList(){
+      const q=(document.getElementById('pot-search').value||'').trim().toLowerCase();
+      const cf=document.getElementById('pot-cat-filter').value;
+      let items=data.potions.slice().sort((a,b)=> a.category===b.category ? (a.number-b.number) : a.category.localeCompare(b.category));
+      if(cf) items=items.filter(p=>p.category===cf);
+      if(q) items=items.filter(p=>(p.name||'').toLowerCase().includes(q)||(p.effect||'').toLowerCase().includes(q));
+      document.getElementById('pot-count').textContent=data.potions.length;
+      const cur=document.getElementById('pot-id').value;
+      document.getElementById('pot-list').innerHTML = items.length? items.map(p=>`
+        <div class="row ${p.id===cur?'active':''}" onclick="editPot('${esc(p.id)}')">
+          <span class="sub">${esc(p.category.slice(0,3).toUpperCase())} #${p.number}</span>
+          <span class="nm">${esc(p.name)}</span>
+          ${p.official?'<span class="badge-official">official</span>':''}
+          <span class="rarity ${esc(bandOf(p.number))}">${esc(bandOf(p.number))}</span>
+        </div>`).join('') : '<div class="empty-note">No potions.</div>';
+    }
+    function newPot(){
+      document.getElementById('pot-form-title').textContent='New potion';
+      document.getElementById('pot-id').value='';
+      document.getElementById('pot-category').value='combat';
+      document.getElementById('pot-number').value='1';
+      document.getElementById('pot-name').value='';
+      document.getElementById('pot-effect').value='';
+      document.getElementById('pot-dmnotes').value='';
+      document.getElementById('pot-official').checked=false;
+      potRarityPreview();
+      document.getElementById('pot-del').style.display='none';
+      renderPotList();
+    }
+    function editPot(id){
+      const p=data.potions.find(x=>x.id===id); if(!p) return;
+      document.getElementById('pot-form-title').textContent='Edit potion';
+      document.getElementById('pot-id').value=p.id;
+      document.getElementById('pot-category').value=p.category||'combat';
+      document.getElementById('pot-number').value=p.number||1;
+      document.getElementById('pot-name').value=p.name||'';
+      document.getElementById('pot-effect').value=p.effect||'';
+      document.getElementById('pot-dmnotes').value=p.dmNotes||'';
+      document.getElementById('pot-official').checked=!!p.official;
+      potRarityPreview();
+      document.getElementById('pot-del').style.display='';
+      renderPotList();
+    }
+    async function savePot(){
+      const name=document.getElementById('pot-name').value.trim();
+      if(!name){ toast('Name is required.', true); return; }
+      const category=document.getElementById('pot-category').value;
+      let number=parseInt(document.getElementById('pot-number').value||'1',10)||1;
+      number=Math.max(1,Math.min(60,number));
+      let id=document.getElementById('pot-id').value;
+      const official=document.getElementById('pot-official').checked;
+      const obj={ id: id || genId('pot'), category, number, rarity: bandOf(number), name,
+        effect: document.getElementById('pot-effect').value, official,
+        dmNotes: document.getElementById('pot-dmnotes').value };
+      // Only one official per slot — clear the flag on siblings if this one is official.
+      if(official){ data.potions.forEach(p=>{ if(p.category===category && p.number===number && p.id!==obj.id) p.official=false; }); }
+      const idx=data.potions.findIndex(x=>x.id===obj.id);
+      if(idx>=0) data.potions[idx]=obj; else data.potions.push(obj);
+      if(await saveKey('potions', data.potions)){ toast('Potion saved.'); document.getElementById('pot-id').value=obj.id; editPot(obj.id); }
+    }
+    async function deletePot(){
+      const id=document.getElementById('pot-id').value; if(!id) return;
+      if(!confirm('Delete this potion?')) return;
+      data.potions=data.potions.filter(x=>x.id!==id);
+      if(await saveKey('potions', data.potions)){ toast('Deleted.'); newPot(); }
+    }
+
+    /* ── Negatives ── */
+    function renderNegList(){
+      document.getElementById('neg-count').textContent=data.negatives.length;
+      const cur=document.getElementById('neg-id').value;
+      document.getElementById('neg-list').innerHTML = data.negatives.length? data.negatives.map(n=>`
+        <div class="row ${n.id===cur?'active':''}" onclick="editNeg('${esc(n.id)}')"><span class="nm">${esc(n.name)}</span></div>`).join('')
+        : '<div class="empty-note">No negative potions.</div>';
+    }
+    function newNeg(){
+      document.getElementById('neg-form-title').textContent='New negative potion';
+      ['neg-id','neg-name','neg-effect'].forEach(id=>document.getElementById(id).value='');
+      document.getElementById('neg-del').style.display='none';
+      renderNegList();
+    }
+    function editNeg(id){
+      const n=data.negatives.find(x=>x.id===id); if(!n) return;
+      document.getElementById('neg-form-title').textContent='Edit negative potion';
+      document.getElementById('neg-id').value=n.id;
+      document.getElementById('neg-name').value=n.name||'';
+      document.getElementById('neg-effect').value=n.effect||'';
+      document.getElementById('neg-del').style.display='';
+      renderNegList();
+    }
+    async function saveNeg(){
+      const name=document.getElementById('neg-name').value.trim();
+      if(!name){ toast('Name is required.', true); return; }
+      let id=document.getElementById('neg-id').value;
+      const obj={ id: id||genId('neg'), name, effect: document.getElementById('neg-effect').value };
+      const idx=data.negatives.findIndex(x=>x.id===obj.id);
+      if(idx>=0) data.negatives[idx]=obj; else data.negatives.push(obj);
+      if(await saveKey('negative_potions', data.negatives)){ toast('Saved.'); document.getElementById('neg-id').value=obj.id; editNeg(obj.id); }
+    }
+    async function deleteNeg(){
+      const id=document.getElementById('neg-id').value; if(!id) return;
+      if(!confirm('Delete this negative potion?')) return;
+      data.negatives=data.negatives.filter(x=>x.id!==id);
+      if(await saveKey('negative_potions', data.negatives)){ toast('Deleted.'); newNeg(); }
+    }
+
+    /* ── Inventory ── */
+    function populateCharSelect(){
+      const sel=document.getElementById('inv-char');
+      sel.innerHTML = data.characters.length
+        ? data.characters.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}${c.player?' ('+esc(c.player)+')':''}</option>`).join('')
+        : '<option value="">No characters — add them in the Atlas Workshop</option>';
+    }
+    function populateInvIngSelect(){
+      const sel=document.getElementById('inv-add-ing');
+      const items=data.ingredients.slice().sort((a,b)=>a.name.localeCompare(b.name));
+      sel.innerHTML = items.map(i=>`<option value="${esc(i.id)}">${esc(i.name)} (${i.rarity})</option>`).join('');
+    }
+    function ingName(id){ const i=data.ingredients.find(x=>x.id===id); return i?i.name:id; }
+    function renderInv(){
+      const cid=document.getElementById('inv-char').value;
+      const inv=Array.isArray(data.inventories[cid])?data.inventories[cid]:[];
+      const list=document.getElementById('inv-list');
+      if(!cid){ list.innerHTML='<div class="empty-note">No character selected.</div>'; return; }
+      const items=inv.slice().sort((a,b)=>ingName(a.ingredientId).localeCompare(ingName(b.ingredientId)));
+      list.innerHTML = items.length ? items.map(e=>`
+        <div class="inv-row">
+          <span class="nm">${esc(ingName(e.ingredientId))}</span>
+          <span class="qstep">
+            <button onclick="bumpQty('${esc(e.ingredientId)}',-1)">−</button>
+            <span class="q">${e.qty||0}</span>
+            <button onclick="bumpQty('${esc(e.ingredientId)}',1)">+</button>
+          </span>
+          <button class="btn danger sm" onclick="removeInv('${esc(e.ingredientId)}')">Remove</button>
+        </div>`).join('') : '<div class="empty-note">Nothing granted yet.</div>';
+    }
+    async function persistInv(){ return saveKey('potion_inventories', data.inventories); }
+    async function grantIng(){
+      const cid=document.getElementById('inv-char').value;
+      if(!cid){ toast('Pick a character first.', true); return; }
+      const ingId=document.getElementById('inv-add-ing').value;
+      const qty=Math.max(1, parseInt(document.getElementById('inv-add-qty').value||'1',10)||1);
+      if(!Array.isArray(data.inventories[cid])) data.inventories[cid]=[];
+      const e=data.inventories[cid].find(x=>x.ingredientId===ingId);
+      if(e) e.qty=(e.qty||0)+qty; else data.inventories[cid].push({ ingredientId: ingId, qty });
+      if(await persistInv()){ toast('Granted.'); renderInv(); }
+    }
+    async function bumpQty(ingId, delta){
+      const cid=document.getElementById('inv-char').value;
+      const inv=data.inventories[cid]; if(!inv) return;
+      const e=inv.find(x=>x.ingredientId===ingId); if(!e) return;
+      e.qty=(e.qty||0)+delta;
+      if(e.qty<=0) data.inventories[cid]=inv.filter(x=>x.ingredientId!==ingId);
+      if(await persistInv()) renderInv();
+    }
+    async function removeInv(ingId){
+      const cid=document.getElementById('inv-char').value;
+      data.inventories[cid]=(data.inventories[cid]||[]).filter(x=>x.ingredientId!==ingId);
+      if(await persistInv()){ toast('Removed.'); renderInv(); }
+    }
+
+    /* ── Import ── */
+    function loadSeed(ev){
+      const file=ev.target.files&&ev.target.files[0];
+      const prev=document.getElementById('import-preview');
+      const btn=document.getElementById('import-btn');
+      if(!file){ seedData=null; btn.disabled=true; prev.textContent=''; return; }
+      const reader=new FileReader();
+      reader.onload=()=>{
+        try{
+          const d=JSON.parse(reader.result);
+          const ing=Array.isArray(d.ingredients)?d.ingredients:[];
+          const pot=Array.isArray(d.potions)?d.potions:[];
+          const neg=Array.isArray(d.negative_potions)?d.negative_potions:(Array.isArray(d.negatives)?d.negatives:[]);
+          if(!ing.length && !pot.length){ throw new Error('No ingredients or potions found in that file.'); }
+          seedData={ ingredients:ing, potions:pot, negatives:neg };
+          prev.innerHTML=`Ready to import: <b>${ing.length}</b> ingredients, <b>${pot.length}</b> potions, <b>${neg.length}</b> negatives.`;
+          btn.disabled=false;
+        }catch(e){ seedData=null; btn.disabled=true; prev.innerHTML=`<span style="color:var(--rust)">Couldn't read that file: ${esc(e.message)}</span>`; }
+      };
+      reader.readAsText(file);
+    }
+    async function doImport(){
+      if(!seedData) return;
+      const btn=document.getElementById('import-btn'); btn.disabled=true; btn.textContent='Importing…';
+      const ok1=await saveKey('potion_ingredients', seedData.ingredients);
+      const ok2=await saveKey('potions', seedData.potions);
+      const ok3=await saveKey('negative_potions', seedData.negatives);
+      btn.textContent='Import to KV';
+      if(ok1&&ok2&&ok3){
+        data.ingredients=seedData.ingredients; data.potions=seedData.potions; data.negatives=seedData.negatives;
+        renderIngList(); renderPotList(); renderNegList(); populateInvIngSelect();
+        toast('Imported into KV.');
+        document.getElementById('import-preview').innerHTML='<b style="color:var(--teal-bright)">Done.</b> The Cauldron is stocked.';
+      } else { btn.disabled=false; }
+    }
+
+    bootstrap();
+  </script>
+</body>
+</html>
