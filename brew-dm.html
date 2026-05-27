@@ -226,6 +226,10 @@
               <div class="fg" style="flex:0 0 90px"><label>Quantity</label><input type="number" id="inv-add-qty" value="1" min="1"></div>
               <div class="fg" style="justify-content:flex-end"><button class="btn" onclick="grantIng()">Grant</button></div>
             </div>
+            <div class="form-actions" style="border-top:1px solid var(--border);padding-top:0.8rem">
+              <button class="btn ghost" onclick="grantAllIng()">Grant ALL ingredients ×qty</button>
+            </div>
+            <div class="hint" style="margin:0.4rem 0 0">Stocks this character with every ingredient at the quantity above — handy for testing. Replaces their current inventory.</div>
           </div>
         </div>
       </div>
@@ -522,6 +526,16 @@
       const e=data.inventories[cid].find(x=>x.ingredientId===ingId);
       if(e) e.qty=(e.qty||0)+qty; else data.inventories[cid].push({ ingredientId: ingId, qty });
       if(await persistInv()){ toast('Granted.'); renderInv(); }
+    }
+    async function grantAllIng(){
+      const cid=document.getElementById('inv-char').value;
+      if(!cid){ toast('Pick a character first.', true); return; }
+      if(!data.ingredients.length){ toast('No ingredients yet — import the seed first.', true); return; }
+      const qty=Math.max(1, parseInt(document.getElementById('inv-add-qty').value||'1',10)||1);
+      const cname=(data.characters.find(c=>c.id===cid)||{}).name||cid;
+      if(!confirm(`Grant ${cname} all ${data.ingredients.length} ingredients ×${qty}? This replaces their current inventory.`)) return;
+      data.inventories[cid]=data.ingredients.map(i=>({ ingredientId: i.id, qty }));
+      if(await persistInv()){ toast(`Stocked ${cname} with all ×${qty}.`); renderInv(); }
     }
     async function bumpQty(ingId, delta){
       const cid=document.getElementById('inv-char').value;
