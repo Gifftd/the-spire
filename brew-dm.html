@@ -114,6 +114,7 @@
         <button class="tab" data-tab="potions" onclick="switchTab('potions')">Potions</button>
         <button class="tab" data-tab="negatives" onclick="switchTab('negatives')">Negatives</button>
         <button class="tab" data-tab="inventory" onclick="switchTab('inventory')">Inventory</button>
+        <button class="tab" data-tab="recipes" onclick="switchTab('recipes')">Recipes</button>
         <button class="tab" data-tab="import" onclick="switchTab('import')">Import</button>
       </div>
 
@@ -234,6 +235,29 @@
         </div>
       </div>
 
+      <!-- RECIPES -->
+      <div class="tab-panel" id="panel-recipes" style="display:none">
+        <div class="hint">Grant a character a known recipe ("found in the world" or other methods). It shows up in their Cauldron and one-taps the ingredients into place. Players also auto-learn recipes when they brew a clean success.</div>
+        <div class="toolbar">
+          <select id="rec-char" onchange="renderRecList()" style="flex:1"></select>
+        </div>
+        <div class="layout">
+          <div>
+            <div class="col-head">Known by this character</div>
+            <div class="list" id="rec-list"></div>
+          </div>
+          <div class="form">
+            <h3>Grant a recipe</h3>
+            <div class="fg"><label>Ingredient 1</label><select id="rec-i0" onchange="recCompute()"></select></div>
+            <div class="fg"><label>Ingredient 2</label><select id="rec-i1" onchange="recCompute()"></select></div>
+            <div class="fg"><label>Ingredient 3</label><select id="rec-i2" onchange="recCompute()"></select></div>
+            <div id="rec-slot-readout" class="hint" style="margin:0.2rem 0">Pick three different ingredients.</div>
+            <div class="fg"><label>Resulting potion</label><select id="rec-potion"></select></div>
+            <div class="form-actions"><button class="btn" onclick="grantRecipe()">Grant recipe</button></div>
+          </div>
+        </div>
+      </div>
+
       <!-- IMPORT -->
       <div class="tab-panel" id="panel-import" style="display:none">
         <div class="form" style="max-width:640px">
@@ -261,8 +285,9 @@
     function genId(prefix){return prefix+'-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
     function bandOf(n){return n<=30?'common':n<=50?'uncommon':'rare';}
 
-    let data = { ingredients:[], potions:[], negatives:[], inventories:{}, characters:[] };
+    let data = { ingredients:[], potions:[], negatives:[], inventories:{}, recipes:{}, characters:[] };
     let seedData = null;
+    let recChosenCat = null;
 
     function toast(msg, isErr){
       const t = document.getElementById('toast');
@@ -284,6 +309,7 @@
         data.potions     = Array.isArray(d.potions)?d.potions:[];
         data.negatives   = Array.isArray(d.negatives)?d.negatives:[];
         data.inventories = (d.inventories && typeof d.inventories==='object')?d.inventories:{};
+        data.recipes     = (d.recipes && typeof d.recipes==='object')?d.recipes:{};
         data.characters  = Array.isArray(d.characters)?d.characters:[];
       } catch(e){
         stateEl.textContent = 'Could not reach the worker. (If you just added the brew endpoints, redeploy the worker first.)';
@@ -296,6 +322,7 @@
       renderPotList(); newPot();
       renderNegList(); newNeg();
       populateCharSelect(); populateInvIngSelect(); renderInv();
+      populateRecChar(); populateRecIngSelects(); renderRecList();
       switchTab('ingredients');
     }
 
@@ -366,13 +393,13 @@
       };
       const idx=data.ingredients.findIndex(x=>x.id===obj.id);
       if(idx>=0) data.ingredients[idx]=obj; else data.ingredients.push(obj);
-      if(await saveKey('potion_ingredients', data.ingredients)){ toast('Ingredient saved.'); document.getElementById('ing-id').value=obj.id; editIng(obj.id); populateInvIngSelect(); }
+      if(await saveKey('potion_ingredients', data.ingredients)){ toast('Ingredient saved.'); document.getElementById('ing-id').value=obj.id; editIng(obj.id); populateInvIngSelect(); populateRecIngSelects(); }
     }
     async function deleteIng(){
       const id=document.getElementById('ing-id').value; if(!id) return;
       if(!confirm('Delete this ingredient?')) return;
       data.ingredients=data.ingredients.filter(x=>x.id!==id);
-      if(await saveKey('potion_ingredients', data.ingredients)){ toast('Deleted.'); newIng(); populateInvIngSelect(); }
+      if(await saveKey('potion_ingredients', data.ingredients)){ toast('Deleted.'); newIng(); populateInvIngSelect(); populateRecIngSelects(); }
     }
 
     /* ── Potions ── */
@@ -551,6 +578,72 @@
       if(await persistInv()){ toast('Removed.'); renderInv(); }
     }
 
+    /* ── Recipes ── */
+    function populateRecChar(){
+      const sel=document.getElementById('rec-char');
+      sel.innerHTML = data.characters.length
+        ? data.characters.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}${c.player?' ('+esc(c.player)+')':''}</option>`).join('')
+        : '<option value="">No characters — add them in the Atlas Workshop</option>';
+    }
+    function populateRecIngSelects(){
+      const items=data.ingredients.slice().sort((a,b)=>a.name.localeCompare(b.name));
+      const opts='<option value="">— choose —</option>'+items.map(i=>`<option value="${esc(i.id)}">${esc(i.name)} (${i.combat}/${i.utility}/${i.whimsy})</option>`).join('');
+      [0,1,2].forEach(k=>{ const el=document.getElementById('rec-i'+k); if(el) el.innerHTML=opts; });
+    }
+    function recCompute(){
+      const ids=[0,1,2].map(k=>document.getElementById('rec-i'+k).value);
+      const readout=document.getElementById('rec-slot-readout');
+      const potSel=document.getElementById('rec-potion');
+      if(!ids.every(x=>x) || new Set(ids.filter(Boolean)).size!==3){ readout.innerHTML='Pick three different ingredients.'; potSel.innerHTML=''; return null; }
+      const get=id=>data.ingredients.find(i=>i.id===id);
+      const sums={combat:0,utility:0,whimsy:0};
+      ids.forEach(id=>{const i=get(id); if(i){ sums.combat+=+i.combat||0; sums.utility+=+i.utility||0; sums.whimsy+=+i.whimsy||0; }});
+      const peak=Math.max(sums.combat,sums.utility,sums.whimsy);
+      const winners=['combat','utility','whimsy'].filter(c=>sums[c]===peak);
+      if(!recChosenCat || !winners.includes(recChosenCat)) recChosenCat=winners[0];
+      const cat=recChosenCat, num=sums[cat], rar=bandOf(num);
+      let tie='';
+      if(winners.length>1){ tie=' &nbsp;·&nbsp; tie: '+winners.map(c=>`<a href="#" onclick="recCategory('${c}');return false" style="color:${c===cat?'var(--teal-bright)':'var(--ink-light)'}">${c}</a>`).join(' / '); }
+      readout.innerHTML=`Brews <b style="color:var(--teal-bright)">${cat.charAt(0).toUpperCase()+cat.slice(1)} #${num}</b> (${rar})${tie}`;
+      const slot=data.potions.filter(p=>p.category===cat && p.number===num);
+      if(!slot.length){ potSel.innerHTML='<option value="">(no potion authored at this slot)</option>'; }
+      else { const off=slot.find(p=>p.official)||slot[0]; potSel.innerHTML=slot.map(p=>`<option value="${esc(p.id)}" ${p.id===off.id?'selected':''}>${esc(p.name)}${p.official?' (official)':''}</option>`).join(''); }
+      return { ids, cat, num };
+    }
+    function recCategory(c){ recChosenCat=c; recCompute(); }
+    async function grantRecipe(){
+      const cid=document.getElementById('rec-char').value;
+      if(!cid){ toast('Pick a character first.', true); return; }
+      const info=recCompute();
+      if(!info){ toast('Pick three different ingredients.', true); return; }
+      const pid=document.getElementById('rec-potion').value;
+      const potion=data.potions.find(p=>p.id===pid);
+      if(!potion){ toast('No potion at that slot to grant.', true); return; }
+      if(!Array.isArray(data.recipes[cid])) data.recipes[cid]=[];
+      const key=info.ids.slice().sort().join('|')+'::'+pid;
+      if(data.recipes[cid].some(r=>(r.ingredientIds||[]).slice().sort().join('|')+'::'+r.potionId===key)){ toast('They already know that recipe.', true); return; }
+      data.recipes[cid].push({ id:genId('rcp'), ingredientIds:info.ids.slice(), category:potion.category, number:potion.number, potionId:potion.id, potionName:potion.name, source:'dm', at:new Date().toISOString() });
+      if(await saveKey('potion_recipes', data.recipes)){ toast('Recipe granted.'); renderRecList(); }
+    }
+    function renderRecList(){
+      const cid=document.getElementById('rec-char').value;
+      const list=document.getElementById('rec-list');
+      if(!cid){ list.innerHTML='<div class="empty-note">No character selected.</div>'; return; }
+      const recs=Array.isArray(data.recipes[cid])?data.recipes[cid]:[];
+      const nm=id=>{const i=data.ingredients.find(x=>x.id===id); return i?i.name:id;};
+      list.innerHTML = recs.length ? recs.slice().sort((a,b)=>(a.potionName||'').localeCompare(b.potionName||'')).map(r=>`
+        <div class="inv-row">
+          <span class="nm"><b style="color:var(--teal-bright)">${esc(r.potionName||'(unknown)')}</b><br><span style="font-size:0.84rem;color:var(--ink-faint)">${esc((r.ingredientIds||[]).map(nm).join(' + '))}</span></span>
+          <span class="sub">${esc((r.category||'').slice(0,3).toUpperCase())} #${r.number}</span>
+          <button class="btn danger sm" onclick="removeRecipe('${esc(r.id)}')">Remove</button>
+        </div>`).join('') : '<div class="empty-note">No recipes known yet.</div>';
+    }
+    async function removeRecipe(id){
+      const cid=document.getElementById('rec-char').value;
+      data.recipes[cid]=(data.recipes[cid]||[]).filter(r=>r.id!==id);
+      if(await saveKey('potion_recipes', data.recipes)){ toast('Removed.'); renderRecList(); }
+    }
+
     /* ── Import ── */
     function loadSeed(ev){
       const file=ev.target.files&&ev.target.files[0];
@@ -581,7 +674,7 @@
       btn.textContent='Import to KV';
       if(ok1&&ok2&&ok3){
         data.ingredients=seedData.ingredients; data.potions=seedData.potions; data.negatives=seedData.negatives;
-        renderIngList(); renderPotList(); renderNegList(); populateInvIngSelect();
+        renderIngList(); renderPotList(); renderNegList(); populateInvIngSelect(); populateRecIngSelects();
         toast('Imported into KV.');
         document.getElementById('import-preview').innerHTML='<b style="color:var(--teal-bright)">Done.</b> The Cauldron is stocked.';
       } else { btn.disabled=false; }
