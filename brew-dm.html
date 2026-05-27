@@ -113,6 +113,7 @@
         <button class="tab active" data-tab="ingredients" onclick="switchTab('ingredients')">Ingredients</button>
         <button class="tab" data-tab="potions" onclick="switchTab('potions')">Potions</button>
         <button class="tab" data-tab="negatives" onclick="switchTab('negatives')">Negatives</button>
+        <button class="tab" data-tab="library" onclick="switchTab('library')">Library</button>
         <button class="tab" data-tab="inventory" onclick="switchTab('inventory')">Inventory</button>
         <button class="tab" data-tab="recipes" onclick="switchTab('recipes')">Recipes</button>
         <button class="tab" data-tab="import" onclick="switchTab('import')">Import</button>
@@ -235,6 +236,39 @@
         </div>
       </div>
 
+      <!-- LIBRARY -->
+      <div class="tab-panel" id="panel-library" style="display:none">
+        <div class="hint">Standard 5e potions imported from D&D Beyond — a reference shelf. Use <b>Slot it</b> to drop one onto a Combat/Utility/Whimsy slot in the Potions tab; from there it brews and can be granted as a recipe like any other potion.</div>
+        <div class="layout">
+          <div>
+            <div class="col-head"><span>Library (<span id="lib-count">0</span>)</span><button class="btn ghost sm" onclick="newLib()">+ New</button></div>
+            <div class="toolbar">
+              <input type="text" id="lib-search" placeholder="Search…" oninput="renderLibList()">
+              <input type="file" id="lib-import-file" accept="application/json,.json" onchange="importLibrary(event)" style="display:none">
+              <button class="btn brass sm" onclick="document.getElementById('lib-import-file').click()">Import seed</button>
+            </div>
+            <div class="list" id="lib-list"></div>
+          </div>
+          <div class="form">
+            <h3 id="lib-form-title">New library potion</h3>
+            <input type="hidden" id="lib-id">
+            <div class="fg"><label>Name</label><input type="text" id="lib-name"></div>
+            <div class="frow">
+              <div class="fg"><label>Rarity</label><input type="text" id="lib-rarity" placeholder="e.g. rare"></div>
+              <div class="fg"><label>Attunement</label><select id="lib-attune"><option value="no">No</option><option value="yes">Yes</option></select></div>
+            </div>
+            <div class="fg"><label>Effect</label><textarea id="lib-effect"></textarea></div>
+            <div class="fg"><label>Source</label><input type="text" id="lib-source" placeholder="e.g. dmg-2024"></div>
+            <div class="form-actions">
+              <button class="btn" onclick="saveLib()">Save</button>
+              <button class="btn" id="lib-slot" onclick="slotFromLibrary()" style="display:none">→ Slot it</button>
+              <button class="btn danger" id="lib-del" onclick="deleteLib()" style="display:none">Delete</button>
+              <button class="btn ghost" onclick="newLib()">Clear</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- RECIPES -->
       <div class="tab-panel" id="panel-recipes" style="display:none">
         <div class="hint">Grant a character a known recipe ("found in the world" or other methods). It shows up in their Cauldron and one-taps the ingredients into place. Players also auto-learn recipes when they brew a clean success.</div>
@@ -285,7 +319,7 @@
     function genId(prefix){return prefix+'-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
     function bandOf(n){return n<=30?'common':n<=50?'uncommon':'rare';}
 
-    let data = { ingredients:[], potions:[], negatives:[], inventories:{}, recipes:{}, characters:[] };
+    let data = { ingredients:[], potions:[], negatives:[], inventories:{}, recipes:{}, library:[], characters:[] };
     let seedData = null;
     let recChosenCat = null;
 
@@ -310,6 +344,7 @@
         data.negatives   = Array.isArray(d.negatives)?d.negatives:[];
         data.inventories = (d.inventories && typeof d.inventories==='object')?d.inventories:{};
         data.recipes     = (d.recipes && typeof d.recipes==='object')?d.recipes:{};
+        data.library     = Array.isArray(d.library)?d.library:[];
         data.characters  = Array.isArray(d.characters)?d.characters:[];
       } catch(e){
         stateEl.textContent = 'Could not reach the worker. (If you just added the brew endpoints, redeploy the worker first.)';
@@ -321,6 +356,7 @@
       renderIngList(); newIng();
       renderPotList(); newPot();
       renderNegList(); newNeg();
+      renderLibList(); newLib();
       populateCharSelect(); populateInvIngSelect(); renderInv();
       populateRecChar(); populateRecIngSelects(); renderRecList();
       switchTab('ingredients');
@@ -511,6 +547,91 @@
       if(!confirm('Delete this negative potion?')) return;
       data.negatives=data.negatives.filter(x=>x.id!==id);
       if(await saveKey('negative_potions', data.negatives)){ toast('Deleted.'); newNeg(); }
+    }
+
+    /* ── Library (standard 5e potions) ── */
+    function rarityClass(r){ r=(r||'').toLowerCase(); return ['common','uncommon','rare'].includes(r)?r:(r.indexOf('rare')>=0?'rare':'common'); }
+    function renderLibList(){
+      const q=(document.getElementById('lib-search').value||'').trim().toLowerCase();
+      let items=data.library.slice().sort((a,b)=>a.name.localeCompare(b.name));
+      if(q) items=items.filter(p=>(p.name||'').toLowerCase().includes(q)||(p.effect||'').toLowerCase().includes(q));
+      document.getElementById('lib-count').textContent=data.library.length;
+      const cur=document.getElementById('lib-id').value;
+      document.getElementById('lib-list').innerHTML = items.length? items.map(p=>`
+        <div class="row ${p.id===cur?'active':''}">
+          <span class="nm" onclick="editLib('${esc(p.id)}')">${esc(p.name)}${p.attunement?' <span class="sub">attune</span>':''}</span>
+          <span class="rarity ${rarityClass(p.rarity)}">${esc(p.rarity||'—')}</span>
+          <button class="btn ghost sm" onclick="slotFromLibrary('${esc(p.id)}')">Slot it</button>
+        </div>`).join('') : '<div class="empty-note">No library potions yet — use “Import seed”.</div>';
+    }
+    function newLib(){
+      document.getElementById('lib-form-title').textContent='New library potion';
+      ['lib-id','lib-name','lib-rarity','lib-effect','lib-source'].forEach(id=>document.getElementById(id).value='');
+      document.getElementById('lib-attune').value='no';
+      document.getElementById('lib-del').style.display='none';
+      document.getElementById('lib-slot').style.display='none';
+      renderLibList();
+    }
+    function editLib(id){
+      const p=data.library.find(x=>x.id===id); if(!p) return;
+      document.getElementById('lib-form-title').textContent='Edit library potion';
+      document.getElementById('lib-id').value=p.id;
+      document.getElementById('lib-name').value=p.name||'';
+      document.getElementById('lib-rarity').value=p.rarity||'';
+      document.getElementById('lib-attune').value=p.attunement?'yes':'no';
+      document.getElementById('lib-effect').value=p.effect||'';
+      document.getElementById('lib-source').value=p.source||'';
+      document.getElementById('lib-del').style.display='';
+      document.getElementById('lib-slot').style.display='';
+      renderLibList();
+    }
+    async function saveLib(){
+      const name=document.getElementById('lib-name').value.trim();
+      if(!name){ toast('Name is required.', true); return; }
+      let id=document.getElementById('lib-id').value;
+      const obj={ id: id || (data.library.some(x=>x.id===slug(name))?genId('lib'):slug(name)),
+        name, rarity: document.getElementById('lib-rarity').value.trim().toLowerCase(),
+        attunement: document.getElementById('lib-attune').value==='yes',
+        effect: document.getElementById('lib-effect').value,
+        source: document.getElementById('lib-source').value.trim() };
+      const idx=data.library.findIndex(x=>x.id===obj.id);
+      if(idx>=0) data.library[idx]=obj; else data.library.push(obj);
+      if(await saveKey('potion_library', data.library)){ toast('Saved.'); document.getElementById('lib-id').value=obj.id; editLib(obj.id); }
+    }
+    async function deleteLib(){
+      const id=document.getElementById('lib-id').value; if(!id) return;
+      if(!confirm('Delete this library potion?')) return;
+      data.library=data.library.filter(x=>x.id!==id);
+      if(await saveKey('potion_library', data.library)){ toast('Deleted.'); newLib(); }
+    }
+    function slotFromLibrary(id){
+      id=id||document.getElementById('lib-id').value;
+      const p=data.library.find(x=>x.id===id); if(!p){ toast('Pick a library potion first.', true); return; }
+      switchTab('potions');
+      newPot();
+      document.getElementById('pot-name').value=p.name;
+      document.getElementById('pot-effect').value=p.effect||'';
+      potRarityPreview();
+      toast('Loaded “'+p.name+'” — set its list + number, then Save.');
+    }
+    function importLibrary(ev){
+      const file=ev.target.files&&ev.target.files[0]; if(!file) return;
+      const reader=new FileReader();
+      reader.onload=async()=>{
+        let added=0, skipped=0;
+        try{
+          const d=JSON.parse(reader.result);
+          const arr=Array.isArray(d.library)?d.library:(Array.isArray(d)?d:[]);
+          if(!arr.length) throw new Error('No "library" array found.');
+          const have=new Set(data.library.map(x=>x.id));
+          arr.forEach(p=>{ const id=p.id||slug(p.name||''); if(!id||have.has(id)){ if(id)skipped++; return; } data.library.push({ id, name:p.name||id, rarity:(p.rarity||'').toLowerCase(), attunement:!!p.attunement, effect:p.effect||'', source:p.source||'' }); have.add(id); added++; });
+          if(added && !(await saveKey('potion_library', data.library))) return;
+          renderLibList();
+          toast('Imported '+added+' new'+(skipped?(', '+skipped+' already present'):'')+'.');
+        }catch(e){ toast('Import failed: '+e.message, true); }
+      };
+      reader.readAsText(file);
+      ev.target.value='';
     }
 
     /* ── Inventory ── */
