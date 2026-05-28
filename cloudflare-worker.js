@@ -222,19 +222,56 @@ function brewResolve(ingredients, potions, negatives, ids, rollTotal, chosenCate
   const slotPotions = (potions || []).filter(p => p.category === category && p.number === number);
   const official = slotPotions.find(p => p.official) || slotPotions[0] || null;
   const pick = arr => (arr && arr.length) ? arr[Math.floor(Math.random() * arr.length)] : null;
+  const normAff = s => (s || '').toString().trim().toLowerCase();
 
-  let outcome, potion = null, options = null;
-  if (margin >= 10)      { outcome = 'choose';   options = slotPotions; }
-  else if (margin >= 0)  { outcome = 'success';  potion = (intendedPotionId && slotPotions.find(p => p.id === intendedPotionId)) || official; }
-  else if (margin >= -5) { outcome = 'wrong';    potion = pick(slotPotions); }
-  else if (margin >= -9) { outcome = 'sludge'; }
-  else                   { outcome = 'negative'; potion = pick(negatives); }
+  // Tally elemental affinities present in the 3 ingredients. Used to select a
+  // variant within the slot on a clean success.
+  const affTally = {};
+  chosen.forEach(i => { const a = normAff(i.affinity); if (a) affTally[a] = (affTally[a] || 0) + 1; });
+  const active = Object.keys(affTally);
+  slot.affinity = { tally: affTally, active };
+
+  let outcome, potion = null, options = null, chooseReason = null;
+  if (margin >= 10) {
+    outcome = 'choose'; options = slotPotions; chooseReason = 'mastery';
+  } else if (margin >= 0) {
+    outcome = 'success';
+    if (active.length === 0) {
+      // No affinity in ingredients → random version (random among slot variants).
+      potion = pick(slotPotions) || official;
+    } else if (active.length === 1) {
+      // One affinity in ingredients → the slot variant with that affinity, else official.
+      const aff = active[0];
+      const matching = slotPotions.filter(p => normAff(p.affinity) === aff);
+      if (matching.length === 0) {
+        potion = (intendedPotionId && slotPotions.find(p => p.id === intendedPotionId)) || official;
+      } else {
+        potion = matching.find(p => p.official) || matching[0];
+      }
+    } else {
+      // 2+ different affinities → player picks among the matching variants.
+      const matchingAny = slotPotions.filter(p => { const a = normAff(p.affinity); return a && active.indexOf(a) >= 0; });
+      if (matchingAny.length === 0) {
+        potion = (intendedPotionId && slotPotions.find(p => p.id === intendedPotionId)) || official;
+      } else if (matchingAny.length === 1) {
+        potion = matchingAny[0];
+      } else {
+        outcome = 'choose'; options = matchingAny; chooseReason = 'affinity'; potion = null;
+      }
+    }
+  } else if (margin >= -5) {
+    outcome = 'wrong'; potion = pick(slotPotions);
+  } else if (margin >= -9) {
+    outcome = 'sludge';
+  } else {
+    outcome = 'negative'; potion = pick(negatives);
+  }
 
   // A slot with no authored potion can't yield one — degrade to sludge.
   if ((outcome === 'success' || outcome === 'wrong') && !potion) { outcome = 'sludge'; }
-  if (outcome === 'choose' && (!options || options.length === 0)) { outcome = 'sludge'; options = null; }
+  if (outcome === 'choose' && (!options || options.length === 0)) { outcome = 'sludge'; options = null; chooseReason = null; }
 
-  return { slot, outcome, potion, options };
+  return { slot, outcome, potion, options, chooseReason };
 }
 
 // ── Per-character recipe book ──────────────────────────────────

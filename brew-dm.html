@@ -52,6 +52,16 @@
     .rarity.common{color:var(--ink-light);border-color:var(--border-light)}
     .rarity.uncommon{color:var(--teal-bright);border-color:var(--teal)}
     .rarity.rare{color:var(--brass);border-color:rgba(184,138,90,0.6)}
+    .aff-chip{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--border-light);color:var(--ink-light);white-space:nowrap}
+    .aff-chip.fire{color:#ff9a6e;border-color:#c43838}
+    .aff-chip.cold,.aff-chip.ice{color:#88c0ff;border-color:#3a6fd0}
+    .aff-chip.lightning{color:#ffe060;border-color:#c4a838}
+    .aff-chip.thunder{color:#a0c8ff;border-color:#4a90d4}
+    .aff-chip.nature,.aff-chip.acid,.aff-chip.poison{color:#9ad080;border-color:#4ca050}
+    .aff-chip.radiant{color:#ffe9a0;border-color:#e0a830}
+    .aff-chip.necrotic{color:#b890c8;border-color:#7a5290}
+    .aff-chip.psychic{color:#e090c0;border-color:#a040a0}
+    .aff-chip.force,.aff-chip.arcane{color:#c8a0ff;border-color:#7c5fc4}
     .vals{display:flex;gap:5px;font-family:'Cinzel',serif;font-size:0.62rem}
     .v-c{color:var(--combat)}.v-u{color:var(--utility)}.v-w{color:var(--whimsy)}
     .badge-official{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--teal-bright)}
@@ -142,6 +152,7 @@
               <div class="fg"><label>Utility</label><input type="number" id="ing-utility" value="0"></div>
               <div class="fg"><label>Whimsy</label><input type="number" id="ing-whimsy" value="0"></div>
             </div>
+            <div class="fg"><label>Elemental affinity</label><input type="text" id="ing-affinity" placeholder="e.g. fire, cold, lightning, nature (leave blank for none)"></div>
             <div class="fg"><label>Description (player-visible)</label><textarea id="ing-desc"></textarea></div>
             <div class="fg"><label>DM notes (private)</label><textarea id="ing-dmnotes" style="min-height:50px"></textarea></div>
             <div class="form-actions">
@@ -177,6 +188,7 @@
             </div>
             <div class="fg"><label><input type="checkbox" id="pot-official" style="width:auto;vertical-align:middle"> Official (the default result on a plain success)</label></div>
             <div class="fg"><label>Name</label><input type="text" id="pot-name"></div>
+            <div class="fg"><label>Elemental affinity</label><input type="text" id="pot-affinity" placeholder="e.g. fire, cold, lightning, nature — leave blank for a universal/no-affinity potion"></div>
             <div class="fg"><label>Effect</label><textarea id="pot-effect"></textarea></div>
             <div class="fg"><label>DM notes (private)</label><textarea id="pot-dmnotes" style="min-height:50px"></textarea></div>
             <div class="form-actions">
@@ -257,6 +269,7 @@
               <div class="fg"><label>Rarity</label><input type="text" id="lib-rarity" placeholder="e.g. rare"></div>
               <div class="fg"><label>Attunement</label><select id="lib-attune"><option value="no">No</option><option value="yes">Yes</option></select></div>
             </div>
+            <div class="fg"><label>Elemental affinity</label><input type="text" id="lib-affinity" placeholder="e.g. fire, cold, lightning, nature — leave blank for none"></div>
             <div class="fg"><label>Effect</label><textarea id="lib-effect"></textarea></div>
             <div class="fg"><label>Source</label><input type="text" id="lib-source" placeholder="e.g. dmg-2024"></div>
             <div class="form-actions">
@@ -318,6 +331,7 @@
     function slug(s){return (s||'').toLowerCase().replace(/['’]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');}
     function genId(prefix){return prefix+'-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
     function bandOf(n){return n<=30?'common':n<=50?'uncommon':'rare';}
+    function affClass(a){return (a||'').toString().trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');}
 
     let data = { ingredients:[], potions:[], negatives:[], inventories:{}, recipes:{}, library:[], characters:[] };
     let seedData = null;
@@ -389,12 +403,13 @@
         <div class="row ${i.id===cur?'active':''}" onclick="editIng('${esc(i.id)}')">
           <span class="nm">${esc(i.name)}</span>
           <span class="vals"><span class="v-c">${i.combat}</span><span class="v-u">${i.utility}</span><span class="v-w">${i.whimsy}</span></span>
+          ${i.affinity?`<span class="aff-chip ${esc(affClass(i.affinity))}">${esc(i.affinity)}</span>`:''}
           <span class="rarity ${esc(i.rarity)}">${esc(i.rarity)}</span>
         </div>`).join('') : '<div class="empty-note">No ingredients.</div>';
     }
     function newIng(){
       document.getElementById('ing-form-title').textContent='New ingredient';
-      ['ing-id','ing-name','ing-desc','ing-dmnotes'].forEach(id=>document.getElementById(id).value='');
+      ['ing-id','ing-name','ing-desc','ing-dmnotes','ing-affinity'].forEach(id=>document.getElementById(id).value='');
       document.getElementById('ing-rarity').value='common';
       ['ing-combat','ing-utility','ing-whimsy'].forEach(id=>document.getElementById(id).value='0');
       document.getElementById('ing-del').style.display='none';
@@ -409,6 +424,7 @@
       document.getElementById('ing-combat').value=i.combat||0;
       document.getElementById('ing-utility').value=i.utility||0;
       document.getElementById('ing-whimsy').value=i.whimsy||0;
+      document.getElementById('ing-affinity').value=i.affinity||'';
       document.getElementById('ing-desc').value=i.description||'';
       document.getElementById('ing-dmnotes').value=i.dmNotes||'';
       document.getElementById('ing-del').style.display='';
@@ -424,6 +440,7 @@
         combat: parseInt(document.getElementById('ing-combat').value||'0',10)||0,
         utility: parseInt(document.getElementById('ing-utility').value||'0',10)||0,
         whimsy: parseInt(document.getElementById('ing-whimsy').value||'0',10)||0,
+        affinity: document.getElementById('ing-affinity').value.trim().toLowerCase(),
         description: document.getElementById('ing-desc').value,
         regions: [], dmNotes: document.getElementById('ing-dmnotes').value
       };
@@ -455,6 +472,7 @@
         <div class="row ${p.id===cur?'active':''}" onclick="editPot('${esc(p.id)}')">
           <span class="sub">${esc(p.category.slice(0,3).toUpperCase())} #${p.number}</span>
           <span class="nm">${esc(p.name)}</span>
+          ${p.affinity?`<span class="aff-chip ${esc(affClass(p.affinity))}">${esc(p.affinity)}</span>`:''}
           ${p.official?'<span class="badge-official">official</span>':''}
           <span class="rarity ${esc(bandOf(p.number))}">${esc(bandOf(p.number))}</span>
         </div>`).join('') : '<div class="empty-note">No potions.</div>';
@@ -465,6 +483,7 @@
       document.getElementById('pot-category').value='combat';
       document.getElementById('pot-number').value='1';
       document.getElementById('pot-name').value='';
+      document.getElementById('pot-affinity').value='';
       document.getElementById('pot-effect').value='';
       document.getElementById('pot-dmnotes').value='';
       document.getElementById('pot-official').checked=false;
@@ -479,6 +498,7 @@
       document.getElementById('pot-category').value=p.category||'combat';
       document.getElementById('pot-number').value=p.number||1;
       document.getElementById('pot-name').value=p.name||'';
+      document.getElementById('pot-affinity').value=p.affinity||'';
       document.getElementById('pot-effect').value=p.effect||'';
       document.getElementById('pot-dmnotes').value=p.dmNotes||'';
       document.getElementById('pot-official').checked=!!p.official;
@@ -495,6 +515,7 @@
       let id=document.getElementById('pot-id').value;
       const official=document.getElementById('pot-official').checked;
       const obj={ id: id || genId('pot'), category, number, rarity: bandOf(number), name,
+        affinity: document.getElementById('pot-affinity').value.trim().toLowerCase(),
         effect: document.getElementById('pot-effect').value, official,
         dmNotes: document.getElementById('pot-dmnotes').value };
       // Only one official per slot — clear the flag on siblings if this one is official.
@@ -560,13 +581,14 @@
       document.getElementById('lib-list').innerHTML = items.length? items.map(p=>`
         <div class="row ${p.id===cur?'active':''}">
           <span class="nm" onclick="editLib('${esc(p.id)}')">${esc(p.name)}${p.attunement?' <span class="sub">attune</span>':''}</span>
+          ${p.affinity?`<span class="aff-chip ${esc(affClass(p.affinity))}">${esc(p.affinity)}</span>`:''}
           <span class="rarity ${rarityClass(p.rarity)}">${esc(p.rarity||'—')}</span>
           <button class="btn ghost sm" onclick="slotFromLibrary('${esc(p.id)}')">Slot it</button>
         </div>`).join('') : '<div class="empty-note">No library potions yet — use “Import seed”.</div>';
     }
     function newLib(){
       document.getElementById('lib-form-title').textContent='New library potion';
-      ['lib-id','lib-name','lib-rarity','lib-effect','lib-source'].forEach(id=>document.getElementById(id).value='');
+      ['lib-id','lib-name','lib-rarity','lib-effect','lib-source','lib-affinity'].forEach(id=>document.getElementById(id).value='');
       document.getElementById('lib-attune').value='no';
       document.getElementById('lib-del').style.display='none';
       document.getElementById('lib-slot').style.display='none';
@@ -579,6 +601,7 @@
       document.getElementById('lib-name').value=p.name||'';
       document.getElementById('lib-rarity').value=p.rarity||'';
       document.getElementById('lib-attune').value=p.attunement?'yes':'no';
+      document.getElementById('lib-affinity').value=p.affinity||'';
       document.getElementById('lib-effect').value=p.effect||'';
       document.getElementById('lib-source').value=p.source||'';
       document.getElementById('lib-del').style.display='';
@@ -592,6 +615,7 @@
       const obj={ id: id || (data.library.some(x=>x.id===slug(name))?genId('lib'):slug(name)),
         name, rarity: document.getElementById('lib-rarity').value.trim().toLowerCase(),
         attunement: document.getElementById('lib-attune').value==='yes',
+        affinity: document.getElementById('lib-affinity').value.trim().toLowerCase(),
         effect: document.getElementById('lib-effect').value,
         source: document.getElementById('lib-source').value.trim() };
       const idx=data.library.findIndex(x=>x.id===obj.id);
@@ -610,6 +634,7 @@
       switchTab('potions');
       newPot();
       document.getElementById('pot-name').value=p.name;
+      document.getElementById('pot-affinity').value=p.affinity||'';
       document.getElementById('pot-effect').value=p.effect||'';
       potRarityPreview();
       toast('Loaded “'+p.name+'” — set its list + number, then Save.');
@@ -624,7 +649,7 @@
           const arr=Array.isArray(d.library)?d.library:(Array.isArray(d)?d:[]);
           if(!arr.length) throw new Error('No "library" array found.');
           const have=new Set(data.library.map(x=>x.id));
-          arr.forEach(p=>{ const id=p.id||slug(p.name||''); if(!id||have.has(id)){ if(id)skipped++; return; } data.library.push({ id, name:p.name||id, rarity:(p.rarity||'').toLowerCase(), attunement:!!p.attunement, effect:p.effect||'', source:p.source||'' }); have.add(id); added++; });
+          arr.forEach(p=>{ const id=p.id||slug(p.name||''); if(!id||have.has(id)){ if(id)skipped++; return; } data.library.push({ id, name:p.name||id, rarity:(p.rarity||'').toLowerCase(), attunement:!!p.attunement, affinity:(p.affinity||'').toString().toLowerCase(), effect:p.effect||'', source:p.source||'' }); have.add(id); added++; });
           if(added && !(await saveKey('potion_library', data.library))) return;
           renderLibList();
           toast('Imported '+added+' new'+(skipped?(', '+skipped+' already present'):'')+'.');

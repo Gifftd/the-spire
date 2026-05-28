@@ -7,7 +7,52 @@ Dates are YYYY-MM-DD.
 
 ---
 
-## [Unreleased] — 2026-05-27
+## [Unreleased] — 2026-05-28
+
+### Elemental affinities — variant selection inside a slot
+
+Potions and ingredients can carry an optional **elemental affinity** (`fire`,
+`cold`, `lightning`, `nature`, etc. — any free-text element name). On a clean
+brewing success, the affinities present in the 3 ingredients pick which variant
+within the slot you actually brew. Lets you author "Dragon's Breath – Fire / Cold /
+Lightning" at one slot, plus a fire-affinity ingredient to steer toward Fire.
+
+**The rule (clean success, margin 0–9):**
+- **0 affinities** in the 3 ingredients → random version among the slot's potions.
+- **1 affinity** (any number of ingredients of that element) → the slot's variant
+  with that affinity. Falls back to the official if no variant matches.
+- **2+ distinct affinities** → `choose` outcome; player picks among the slot
+  variants whose affinity matches one of the active elements.
+
+Other outcomes are unchanged: a masterful +10 still gives free pick of every
+potion in the slot, near-misses still roll random, sludge/negative still apply.
+The brew check itself isn't affected.
+
+#### Worker (`cloudflare-worker.js`)
+- `brewResolve` now tallies ingredient affinities, returns `slot.affinity = {tally,
+  active}`, and chooses the success variant per the rule above. Returns a new
+  `chooseReason: 'mastery' | 'affinity'` so the UI can label the picker correctly.
+- ⚠️ **Requires another manual worker redeploy.**
+
+#### Editor (`brew-dm.html`)
+- New **Elemental affinity** field on the Ingredient, Potion, and Library forms.
+  Library → "Slot it" copies the affinity through to the slotted potion.
+- Affinity chips render in the Ingredients / Potions / Library lists, colored by
+  element (fire = red, cold = blue, lightning = gold, nature = green, etc.; unknown
+  elements get a neutral chip).
+
+#### Player (`brew.html`)
+- Affinity chips show on ingredient picker rows and in the filled recipe slots.
+- An **Affinity** tally appears under the Combat/Utility/Whimsy bars (e.g.
+  "fire ×2  cold").
+- The `choose` panel now reads "Multiple affinities — pick your variant" for
+  affinity-driven picks (vs. the existing "Masterful — choose" for the +10 path),
+  and each option shows its affinity chip.
+
+#### Backward compatibility
+- All affinity fields default to empty — existing ingredients/potions keep brewing
+  exactly as before. Affinity only changes behaviour when both an ingredient *and*
+  a slot variant carry one.
 
 ### Potion library — standard 5e potions, assignable to slots
 
