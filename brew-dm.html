@@ -102,6 +102,34 @@
     .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel-light);border:1px solid var(--teal);border-radius:var(--radius);padding:10px 18px;color:var(--ink);font-size:0.9rem;box-shadow:0 4px 16px rgba(0,0,0,0.5);opacity:0;transition:opacity 0.2s;pointer-events:none;z-index:50}
     .toast.show{opacity:1}
     .toast.err{border-color:var(--rust);color:#e3a08e}
+
+    /* Analysis tab */
+    .ana-cards{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:1rem}
+    .ana-card{flex:1;min-width:140px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:0.7rem 0.9rem;text-align:center}
+    .ana-card .val{font-family:'Cinzel',serif;font-size:1.5rem;color:var(--teal-bright);line-height:1.1}
+    .ana-card .lbl{font-family:'Cinzel',serif;font-size:0.54rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-faint);margin-top:0.3rem}
+    .ana-section{margin-bottom:1.4rem}
+    .ana-section-h{font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass);margin-bottom:0.5rem}
+    .ana-warn-list{border:1px solid rgba(168,93,74,0.5);background:rgba(168,93,74,0.07);border-radius:var(--radius);padding:0.4rem 0.6rem}
+    .ana-warn-row{display:flex;gap:10px;align-items:center;padding:6px 4px;font-size:0.92rem;border-bottom:1px solid rgba(168,93,74,0.2)}
+    .ana-warn-row:last-child{border-bottom:none}
+    .ana-warn-row .pname{flex:1;color:var(--ink)}
+    .ana-warn-row .reason{color:#e3a08e;font-size:0.84rem}
+    .ana-cov-table{width:100%;border-collapse:collapse;font-size:0.9rem}
+    .ana-cov-table th,.ana-cov-table td{padding:5px 8px;text-align:left;border-bottom:1px solid var(--border)}
+    .ana-cov-table th{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;color:var(--ink-faint);text-transform:uppercase}
+    .ana-cov-table td.num{text-align:right;font-family:'Cinzel',serif;color:var(--teal-bright)}
+    .ana-cov-table tr.danger td.num{color:var(--rust);font-weight:700}
+    .ana-cov-table tr.warn td.num{color:#f0b076}
+    .ana-slot-matrix{width:100%;border-collapse:collapse;font-size:0.84rem;font-family:'Cinzel',serif}
+    .ana-slot-matrix th,.ana-slot-matrix td{padding:3px 8px;text-align:center;border:1px solid var(--border)}
+    .ana-slot-matrix th{color:var(--ink-faint);font-size:0.58rem;letter-spacing:0.08em}
+    .ana-slot-matrix td.thin{color:var(--rust);font-weight:700}
+    .ana-slot-matrix td.thinish{color:#f0b076}
+    .ana-slot-matrix td.row-h{color:var(--ink-faint);background:var(--panel-deep)}
+    .ana-slot-matrix tr.band-uncommon td.row-h{color:var(--teal-bright)}
+    .ana-slot-matrix tr.band-rare td.row-h{color:var(--brass)}
+    .ana-ok{color:var(--teal-bright);font-style:italic;font-size:0.9rem}
     .footer{margin-top:2rem;text-align:center;padding-top:1.5rem;border-top:1px solid var(--border)}
     .footer-text{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--ink-faint)}
   </style>
@@ -126,6 +154,7 @@
         <button class="tab" data-tab="library" onclick="switchTab('library')">Library</button>
         <button class="tab" data-tab="inventory" onclick="switchTab('inventory')">Inventory</button>
         <button class="tab" data-tab="recipes" onclick="switchTab('recipes')">Recipes</button>
+        <button class="tab" data-tab="analysis" onclick="switchTab('analysis')">Analysis</button>
         <button class="tab" data-tab="import" onclick="switchTab('import')">Import</button>
       </div>
 
@@ -305,6 +334,19 @@
         </div>
       </div>
 
+      <!-- ANALYSIS -->
+      <div class="tab-panel" id="panel-analysis" style="display:none">
+        <div class="hint">Counts how many 3-ingredient combinations land on every potion slot, and which ingredient affinities can reach each slot. Use it to spot variants you've authored that no combo can actually brew, and to gauge whether you have enough affinity-tagged ingredients to cover every slot.</div>
+        <div class="toolbar" style="justify-content:space-between;align-items:center">
+          <button class="btn" onclick="runAnalysis()">Recompute</button>
+          <span id="ana-status" class="hint" style="margin:0">Switch to this tab to run the analysis.</span>
+        </div>
+        <div class="ana-section"><div id="ana-summary"></div></div>
+        <div class="ana-section"><div class="ana-section-h">Unreachable / thin authored variants</div><div id="ana-warnings"></div></div>
+        <div class="ana-section"><div class="ana-section-h">Affinity coverage (authored variants, worst first)</div><div id="ana-coverage"></div></div>
+        <div class="ana-section"><div class="ana-section-h">Combos per slot</div><div id="ana-slots"></div></div>
+      </div>
+
       <!-- IMPORT -->
       <div class="tab-panel" id="panel-import" style="display:none">
         <div class="form" style="max-width:640px">
@@ -380,6 +422,7 @@
       document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
       document.querySelectorAll('.tab-panel').forEach(p=>p.style.display='none');
       document.getElementById('panel-'+name).style.display='';
+      if (name === 'analysis' && !window.__anaCache) runAnalysis();
     }
 
     async function saveKey(type, payload){
@@ -788,6 +831,121 @@
       const cid=document.getElementById('rec-char').value;
       data.recipes[cid]=(data.recipes[cid]||[]).filter(r=>r.id!==id);
       if(await saveKey('potion_recipes', data.recipes)){ toast('Removed.'); renderRecList(); }
+    }
+
+    /* ── Analysis (combinatorial coverage) ── */
+    function _anaAdd(bySlot, cat, num, affKeys){
+      const key = cat + '-' + num;
+      let s = bySlot[key]; if (!s) s = bySlot[key] = { total: 0, byAff: {} };
+      s.total++;
+      if (affKeys.length === 0) s.byAff['(none)'] = (s.byAff['(none)']||0) + 1;
+      else affKeys.forEach(a => { s.byAff[a] = (s.byAff[a]||0) + 1; });
+    }
+    function computeAnalysis(){
+      const ings = data.ingredients || [];
+      const n = ings.length;
+      const bySlot = {};
+      let combosTotal = 0, affTaggedIngs = 0;
+      for (let z = 0; z < n; z++) if (ings[z].affinity) affTaggedIngs++;
+      // C(n,3) loop. Ties (sum equal across categories) count for each tied slot.
+      for (let i = 0; i < n - 2; i++) {
+        const a = ings[i]; const ac=+a.combat||0, au=+a.utility||0, aw=+a.whimsy||0; const aA=a.affinity||'';
+        for (let j = i + 1; j < n - 1; j++) {
+          const b = ings[j]; const bc=+b.combat||0, bu=+b.utility||0, bw=+b.whimsy||0; const bA=b.affinity||'';
+          const acb = ac+bc, aub = au+bu, awb = aw+bw;
+          for (let k = j + 1; k < n; k++) {
+            const c = ings[k]; const sc=acb+(+c.combat||0), su=aub+(+c.utility||0), sw=awb+(+c.whimsy||0);
+            const peak = sc>su ? (sc>sw?sc:sw) : (su>sw?su:sw);
+            if (peak === 0) continue;
+            combosTotal++;
+            const cA = c.affinity || '';
+            const distinct = {}; if (aA) distinct[aA]=1; if (bA) distinct[bA]=1; if (cA) distinct[cA]=1;
+            const keys = Object.keys(distinct);
+            if (sc === peak) _anaAdd(bySlot, 'combat',  peak, keys);
+            if (su === peak) _anaAdd(bySlot, 'utility', peak, keys);
+            if (sw === peak) _anaAdd(bySlot, 'whimsy',  peak, keys);
+          }
+        }
+      }
+      return { bySlot, combosTotal, affTaggedIngs, n };
+    }
+    function renderAnalysis(stats){
+      const potions = data.potions || [];
+      const affTaggedPots = potions.filter(p => p.affinity).length;
+      // Summary cards
+      document.getElementById('ana-summary').innerHTML = `<div class="ana-cards">
+        <div class="ana-card"><div class="val">${stats.n}</div><div class="lbl">Ingredients</div></div>
+        <div class="ana-card"><div class="val">${stats.affTaggedIngs}</div><div class="lbl">Affinity-tagged</div></div>
+        <div class="ana-card"><div class="val">${potions.length}</div><div class="lbl">Potions</div></div>
+        <div class="ana-card"><div class="val">${affTaggedPots}</div><div class="lbl">Affinity variants</div></div>
+        <div class="ana-card"><div class="val">${stats.combosTotal.toLocaleString()}</div><div class="lbl">Total combos</div></div>
+      </div>`;
+      // Warnings + coverage for authored affinity variants
+      const warnings = [], coverage = [];
+      potions.forEach(p => {
+        if (!p.affinity) return;
+        const key = p.category + '-' + p.number;
+        const s = stats.bySlot[key] || { total: 0, byAff: {} };
+        const reach = s.byAff[p.affinity] || 0;
+        coverage.push({ p, reach, total: s.total });
+        if (reach === 0) warnings.push({ p, total: s.total });
+      });
+      const warnsEl = document.getElementById('ana-warnings');
+      if (potions.length === 0 || affTaggedPots === 0) {
+        warnsEl.innerHTML = `<div class="hint" style="margin:0">No potions are tagged with an affinity yet.</div>`;
+      } else if (warnings.length === 0) {
+        warnsEl.innerHTML = `<div class="ana-ok">All ${affTaggedPots} authored affinity variants are reachable by at least one ingredient combo. ✓</div>`;
+      } else {
+        warnsEl.innerHTML = `<div class="ana-warn-list">${warnings.map(w => `<div class="ana-warn-row">
+          <span class="pname">${esc(w.p.name)} <span class="aff-chip ${esc(affClass(w.p.affinity))}">${esc(w.p.affinity)}</span></span>
+          <span class="sub">${esc(w.p.category.toUpperCase().slice(0,3))} #${w.p.number}</span>
+          <span class="reason">0 combos reach this slot with a ${esc(w.p.affinity)}-tagged ingredient (${w.total} total combos at slot)</span>
+        </div>`).join('')}</div>`;
+      }
+      // Coverage table: authored variants sorted by reach ascending (worst first)
+      coverage.sort((a,b) => a.reach - b.reach || (b.total - a.total));
+      const covEl = document.getElementById('ana-coverage');
+      if (coverage.length === 0) {
+        covEl.innerHTML = `<div class="hint" style="margin:0">Tag potion variants with an affinity to see coverage here.</div>`;
+      } else {
+        covEl.innerHTML = `<table class="ana-cov-table">
+          <thead><tr><th>Potion</th><th>Slot</th><th>Affinity</th><th class="num">Combos reaching</th><th class="num">Slot total</th></tr></thead>
+          <tbody>${coverage.map(r => {
+            const cls = r.reach === 0 ? 'danger' : r.reach < 5 ? 'warn' : '';
+            return `<tr class="${cls}">
+              <td>${esc(r.p.name)}</td>
+              <td><span class="sub">${esc(r.p.category.toUpperCase().slice(0,3))} #${r.p.number}</span></td>
+              <td><span class="aff-chip ${esc(affClass(r.p.affinity))}">${esc(r.p.affinity)}</span></td>
+              <td class="num">${r.reach}</td>
+              <td class="num" style="color:var(--ink-light)">${r.total}</td>
+            </tr>`;
+          }).join('')}</tbody></table>`;
+      }
+      // Slot matrix: 60 rows × 3 columns (Combat/Utility/Whimsy)
+      let head = '<tr><th>#</th><th>Combat</th><th>Utility</th><th>Whimsy</th></tr>';
+      let body = '';
+      for (let i = 1; i <= 60; i++) {
+        const band = i <= 30 ? 'common' : i <= 50 ? 'uncommon' : 'rare';
+        const cells = ['combat','utility','whimsy'].map(cat => {
+          const num = (stats.bySlot[cat+'-'+i] || {}).total || 0;
+          const cls = num === 0 ? 'thin' : num < 5 ? 'thinish' : '';
+          return `<td class="${cls}">${num}</td>`;
+        }).join('');
+        body += `<tr class="band-${band}"><td class="row-h">${i}</td>${cells}</tr>`;
+      }
+      document.getElementById('ana-slots').innerHTML = `<table class="ana-slot-matrix"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+    }
+    function runAnalysis(){
+      const status = document.getElementById('ana-status');
+      status.textContent = 'Computing…';
+      setTimeout(function(){
+        const t0 = performance.now();
+        const stats = computeAnalysis();
+        const dt = (performance.now() - t0).toFixed(0);
+        window.__anaCache = stats;
+        renderAnalysis(stats);
+        status.textContent = `Computed ${stats.combosTotal.toLocaleString()} combos in ${dt} ms.`;
+      }, 0);
     }
 
     /* ── Import ── */

@@ -9,6 +9,29 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-28
 
+### Analysis tab — combo coverage for affinity tagging
+
+A new **Analysis** tab in the Apothecary that runs the full combinatorial analysis
+(every C(135, 3) = 400,995 unique-ingredient combo) and shows how many combos
+land on each slot, broken down by ingredient affinity. Use it to spot authored
+variants you can't actually brew and to gauge whether you have enough affinity-
+tagged ingredients to cover every authored variant.
+
+#### Added — `brew-dm.html`
+- New **Analysis** tab with auto-run on first open + a Recompute button.
+- **Summary cards**: ingredient/affinity-tagged counts, potion/variant counts, total combos.
+- **Unreachable / thin variants warning**: any authored potion with affinity X where
+  no combo reaches that slot with an X-tagged ingredient is flagged red.
+- **Affinity coverage table**: every authored affinity variant sorted by reach
+  ascending (worst first). Each row shows the potion, slot, affinity chip, combos
+  that reach it with that affinity, and total combos at the slot. Rows go red for
+  0 reach and amber for &lt; 5.
+- **Slot overview matrix**: 60 rows × 3 columns showing per-slot combo counts; thin
+  slots (0 or &lt; 5) are tinted red/amber.
+
+All client-side over the existing `data.ingredients` / `data.potions` — no worker
+or KV changes. The C(135, 3) loop runs in ~30 ms in the browser.
+
 ### Elemental affinities — variant selection inside a slot
 
 Potions and ingredients can carry an optional **elemental affinity** (`fire`,
