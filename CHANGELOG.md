@@ -9,6 +9,31 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-28
 
+### Apply affinity tags from file — bulk-tag ingredients
+
+A new file-import in the Apothecary's Import tab that reads a small
+`{id: affinity}` map and sets each listed ingredient's affinity in one shot.
+Safe to re-apply (only listed ingredients are touched), so the JSON file is a
+living document — edit and re-import as you refine tags.
+
+#### Added — `brew-dm.html`
+- New **Apply affinity tags** form in the Import tab. Accepts a file shaped
+  `{tags: {id: affinity}}` (or just `{id: affinity}`). Reports applied / unchanged /
+  unknown-id counts after the merge.
+- Re-renders the Ingredients list and invalidates the cached Analysis result so
+  the next visit to the Analysis tab recomputes against the new tags.
+
+#### Added — `obojima-affinity-tags.json` (gitignored)
+- Initial affinity classification for all 135 Obojima ingredients: 95 tagged, 40
+  left blank (mundane items like *Chicken Egg*, *Earwax*, *Apper Carrot* — they
+  trigger the "random version" path on a brew). Themes follow the descriptions:
+  *Boom Beri / Jumping Bonfire / Coal* → fire, *Bottled Lightning / Spark Plug* →
+  lightning, *Pungent Sea Foam / Lionfish Poison* → poison, *Ribbon Rot / Night
+  Thistle / Corrupted ___* → necrotic, *Spirit Root / Sun Shroom / Tears of the
+  Moon* → radiant, etc. Per-affinity counts: nature 23, fire 16, radiant 12,
+  necrotic 11, psychic 9, force 7, poison 5, acid 4, thunder 4, lightning 3, cold
+  1 (the snow dragon's breath — the only obvious cold-themed ingredient).
+
 ### Analysis tab — combo coverage for affinity tagging
 
 A new **Analysis** tab in the Apothecary that runs the full combinatorial analysis
