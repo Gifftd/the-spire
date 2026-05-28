@@ -66,6 +66,18 @@
     .ing-qty{font-family:'Cinzel',serif;font-size:0.62rem;color:var(--teal-bright);min-width:24px;text-align:right}
     .ing-vals{display:flex;gap:5px;font-family:'Cinzel',serif;font-size:0.62rem}
     .v-c{color:var(--combat)}.v-u{color:var(--utility)}.v-w{color:var(--whimsy)}
+    .aff-chip{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--border-light);color:var(--ink-light);white-space:nowrap}
+    .aff-chip.fire{color:#ff9a6e;border-color:#c43838}
+    .aff-chip.cold,.aff-chip.ice{color:#88c0ff;border-color:#3a6fd0}
+    .aff-chip.lightning{color:#ffe060;border-color:#c4a838}
+    .aff-chip.thunder{color:#a0c8ff;border-color:#4a90d4}
+    .aff-chip.nature,.aff-chip.acid,.aff-chip.poison{color:#9ad080;border-color:#4ca050}
+    .aff-chip.radiant{color:#ffe9a0;border-color:#e0a830}
+    .aff-chip.necrotic{color:#b890c8;border-color:#7a5290}
+    .aff-chip.psychic{color:#e090c0;border-color:#a040a0}
+    .aff-chip.force,.aff-chip.arcane{color:#c8a0ff;border-color:#7c5fc4}
+    .affinity-tally{display:flex;flex-wrap:wrap;gap:5px;margin-top:0.6rem}
+    .affinity-tally .tally-label{font-family:'Cinzel',serif;font-size:0.56rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint);align-self:center;margin-right:4px}
     .empty-note{padding:1.5rem 1rem;text-align:center;color:var(--ink-faint);font-style:italic;font-size:0.92rem}
 
     /* Recipe slots */
@@ -215,6 +227,7 @@
   <script>
     const WORKER_URL = (window.Auth && window.Auth.WORKER_URL) || 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
     function esc(s){return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+    function affClass(a){return (a||'').toString().trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');}
 
     let isDM = false;
     let catalog = [];           // all ingredients [{id,name,rarity,combat,utility,whimsy,description}]
@@ -346,6 +359,7 @@
         return `<div class="ing-row ${dis?'disabled':''}" ${dis?'':`onclick="pick('${esc(i.id)}')"`}>
           <span class="ing-name">${esc(i.name)}${picked?' ✓':''}</span>
           <span class="ing-vals"><span class="v-c">${i.combat}</span><span class="v-u">${i.utility}</span><span class="v-w">${i.whimsy}</span></span>
+          ${i.affinity?`<span class="aff-chip ${esc(affClass(i.affinity))}">${esc(i.affinity)}</span>`:''}
           <span class="ing-rarity ${esc(i.rarity)}">${esc(i.rarity)}</span>
           ${showQty?`<span class="ing-qty">×${qtyOf(i.id)}</span>`:''}
         </div>`;
@@ -383,7 +397,7 @@
         const id = selected[k];
         if (id){
           const i = byId[id];
-          html += `<div class="slot filled" onclick="unpick(${k})"><span class="x">✕</span><span class="slot-name">${esc(i.name)}</span><span class="slot-vals"><span class="v-c">${i.combat}</span><span class="v-u">${i.utility}</span><span class="v-w">${i.whimsy}</span></span></div>`;
+          html += `<div class="slot filled" onclick="unpick(${k})"><span class="x">✕</span><span class="slot-name">${esc(i.name)}</span><span class="slot-vals"><span class="v-c">${i.combat}</span><span class="v-u">${i.utility}</span><span class="v-w">${i.whimsy}</span></span>${i.affinity?`<span class="aff-chip ${esc(affClass(i.affinity))}" style="margin-top:4px">${esc(i.affinity)}</span>`:''}</div>`;
         } else {
           html += `<div class="slot"><span class="slot-empty">Empty</span></div>`;
         }
@@ -402,7 +416,14 @@
           <span class="sum-val">${sums[c]}</span>
         </div>`;
       }).join('');
-      document.getElementById('sums').innerHTML = sumHtml;
+      // Affinity tally across the chosen ingredients
+      const affTally = {};
+      selected.forEach(id => { const i = byId[id]; const a = (i && i.affinity || '').toLowerCase(); if (a) affTally[a] = (affTally[a]||0) + 1; });
+      const affKeys = Object.keys(affTally);
+      const tallyHtml = affKeys.length
+        ? `<div class="affinity-tally"><span class="tally-label">Affinity</span>${affKeys.map(a=>`<span class="aff-chip ${esc(affClass(a))}">${esc(a)}${affTally[a]>1?` ×${affTally[a]}`:''}</span>`).join('')}</div>`
+        : '';
+      document.getElementById('sums').innerHTML = sumHtml + tallyHtml;
 
       const slotResEl = document.getElementById('slot-result');
       const tieEl = document.getElementById('tie-chooser');
@@ -515,9 +536,14 @@
           <div class="potion-effect">${esc(res.potion?res.potion.effect:'')}</div>${rollReadout(slot)}`;
       } else if (o==='choose'){
         const opts = (res.options||[]);
-        inner = `<div class="brew-outcome">Masterful — choose your potion</div>
-          <div class="potion-effect">You beat the DC by 10+. Pick which ${slot.category} #${slot.number} potion you crafted:</div>
-          <div class="choose-opts">${opts.map((p,i)=>`<button class="choose-opt" onclick="chooseOpt(${i})"><div class="nm">${esc(p.name)}</div><div class="ef">${esc(p.effect)}</div></button>`).join('')}</div>
+        const aff = res.chooseReason === 'affinity';
+        const heading = aff ? 'Multiple affinities — pick your variant' : 'Masterful — choose your potion';
+        const sub = aff
+          ? 'Your ingredients carry more than one elemental affinity. Pick which variant you brewed:'
+          : `You beat the DC by 10+. Pick which ${slot.category} #${slot.number} potion you crafted:`;
+        inner = `<div class="brew-outcome">${heading}</div>
+          <div class="potion-effect">${sub}</div>
+          <div class="choose-opts">${opts.map((p,i)=>`<button class="choose-opt" onclick="chooseOpt(${i})"><div class="nm">${esc(p.name)}${p.affinity?` <span class="aff-chip ${esc(affClass(p.affinity))}">${esc(p.affinity)}</span>`:''}</div><div class="ef">${esc(p.effect)}</div></button>`).join('')}</div>
           ${rollReadout(slot)}`;
         window._chooseOpts = opts;
       } else if (o==='wrong'){
