@@ -186,6 +186,7 @@
             <div class="fg"><label>DM notes (private)</label><textarea id="ing-dmnotes" style="min-height:50px"></textarea></div>
             <div class="form-actions">
               <button class="btn" onclick="saveIng()">Save ingredient</button>
+              <button class="btn ghost" id="ing-dup" onclick="duplicateIng()" style="display:none" title="Create a copy of this ingredient">⎘ Duplicate</button>
               <button class="btn danger" id="ing-del" onclick="deleteIng()" style="display:none">Delete</button>
               <button class="btn ghost" onclick="newIng()">Clear</button>
             </div>
@@ -222,6 +223,7 @@
             <div class="fg"><label>DM notes (private)</label><textarea id="pot-dmnotes" style="min-height:50px"></textarea></div>
             <div class="form-actions">
               <button class="btn" onclick="savePot()">Save potion</button>
+              <button class="btn ghost" id="pot-dup" onclick="duplicatePot()" style="display:none" title="Create a copy of this potion">⎘ Duplicate</button>
               <button class="btn danger" id="pot-del" onclick="deletePot()" style="display:none">Delete</button>
               <button class="btn ghost" onclick="newPot()">Clear</button>
             </div>
@@ -463,6 +465,7 @@
       document.getElementById('ing-rarity').value='common';
       ['ing-combat','ing-utility','ing-whimsy'].forEach(id=>document.getElementById(id).value='0');
       document.getElementById('ing-del').style.display='none';
+      document.getElementById('ing-dup').style.display='none';
       renderIngList();
     }
     function editIng(id){
@@ -478,6 +481,23 @@
       document.getElementById('ing-desc').value=i.description||'';
       document.getElementById('ing-dmnotes').value=i.dmNotes||'';
       document.getElementById('ing-del').style.display='';
+      document.getElementById('ing-dup').style.display='';
+      renderIngList();
+    }
+    function duplicateIng(){
+      // Prefill the form as a NEW ingredient based on the one currently loaded.
+      // We don't save automatically — the DM gets to tweak fields and then hit Save.
+      const baseName=(document.getElementById('ing-name').value||'').trim();
+      if(!baseName){ toast('Open an ingredient first, then click Duplicate.', true); return; }
+      document.getElementById('ing-form-title').textContent='New ingredient (copy)';
+      document.getElementById('ing-id').value='';          // clear id → saveIng() will generate a new one
+      document.getElementById('ing-name').value=baseName+' (copy)';
+      // Every other form field already holds the source values — leave them as-is for editing.
+      document.getElementById('ing-del').style.display='none';
+      document.getElementById('ing-dup').style.display='none';
+      document.getElementById('ing-name').focus();
+      document.getElementById('ing-name').select();
+      toast('Copy started — edit fields and Save.');
       renderIngList();
     }
     async function saveIng(){
@@ -539,6 +559,7 @@
       document.getElementById('pot-official').checked=false;
       potRarityPreview();
       document.getElementById('pot-del').style.display='none';
+      document.getElementById('pot-dup').style.display='none';
       renderPotList();
     }
     function editPot(id){
@@ -554,6 +575,28 @@
       document.getElementById('pot-official').checked=!!p.official;
       potRarityPreview();
       document.getElementById('pot-del').style.display='';
+      document.getElementById('pot-dup').style.display='';
+      renderPotList();
+    }
+    function duplicatePot(){
+      // Prefill the form as a NEW potion based on the one currently loaded.
+      // Same category + number (potions can share slots — see the hint above
+      // the list). The copy is created as non-official so it doesn't fight the
+      // original for the default-result slot; the DM can flip it on if they
+      // want it to replace the source.
+      const baseName=(document.getElementById('pot-name').value||'').trim();
+      if(!baseName){ toast('Open a potion first, then click Duplicate.', true); return; }
+      document.getElementById('pot-form-title').textContent='New potion (copy)';
+      document.getElementById('pot-id').value='';
+      document.getElementById('pot-name').value=baseName+' (copy)';
+      document.getElementById('pot-official').checked=false;
+      // category / number / affinity / effect / dmNotes are left as-is for editing.
+      potRarityPreview();
+      document.getElementById('pot-del').style.display='none';
+      document.getElementById('pot-dup').style.display='none';
+      document.getElementById('pot-name').focus();
+      document.getElementById('pot-name').select();
+      toast('Copy started — edit fields and Save.');
       renderPotList();
     }
     async function savePot(){
