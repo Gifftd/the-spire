@@ -359,6 +359,13 @@
             <button class="btn brass" id="import-btn" onclick="doImport()" disabled>Import to KV</button>
           </div>
         </div>
+
+        <div class="form" style="max-width:640px;margin-top:1rem">
+          <h3>Apply affinity tags</h3>
+          <div class="hint">Reads a <code>{id: affinity}</code> map (or <code>{tags: {id: affinity}}</code>) and sets each listed ingredient's affinity. Safe to re-apply — only the listed ingredients are touched; everything else is left alone. Use it after editing <code>obojima-affinity-tags.json</code>.</div>
+          <div class="fg"><label>Tags file</label><input type="file" id="aff-tags-file" accept="application/json,.json" onchange="applyAffinityTags(event)"></div>
+          <div id="aff-tags-result" class="hint"></div>
+        </div>
       </div>
     </div>
 
@@ -982,6 +989,43 @@
         toast('Imported into KV.');
         document.getElementById('import-preview').innerHTML='<b style="color:var(--teal-bright)">Done.</b> The Cauldron is stocked.';
       } else { btn.disabled=false; }
+    }
+
+    /* ── Apply affinity tags from a {id: affinity} map ── */
+    function applyAffinityTags(ev){
+      const file=ev.target.files&&ev.target.files[0];
+      const out=document.getElementById('aff-tags-result');
+      if(!file) return;
+      const reader=new FileReader();
+      reader.onload=async()=>{
+        out.innerHTML='';
+        try{
+          const d=JSON.parse(reader.result);
+          const tags=(d && d.tags && typeof d.tags==='object') ? d.tags : (d && typeof d==='object' ? d : null);
+          if(!tags || Array.isArray(tags)) throw new Error('Expected an object {id: affinity} or {tags: {id: affinity}}.');
+          let updated=0, unchanged=0, missing=[];
+          for(const id in tags){
+            if(!Object.prototype.hasOwnProperty.call(tags,id)) continue;
+            const aff=(tags[id]||'').toString().trim().toLowerCase();
+            const ing=data.ingredients.find(x=>x.id===id);
+            if(!ing){ missing.push(id); continue; }
+            if((ing.affinity||'')===aff){ unchanged++; continue; }
+            ing.affinity=aff; updated++;
+          }
+          if(updated===0 && missing.length===0){
+            out.innerHTML=`Nothing to change — all ${unchanged} listed affinities already matched.`;
+            return;
+          }
+          if(updated>0 && !(await saveKey('potion_ingredients', data.ingredients))) return;
+          if(updated>0){ renderIngList(); window.__anaCache=null; }
+          out.innerHTML=`Applied <b style="color:var(--teal-bright)">${updated}</b> tag${updated===1?'':'s'}`
+            +(unchanged?`, ${unchanged} unchanged`:'')
+            +(missing.length?`, <span style="color:var(--rust)">${missing.length} unknown id${missing.length===1?'':'s'} skipped (${esc(missing.slice(0,4).join(', '))}${missing.length>4?'…':''})</span>`:'')+'.';
+          if(updated>0) toast('Applied '+updated+' affinity tag'+(updated===1?'':'s')+'.');
+        }catch(e){ out.innerHTML=`<span style="color:var(--rust)">Couldn't read that file: ${esc(e.message)}</span>`; }
+      };
+      reader.readAsText(file);
+      ev.target.value='';
     }
 
     bootstrap();

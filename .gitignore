@@ -9,6 +9,7 @@ CLAUDE.md
 obojima-seed.json
 obojima-potions.json
 dnd-potions-seed.json
+obojima-affinity-tags.json
 *.seed.json
 
 # macOS
