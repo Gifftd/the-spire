@@ -239,10 +239,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
   <div class="player-badge" id="player-badge">
     <span class="player-badge-label">Playing as</span>
     <span class="player-badge-name" id="player-badge-name"></span>
-    <button class="btn-pill" type="button" onclick="toggleNPCRoster()">
-      NPCs
-      <span class="whispers-count" id="npc-count-pill">0</span>
-    </button>
+    <button class="btn-pill" type="button" onclick="toggleNPCRoster()">NPCs</button>
     <button class="btn-pill" type="button" onclick="toggleWhispers()">
       Whispers
       <span class="whispers-count" id="whispers-count">0</span>
@@ -611,11 +608,7 @@ function locationNameById(id) {
 
 function renderNPCRoster() {
   const list = document.getElementById('npc-roster-list');
-  const pill = document.getElementById('npc-count-pill');
   if (!list) return;
-
-  pill.textContent = knownNpcs.length;
-  pill.classList.toggle('visible', knownNpcs.length > 0);
 
   const query = (document.getElementById('npc-roster-search')?.value || '').trim().toLowerCase();
   const filtered = !query ? knownNpcs : knownNpcs.filter(n =>
