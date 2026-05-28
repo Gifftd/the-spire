@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Spire — The Cauldron</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#080c10;--panel:#131c22;--panel-deep:#0d141a;--panel-light:#1c2730;
+      --border:#2c4048;--border-light:#3e5862;
+      --teal:#4a9595;--teal-bright:#7ec5c5;--teal-deep:#2a5454;--teal-faint:#1b3838;
+      --ink:#dde3e5;--ink-light:#a3adb3;--ink-faint:#6c787f;
+      --brass:#b88a5a;--rust:#a85d4a;
+      --combat:#c43838;--utility:#3a6fd0;--whimsy:#b060d0;
+      --radius:4px;
+    }
+    body{
+      background:var(--bg);
+      background-image:
+        radial-gradient(ellipse at 20% 10%, rgba(74,149,149,0.10) 0%, transparent 55%),
+        radial-gradient(ellipse at 80% 90%, rgba(184,138,90,0.06) 0%, transparent 55%);
+      min-height:100vh; color:var(--ink);
+      font-family:'Crimson Text',Georgia,serif;
+      padding:1.5rem 1rem 4rem;
+    }
+    .wrap{max-width:1000px;margin:0 auto}
+
+    /* Topbar */
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding-bottom:1rem;margin-bottom:1.25rem;border-bottom:1px solid var(--border);flex-wrap:wrap}
+    .topbar h1{font-family:'Cinzel',serif;font-size:1.4rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--ink)}
+    .topbar h1 .accent{color:var(--teal-bright);font-weight:400}
+    .topbar-meta{display:flex;align-items:center;gap:8px;font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-faint)}
+    .topbar-meta .role{padding:2px 8px;border-radius:10px;border:1px solid;font-size:0.55rem}
+    .role.dm{color:var(--brass);border-color:rgba(184,138,90,0.45);background:rgba(184,138,90,0.10)}
+    .role.player{color:var(--teal-bright);border-color:rgba(74,149,149,0.45);background:rgba(74,149,149,0.12)}
+    .home-link{font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-light);text-decoration:none;padding:6px 12px;border:1px solid var(--border-light);border-radius:var(--radius);transition:all 0.15s}
+    .home-link:hover{border-color:var(--teal);color:var(--teal-bright)}
+
+    /* Mode tabs */
+    .modes{display:flex;gap:6px;margin-bottom:1.25rem}
+    .mode-tab{font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-light);background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius);padding:8px 16px;cursor:pointer;transition:all 0.15s}
+    .mode-tab:hover{border-color:var(--teal)}
+    .mode-tab.active{background:var(--teal-faint);border-color:var(--teal);color:var(--teal-bright)}
+    .mode-hint{font-size:0.92rem;color:var(--ink-faint);font-style:italic;margin:-0.5rem 0 1.25rem}
+
+    /* Two-column layout */
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;align-items:start}
+    @media (max-width:760px){.grid{grid-template-columns:1fr}}
+    .col-head{font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--brass);margin-bottom:0.6rem}
+
+    /* Ingredient picker */
+    .search{width:100%;background:var(--panel-deep);border:1px solid var(--border);border-radius:2px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.95rem;padding:8px 11px;outline:none;margin-bottom:0.6rem}
+    .search:focus{border-color:var(--teal)}
+    .ing-list{max-height:460px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--panel-deep)}
+    .ing-row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.12s}
+    .ing-row:last-child{border-bottom:none}
+    .ing-row:hover{background:var(--panel-light)}
+    .ing-row.disabled{opacity:0.4;cursor:not-allowed}
+    .ing-name{flex:1;font-size:0.95rem;color:var(--ink)}
+    .ing-rarity{font-family:'Cinzel',serif;font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid}
+    .ing-rarity.common{color:var(--ink-light);border-color:var(--border-light)}
+    .ing-rarity.uncommon{color:var(--teal-bright);border-color:var(--teal)}
+    .ing-rarity.rare{color:var(--brass);border-color:rgba(184,138,90,0.6)}
+    .ing-qty{font-family:'Cinzel',serif;font-size:0.62rem;color:var(--teal-bright);min-width:24px;text-align:right}
+    .ing-vals{display:flex;gap:5px;font-family:'Cinzel',serif;font-size:0.62rem}
+    .v-c{color:var(--combat)}.v-u{color:var(--utility)}.v-w{color:var(--whimsy)}
+    .aff-chip{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--border-light);color:var(--ink-light);white-space:nowrap}
+    .aff-chip.fire{color:#ff9a6e;border-color:#c43838}
+    .aff-chip.cold,.aff-chip.ice{color:#88c0ff;border-color:#3a6fd0}
+    .aff-chip.lightning{color:#ffe060;border-color:#c4a838}
+    .aff-chip.thunder{color:#a0c8ff;border-color:#4a90d4}
+    .aff-chip.nature,.aff-chip.acid,.aff-chip.poison{color:#9ad080;border-color:#4ca050}
+    .aff-chip.radiant{color:#ffe9a0;border-color:#e0a830}
+    .aff-chip.necrotic{color:#b890c8;border-color:#7a5290}
+    .aff-chip.psychic{color:#e090c0;border-color:#a040a0}
+    .aff-chip.force,.aff-chip.arcane{color:#c8a0ff;border-color:#7c5fc4}
+    .affinity-tally{display:flex;flex-wrap:wrap;gap:5px;margin-top:0.6rem}
+    .affinity-tally .tally-label{font-family:'Cinzel',serif;font-size:0.56rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint);align-self:center;margin-right:4px}
+    .empty-note{padding:1.5rem 1rem;text-align:center;color:var(--ink-faint);font-style:italic;font-size:0.92rem}
+
+    /* Recipe slots */
+    .slots{display:flex;gap:8px;margin-bottom:1rem}
+    .slot{flex:1;min-height:64px;border:1px dashed var(--border-light);border-radius:var(--radius);background:var(--panel-deep);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px;text-align:center;position:relative}
+    .slot.filled{border-style:solid;border-color:var(--teal-deep);background:var(--panel-light);cursor:pointer}
+    .slot.filled:hover{border-color:var(--rust)}
+    .slot-name{font-size:0.85rem;color:var(--ink);line-height:1.2}
+    .slot-vals{display:flex;gap:6px;font-family:'Cinzel',serif;font-size:0.6rem;margin-top:4px}
+    .slot-empty{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint)}
+    .slot .x{position:absolute;top:3px;right:6px;color:var(--ink-faint);font-size:0.8rem}
+    .slot.filled:hover .x{color:var(--rust)}
+
+    .panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;margin-bottom:1rem}
+
+    /* Sums */
+    .sum-row{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+    .sum-label{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;width:62px;color:var(--ink-light)}
+    .sum-bar{flex:1;height:14px;background:var(--panel-deep);border:1px solid var(--border);border-radius:7px;overflow:hidden}
+    .sum-fill{height:100%;border-radius:7px;transition:width 0.25s}
+    .sum-fill.combat{background:var(--combat)}.sum-fill.utility{background:var(--utility)}.sum-fill.whimsy{background:var(--whimsy)}
+    .sum-val{font-family:'Cinzel',serif;font-size:0.85rem;width:26px;text-align:right}
+    .sum-row.win .sum-label{color:var(--teal-bright)}
+    .sum-row.win .sum-val{color:var(--teal-bright);font-weight:700}
+
+    /* Slot result */
+    .result-line{font-family:'Cinzel',serif;font-size:0.9rem;letter-spacing:0.04em;color:var(--ink);margin-top:0.6rem;line-height:1.5}
+    .result-line .big{font-size:1.15rem;color:var(--teal-bright)}
+    .meta-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:0.6rem}
+    .meta-chip{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.06em;padding:3px 9px;border-radius:10px;border:1px solid var(--border-light);color:var(--ink-light)}
+    .meta-chip b{color:var(--ink)}
+
+    /* Tie chooser */
+    .tie{margin-top:0.7rem;padding:0.6rem 0.7rem;border:1px solid rgba(184,138,90,0.4);border-radius:var(--radius);background:rgba(184,138,90,0.07)}
+    .tie-label{font-family:'Cinzel',serif;font-size:0.58rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--brass);margin-bottom:0.4rem}
+    .tie-opts{display:flex;gap:6px;flex-wrap:wrap}
+    .tie-opt{font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.08em;text-transform:uppercase;padding:4px 11px;border-radius:var(--radius);border:1px solid var(--border-light);background:var(--panel-deep);color:var(--ink-light);cursor:pointer}
+    .tie-opt.active{border-color:var(--teal);color:var(--teal-bright);background:var(--teal-faint)}
+
+    /* Brew controls */
+    .brew-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-top:0.4rem}
+    .field{display:flex;flex-direction:column;gap:3px}
+    .field label{font-family:'Cinzel',serif;font-size:0.56rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint)}
+    .field input{width:90px;background:var(--panel-deep);border:1px solid var(--border);border-radius:2px;color:var(--ink);font-family:'Cinzel',serif;font-size:1rem;padding:7px 9px;outline:none;text-align:center}
+    .field input:focus{border-color:var(--teal)}
+    .btn{font-family:'Cinzel',serif;font-size:0.74rem;letter-spacing:0.12em;text-transform:uppercase;padding:10px 20px;border-radius:var(--radius);border:1px solid var(--teal);background:var(--teal-deep);color:#eafafa;cursor:pointer;transition:all 0.15s}
+    .btn:hover{background:var(--teal);box-shadow:0 0 14px rgba(74,149,149,0.3)}
+    .btn:disabled{opacity:0.4;cursor:not-allowed;box-shadow:none}
+    .btn.secondary{background:var(--panel-deep);border-color:var(--border-light);color:var(--ink-light)}
+    .btn.secondary:hover{border-color:var(--teal);color:var(--teal-bright);box-shadow:none}
+
+    /* Brew result */
+    .brew-result{border-radius:var(--radius);padding:1rem 1.1rem;margin-top:0.4rem;border:1px solid var(--border);background:var(--panel-deep)}
+    .brew-result.success{border-color:var(--teal);background:linear-gradient(160deg,rgba(74,149,149,0.12),var(--panel-deep))}
+    .brew-result.choose{border-color:var(--brass);background:linear-gradient(160deg,rgba(184,138,90,0.12),var(--panel-deep))}
+    .brew-result.wrong{border-color:#c87800;background:linear-gradient(160deg,rgba(200,120,0,0.10),var(--panel-deep))}
+    .brew-result.sludge{border-color:var(--ink-faint)}
+    .brew-result.negative{border-color:var(--rust);background:linear-gradient(160deg,rgba(168,93,74,0.14),var(--panel-deep))}
+    .brew-outcome{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.16em;text-transform:uppercase;margin-bottom:0.5rem}
+    .brew-result.success .brew-outcome{color:var(--teal-bright)}
+    .brew-result.choose .brew-outcome{color:var(--brass)}
+    .brew-result.wrong .brew-outcome{color:#f0b076}
+    .brew-result.sludge .brew-outcome{color:var(--ink-faint)}
+    .brew-result.negative .brew-outcome{color:var(--rust)}
+    .potion-name{font-family:'Cinzel',serif;font-size:1.15rem;letter-spacing:0.04em;color:var(--ink);margin-bottom:0.3rem}
+    .potion-effect{font-size:0.98rem;line-height:1.6;color:var(--ink-light);white-space:pre-wrap}
+    .roll-readout{font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.06em;color:var(--ink-faint);margin-top:0.6rem}
+    .roll-readout b{color:var(--ink-light)}
+    .choose-opts{display:grid;gap:8px;margin-top:0.6rem}
+    .choose-opt{text-align:left;border:1px solid var(--border-light);border-radius:var(--radius);background:var(--panel);padding:0.6rem 0.8rem;cursor:pointer;transition:all 0.15s;color:var(--ink)}
+    .choose-opt:hover{border-color:var(--teal);background:var(--panel-light)}
+    .choose-opt .nm{font-family:'Cinzel',serif;font-size:0.92rem;color:var(--teal-bright);margin-bottom:0.2rem}
+    .choose-opt .ef{font-size:0.88rem;line-height:1.5;color:var(--ink-light)}
+
+    .state{text-align:center;padding:3rem 1rem;color:var(--ink-faint);font-style:italic}
+    .state.error{color:var(--rust)}
+    .footer{margin-top:2rem;text-align:center;padding-top:1.5rem;border-top:1px solid var(--border)}
+    .footer-text{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--ink-faint)}
+
+    /* Known recipes */
+    .recipes-panel{margin-bottom:1rem}
+    .rec-list{max-height:210px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--panel-deep)}
+    .rec-row{display:flex;flex-direction:column;gap:2px;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.12s}
+    .rec-row:last-child{border-bottom:none}
+    .rec-row:hover{background:var(--panel-light)}
+    .rec-row.missing{opacity:0.5}
+    .rec-top{display:flex;align-items:baseline;gap:8px}
+    .rec-name{font-family:'Cinzel',serif;font-size:0.82rem;color:var(--teal-bright);letter-spacing:0.03em;flex:1}
+    .rec-slot{font-family:'Cinzel',serif;font-size:0.56rem;letter-spacing:0.06em;color:var(--ink-faint);text-transform:uppercase}
+    .rec-ings{font-size:0.84rem;color:var(--ink-light)}
+    .rec-missing{font-family:'Cinzel',serif;font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--rust)}
+    .empty-rec{padding:0.9rem 1rem;text-align:center;color:var(--ink-faint);font-style:italic;font-size:0.86rem}
+
+    .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel-light);border:1px solid var(--teal);border-radius:var(--radius);padding:10px 18px;color:var(--ink);font-size:0.9rem;box-shadow:0 4px 16px rgba(0,0,0,0.5);opacity:0;transition:opacity 0.2s;pointer-events:none;z-index:50}
+    .toast.show{opacity:1}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <h1>The <span class="accent">Cauldron</span></h1>
+      <div class="topbar-meta">
+        <span id="role-line">— loading —</span>
+        <a href="home.html" class="home-link">⌂ Home</a>
+      </div>
+    </div>
+
+    <div id="state" class="state">Lighting the burner…</div>
+
+    <div id="tool" style="display:none">
+      <div class="modes">
+        <button class="mode-tab active" id="tab-craft" onclick="setMode('craft')">Craft</button>
+        <button class="mode-tab" id="tab-experiment" onclick="setMode('experiment')">Experiment</button>
+      </div>
+      <div class="mode-hint" id="mode-hint"></div>
+
+      <div class="grid">
+        <div>
+          <div class="recipes-panel" id="recipes-panel" style="display:none">
+            <div class="col-head">Known recipes (<span id="rec-count">0</span>)</div>
+            <div class="rec-list" id="rec-list"></div>
+          </div>
+          <div class="col-head" id="picker-head">Your ingredients</div>
+          <input type="text" class="search" id="search" placeholder="Search ingredients…" oninput="renderList()">
+          <div class="ing-list" id="ing-list"></div>
+        </div>
+
+        <div>
+          <div class="col-head">Recipe — 3 ingredients</div>
+          <div class="slots" id="slots"></div>
+          <div class="panel" id="calc-panel">
+            <div id="sums"></div>
+            <div id="slot-result"></div>
+            <div id="tie-chooser"></div>
+          </div>
+          <div id="brew-zone"></div>
+          <div id="result-zone"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer"><p class="footer-text">The Spire · The Cauldron</p></div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script src="auth.js"></script>
+  <script>
+    const WORKER_URL = (window.Auth && window.Auth.WORKER_URL) || 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+    function esc(s){return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+    function affClass(a){return (a||'').toString().trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');}
+
+    let isDM = false;
+    let catalog = [];           // all ingredients [{id,name,rarity,combat,utility,whimsy,description}]
+    let byId = {};
+    let inventory = [];         // [{ingredientId, qty}] (players only)
+    let recipes = [];           // known recipes for this character
+    let mode = 'craft';
+    let selected = [];          // up to 3 ingredient ids
+    let chosenCategory = null;  // tie-break choice
+    let lastRoll = null;        // {d20, bonus, total}
+
+    function toast(msg){
+      const t = document.getElementById('toast');
+      t.textContent = msg; t.className = 'toast show';
+      clearTimeout(t._t); t._t = setTimeout(()=>{ t.className='toast'; }, 3000);
+    }
+
+    async function bootstrap(){
+      const ident = Auth.identity();
+      isDM = ident.role === 'dm';
+      const roleEl = document.getElementById('role-line');
+      const stateEl = document.getElementById('state');
+      roleEl.innerHTML = `Brewing as <strong style="color:var(--ink)">${esc(ident.display||'Visitor')}</strong> <span class="role ${esc(ident.role)}">${isDM?'DM':'Player'}</span>`;
+
+      if (!Auth.requireRole('any-login', { reason:'Log in to use the Cauldron.' })) return;
+
+      try {
+        if (isDM){
+          const r = await fetch(WORKER_URL + '?type=potion_data_dm', { cache:'no-store', headers: Auth.dmHeaders() });
+          if (r.status === 401){ stateEl.textContent='Your DM session expired — sign in again on the home page.'; stateEl.classList.add('error'); return; }
+          if (!r.ok) throw new Error('HTTP '+r.status);
+          const d = await r.json();
+          catalog = Array.isArray(d.ingredients) ? d.ingredients : [];
+          inventory = [];
+        } else {
+          const c = Auth.playerCreds();
+          const u = `${WORKER_URL}?type=brew_player&characterId=${encodeURIComponent(c.characterId)}&code=${encodeURIComponent(c.code)}`;
+          const r = await fetch(u, { cache:'no-store' });
+          if (!r.ok) throw new Error('HTTP '+r.status);
+          const d = await r.json();
+          catalog = Array.isArray(d.ingredients) ? d.ingredients : [];
+          inventory = Array.isArray(d.inventory) ? d.inventory : [];
+          recipes = Array.isArray(d.recipes) ? d.recipes : [];
+        }
+      } catch(e){
+        stateEl.textContent = 'Could not reach the brewing stores.';
+        stateEl.classList.add('error');
+        return;
+      }
+      byId = Object.fromEntries(catalog.map(i => [i.id, i]));
+      if (catalog.length === 0){
+        stateEl.innerHTML = isDM
+          ? 'No ingredients yet. Open the <a class="home-link" href="brew-dm.html">Apothecary</a> and run the import.'
+          : 'The brewing stores are empty — your DM hasn\'t stocked ingredients yet.';
+        return;
+      }
+      stateEl.style.display = 'none';
+      document.getElementById('tool').style.display = '';
+      setMode('craft');
+    }
+
+    function setMode(m){
+      mode = m;
+      selected = []; chosenCategory = null; lastRoll = null;
+      document.getElementById('tab-craft').classList.toggle('active', m==='craft');
+      document.getElementById('tab-experiment').classList.toggle('active', m==='experiment');
+      const head = document.getElementById('picker-head');
+      const hint = document.getElementById('mode-hint');
+      if (m==='craft'){
+        head.textContent = isDM ? 'All ingredients (DM test brew)' : 'Your ingredients';
+        hint.textContent = isDM
+          ? 'DM test brew — resolves a real result with no consumption. Players brew from their granted inventory.'
+          : 'Brew from what you carry. The 3 ingredients are consumed — even on a botch.';
+      } else {
+        head.textContent = 'All ingredients';
+        hint.textContent = 'Plan a recipe against the full ingredient list. Shows the slot it hits, but the potion stays a mystery until you actually brew it.';
+      }
+      document.getElementById('search').value = '';
+      renderList(); renderRecipe(); renderRecipes();
+    }
+
+    function renderRecipes(){
+      const panel = document.getElementById('recipes-panel');
+      if (isDM || recipes.length === 0){ panel.style.display = 'none'; return; }
+      panel.style.display = '';
+      document.getElementById('rec-count').textContent = recipes.length;
+      const nm = id => { const i = byId[id]; return i ? i.name : id; };
+      const sorted = recipes.slice().sort((a,b)=>(a.potionName||'').localeCompare(b.potionName||''));
+      document.getElementById('rec-list').innerHTML = sorted.map(r => {
+        const ings = (r.ingredientIds||[]).map(nm).join(' + ');
+        const missing = (mode === 'craft' && !isDM) && (r.ingredientIds||[]).some(id => qtyOf(id) <= 0);
+        const slot = (r.category||'').charAt(0).toUpperCase()+(r.category||'').slice(1)+' #'+r.number;
+        return `<div class="rec-row ${missing?'missing':''}" onclick="loadRecipe('${esc(r.id)}')">
+          <div class="rec-top"><span class="rec-name">${esc(r.potionName||'(unknown)')}</span><span class="rec-slot">${esc(slot)}</span>${missing?'<span class="rec-missing">missing</span>':''}</div>
+          <span class="rec-ings">${esc(ings)}</span>
+        </div>`;
+      }).join('');
+    }
+
+    function loadRecipe(id){
+      const r = recipes.find(x => x.id === id); if (!r) return;
+      selected = (r.ingredientIds||[]).filter(x => byId[x]).slice(0,3);
+      chosenCategory = null; lastRoll = null;
+      renderList(); renderRecipe(); renderRecipes();
+    }
+
+    function available(){
+      if (mode==='experiment' || isDM) return catalog;
+      // craft (player): only owned ingredients with qty>0
+      return inventory.filter(e => (e.qty||0) > 0).map(e => byId[e.ingredientId]).filter(Boolean);
+    }
+    function qtyOf(id){ const e = inventory.find(x=>x.ingredientId===id); return e ? (e.qty||0) : 0; }
+
+    function renderList(){
+      const list = document.getElementById('ing-list');
+      const q = (document.getElementById('search').value||'').trim().toLowerCase();
+      let items = available();
+      if (q) items = items.filter(i => i.name.toLowerCase().includes(q));
+      items = items.slice().sort((a,b)=>a.name.localeCompare(b.name));
+      if (items.length === 0){
+        list.innerHTML = `<div class="empty-note">${mode==='craft'&&!isDM ? 'You have no ingredients to brew with.' : 'No ingredients match that search.'}</div>`;
+        return;
+      }
+      const showQty = (mode==='craft' && !isDM);
+      list.innerHTML = items.map(i => {
+        const picked = selected.includes(i.id);
+        const full = selected.length >= 3 && !picked;
+        const dis = picked || full;
+        return `<div class="ing-row ${dis?'disabled':''}" ${dis?'':`onclick="pick('${esc(i.id)}')"`}>
+          <span class="ing-name">${esc(i.name)}${picked?' ✓':''}</span>
+          <span class="ing-vals"><span class="v-c">${i.combat}</span><span class="v-u">${i.utility}</span><span class="v-w">${i.whimsy}</span></span>
+          ${i.affinity?`<span class="aff-chip ${esc(affClass(i.affinity))}">${esc(i.affinity)}</span>`:''}
+          <span class="ing-rarity ${esc(i.rarity)}">${esc(i.rarity)}</span>
+          ${showQty?`<span class="ing-qty">×${qtyOf(i.id)}</span>`:''}
+        </div>`;
+      }).join('');
+    }
+
+    function pick(id){
+      if (selected.includes(id) || selected.length>=3) return;
+      selected.push(id);
+      chosenCategory = null; lastRoll = null;
+      renderList(); renderRecipe();
+    }
+    function unpick(idx){
+      selected.splice(idx,1);
+      chosenCategory = null; lastRoll = null;
+      renderList(); renderRecipe();
+    }
+
+    function computeSums(){
+      const s = {combat:0,utility:0,whimsy:0};
+      selected.forEach(id => { const i = byId[id]; if(i){ s.combat+=+i.combat||0; s.utility+=+i.utility||0; s.whimsy+=+i.whimsy||0; } });
+      return s;
+    }
+    function bandOf(n){ return n<=30?'common':n<=50?'uncommon':'rare'; }
+    function dcOf(r){ return r==='common'?10:r==='uncommon'?15:20; }
+    function mukOf(r){ return r==='common'?15:r==='uncommon'?75:300; }
+
+    function renderRecipe(){
+      // Any change to the recipe invalidates a prior brew result.
+      document.getElementById('result-zone').innerHTML = '';
+      // slots
+      const slotsEl = document.getElementById('slots');
+      let html = '';
+      for (let k=0;k<3;k++){
+        const id = selected[k];
+        if (id){
+          const i = byId[id];
+          html += `<div class="slot filled" onclick="unpick(${k})"><span class="x">✕</span><span class="slot-name">${esc(i.name)}</span><span class="slot-vals"><span class="v-c">${i.combat}</span><span class="v-u">${i.utility}</span><span class="v-w">${i.whimsy}</span></span>${i.affinity?`<span class="aff-chip ${esc(affClass(i.affinity))}" style="margin-top:4px">${esc(i.affinity)}</span>`:''}</div>`;
+        } else {
+          html += `<div class="slot"><span class="slot-empty">Empty</span></div>`;
+        }
+      }
+      slotsEl.innerHTML = html;
+
+      const sums = computeSums();
+      const peak = Math.max(sums.combat, sums.utility, sums.whimsy);
+      const winners = ['combat','utility','whimsy'].filter(c => sums[c]===peak && peak>0);
+      const maxScale = 60;
+      const sumHtml = ['combat','utility','whimsy'].map(c => {
+        const win = winners.includes(c);
+        return `<div class="sum-row ${win?'win':''}">
+          <span class="sum-label">${c}</span>
+          <span class="sum-bar"><span class="sum-fill ${c}" style="width:${Math.min(100, sums[c]/maxScale*100)}%"></span></span>
+          <span class="sum-val">${sums[c]}</span>
+        </div>`;
+      }).join('');
+      // Affinity tally across the chosen ingredients
+      const affTally = {};
+      selected.forEach(id => { const i = byId[id]; const a = (i && i.affinity || '').toLowerCase(); if (a) affTally[a] = (affTally[a]||0) + 1; });
+      const affKeys = Object.keys(affTally);
+      const tallyHtml = affKeys.length
+        ? `<div class="affinity-tally"><span class="tally-label">Affinity</span>${affKeys.map(a=>`<span class="aff-chip ${esc(affClass(a))}">${esc(a)}${affTally[a]>1?` ×${affTally[a]}`:''}</span>`).join('')}</div>`
+        : '';
+      document.getElementById('sums').innerHTML = sumHtml + tallyHtml;
+
+      const slotResEl = document.getElementById('slot-result');
+      const tieEl = document.getElementById('tie-chooser');
+      const brewZone = document.getElementById('brew-zone');
+
+      if (selected.length < 3){
+        slotResEl.innerHTML = `<div class="result-line" style="color:var(--ink-faint)">Add ${3-selected.length} more ingredient${3-selected.length===1?'':'s'} to see the recipe.</div>`;
+        tieEl.innerHTML = ''; brewZone.innerHTML = '';
+        return;
+      }
+
+      // tie handling
+      let category = winners[0];
+      if (winners.length>1){
+        if (!chosenCategory || !winners.includes(chosenCategory)) chosenCategory = winners[0];
+        category = chosenCategory;
+        tieEl.innerHTML = `<div class="tie"><div class="tie-label">Tie — choose the list</div><div class="tie-opts">${
+          winners.map(c=>`<span class="tie-opt ${c===category?'active':''}" onclick="setCategory('${c}')">${c}</span>`).join('')
+        }</div></div>`;
+      } else {
+        tieEl.innerHTML = '';
+      }
+
+      const number = sums[category];
+      const rarity = bandOf(number);
+      const dc = dcOf(rarity), muk = mukOf(rarity);
+      slotResEl.innerHTML = `
+        <div class="result-line">This recipe brews <span class="big">${category.charAt(0).toUpperCase()+category.slice(1)} #${number}</span></div>
+        <div class="meta-chips">
+          <span class="meta-chip">Rarity <b>${rarity}</b></span>
+          <span class="meta-chip">Brew DC <b>${dc}</b></span>
+          <span class="meta-chip">Muk <b>${muk} gp</b></span>
+          <span class="meta-chip">Time <b>10 min</b></span>
+        </div>`;
+
+      renderBrewZone(category, number, rarity, dc);
+    }
+
+    function setCategory(c){ chosenCategory = c; lastRoll = null; renderRecipe(); document.getElementById('result-zone').innerHTML=''; }
+
+    function renderBrewZone(category, number, rarity, dc){
+      const zone = document.getElementById('brew-zone');
+      if (mode==='experiment'){
+        zone.innerHTML = `<div class="panel"><div class="result-line" style="color:var(--ink-faint);font-family:'Crimson Text',serif;font-style:italic">
+          The potion at this slot stays hidden. Brew it for real ${isDM?'(switch to Craft to test)':'from your inventory'} to discover what it makes.</div></div>`;
+        return;
+      }
+      zone.innerHTML = `<div class="panel">
+        <div class="brew-controls">
+          <div class="field"><label>Alchemy bonus</label><input type="number" id="bonus" value="0"></div>
+          <div class="field"><label>d20 (blank = roll)</label><input type="number" id="d20" placeholder="roll" min="1" max="20"></div>
+          <button class="btn" id="brew-btn" onclick="brew('${category}')">${isDM?'Test Brew':'Brew Potion'}</button>
+        </div>
+        <div class="roll-readout" style="margin-top:0.7rem">Need a total of <b>${dc}</b> or higher. Beat it by 10+ to choose your potion; miss by 6–9 and you get sludge; miss by 10+ for a nasty surprise.</div>
+      </div>`;
+    }
+
+    async function brew(category){
+      const btn = document.getElementById('brew-btn');
+      const bonus = parseInt(document.getElementById('bonus').value||'0',10) || 0;
+      const d20raw = document.getElementById('d20').value;
+      const d20 = d20raw==='' ? (Math.floor(Math.random()*20)+1) : Math.max(1,Math.min(20,parseInt(d20raw,10)||1));
+      const total = d20 + bonus;
+      lastRoll = { d20, bonus, total };
+      btn.disabled = true; btn.textContent = 'Brewing…';
+
+      const body = { type:'brew', ingredientIds: selected.slice(), rollTotal: total, category };
+      let headers = { 'Content-Type':'application/json' };
+      if (isDM){ headers = Auth.dmHeaders(); }
+      else { const c = Auth.playerCreds(); body.characterId = c.characterId; body.code = c.code; }
+
+      let res;
+      try {
+        const r = await fetch(WORKER_URL, { method:'POST', headers, body: JSON.stringify(body) });
+        res = await r.json();
+        if (!r.ok || res.error) throw new Error(res.error || ('HTTP '+r.status));
+      } catch(e){
+        document.getElementById('result-zone').innerHTML = `<div class="brew-result negative"><div class="brew-outcome">Brew failed</div><div class="potion-effect">${esc(e.message||'Something went wrong.')}</div></div>`;
+        btn.disabled = false; btn.textContent = isDM?'Test Brew':'Brew Potion';
+        return;
+      }
+
+      // update inventory + recipe book from the response
+      if (res.consumed && Array.isArray(res.inventory)) inventory = res.inventory;
+      if (Array.isArray(res.recipes)) recipes = res.recipes;
+      renderResult(res);
+      // refresh picker + recipes (inventory and book may have changed)
+      renderList(); renderRecipes();
+      if (res.learned && res.potion) toast('✦ Recipe learned: ' + res.potion.name);
+      btn.disabled = false; btn.textContent = isDM?'Test Brew':'Brew Potion';
+    }
+
+    function rollReadout(slot){
+      const m = slot.margin;
+      const sign = m>=0?'+':'';
+      return `<div class="roll-readout">Rolled <b>${lastRoll.d20}</b>${lastRoll.bonus?` ${lastRoll.bonus>=0?'+':''}${lastRoll.bonus}`:''} = <b>${slot.rollTotal}</b> vs DC <b>${slot.DC}</b> &nbsp;·&nbsp; margin <b>${sign}${m}</b>${res_consumed_note()}</div>`;
+    }
+    let _consumed = false;
+    function res_consumed_note(){ return _consumed ? ' &nbsp;·&nbsp; ingredients consumed' : ''; }
+
+    function renderResult(res){
+      _consumed = !!res.consumed;
+      const zone = document.getElementById('result-zone');
+      const slot = res.slot || {};
+      const o = res.outcome;
+      let inner = '';
+      if (o==='success'){
+        inner = `<div class="brew-outcome">Success — you brewed it</div>
+          <div class="potion-name">${esc(res.potion?res.potion.name:'(unknown)')}</div>
+          <div class="potion-effect">${esc(res.potion?res.potion.effect:'')}</div>${rollReadout(slot)}`;
+      } else if (o==='choose'){
+        const opts = (res.options||[]);
+        const aff = res.chooseReason === 'affinity';
+        const heading = aff ? 'Multiple affinities — pick your variant' : 'Masterful — choose your potion';
+        const sub = aff
+          ? 'Your ingredients carry more than one elemental affinity. Pick which variant you brewed:'
+          : `You beat the DC by 10+. Pick which ${slot.category} #${slot.number} potion you crafted:`;
+        inner = `<div class="brew-outcome">${heading}</div>
+          <div class="potion-effect">${sub}</div>
+          <div class="choose-opts">${opts.map((p,i)=>`<button class="choose-opt" onclick="chooseOpt(${i})"><div class="nm">${esc(p.name)}${p.affinity?` <span class="aff-chip ${esc(affClass(p.affinity))}">${esc(p.affinity)}</span>`:''}</div><div class="ef">${esc(p.effect)}</div></button>`).join('')}</div>
+          ${rollReadout(slot)}`;
+        window._chooseOpts = opts;
+      } else if (o==='wrong'){
+        inner = `<div class="brew-outcome">Not quite — something else came out</div>
+          <div class="potion-name">${esc(res.potion?res.potion.name:'(unknown)')}</div>
+          <div class="potion-effect">${esc(res.potion?res.potion.effect:'')}</div>${rollReadout(slot)}`;
+      } else if (o==='sludge'){
+        inner = `<div class="brew-outcome">Sludge</div>
+          <div class="potion-effect">The mixture curdles into a useless grey sludge. Nothing brews — and your ingredients are gone.</div>${rollReadout(slot)}`;
+      } else if (o==='negative'){
+        inner = `<div class="brew-outcome">Disaster — a cursed brew</div>
+          <div class="potion-name">${esc(res.potion?res.potion.name:'(unknown)')}</div>
+          <div class="potion-effect">${esc(res.potion?res.potion.effect:'')}</div>${rollReadout(slot)}`;
+      }
+      zone.innerHTML = `<div class="brew-result ${esc(o)}">${inner}</div>`;
+    }
+
+    async function chooseOpt(i){
+      const p = (window._chooseOpts||[])[i];
+      if (!p) return;
+      const zone = document.getElementById('result-zone');
+      zone.innerHTML = `<div class="brew-result success"><div class="brew-outcome">You crafted</div>
+        <div class="potion-name">${esc(p.name)}</div>
+        <div class="potion-effect">${esc(p.effect)}</div></div>`;
+      // Record the chosen potion as a known recipe (players only).
+      if (!isDM){
+        try {
+          const c = Auth.playerCreds();
+          const r = await fetch(WORKER_URL, { method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ type:'record_recipe', characterId:c.characterId, code:c.code, ingredientIds: selected.slice(), potionId: p.id }) });
+          const d = await r.json();
+          if (r.ok && Array.isArray(d.recipes)){ recipes = d.recipes; renderRecipes(); if (d.learned) toast('✦ Recipe learned: ' + p.name); }
+        } catch {}
+      }
+    }
+
+    bootstrap();
+  </script>
+</body>
+</html>

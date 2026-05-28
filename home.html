@@ -439,6 +439,8 @@
       chronicle: `<svg class="card-icon" viewBox="0 0 52 52" fill="none"><path d="M14 9 L38 9 L38 43 L14 43 Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><line x1="14" y1="9" x2="14" y2="43" stroke="currentColor" stroke-width="3"/><line x1="19" y1="17" x2="33" y2="17" stroke="currentColor" stroke-width="1.5"/><line x1="19" y1="23" x2="33" y2="23" stroke="currentColor" stroke-width="1.5"/><line x1="19" y1="29" x2="29" y2="29" stroke="currentColor" stroke-width="1.5"/><circle cx="26" cy="37" r="2" stroke="currentColor" stroke-width="1.5"/></svg>`,
       mapdm: `<svg class="card-icon" viewBox="0 0 52 52" fill="none"><polygon points="6,12 18,8 34,14 46,10 46,40 34,44 18,38 6,42" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M22 22 L28 22 L28 28 L34 28 L34 34 L22 34 Z" stroke="currentColor" stroke-width="1.8" fill="none"/><circle cx="36" cy="20" r="2.5" fill="currentColor"/></svg>`,
       initdm: `<svg class="card-icon" viewBox="0 0 52 52" fill="none"><circle cx="26" cy="26" r="18" stroke="currentColor" stroke-width="2"/><path d="M26 14 V26 L34 30" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="26" cy="26" r="1.8" fill="currentColor"/></svg>`,
+      cauldron: `<svg class="card-icon" viewBox="0 0 52 52" fill="none"><ellipse cx="26" cy="23" rx="15" ry="4" stroke="currentColor" stroke-width="2"/><path d="M11 23 Q12 40 26 41 Q40 40 41 23" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><line x1="6" y1="22" x2="11" y2="24" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="46" y1="22" x2="41" y2="24" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="22" cy="14" r="1.6" stroke="currentColor" stroke-width="1.5"/><circle cx="29" cy="11" r="2.2" stroke="currentColor" stroke-width="1.5"/><line x1="20" y1="44" x2="20" y2="47" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="32" y1="44" x2="32" y2="47" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
+      apothecary: `<svg class="card-icon" viewBox="0 0 52 52" fill="none"><path d="M21 9 V21 L13 39 A3 3 0 0 0 16 43 H36 A3 3 0 0 0 39 39 L31 21 V9" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><line x1="18" y1="9" x2="34" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16.5 31 H35.5" stroke="currentColor" stroke-width="1.6"/><circle cx="24" cy="36" r="1.4" fill="currentColor"/><circle cx="29" cy="38" r="1.2" fill="currentColor"/></svg>`,
     };
 
     function makeCard({ href, icon, title, desc, dm = false, badge = '' }) {
@@ -461,6 +463,7 @@
       if (role === 'player' || role === 'dm') {
         const playerCards = [
           makeCard({ href: 'index.html', icon: ICONS.perks, title: 'The Ledger', desc: 'Your creation bonus and the perks granted to you.' }),
+          makeCard({ href: 'brew.html', icon: ICONS.cauldron, title: 'The Cauldron', desc: 'Combine ingredients and brew a potion — if your roll holds.' }),
         ];
         sections.push(`<div class="section-heading">For the Sworn</div><div class="cards">${playerCards.join('')}</div>`);
       }
@@ -470,6 +473,7 @@
         const dmCards = [
           makeCard({ href: 'map-dm.html',        icon: ICONS.mapdm,  title: 'Atlas Workshop', desc: 'Place pins, write lore, manage characters and whispers.', dm: true }),
           makeCard({ href: 'initiative-dm.html', icon: ICONS.initdm, title: 'War Table',      desc: 'Order, HP, conditions, broadcast to players.',           dm: true }),
+          makeCard({ href: 'brew-dm.html',       icon: ICONS.apothecary, title: 'The Apothecary', desc: 'Stock ingredients & potions, grant inventory, import the book.', dm: true }),
         ];
         sections.push(`<div class="section-heading">Keeper's Wing</div><div class="cards">${dmCards.join('')}</div>`);
       }

@@ -7,7 +7,205 @@ Dates are YYYY-MM-DD.
 
 ---
 
-## [Unreleased] — 2026-05-21
+## [Unreleased] — 2026-05-28
+
+### Apply affinity tags from file — bulk-tag ingredients
+
+A new file-import in the Apothecary's Import tab that reads a small
+`{id: affinity}` map and sets each listed ingredient's affinity in one shot.
+Safe to re-apply (only listed ingredients are touched), so the JSON file is a
+living document — edit and re-import as you refine tags.
+
+#### Added — `brew-dm.html`
+- New **Apply affinity tags** form in the Import tab. Accepts a file shaped
+  `{tags: {id: affinity}}` (or just `{id: affinity}`). Reports applied / unchanged /
+  unknown-id counts after the merge.
+- Re-renders the Ingredients list and invalidates the cached Analysis result so
+  the next visit to the Analysis tab recomputes against the new tags.
+
+#### Added — `obojima-affinity-tags.json` (gitignored)
+- Initial affinity classification for all 135 Obojima ingredients: 95 tagged, 40
+  left blank (mundane items like *Chicken Egg*, *Earwax*, *Apper Carrot* — they
+  trigger the "random version" path on a brew). Themes follow the descriptions:
+  *Boom Beri / Jumping Bonfire / Coal* → fire, *Bottled Lightning / Spark Plug* →
+  lightning, *Pungent Sea Foam / Lionfish Poison* → poison, *Ribbon Rot / Night
+  Thistle / Corrupted ___* → necrotic, *Spirit Root / Sun Shroom / Tears of the
+  Moon* → radiant, etc. Per-affinity counts: nature 23, fire 16, radiant 12,
+  necrotic 11, psychic 9, force 7, poison 5, acid 4, thunder 4, lightning 3, cold
+  1 (the snow dragon's breath — the only obvious cold-themed ingredient).
+
+### Analysis tab — combo coverage for affinity tagging
+
+A new **Analysis** tab in the Apothecary that runs the full combinatorial analysis
+(every C(135, 3) = 400,995 unique-ingredient combo) and shows how many combos
+land on each slot, broken down by ingredient affinity. Use it to spot authored
+variants you can't actually brew and to gauge whether you have enough affinity-
+tagged ingredients to cover every authored variant.
+
+#### Added — `brew-dm.html`
+- New **Analysis** tab with auto-run on first open + a Recompute button.
+- **Summary cards**: ingredient/affinity-tagged counts, potion/variant counts, total combos.
+- **Unreachable / thin variants warning**: any authored potion with affinity X where
+  no combo reaches that slot with an X-tagged ingredient is flagged red.
+- **Affinity coverage table**: every authored affinity variant sorted by reach
+  ascending (worst first). Each row shows the potion, slot, affinity chip, combos
+  that reach it with that affinity, and total combos at the slot. Rows go red for
+  0 reach and amber for &lt; 5.
+- **Slot overview matrix**: 60 rows × 3 columns showing per-slot combo counts; thin
+  slots (0 or &lt; 5) are tinted red/amber.
+
+All client-side over the existing `data.ingredients` / `data.potions` — no worker
+or KV changes. The C(135, 3) loop runs in ~30 ms in the browser.
+
+### Elemental affinities — variant selection inside a slot
+
+Potions and ingredients can carry an optional **elemental affinity** (`fire`,
+`cold`, `lightning`, `nature`, etc. — any free-text element name). On a clean
+brewing success, the affinities present in the 3 ingredients pick which variant
+within the slot you actually brew. Lets you author "Dragon's Breath – Fire / Cold /
+Lightning" at one slot, plus a fire-affinity ingredient to steer toward Fire.
+
+**The rule (clean success, margin 0–9):**
+- **0 affinities** in the 3 ingredients → random version among the slot's potions.
+- **1 affinity** (any number of ingredients of that element) → the slot's variant
+  with that affinity. Falls back to the official if no variant matches.
+- **2+ distinct affinities** → `choose` outcome; player picks among the slot
+  variants whose affinity matches one of the active elements.
+
+Other outcomes are unchanged: a masterful +10 still gives free pick of every
+potion in the slot, near-misses still roll random, sludge/negative still apply.
+The brew check itself isn't affected.
+
+#### Worker (`cloudflare-worker.js`)
+- `brewResolve` now tallies ingredient affinities, returns `slot.affinity = {tally,
+  active}`, and chooses the success variant per the rule above. Returns a new
+  `chooseReason: 'mastery' | 'affinity'` so the UI can label the picker correctly.
+- ⚠️ **Requires another manual worker redeploy.**
+
+#### Editor (`brew-dm.html`)
+- New **Elemental affinity** field on the Ingredient, Potion, and Library forms.
+  Library → "Slot it" copies the affinity through to the slotted potion.
+- Affinity chips render in the Ingredients / Potions / Library lists, colored by
+  element (fire = red, cold = blue, lightning = gold, nature = green, etc.; unknown
+  elements get a neutral chip).
+
+#### Player (`brew.html`)
+- Affinity chips show on ingredient picker rows and in the filled recipe slots.
+- An **Affinity** tally appears under the Combat/Utility/Whimsy bars (e.g.
+  "fire ×2  cold").
+- The `choose` panel now reads "Multiple affinities — pick your variant" for
+  affinity-driven picks (vs. the existing "Masterful — choose" for the +10 path),
+  and each option shows its affinity chip.
+
+#### Backward compatibility
+- All affinity fields default to empty — existing ingredients/potions keep brewing
+  exactly as before. Affinity only changes behaviour when both an ingredient *and*
+  a slot variant carry one.
+
+### Potion library — standard 5e potions, assignable to slots
+
+A reference shelf of standard D&D potions the DM can drop onto Obojima brew slots.
+Imported the 28 potions from the 2024 Dungeon Master's Guide (Magic Items A–Z):
+Healing, Fire Breath, Flying, Giant Strength, Invisibility, the Oils, etc.
+
+A library potion is `{id,name,rarity,attunement,effect,source}` in a new
+`potion_library` KV key. It is **not** brewable on its own — the brew math is
+untouched. Instead the DM places one onto a slot, after which it brews and grants
+as a recipe like any other potion.
+
+#### Added — `brew-dm.html` (DM)
+- **Library** tab: manage the standard potions (search / edit / delete) and
+  **Import seed** (`dnd-potions-seed.json`, merge by id — re-import skips dupes).
+- **Slot it** on a library potion jumps to the Potions tab with the name + effect
+  pre-filled; the DM sets the list + number and saves it as a real slotted potion.
+
+#### Worker (`cloudflare-worker.js`)
+- `potion_data_dm` now returns `library`; `potion_library` added to the DM write
+  types + KV keys. (Players don't fetch the library directly — it only reaches them
+  once a library potion has been slotted into `potions`.)
+- ⚠️ **Requires another manual worker redeploy.**
+
+#### Data / privacy
+- DMG potion text is third-party copyrighted content: `dnd-potions-seed.json` is
+  gitignored and lives in KV only, same as the Obojima data.
+
+### Recipe book — per-character known recipes
+
+Players now keep a recipe book in The Cauldron and grow it as they discover combos.
+
+A recipe is a **3-ingredient combo → the potion it makes**, stored per character in
+a new `potion_recipes` KV key (deduped by ingredient set + potion, so a combo that
+can make more than one potion via a masterful "choose" keeps an entry per potion).
+
+#### Added — `brew.html` (player)
+- **Known recipes** panel: lists the character's recipes (potion name + ingredients
+  + slot). Tapping one loads its three ingredients into the recipe slots (greyed when
+  the player doesn't currently hold them all). Pre-fill only — you still roll the brew.
+- New recipes are learned automatically on a **clean success** (the intended/official
+  potion), and on a **masterful "choose"** once the player picks which potion they
+  made. A toast announces each newly learned recipe.
+
+#### Added — `brew-dm.html` (DM)
+- **Recipes** tab: pick a character, see their known recipes (with remove), and grant
+  one by choosing three ingredients — the editor computes the slot (with a tie picker)
+  and lets you select which potion in that slot the recipe yields (default: official).
+
+#### Worker (`cloudflare-worker.js`)
+- `brew_player` and `potion_data_dm` now return `recipes`. POST `brew` auto-records a
+  recipe on a clean success and returns the updated book. New POST `record_recipe`
+  (player) validates that the combo can actually brew the chosen potion before saving
+  (used by the "choose" pick). `potion_recipes` added to the DM write types + KV keys.
+- ⚠️ **Requires another manual worker redeploy** for recipes to work.
+
+### Potion brewing tool — The Cauldron (player) + The Apothecary (DM)
+
+A new campaign tool based on Obojima: Tales from the Tall Grass potion brewing,
+with a homebrew check-and-margin layer on top. Players combine three ingredients
+to brew a potion; the DM stocks the ingredient/potion lists and grants inventory.
+
+**The mechanic.** Each ingredient has Combat / Utility / Whimsy values. A recipe is
+3 unique ingredients; the highest summed attribute picks the list and *is* the
+potion number (1–60). Rarity comes from the number band (1–30 common, 31–50
+uncommon, 51–60 rare); brewing DC is 10 / 15 / 20 by rarity. Outcome by margin
+(roll − DC): **+10** choose any potion in the slot · **0..+9** the official potion ·
+**−1..−5** a random potion from the slot · **−6..−9** sludge (nothing) ·
+**−10 or worse** a random negative potion. Brewing consumes the 3 ingredients
+(even on a botch). Ties let the brewer pick the list.
+
+#### Added — `brew.html` (player "The Cauldron")
+- Craft mode (brew from granted inventory, consumes ingredients) and Experiment
+  mode (plan against the full ingredient list; shows the slot but keeps the potion
+  hidden until actually brewed). Live attribute sums, slot/rarity/DC readout, and a
+  d20 roller (or type your own roll + alchemy bonus). DM can test-brew without
+  consuming.
+
+#### Added — `brew-dm.html` (DM "The Apothecary")
+- Tabs: Ingredients / Potions / Negatives / Inventory / Import. Full CRUD for
+  ingredients (values + description + DM notes), potions (multiple per slot, with an
+  *official* flag), and negative potions. Per-character ingredient inventory with
+  quantities. One-time **Import** reads `obojima-seed.json` and seeds KV.
+
+#### Added — Worker (`cloudflare-worker.js`)
+- GET `brew_player` (player creds → ingredient catalogue + that character's
+  inventory) and `potion_data_dm` (DM → everything for the editor).
+- POST `brew` — resolves the recipe + margin **server-side** and consumes
+  ingredients, so the potion and negative lists never reach the browser except as
+  the resolved result (snoop-safe, like the map's player_view).
+- New DM write types: `potion_ingredients`, `potions`, `negative_potions`,
+  `potion_inventories`. New KV keys of the same names.
+- ⚠️ **Requires the manual worker redeploy** (paste into the Cloudflare dashboard).
+  Until redeployed, the tool can't load or brew.
+
+#### Added — Hub (`home.html`)
+- "The Cauldron" card (players) and "The Apothecary" card (DM).
+
+#### Data / privacy
+- Obojima ingredient/potion text is third-party copyrighted content and lives in
+  KV only. `obojima-seed.json` / `obojima-potions.json` are gitignored so they
+  never reach the public repo. The tool *code* is in the repo; the book *data* is not.
+- Seeded from the book: 135 ingredients (69 common / 45 uncommon / 21 rare),
+  180 potions (60 each Combat/Utility/Whimsy), and 10 negative potions adapted
+  from the Potion Mishaps table.
 
 ### Pin color + outline refresh
 

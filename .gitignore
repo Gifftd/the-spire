@@ -1,6 +1,17 @@
 # Local backups taken before edits — not for git history
 backups/
 
+# Local-only AI/dev context — kept off GitHub on purpose
+CLAUDE.md
+
+# Obojima potion data — third-party copyrighted content, stays in KV only,
+# never committed to the public repo. Imported into the worker by the DM.
+obojima-seed.json
+obojima-potions.json
+dnd-potions-seed.json
+obojima-affinity-tags.json
+*.seed.json
+
 # macOS
 .DS_Store
 

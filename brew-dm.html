@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Spire — The Apothecary (DM)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#080c10;--panel:#131c22;--panel-deep:#0d141a;--panel-light:#1c2730;
+      --border:#2c4048;--border-light:#3e5862;
+      --teal:#4a9595;--teal-bright:#7ec5c5;--teal-deep:#2a5454;--teal-faint:#1b3838;
+      --ink:#dde3e5;--ink-light:#a3adb3;--ink-faint:#6c787f;
+      --brass:#b88a5a;--brass-bright:#d8b888;--rust:#a85d4a;
+      --combat:#c43838;--utility:#3a6fd0;--whimsy:#b060d0;
+      --radius:4px;
+    }
+    body{background:var(--bg);background-image:radial-gradient(ellipse at 20% 10%, rgba(184,138,90,0.08) 0%, transparent 55%),radial-gradient(ellipse at 80% 90%, rgba(74,149,149,0.06) 0%, transparent 55%);min-height:100vh;color:var(--ink);font-family:'Crimson Text',Georgia,serif;padding:1.5rem 1rem 4rem}
+    .wrap{max-width:1040px;margin:0 auto}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding-bottom:1rem;margin-bottom:1.25rem;border-bottom:1px solid var(--border);flex-wrap:wrap}
+    .topbar h1{font-family:'Cinzel',serif;font-size:1.4rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--ink)}
+    .topbar h1 .accent{color:var(--brass-bright);font-weight:400}
+    .topbar-meta{display:flex;align-items:center;gap:8px;font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-faint)}
+    .role.dm{padding:2px 8px;border-radius:10px;border:1px solid rgba(184,138,90,0.45);background:rgba(184,138,90,0.10);color:var(--brass);font-size:0.55rem}
+    .home-link{font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-light);text-decoration:none;padding:6px 12px;border:1px solid var(--border-light);border-radius:var(--radius)}
+    .home-link:hover{border-color:var(--brass);color:var(--brass-bright)}
+
+    .tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:1.25rem;border-bottom:1px solid var(--border)}
+    .tab{font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-light);background:none;border:none;border-bottom:2px solid transparent;padding:9px 15px;cursor:pointer}
+    .tab:hover{color:var(--brass-bright)}
+    .tab.active{color:var(--brass-bright);border-bottom-color:var(--brass)}
+
+    .layout{display:grid;grid-template-columns:1fr 1.1fr;gap:1.25rem;align-items:start}
+    @media (max-width:820px){.layout{grid-template-columns:1fr}}
+    .col-head{font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--brass);margin-bottom:0.6rem;display:flex;justify-content:space-between;align-items:center}
+
+    .toolbar{display:flex;gap:6px;margin-bottom:0.6rem;flex-wrap:wrap}
+    input,select,textarea{background:var(--panel-deep);border:1px solid var(--border);border-radius:2px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.95rem;padding:7px 10px;outline:none}
+    input:focus,select:focus,textarea:focus{border-color:var(--teal)}
+    textarea{width:100%;resize:vertical;min-height:80px;line-height:1.5}
+    .toolbar input{flex:1;min-width:140px}
+
+    .list{max-height:520px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--panel-deep)}
+    .row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer}
+    .row:last-child{border-bottom:none}
+    .row:hover{background:var(--panel-light)}
+    .row.active{background:var(--teal-faint)}
+    .row .nm{flex:1;font-size:0.95rem;color:var(--ink)}
+    .row .sub{font-family:'Cinzel',serif;font-size:0.6rem;color:var(--ink-faint);letter-spacing:0.04em}
+    .rarity{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid}
+    .rarity.common{color:var(--ink-light);border-color:var(--border-light)}
+    .rarity.uncommon{color:var(--teal-bright);border-color:var(--teal)}
+    .rarity.rare{color:var(--brass);border-color:rgba(184,138,90,0.6)}
+    .aff-chip{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--border-light);color:var(--ink-light);white-space:nowrap}
+    .aff-chip.fire{color:#ff9a6e;border-color:#c43838}
+    .aff-chip.cold,.aff-chip.ice{color:#88c0ff;border-color:#3a6fd0}
+    .aff-chip.lightning{color:#ffe060;border-color:#c4a838}
+    .aff-chip.thunder{color:#a0c8ff;border-color:#4a90d4}
+    .aff-chip.nature,.aff-chip.acid,.aff-chip.poison{color:#9ad080;border-color:#4ca050}
+    .aff-chip.radiant{color:#ffe9a0;border-color:#e0a830}
+    .aff-chip.necrotic{color:#b890c8;border-color:#7a5290}
+    .aff-chip.psychic{color:#e090c0;border-color:#a040a0}
+    .aff-chip.force,.aff-chip.arcane{color:#c8a0ff;border-color:#7c5fc4}
+    .vals{display:flex;gap:5px;font-family:'Cinzel',serif;font-size:0.62rem}
+    .v-c{color:var(--combat)}.v-u{color:var(--utility)}.v-w{color:var(--whimsy)}
+    .badge-official{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--teal-bright)}
+
+    .form{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem}
+    .form h3{font-family:'Cinzel',serif;font-size:0.78rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--brass-bright);margin-bottom:0.8rem}
+    .fg{margin-bottom:0.7rem;display:flex;flex-direction:column;gap:4px}
+    .fg label{font-family:'Cinzel',serif;font-size:0.56rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint)}
+    .frow{display:flex;gap:8px}
+    .frow .fg{flex:1}
+    .form-actions{display:flex;gap:8px;margin-top:0.8rem;flex-wrap:wrap}
+    .btn{font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;padding:9px 16px;border-radius:var(--radius);border:1px solid var(--teal);background:var(--teal-deep);color:#eafafa;cursor:pointer;transition:all 0.15s}
+    .btn:hover{background:var(--teal)}
+    .btn:disabled{opacity:0.4;cursor:not-allowed}
+    .btn.brass{border-color:var(--brass);background:rgba(184,138,90,0.18);color:var(--brass-bright)}
+    .btn.brass:hover{background:rgba(184,138,90,0.32)}
+    .btn.ghost{background:none;border-color:var(--border-light);color:var(--ink-light)}
+    .btn.ghost:hover{border-color:var(--teal);color:var(--teal-bright)}
+    .btn.danger{border-color:var(--rust);background:rgba(168,93,74,0.15);color:#e3a08e}
+    .btn.danger:hover{background:rgba(168,93,74,0.3)}
+    .btn.sm{padding:4px 10px;font-size:0.6rem}
+
+    .empty-note{padding:1.5rem 1rem;text-align:center;color:var(--ink-faint);font-style:italic;font-size:0.92rem}
+    .hint{font-size:0.9rem;color:var(--ink-faint);font-style:italic;line-height:1.5;margin-bottom:0.8rem}
+    .warn{border:1px solid rgba(168,93,74,0.5);background:rgba(168,93,74,0.08);border-radius:var(--radius);padding:0.8rem 0.9rem;color:#e3a08e;font-size:0.92rem;line-height:1.5;margin-bottom:0.9rem}
+
+    /* inventory rows */
+    .inv-row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border)}
+    .inv-row:last-child{border-bottom:none}
+    .inv-row .nm{flex:1}
+    .qstep{display:flex;align-items:center;gap:6px}
+    .qstep button{width:26px;height:26px;border-radius:4px;border:1px solid var(--border-light);background:var(--panel-deep);color:var(--ink);cursor:pointer;font-size:1rem;line-height:1}
+    .qstep button:hover{border-color:var(--teal)}
+    .qstep .q{font-family:'Cinzel',serif;min-width:24px;text-align:center;color:var(--teal-bright)}
+
+    .state{text-align:center;padding:3rem 1rem;color:var(--ink-faint);font-style:italic}
+    .state.error{color:var(--rust)}
+    .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel-light);border:1px solid var(--teal);border-radius:var(--radius);padding:10px 18px;color:var(--ink);font-size:0.9rem;box-shadow:0 4px 16px rgba(0,0,0,0.5);opacity:0;transition:opacity 0.2s;pointer-events:none;z-index:50}
+    .toast.show{opacity:1}
+    .toast.err{border-color:var(--rust);color:#e3a08e}
+
+    /* Analysis tab */
+    .ana-cards{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:1rem}
+    .ana-card{flex:1;min-width:140px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:0.7rem 0.9rem;text-align:center}
+    .ana-card .val{font-family:'Cinzel',serif;font-size:1.5rem;color:var(--teal-bright);line-height:1.1}
+    .ana-card .lbl{font-family:'Cinzel',serif;font-size:0.54rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-faint);margin-top:0.3rem}
+    .ana-section{margin-bottom:1.4rem}
+    .ana-section-h{font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass);margin-bottom:0.5rem}
+    .ana-warn-list{border:1px solid rgba(168,93,74,0.5);background:rgba(168,93,74,0.07);border-radius:var(--radius);padding:0.4rem 0.6rem}
+    .ana-warn-row{display:flex;gap:10px;align-items:center;padding:6px 4px;font-size:0.92rem;border-bottom:1px solid rgba(168,93,74,0.2)}
+    .ana-warn-row:last-child{border-bottom:none}
+    .ana-warn-row .pname{flex:1;color:var(--ink)}
+    .ana-warn-row .reason{color:#e3a08e;font-size:0.84rem}
+    .ana-cov-table{width:100%;border-collapse:collapse;font-size:0.9rem}
+    .ana-cov-table th,.ana-cov-table td{padding:5px 8px;text-align:left;border-bottom:1px solid var(--border)}
+    .ana-cov-table th{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;color:var(--ink-faint);text-transform:uppercase}
+    .ana-cov-table td.num{text-align:right;font-family:'Cinzel',serif;color:var(--teal-bright)}
+    .ana-cov-table tr.danger td.num{color:var(--rust);font-weight:700}
+    .ana-cov-table tr.warn td.num{color:#f0b076}
+    .ana-slot-matrix{width:100%;border-collapse:collapse;font-size:0.84rem;font-family:'Cinzel',serif}
+    .ana-slot-matrix th,.ana-slot-matrix td{padding:3px 8px;text-align:center;border:1px solid var(--border)}
+    .ana-slot-matrix th{color:var(--ink-faint);font-size:0.58rem;letter-spacing:0.08em}
+    .ana-slot-matrix td.thin{color:var(--rust);font-weight:700}
+    .ana-slot-matrix td.thinish{color:#f0b076}
+    .ana-slot-matrix td.row-h{color:var(--ink-faint);background:var(--panel-deep)}
+    .ana-slot-matrix tr.band-uncommon td.row-h{color:var(--teal-bright)}
+    .ana-slot-matrix tr.band-rare td.row-h{color:var(--brass)}
+    .ana-ok{color:var(--teal-bright);font-style:italic;font-size:0.9rem}
+    .footer{margin-top:2rem;text-align:center;padding-top:1.5rem;border-top:1px solid var(--border)}
+    .footer-text{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--ink-faint)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <h1>The <span class="accent">Apothecary</span></h1>
+      <div class="topbar-meta">
+        <span id="role-line">— loading —</span>
+        <a href="home.html" class="home-link">⌂ Home</a>
+      </div>
+    </div>
+
+    <div id="state" class="state">Unlocking the stores…</div>
+
+    <div id="tool" style="display:none">
+      <div class="tabs">
+        <button class="tab active" data-tab="ingredients" onclick="switchTab('ingredients')">Ingredients</button>
+        <button class="tab" data-tab="potions" onclick="switchTab('potions')">Potions</button>
+        <button class="tab" data-tab="negatives" onclick="switchTab('negatives')">Negatives</button>
+        <button class="tab" data-tab="library" onclick="switchTab('library')">Library</button>
+        <button class="tab" data-tab="inventory" onclick="switchTab('inventory')">Inventory</button>
+        <button class="tab" data-tab="recipes" onclick="switchTab('recipes')">Recipes</button>
+        <button class="tab" data-tab="analysis" onclick="switchTab('analysis')">Analysis</button>
+        <button class="tab" data-tab="import" onclick="switchTab('import')">Import</button>
+      </div>
+
+      <!-- INGREDIENTS -->
+      <div class="tab-panel" id="panel-ingredients">
+        <div class="layout">
+          <div>
+            <div class="col-head"><span>Ingredients (<span id="ing-count">0</span>)</span><button class="btn ghost sm" onclick="newIng()">+ New</button></div>
+            <div class="toolbar">
+              <input type="text" id="ing-search" placeholder="Search…" oninput="renderIngList()">
+              <select id="ing-rarity-filter" onchange="renderIngList()">
+                <option value="">All rarities</option><option value="common">Common</option><option value="uncommon">Uncommon</option><option value="rare">Rare</option>
+              </select>
+            </div>
+            <div class="list" id="ing-list"></div>
+          </div>
+          <div class="form">
+            <h3 id="ing-form-title">New ingredient</h3>
+            <input type="hidden" id="ing-id">
+            <div class="fg"><label>Name</label><input type="text" id="ing-name"></div>
+            <div class="frow">
+              <div class="fg"><label>Rarity</label><select id="ing-rarity"><option value="common">Common</option><option value="uncommon">Uncommon</option><option value="rare">Rare</option></select></div>
+              <div class="fg"><label>Combat</label><input type="number" id="ing-combat" value="0"></div>
+              <div class="fg"><label>Utility</label><input type="number" id="ing-utility" value="0"></div>
+              <div class="fg"><label>Whimsy</label><input type="number" id="ing-whimsy" value="0"></div>
+            </div>
+            <div class="fg"><label>Elemental affinity</label><input type="text" id="ing-affinity" placeholder="e.g. fire, cold, lightning, nature (leave blank for none)"></div>
+            <div class="fg"><label>Description (player-visible)</label><textarea id="ing-desc"></textarea></div>
+            <div class="fg"><label>DM notes (private)</label><textarea id="ing-dmnotes" style="min-height:50px"></textarea></div>
+            <div class="form-actions">
+              <button class="btn" onclick="saveIng()">Save ingredient</button>
+              <button class="btn ghost" id="ing-dup" onclick="duplicateIng()" style="display:none" title="Create a copy of this ingredient">⎘ Duplicate</button>
+              <button class="btn danger" id="ing-del" onclick="deleteIng()" style="display:none">Delete</button>
+              <button class="btn ghost" onclick="newIng()">Clear</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- POTIONS -->
+      <div class="tab-panel" id="panel-potions" style="display:none">
+        <div class="layout">
+          <div>
+            <div class="col-head"><span>Potions (<span id="pot-count">0</span>)</span><button class="btn ghost sm" onclick="newPot()">+ New</button></div>
+            <div class="toolbar">
+              <input type="text" id="pot-search" placeholder="Search name/effect…" oninput="renderPotList()">
+              <select id="pot-cat-filter" onchange="renderPotList()">
+                <option value="">All lists</option><option value="combat">Combat</option><option value="utility">Utility</option><option value="whimsy">Whimsy</option>
+              </select>
+            </div>
+            <div class="hint">Multiple potions can share a slot (e.g. Combat #21). On a plain success the player gets the <b>official</b> one; alternates surface on a 10+ beat (their choice) or a near-miss (random).</div>
+            <div class="list" id="pot-list"></div>
+          </div>
+          <div class="form">
+            <h3 id="pot-form-title">New potion</h3>
+            <input type="hidden" id="pot-id">
+            <div class="frow">
+              <div class="fg"><label>List</label><select id="pot-category" onchange="potRarityPreview()"><option value="combat">Combat</option><option value="utility">Utility</option><option value="whimsy">Whimsy</option></select></div>
+              <div class="fg"><label>Number (1–60)</label><input type="number" id="pot-number" min="1" max="60" value="1" oninput="potRarityPreview()"></div>
+              <div class="fg"><label>Rarity</label><input type="text" id="pot-rarity" readonly style="opacity:0.8"></div>
+            </div>
+            <div class="fg"><label><input type="checkbox" id="pot-official" style="width:auto;vertical-align:middle"> Official (the default result on a plain success)</label></div>
+            <div class="fg"><label>Name</label><input type="text" id="pot-name"></div>
+            <div class="fg"><label>Elemental affinity</label><input type="text" id="pot-affinity" placeholder="e.g. fire, cold, lightning, nature — leave blank for a universal/no-affinity potion"></div>
+            <div class="fg"><label>Effect</label><textarea id="pot-effect"></textarea></div>
+            <div class="fg"><label>DM notes (private)</label><textarea id="pot-dmnotes" style="min-height:50px"></textarea></div>
+            <div class="form-actions">
+              <button class="btn" onclick="savePot()">Save potion</button>
+              <button class="btn ghost" id="pot-dup" onclick="duplicatePot()" style="display:none" title="Create a copy of this potion">⎘ Duplicate</button>
+              <button class="btn danger" id="pot-del" onclick="deletePot()" style="display:none">Delete</button>
+              <button class="btn ghost" onclick="newPot()">Clear</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- NEGATIVES -->
+      <div class="tab-panel" id="panel-negatives" style="display:none">
+        <div class="layout">
+          <div>
+            <div class="col-head"><span>Negative potions (<span id="neg-count">0</span>)</span><button class="btn ghost sm" onclick="newNeg()">+ New</button></div>
+            <div class="hint">Drawn at random when a brew fails by 10 or more.</div>
+            <div class="list" id="neg-list"></div>
+          </div>
+          <div class="form">
+            <h3 id="neg-form-title">New negative potion</h3>
+            <input type="hidden" id="neg-id">
+            <div class="fg"><label>Name</label><input type="text" id="neg-name"></div>
+            <div class="fg"><label>Effect</label><textarea id="neg-effect"></textarea></div>
+            <div class="form-actions">
+              <button class="btn" onclick="saveNeg()">Save</button>
+              <button class="btn danger" id="neg-del" onclick="deleteNeg()" style="display:none">Delete</button>
+              <button class="btn ghost" onclick="newNeg()">Clear</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- INVENTORY -->
+      <div class="tab-panel" id="panel-inventory" style="display:none">
+        <div class="hint">Grant ingredients to a character. They brew from this in the Cauldron, and brewing consumes them.</div>
+        <div class="toolbar">
+          <select id="inv-char" onchange="renderInv()" style="flex:1"></select>
+        </div>
+        <div class="layout">
+          <div>
+            <div class="col-head">Held by this character</div>
+            <div class="list" id="inv-list"></div>
+          </div>
+          <div class="form">
+            <h3>Grant an ingredient</h3>
+            <div class="fg"><label>Ingredient</label><select id="inv-add-ing"></select></div>
+            <div class="frow">
+              <div class="fg" style="flex:0 0 90px"><label>Quantity</label><input type="number" id="inv-add-qty" value="1" min="1"></div>
+              <div class="fg" style="justify-content:flex-end"><button class="btn" onclick="grantIng()">Grant</button></div>
+            </div>
+            <div class="form-actions" style="border-top:1px solid var(--border);padding-top:0.8rem">
+              <button class="btn ghost" onclick="grantAllIng()">Grant ALL ingredients ×qty</button>
+            </div>
+            <div class="hint" style="margin:0.4rem 0 0">Stocks this character with every ingredient at the quantity above — handy for testing. Replaces their current inventory.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LIBRARY -->
+      <div class="tab-panel" id="panel-library" style="display:none">
+        <div class="hint">Standard 5e potions imported from D&D Beyond — a reference shelf. Use <b>Slot it</b> to drop one onto a Combat/Utility/Whimsy slot in the Potions tab; from there it brews and can be granted as a recipe like any other potion.</div>
+        <div class="layout">
+          <div>
+            <div class="col-head"><span>Library (<span id="lib-count">0</span>)</span><button class="btn ghost sm" onclick="newLib()">+ New</button></div>
+            <div class="toolbar">
+              <input type="text" id="lib-search" placeholder="Search…" oninput="renderLibList()">
+              <input type="file" id="lib-import-file" accept="application/json,.json" onchange="importLibrary(event)" style="display:none">
+              <button class="btn brass sm" onclick="document.getElementById('lib-import-file').click()">Import seed</button>
+            </div>
+            <div class="list" id="lib-list"></div>
+          </div>
+          <div class="form">
+            <h3 id="lib-form-title">New library potion</h3>
+            <input type="hidden" id="lib-id">
+            <div class="fg"><label>Name</label><input type="text" id="lib-name"></div>
+            <div class="frow">
+              <div class="fg"><label>Rarity</label><input type="text" id="lib-rarity" placeholder="e.g. rare"></div>
+              <div class="fg"><label>Attunement</label><select id="lib-attune"><option value="no">No</option><option value="yes">Yes</option></select></div>
+            </div>
+            <div class="fg"><label>Elemental affinity</label><input type="text" id="lib-affinity" placeholder="e.g. fire, cold, lightning, nature — leave blank for none"></div>
+            <div class="fg"><label>Effect</label><textarea id="lib-effect"></textarea></div>
+            <div class="fg"><label>Source</label><input type="text" id="lib-source" placeholder="e.g. dmg-2024"></div>
+            <div class="form-actions">
+              <button class="btn" onclick="saveLib()">Save</button>
+              <button class="btn" id="lib-slot" onclick="slotFromLibrary()" style="display:none">→ Slot it</button>
+              <button class="btn danger" id="lib-del" onclick="deleteLib()" style="display:none">Delete</button>
+              <button class="btn ghost" onclick="newLib()">Clear</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RECIPES -->
+      <div class="tab-panel" id="panel-recipes" style="display:none">
+        <div class="hint">Grant a character a known recipe ("found in the world" or other methods). It shows up in their Cauldron and one-taps the ingredients into place. Players also auto-learn recipes when they brew a clean success.</div>
+        <div class="toolbar">
+          <select id="rec-char" onchange="renderRecList()" style="flex:1"></select>
+        </div>
+        <div class="layout">
+          <div>
+            <div class="col-head">Known by this character</div>
+            <div class="list" id="rec-list"></div>
+          </div>
+          <div class="form">
+            <h3>Grant a recipe</h3>
+            <div class="fg"><label>Ingredient 1</label><select id="rec-i0" onchange="recCompute()"></select></div>
+            <div class="fg"><label>Ingredient 2</label><select id="rec-i1" onchange="recCompute()"></select></div>
+            <div class="fg"><label>Ingredient 3</label><select id="rec-i2" onchange="recCompute()"></select></div>
+            <div id="rec-slot-readout" class="hint" style="margin:0.2rem 0">Pick three different ingredients.</div>
+            <div class="fg"><label>Resulting potion</label><select id="rec-potion"></select></div>
+            <div class="form-actions"><button class="btn" onclick="grantRecipe()">Grant recipe</button></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ANALYSIS -->
+      <div class="tab-panel" id="panel-analysis" style="display:none">
+        <div class="hint">Counts how many 3-ingredient combinations land on every potion slot, and which ingredient affinities can reach each slot. Use it to spot variants you've authored that no combo can actually brew, and to gauge whether you have enough affinity-tagged ingredients to cover every slot.</div>
+        <div class="toolbar" style="justify-content:space-between;align-items:center">
+          <button class="btn" onclick="runAnalysis()">Recompute</button>
+          <span id="ana-status" class="hint" style="margin:0">Switch to this tab to run the analysis.</span>
+        </div>
+        <div class="ana-section"><div id="ana-summary"></div></div>
+        <div class="ana-section"><div class="ana-section-h">Unreachable / thin authored variants</div><div id="ana-warnings"></div></div>
+        <div class="ana-section"><div class="ana-section-h">Affinity coverage (authored variants, worst first)</div><div id="ana-coverage"></div></div>
+        <div class="ana-section"><div class="ana-section-h">Combos per slot</div><div id="ana-slots"></div></div>
+      </div>
+
+      <!-- IMPORT -->
+      <div class="tab-panel" id="panel-import" style="display:none">
+        <div class="form" style="max-width:640px">
+          <h3>Import Obojima seed</h3>
+          <div class="warn"><b>Overwrites</b> the ingredient, potion, and negative lists with the contents of the seed file. Inventories are left untouched. Use once to stock the tool, then manage everything in the tabs.</div>
+          <div class="hint">Pick the <code>obojima-seed.json</code> file (it sits in your project folder). Nothing uploads anywhere except your own worker's KV store.</div>
+          <div class="fg"><label>Seed file</label><input type="file" id="import-file" accept="application/json,.json" onchange="loadSeed(event)"></div>
+          <div id="import-preview" class="hint"></div>
+          <div class="form-actions">
+            <button class="btn brass" id="import-btn" onclick="doImport()" disabled>Import to KV</button>
+          </div>
+        </div>
+
+        <div class="form" style="max-width:640px;margin-top:1rem">
+          <h3>Apply affinity tags</h3>
+          <div class="hint">Reads a <code>{id: affinity}</code> map (or <code>{tags: {id: affinity}}</code>) and sets each listed ingredient's affinity. Safe to re-apply — only the listed ingredients are touched; everything else is left alone. Use it after editing <code>obojima-affinity-tags.json</code>.</div>
+          <div class="fg"><label>Tags file</label><input type="file" id="aff-tags-file" accept="application/json,.json" onchange="applyAffinityTags(event)"></div>
+          <div id="aff-tags-result" class="hint"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer"><p class="footer-text">The Spire · The Apothecary</p></div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script src="auth.js"></script>
+  <script>
+    const WORKER_URL = (window.Auth && window.Auth.WORKER_URL) || 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+    function esc(s){return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+    function slug(s){return (s||'').toLowerCase().replace(/['’]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');}
+    function genId(prefix){return prefix+'-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+    function bandOf(n){return n<=30?'common':n<=50?'uncommon':'rare';}
+    function affClass(a){return (a||'').toString().trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');}
+
+    let data = { ingredients:[], potions:[], negatives:[], inventories:{}, recipes:{}, library:[], characters:[] };
+    let seedData = null;
+    let recChosenCat = null;
+
+    function toast(msg, isErr){
+      const t = document.getElementById('toast');
+      t.textContent = msg; t.className = 'toast show' + (isErr?' err':'');
+      clearTimeout(t._t); t._t = setTimeout(()=>{ t.className='toast'; }, 2600);
+    }
+
+    async function bootstrap(){
+      const ident = Auth.identity();
+      document.getElementById('role-line').innerHTML = `${esc(ident.display||'DM')} <span class="role dm">DM</span>`;
+      if (!Auth.requireRole('dm', { reason:'The Apothecary is for the DM only.' })) return;
+      const stateEl = document.getElementById('state');
+      try {
+        const r = await fetch(WORKER_URL + '?type=potion_data_dm', { cache:'no-store', headers: Auth.dmHeaders() });
+        if (r.status === 401){ stateEl.textContent='Your DM session expired — sign in again on the home page.'; stateEl.classList.add('error'); return; }
+        if (!r.ok) throw new Error('HTTP '+r.status);
+        const d = await r.json();
+        data.ingredients = Array.isArray(d.ingredients)?d.ingredients:[];
+        data.potions     = Array.isArray(d.potions)?d.potions:[];
+        data.negatives   = Array.isArray(d.negatives)?d.negatives:[];
+        data.inventories = (d.inventories && typeof d.inventories==='object')?d.inventories:{};
+        data.recipes     = (d.recipes && typeof d.recipes==='object')?d.recipes:{};
+        data.library     = Array.isArray(d.library)?d.library:[];
+        data.characters  = Array.isArray(d.characters)?d.characters:[];
+      } catch(e){
+        stateEl.textContent = 'Could not reach the worker. (If you just added the brew endpoints, redeploy the worker first.)';
+        stateEl.classList.add('error');
+        return;
+      }
+      stateEl.style.display='none';
+      document.getElementById('tool').style.display='';
+      renderIngList(); newIng();
+      renderPotList(); newPot();
+      renderNegList(); newNeg();
+      renderLibList(); newLib();
+      populateCharSelect(); populateInvIngSelect(); renderInv();
+      populateRecChar(); populateRecIngSelects(); renderRecList();
+      switchTab('ingredients');
+    }
+
+    function switchTab(name){
+      document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+      document.querySelectorAll('.tab-panel').forEach(p=>p.style.display='none');
+      document.getElementById('panel-'+name).style.display='';
+      if (name === 'analysis' && !window.__anaCache) runAnalysis();
+    }
+
+    async function saveKey(type, payload){
+      const r = await fetch(WORKER_URL, { method:'POST', headers: Auth.dmHeaders(), body: JSON.stringify({ type, payload }) });
+      if (r.status === 401){ toast('DM session expired — sign in again.', true); return false; }
+      let b={}; try{ b=await r.json(); }catch{}
+      if (!r.ok || b.error){ toast(b.error||('Save failed (HTTP '+r.status+')'), true); return false; }
+      return true;
+    }
+
+    /* ── Ingredients ── */
+    function renderIngList(){
+      const q=(document.getElementById('ing-search').value||'').trim().toLowerCase();
+      const rf=document.getElementById('ing-rarity-filter').value;
+      let items=data.ingredients.slice().sort((a,b)=>a.name.localeCompare(b.name));
+      if(rf) items=items.filter(i=>i.rarity===rf);
+      if(q) items=items.filter(i=>i.name.toLowerCase().includes(q));
+      document.getElementById('ing-count').textContent=data.ingredients.length;
+      const cur=document.getElementById('ing-id').value;
+      document.getElementById('ing-list').innerHTML = items.length? items.map(i=>`
+        <div class="row ${i.id===cur?'active':''}" onclick="editIng('${esc(i.id)}')">
+          <span class="nm">${esc(i.name)}</span>
+          <span class="vals"><span class="v-c">${i.combat}</span><span class="v-u">${i.utility}</span><span class="v-w">${i.whimsy}</span></span>
+          ${i.affinity?`<span class="aff-chip ${esc(affClass(i.affinity))}">${esc(i.affinity)}</span>`:''}
+          <span class="rarity ${esc(i.rarity)}">${esc(i.rarity)}</span>
+        </div>`).join('') : '<div class="empty-note">No ingredients.</div>';
+    }
+    function newIng(){
+      document.getElementById('ing-form-title').textContent='New ingredient';
+      ['ing-id','ing-name','ing-desc','ing-dmnotes','ing-affinity'].forEach(id=>document.getElementById(id).value='');
+      document.getElementById('ing-rarity').value='common';
+      ['ing-combat','ing-utility','ing-whimsy'].forEach(id=>document.getElementById(id).value='0');
+      document.getElementById('ing-del').style.display='none';
+      document.getElementById('ing-dup').style.display='none';
+      renderIngList();
+    }
+    function editIng(id){
+      const i=data.ingredients.find(x=>x.id===id); if(!i) return;
+      document.getElementById('ing-form-title').textContent='Edit ingredient';
+      document.getElementById('ing-id').value=i.id;
+      document.getElementById('ing-name').value=i.name||'';
+      document.getElementById('ing-rarity').value=i.rarity||'common';
+      document.getElementById('ing-combat').value=i.combat||0;
+      document.getElementById('ing-utility').value=i.utility||0;
+      document.getElementById('ing-whimsy').value=i.whimsy||0;
+      document.getElementById('ing-affinity').value=i.affinity||'';
+      document.getElementById('ing-desc').value=i.description||'';
+      document.getElementById('ing-dmnotes').value=i.dmNotes||'';
+      document.getElementById('ing-del').style.display='';
+      document.getElementById('ing-dup').style.display='';
+      renderIngList();
+    }
+    function duplicateIng(){
+      // Prefill the form as a NEW ingredient based on the one currently loaded.
+      // We don't save automatically — the DM gets to tweak fields and then hit Save.
+      const baseName=(document.getElementById('ing-name').value||'').trim();
+      if(!baseName){ toast('Open an ingredient first, then click Duplicate.', true); return; }
+      document.getElementById('ing-form-title').textContent='New ingredient (copy)';
+      document.getElementById('ing-id').value='';          // clear id → saveIng() will generate a new one
+      document.getElementById('ing-name').value=baseName+' (copy)';
+      // Every other form field already holds the source values — leave them as-is for editing.
+      document.getElementById('ing-del').style.display='none';
+      document.getElementById('ing-dup').style.display='none';
+      document.getElementById('ing-name').focus();
+      document.getElementById('ing-name').select();
+      toast('Copy started — edit fields and Save.');
+      renderIngList();
+    }
+    async function saveIng(){
+      const name=document.getElementById('ing-name').value.trim();
+      if(!name){ toast('Name is required.', true); return; }
+      let id=document.getElementById('ing-id').value;
+      const obj={
+        id: id || (data.ingredients.some(x=>x.id===slug(name))? genId('ing') : slug(name)),
+        name, rarity: document.getElementById('ing-rarity').value,
+        combat: parseInt(document.getElementById('ing-combat').value||'0',10)||0,
+        utility: parseInt(document.getElementById('ing-utility').value||'0',10)||0,
+        whimsy: parseInt(document.getElementById('ing-whimsy').value||'0',10)||0,
+        affinity: document.getElementById('ing-affinity').value.trim().toLowerCase(),
+        description: document.getElementById('ing-desc').value,
+        regions: [], dmNotes: document.getElementById('ing-dmnotes').value
+      };
+      const idx=data.ingredients.findIndex(x=>x.id===obj.id);
+      if(idx>=0) data.ingredients[idx]=obj; else data.ingredients.push(obj);
+      if(await saveKey('potion_ingredients', data.ingredients)){ toast('Ingredient saved.'); document.getElementById('ing-id').value=obj.id; editIng(obj.id); populateInvIngSelect(); populateRecIngSelects(); }
+    }
+    async function deleteIng(){
+      const id=document.getElementById('ing-id').value; if(!id) return;
+      if(!confirm('Delete this ingredient?')) return;
+      data.ingredients=data.ingredients.filter(x=>x.id!==id);
+      if(await saveKey('potion_ingredients', data.ingredients)){ toast('Deleted.'); newIng(); populateInvIngSelect(); populateRecIngSelects(); }
+    }
+
+    /* ── Potions ── */
+    function potRarityPreview(){
+      const n=parseInt(document.getElementById('pot-number').value||'1',10)||1;
+      document.getElementById('pot-rarity').value=bandOf(n);
+    }
+    function renderPotList(){
+      const q=(document.getElementById('pot-search').value||'').trim().toLowerCase();
+      const cf=document.getElementById('pot-cat-filter').value;
+      let items=data.potions.slice().sort((a,b)=> a.category===b.category ? (a.number-b.number) : a.category.localeCompare(b.category));
+      if(cf) items=items.filter(p=>p.category===cf);
+      if(q) items=items.filter(p=>(p.name||'').toLowerCase().includes(q)||(p.effect||'').toLowerCase().includes(q));
+      document.getElementById('pot-count').textContent=data.potions.length;
+      const cur=document.getElementById('pot-id').value;
+      document.getElementById('pot-list').innerHTML = items.length? items.map(p=>`
+        <div class="row ${p.id===cur?'active':''}" onclick="editPot('${esc(p.id)}')">
+          <span class="sub">${esc(p.category.slice(0,3).toUpperCase())} #${p.number}</span>
+          <span class="nm">${esc(p.name)}</span>
+          ${p.affinity?`<span class="aff-chip ${esc(affClass(p.affinity))}">${esc(p.affinity)}</span>`:''}
+          ${p.official?'<span class="badge-official">official</span>':''}
+          <span class="rarity ${esc(bandOf(p.number))}">${esc(bandOf(p.number))}</span>
+        </div>`).join('') : '<div class="empty-note">No potions.</div>';
+    }
+    function newPot(){
+      document.getElementById('pot-form-title').textContent='New potion';
+      document.getElementById('pot-id').value='';
+      document.getElementById('pot-category').value='combat';
+      document.getElementById('pot-number').value='1';
+      document.getElementById('pot-name').value='';
+      document.getElementById('pot-affinity').value='';
+      document.getElementById('pot-effect').value='';
+      document.getElementById('pot-dmnotes').value='';
+      document.getElementById('pot-official').checked=false;
+      potRarityPreview();
+      document.getElementById('pot-del').style.display='none';
+      document.getElementById('pot-dup').style.display='none';
+      renderPotList();
+    }
+    function editPot(id){
+      const p=data.potions.find(x=>x.id===id); if(!p) return;
+      document.getElementById('pot-form-title').textContent='Edit potion';
+      document.getElementById('pot-id').value=p.id;
+      document.getElementById('pot-category').value=p.category||'combat';
+      document.getElementById('pot-number').value=p.number||1;
+      document.getElementById('pot-name').value=p.name||'';
+      document.getElementById('pot-affinity').value=p.affinity||'';
+      document.getElementById('pot-effect').value=p.effect||'';
+      document.getElementById('pot-dmnotes').value=p.dmNotes||'';
+      document.getElementById('pot-official').checked=!!p.official;
+      potRarityPreview();
+      document.getElementById('pot-del').style.display='';
+      document.getElementById('pot-dup').style.display='';
+      renderPotList();
+    }
+    function duplicatePot(){
+      // Prefill the form as a NEW potion based on the one currently loaded.
+      // Same category + number (potions can share slots — see the hint above
+      // the list). The copy is created as non-official so it doesn't fight the
+      // original for the default-result slot; the DM can flip it on if they
+      // want it to replace the source.
+      const baseName=(document.getElementById('pot-name').value||'').trim();
+      if(!baseName){ toast('Open a potion first, then click Duplicate.', true); return; }
+      document.getElementById('pot-form-title').textContent='New potion (copy)';
+      document.getElementById('pot-id').value='';
+      document.getElementById('pot-name').value=baseName+' (copy)';
+      document.getElementById('pot-official').checked=false;
+      // category / number / affinity / effect / dmNotes are left as-is for editing.
+      potRarityPreview();
+      document.getElementById('pot-del').style.display='none';
+      document.getElementById('pot-dup').style.display='none';
+      document.getElementById('pot-name').focus();
+      document.getElementById('pot-name').select();
+      toast('Copy started — edit fields and Save.');
+      renderPotList();
+    }
+    async function savePot(){
+      const name=document.getElementById('pot-name').value.trim();
+      if(!name){ toast('Name is required.', true); return; }
+      const category=document.getElementById('pot-category').value;
+      let number=parseInt(document.getElementById('pot-number').value||'1',10)||1;
+      number=Math.max(1,Math.min(60,number));
+      let id=document.getElementById('pot-id').value;
+      const official=document.getElementById('pot-official').checked;
+      const obj={ id: id || genId('pot'), category, number, rarity: bandOf(number), name,
+        affinity: document.getElementById('pot-affinity').value.trim().toLowerCase(),
+        effect: document.getElementById('pot-effect').value, official,
+        dmNotes: document.getElementById('pot-dmnotes').value };
+      // Only one official per slot — clear the flag on siblings if this one is official.
+      if(official){ data.potions.forEach(p=>{ if(p.category===category && p.number===number && p.id!==obj.id) p.official=false; }); }
+      const idx=data.potions.findIndex(x=>x.id===obj.id);
+      if(idx>=0) data.potions[idx]=obj; else data.potions.push(obj);
+      if(await saveKey('potions', data.potions)){ toast('Potion saved.'); document.getElementById('pot-id').value=obj.id; editPot(obj.id); }
+    }
+    async function deletePot(){
+      const id=document.getElementById('pot-id').value; if(!id) return;
+      if(!confirm('Delete this potion?')) return;
+      data.potions=data.potions.filter(x=>x.id!==id);
+      if(await saveKey('potions', data.potions)){ toast('Deleted.'); newPot(); }
+    }
+
+    /* ── Negatives ── */
+    function renderNegList(){
+      document.getElementById('neg-count').textContent=data.negatives.length;
+      const cur=document.getElementById('neg-id').value;
+      document.getElementById('neg-list').innerHTML = data.negatives.length? data.negatives.map(n=>`
+        <div class="row ${n.id===cur?'active':''}" onclick="editNeg('${esc(n.id)}')"><span class="nm">${esc(n.name)}</span></div>`).join('')
+        : '<div class="empty-note">No negative potions.</div>';
+    }
+    function newNeg(){
+      document.getElementById('neg-form-title').textContent='New negative potion';
+      ['neg-id','neg-name','neg-effect'].forEach(id=>document.getElementById(id).value='');
+      document.getElementById('neg-del').style.display='none';
+      renderNegList();
+    }
+    function editNeg(id){
+      const n=data.negatives.find(x=>x.id===id); if(!n) return;
+      document.getElementById('neg-form-title').textContent='Edit negative potion';
+      document.getElementById('neg-id').value=n.id;
+      document.getElementById('neg-name').value=n.name||'';
+      document.getElementById('neg-effect').value=n.effect||'';
+      document.getElementById('neg-del').style.display='';
+      renderNegList();
+    }
+    async function saveNeg(){
+      const name=document.getElementById('neg-name').value.trim();
+      if(!name){ toast('Name is required.', true); return; }
+      let id=document.getElementById('neg-id').value;
+      const obj={ id: id||genId('neg'), name, effect: document.getElementById('neg-effect').value };
+      const idx=data.negatives.findIndex(x=>x.id===obj.id);
+      if(idx>=0) data.negatives[idx]=obj; else data.negatives.push(obj);
+      if(await saveKey('negative_potions', data.negatives)){ toast('Saved.'); document.getElementById('neg-id').value=obj.id; editNeg(obj.id); }
+    }
+    async function deleteNeg(){
+      const id=document.getElementById('neg-id').value; if(!id) return;
+      if(!confirm('Delete this negative potion?')) return;
+      data.negatives=data.negatives.filter(x=>x.id!==id);
+      if(await saveKey('negative_potions', data.negatives)){ toast('Deleted.'); newNeg(); }
+    }
+
+    /* ── Library (standard 5e potions) ── */
+    function rarityClass(r){ r=(r||'').toLowerCase(); return ['common','uncommon','rare'].includes(r)?r:(r.indexOf('rare')>=0?'rare':'common'); }
+    function renderLibList(){
+      const q=(document.getElementById('lib-search').value||'').trim().toLowerCase();
+      let items=data.library.slice().sort((a,b)=>a.name.localeCompare(b.name));
+      if(q) items=items.filter(p=>(p.name||'').toLowerCase().includes(q)||(p.effect||'').toLowerCase().includes(q));
+      document.getElementById('lib-count').textContent=data.library.length;
+      const cur=document.getElementById('lib-id').value;
+      document.getElementById('lib-list').innerHTML = items.length? items.map(p=>`
+        <div class="row ${p.id===cur?'active':''}">
+          <span class="nm" onclick="editLib('${esc(p.id)}')">${esc(p.name)}${p.attunement?' <span class="sub">attune</span>':''}</span>
+          ${p.affinity?`<span class="aff-chip ${esc(affClass(p.affinity))}">${esc(p.affinity)}</span>`:''}
+          <span class="rarity ${rarityClass(p.rarity)}">${esc(p.rarity||'—')}</span>
+          <button class="btn ghost sm" onclick="slotFromLibrary('${esc(p.id)}')">Slot it</button>
+        </div>`).join('') : '<div class="empty-note">No library potions yet — use “Import seed”.</div>';
+    }
+    function newLib(){
+      document.getElementById('lib-form-title').textContent='New library potion';
+      ['lib-id','lib-name','lib-rarity','lib-effect','lib-source','lib-affinity'].forEach(id=>document.getElementById(id).value='');
+      document.getElementById('lib-attune').value='no';
+      document.getElementById('lib-del').style.display='none';
+      document.getElementById('lib-slot').style.display='none';
+      renderLibList();
+    }
+    function editLib(id){
+      const p=data.library.find(x=>x.id===id); if(!p) return;
+      document.getElementById('lib-form-title').textContent='Edit library potion';
+      document.getElementById('lib-id').value=p.id;
+      document.getElementById('lib-name').value=p.name||'';
+      document.getElementById('lib-rarity').value=p.rarity||'';
+      document.getElementById('lib-attune').value=p.attunement?'yes':'no';
+      document.getElementById('lib-affinity').value=p.affinity||'';
+      document.getElementById('lib-effect').value=p.effect||'';
+      document.getElementById('lib-source').value=p.source||'';
+      document.getElementById('lib-del').style.display='';
+      document.getElementById('lib-slot').style.display='';
+      renderLibList();
+    }
+    async function saveLib(){
+      const name=document.getElementById('lib-name').value.trim();
+      if(!name){ toast('Name is required.', true); return; }
+      let id=document.getElementById('lib-id').value;
+      const obj={ id: id || (data.library.some(x=>x.id===slug(name))?genId('lib'):slug(name)),
+        name, rarity: document.getElementById('lib-rarity').value.trim().toLowerCase(),
+        attunement: document.getElementById('lib-attune').value==='yes',
+        affinity: document.getElementById('lib-affinity').value.trim().toLowerCase(),
+        effect: document.getElementById('lib-effect').value,
+        source: document.getElementById('lib-source').value.trim() };
+      const idx=data.library.findIndex(x=>x.id===obj.id);
+      if(idx>=0) data.library[idx]=obj; else data.library.push(obj);
+      if(await saveKey('potion_library', data.library)){ toast('Saved.'); document.getElementById('lib-id').value=obj.id; editLib(obj.id); }
+    }
+    async function deleteLib(){
+      const id=document.getElementById('lib-id').value; if(!id) return;
+      if(!confirm('Delete this library potion?')) return;
+      data.library=data.library.filter(x=>x.id!==id);
+      if(await saveKey('potion_library', data.library)){ toast('Deleted.'); newLib(); }
+    }
+    function slotFromLibrary(id){
+      id=id||document.getElementById('lib-id').value;
+      const p=data.library.find(x=>x.id===id); if(!p){ toast('Pick a library potion first.', true); return; }
+      switchTab('potions');
+      newPot();
+      document.getElementById('pot-name').value=p.name;
+      document.getElementById('pot-affinity').value=p.affinity||'';
+      document.getElementById('pot-effect').value=p.effect||'';
+      potRarityPreview();
+      toast('Loaded “'+p.name+'” — set its list + number, then Save.');
+    }
+    function importLibrary(ev){
+      const file=ev.target.files&&ev.target.files[0]; if(!file) return;
+      const reader=new FileReader();
+      reader.onload=async()=>{
+        let added=0, skipped=0;
+        try{
+          const d=JSON.parse(reader.result);
+          const arr=Array.isArray(d.library)?d.library:(Array.isArray(d)?d:[]);
+          if(!arr.length) throw new Error('No "library" array found.');
+          const have=new Set(data.library.map(x=>x.id));
+          arr.forEach(p=>{ const id=p.id||slug(p.name||''); if(!id||have.has(id)){ if(id)skipped++; return; } data.library.push({ id, name:p.name||id, rarity:(p.rarity||'').toLowerCase(), attunement:!!p.attunement, affinity:(p.affinity||'').toString().toLowerCase(), effect:p.effect||'', source:p.source||'' }); have.add(id); added++; });
+          if(added && !(await saveKey('potion_library', data.library))) return;
+          renderLibList();
+          toast('Imported '+added+' new'+(skipped?(', '+skipped+' already present'):'')+'.');
+        }catch(e){ toast('Import failed: '+e.message, true); }
+      };
+      reader.readAsText(file);
+      ev.target.value='';
+    }
+
+    /* ── Inventory ── */
+    function populateCharSelect(){
+      const sel=document.getElementById('inv-char');
+      sel.innerHTML = data.characters.length
+        ? data.characters.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}${c.player?' ('+esc(c.player)+')':''}</option>`).join('')
+        : '<option value="">No characters — add them in the Atlas Workshop</option>';
+    }
+    function populateInvIngSelect(){
+      const sel=document.getElementById('inv-add-ing');
+      const items=data.ingredients.slice().sort((a,b)=>a.name.localeCompare(b.name));
+      sel.innerHTML = items.map(i=>`<option value="${esc(i.id)}">${esc(i.name)} (${i.rarity})</option>`).join('');
+    }
+    function ingName(id){ const i=data.ingredients.find(x=>x.id===id); return i?i.name:id; }
+    function renderInv(){
+      const cid=document.getElementById('inv-char').value;
+      const inv=Array.isArray(data.inventories[cid])?data.inventories[cid]:[];
+      const list=document.getElementById('inv-list');
+      if(!cid){ list.innerHTML='<div class="empty-note">No character selected.</div>'; return; }
+      const items=inv.slice().sort((a,b)=>ingName(a.ingredientId).localeCompare(ingName(b.ingredientId)));
+      list.innerHTML = items.length ? items.map(e=>`
+        <div class="inv-row">
+          <span class="nm">${esc(ingName(e.ingredientId))}</span>
+          <span class="qstep">
+            <button onclick="bumpQty('${esc(e.ingredientId)}',-1)">−</button>
+            <span class="q">${e.qty||0}</span>
+            <button onclick="bumpQty('${esc(e.ingredientId)}',1)">+</button>
+          </span>
+          <button class="btn danger sm" onclick="removeInv('${esc(e.ingredientId)}')">Remove</button>
+        </div>`).join('') : '<div class="empty-note">Nothing granted yet.</div>';
+    }
+    async function persistInv(){ return saveKey('potion_inventories', data.inventories); }
+    async function grantIng(){
+      const cid=document.getElementById('inv-char').value;
+      if(!cid){ toast('Pick a character first.', true); return; }
+      const ingId=document.getElementById('inv-add-ing').value;
+      const qty=Math.max(1, parseInt(document.getElementById('inv-add-qty').value||'1',10)||1);
+      if(!Array.isArray(data.inventories[cid])) data.inventories[cid]=[];
+      const e=data.inventories[cid].find(x=>x.ingredientId===ingId);
+      if(e) e.qty=(e.qty||0)+qty; else data.inventories[cid].push({ ingredientId: ingId, qty });
+      if(await persistInv()){ toast('Granted.'); renderInv(); }
+    }
+    async function grantAllIng(){
+      const cid=document.getElementById('inv-char').value;
+      if(!cid){ toast('Pick a character first.', true); return; }
+      if(!data.ingredients.length){ toast('No ingredients yet — import the seed first.', true); return; }
+      const qty=Math.max(1, parseInt(document.getElementById('inv-add-qty').value||'1',10)||1);
+      const cname=(data.characters.find(c=>c.id===cid)||{}).name||cid;
+      if(!confirm(`Grant ${cname} all ${data.ingredients.length} ingredients ×${qty}? This replaces their current inventory.`)) return;
+      data.inventories[cid]=data.ingredients.map(i=>({ ingredientId: i.id, qty }));
+      if(await persistInv()){ toast(`Stocked ${cname} with all ×${qty}.`); renderInv(); }
+    }
+    async function bumpQty(ingId, delta){
+      const cid=document.getElementById('inv-char').value;
+      const inv=data.inventories[cid]; if(!inv) return;
+      const e=inv.find(x=>x.ingredientId===ingId); if(!e) return;
+      e.qty=(e.qty||0)+delta;
+      if(e.qty<=0) data.inventories[cid]=inv.filter(x=>x.ingredientId!==ingId);
+      if(await persistInv()) renderInv();
+    }
+    async function removeInv(ingId){
+      const cid=document.getElementById('inv-char').value;
+      data.inventories[cid]=(data.inventories[cid]||[]).filter(x=>x.ingredientId!==ingId);
+      if(await persistInv()){ toast('Removed.'); renderInv(); }
+    }
+
+    /* ── Recipes ── */
+    function populateRecChar(){
+      const sel=document.getElementById('rec-char');
+      sel.innerHTML = data.characters.length
+        ? data.characters.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}${c.player?' ('+esc(c.player)+')':''}</option>`).join('')
+        : '<option value="">No characters — add them in the Atlas Workshop</option>';
+    }
+    function populateRecIngSelects(){
+      const items=data.ingredients.slice().sort((a,b)=>a.name.localeCompare(b.name));
+      const opts='<option value="">— choose —</option>'+items.map(i=>`<option value="${esc(i.id)}">${esc(i.name)} (${i.combat}/${i.utility}/${i.whimsy})</option>`).join('');
+      [0,1,2].forEach(k=>{ const el=document.getElementById('rec-i'+k); if(el) el.innerHTML=opts; });
+    }
+    function recCompute(){
+      const ids=[0,1,2].map(k=>document.getElementById('rec-i'+k).value);
+      const readout=document.getElementById('rec-slot-readout');
+      const potSel=document.getElementById('rec-potion');
+      if(!ids.every(x=>x) || new Set(ids.filter(Boolean)).size!==3){ readout.innerHTML='Pick three different ingredients.'; potSel.innerHTML=''; return null; }
+      const get=id=>data.ingredients.find(i=>i.id===id);
+      const sums={combat:0,utility:0,whimsy:0};
+      ids.forEach(id=>{const i=get(id); if(i){ sums.combat+=+i.combat||0; sums.utility+=+i.utility||0; sums.whimsy+=+i.whimsy||0; }});
+      const peak=Math.max(sums.combat,sums.utility,sums.whimsy);
+      const winners=['combat','utility','whimsy'].filter(c=>sums[c]===peak);
+      if(!recChosenCat || !winners.includes(recChosenCat)) recChosenCat=winners[0];
+      const cat=recChosenCat, num=sums[cat], rar=bandOf(num);
+      let tie='';
+      if(winners.length>1){ tie=' &nbsp;·&nbsp; tie: '+winners.map(c=>`<a href="#" onclick="recCategory('${c}');return false" style="color:${c===cat?'var(--teal-bright)':'var(--ink-light)'}">${c}</a>`).join(' / '); }
+      readout.innerHTML=`Brews <b style="color:var(--teal-bright)">${cat.charAt(0).toUpperCase()+cat.slice(1)} #${num}</b> (${rar})${tie}`;
+      const slot=data.potions.filter(p=>p.category===cat && p.number===num);
+      if(!slot.length){ potSel.innerHTML='<option value="">(no potion authored at this slot)</option>'; }
+      else { const off=slot.find(p=>p.official)||slot[0]; potSel.innerHTML=slot.map(p=>`<option value="${esc(p.id)}" ${p.id===off.id?'selected':''}>${esc(p.name)}${p.official?' (official)':''}</option>`).join(''); }
+      return { ids, cat, num };
+    }
+    function recCategory(c){ recChosenCat=c; recCompute(); }
+    async function grantRecipe(){
+      const cid=document.getElementById('rec-char').value;
+      if(!cid){ toast('Pick a character first.', true); return; }
+      const info=recCompute();
+      if(!info){ toast('Pick three different ingredients.', true); return; }
+      const pid=document.getElementById('rec-potion').value;
+      const potion=data.potions.find(p=>p.id===pid);
+      if(!potion){ toast('No potion at that slot to grant.', true); return; }
+      if(!Array.isArray(data.recipes[cid])) data.recipes[cid]=[];
+      const key=info.ids.slice().sort().join('|')+'::'+pid;
+      if(data.recipes[cid].some(r=>(r.ingredientIds||[]).slice().sort().join('|')+'::'+r.potionId===key)){ toast('They already know that recipe.', true); return; }
+      data.recipes[cid].push({ id:genId('rcp'), ingredientIds:info.ids.slice(), category:potion.category, number:potion.number, potionId:potion.id, potionName:potion.name, source:'dm', at:new Date().toISOString() });
+      if(await saveKey('potion_recipes', data.recipes)){ toast('Recipe granted.'); renderRecList(); }
+    }
+    function renderRecList(){
+      const cid=document.getElementById('rec-char').value;
+      const list=document.getElementById('rec-list');
+      if(!cid){ list.innerHTML='<div class="empty-note">No character selected.</div>'; return; }
+      const recs=Array.isArray(data.recipes[cid])?data.recipes[cid]:[];
+      const nm=id=>{const i=data.ingredients.find(x=>x.id===id); return i?i.name:id;};
+      list.innerHTML = recs.length ? recs.slice().sort((a,b)=>(a.potionName||'').localeCompare(b.potionName||'')).map(r=>`
+        <div class="inv-row">
+          <span class="nm"><b style="color:var(--teal-bright)">${esc(r.potionName||'(unknown)')}</b><br><span style="font-size:0.84rem;color:var(--ink-faint)">${esc((r.ingredientIds||[]).map(nm).join(' + '))}</span></span>
+          <span class="sub">${esc((r.category||'').slice(0,3).toUpperCase())} #${r.number}</span>
+          <button class="btn danger sm" onclick="removeRecipe('${esc(r.id)}')">Remove</button>
+        </div>`).join('') : '<div class="empty-note">No recipes known yet.</div>';
+    }
+    async function removeRecipe(id){
+      const cid=document.getElementById('rec-char').value;
+      data.recipes[cid]=(data.recipes[cid]||[]).filter(r=>r.id!==id);
+      if(await saveKey('potion_recipes', data.recipes)){ toast('Removed.'); renderRecList(); }
+    }
+
+    /* ── Analysis (combinatorial coverage) ── */
+    function _anaAdd(bySlot, cat, num, affKeys){
+      const key = cat + '-' + num;
+      let s = bySlot[key]; if (!s) s = bySlot[key] = { total: 0, byAff: {} };
+      s.total++;
+      if (affKeys.length === 0) s.byAff['(none)'] = (s.byAff['(none)']||0) + 1;
+      else affKeys.forEach(a => { s.byAff[a] = (s.byAff[a]||0) + 1; });
+    }
+    function computeAnalysis(){
+      const ings = data.ingredients || [];
+      const n = ings.length;
+      const bySlot = {};
+      let combosTotal = 0, affTaggedIngs = 0;
+      for (let z = 0; z < n; z++) if (ings[z].affinity) affTaggedIngs++;
+      // C(n,3) loop. Ties (sum equal across categories) count for each tied slot.
+      for (let i = 0; i < n - 2; i++) {
+        const a = ings[i]; const ac=+a.combat||0, au=+a.utility||0, aw=+a.whimsy||0; const aA=a.affinity||'';
+        for (let j = i + 1; j < n - 1; j++) {
+          const b = ings[j]; const bc=+b.combat||0, bu=+b.utility||0, bw=+b.whimsy||0; const bA=b.affinity||'';
+          const acb = ac+bc, aub = au+bu, awb = aw+bw;
+          for (let k = j + 1; k < n; k++) {
+            const c = ings[k]; const sc=acb+(+c.combat||0), su=aub+(+c.utility||0), sw=awb+(+c.whimsy||0);
+            const peak = sc>su ? (sc>sw?sc:sw) : (su>sw?su:sw);
+            if (peak === 0) continue;
+            combosTotal++;
+            const cA = c.affinity || '';
+            const distinct = {}; if (aA) distinct[aA]=1; if (bA) distinct[bA]=1; if (cA) distinct[cA]=1;
+            const keys = Object.keys(distinct);
+            if (sc === peak) _anaAdd(bySlot, 'combat',  peak, keys);
+            if (su === peak) _anaAdd(bySlot, 'utility', peak, keys);
+            if (sw === peak) _anaAdd(bySlot, 'whimsy',  peak, keys);
+          }
+        }
+      }
+      return { bySlot, combosTotal, affTaggedIngs, n };
+    }
+    function renderAnalysis(stats){
+      const potions = data.potions || [];
+      const affTaggedPots = potions.filter(p => p.affinity).length;
+      // Summary cards
+      document.getElementById('ana-summary').innerHTML = `<div class="ana-cards">
+        <div class="ana-card"><div class="val">${stats.n}</div><div class="lbl">Ingredients</div></div>
+        <div class="ana-card"><div class="val">${stats.affTaggedIngs}</div><div class="lbl">Affinity-tagged</div></div>
+        <div class="ana-card"><div class="val">${potions.length}</div><div class="lbl">Potions</div></div>
+        <div class="ana-card"><div class="val">${affTaggedPots}</div><div class="lbl">Affinity variants</div></div>
+        <div class="ana-card"><div class="val">${stats.combosTotal.toLocaleString()}</div><div class="lbl">Total combos</div></div>
+      </div>`;
+      // Warnings + coverage for authored affinity variants
+      const warnings = [], coverage = [];
+      potions.forEach(p => {
+        if (!p.affinity) return;
+        const key = p.category + '-' + p.number;
+        const s = stats.bySlot[key] || { total: 0, byAff: {} };
+        const reach = s.byAff[p.affinity] || 0;
+        coverage.push({ p, reach, total: s.total });
+        if (reach === 0) warnings.push({ p, total: s.total });
+      });
+      const warnsEl = document.getElementById('ana-warnings');
+      if (potions.length === 0 || affTaggedPots === 0) {
+        warnsEl.innerHTML = `<div class="hint" style="margin:0">No potions are tagged with an affinity yet.</div>`;
+      } else if (warnings.length === 0) {
+        warnsEl.innerHTML = `<div class="ana-ok">All ${affTaggedPots} authored affinity variants are reachable by at least one ingredient combo. ✓</div>`;
+      } else {
+        warnsEl.innerHTML = `<div class="ana-warn-list">${warnings.map(w => `<div class="ana-warn-row">
+          <span class="pname">${esc(w.p.name)} <span class="aff-chip ${esc(affClass(w.p.affinity))}">${esc(w.p.affinity)}</span></span>
+          <span class="sub">${esc(w.p.category.toUpperCase().slice(0,3))} #${w.p.number}</span>
+          <span class="reason">0 combos reach this slot with a ${esc(w.p.affinity)}-tagged ingredient (${w.total} total combos at slot)</span>
+        </div>`).join('')}</div>`;
+      }
+      // Coverage table: authored variants sorted by reach ascending (worst first)
+      coverage.sort((a,b) => a.reach - b.reach || (b.total - a.total));
+      const covEl = document.getElementById('ana-coverage');
+      if (coverage.length === 0) {
+        covEl.innerHTML = `<div class="hint" style="margin:0">Tag potion variants with an affinity to see coverage here.</div>`;
+      } else {
+        covEl.innerHTML = `<table class="ana-cov-table">
+          <thead><tr><th>Potion</th><th>Slot</th><th>Affinity</th><th class="num">Combos reaching</th><th class="num">Slot total</th></tr></thead>
+          <tbody>${coverage.map(r => {
+            const cls = r.reach === 0 ? 'danger' : r.reach < 5 ? 'warn' : '';
+            return `<tr class="${cls}">
+              <td>${esc(r.p.name)}</td>
+              <td><span class="sub">${esc(r.p.category.toUpperCase().slice(0,3))} #${r.p.number}</span></td>
+              <td><span class="aff-chip ${esc(affClass(r.p.affinity))}">${esc(r.p.affinity)}</span></td>
+              <td class="num">${r.reach}</td>
+              <td class="num" style="color:var(--ink-light)">${r.total}</td>
+            </tr>`;
+          }).join('')}</tbody></table>`;
+      }
+      // Slot matrix: 60 rows × 3 columns (Combat/Utility/Whimsy)
+      let head = '<tr><th>#</th><th>Combat</th><th>Utility</th><th>Whimsy</th></tr>';
+      let body = '';
+      for (let i = 1; i <= 60; i++) {
+        const band = i <= 30 ? 'common' : i <= 50 ? 'uncommon' : 'rare';
+        const cells = ['combat','utility','whimsy'].map(cat => {
+          const num = (stats.bySlot[cat+'-'+i] || {}).total || 0;
+          const cls = num === 0 ? 'thin' : num < 5 ? 'thinish' : '';
+          return `<td class="${cls}">${num}</td>`;
+        }).join('');
+        body += `<tr class="band-${band}"><td class="row-h">${i}</td>${cells}</tr>`;
+      }
+      document.getElementById('ana-slots').innerHTML = `<table class="ana-slot-matrix"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+    }
+    function runAnalysis(){
+      const status = document.getElementById('ana-status');
+      status.textContent = 'Computing…';
+      setTimeout(function(){
+        const t0 = performance.now();
+        const stats = computeAnalysis();
+        const dt = (performance.now() - t0).toFixed(0);
+        window.__anaCache = stats;
+        renderAnalysis(stats);
+        status.textContent = `Computed ${stats.combosTotal.toLocaleString()} combos in ${dt} ms.`;
+      }, 0);
+    }
+
+    /* ── Import ── */
+    function loadSeed(ev){
+      const file=ev.target.files&&ev.target.files[0];
+      const prev=document.getElementById('import-preview');
+      const btn=document.getElementById('import-btn');
+      if(!file){ seedData=null; btn.disabled=true; prev.textContent=''; return; }
+      const reader=new FileReader();
+      reader.onload=()=>{
+        try{
+          const d=JSON.parse(reader.result);
+          const ing=Array.isArray(d.ingredients)?d.ingredients:[];
+          const pot=Array.isArray(d.potions)?d.potions:[];
+          const neg=Array.isArray(d.negative_potions)?d.negative_potions:(Array.isArray(d.negatives)?d.negatives:[]);
+          if(!ing.length && !pot.length){ throw new Error('No ingredients or potions found in that file.'); }
+          seedData={ ingredients:ing, potions:pot, negatives:neg };
+          prev.innerHTML=`Ready to import: <b>${ing.length}</b> ingredients, <b>${pot.length}</b> potions, <b>${neg.length}</b> negatives.`;
+          btn.disabled=false;
+        }catch(e){ seedData=null; btn.disabled=true; prev.innerHTML=`<span style="color:var(--rust)">Couldn't read that file: ${esc(e.message)}</span>`; }
+      };
+      reader.readAsText(file);
+    }
+    async function doImport(){
+      if(!seedData) return;
+      const btn=document.getElementById('import-btn'); btn.disabled=true; btn.textContent='Importing…';
+      const ok1=await saveKey('potion_ingredients', seedData.ingredients);
+      const ok2=await saveKey('potions', seedData.potions);
+      const ok3=await saveKey('negative_potions', seedData.negatives);
+      btn.textContent='Import to KV';
+      if(ok1&&ok2&&ok3){
+        data.ingredients=seedData.ingredients; data.potions=seedData.potions; data.negatives=seedData.negatives;
+        renderIngList(); renderPotList(); renderNegList(); populateInvIngSelect(); populateRecIngSelects();
+        toast('Imported into KV.');
+        document.getElementById('import-preview').innerHTML='<b style="color:var(--teal-bright)">Done.</b> The Cauldron is stocked.';
+      } else { btn.disabled=false; }
+    }
+
+    /* ── Apply affinity tags from a {id: affinity} map ── */
+    function applyAffinityTags(ev){
+      const file=ev.target.files&&ev.target.files[0];
+      const out=document.getElementById('aff-tags-result');
+      if(!file) return;
+      const reader=new FileReader();
+      reader.onload=async()=>{
+        out.innerHTML='';
+        try{
+          const d=JSON.parse(reader.result);
+          const tags=(d && d.tags && typeof d.tags==='object') ? d.tags : (d && typeof d==='object' ? d : null);
+          if(!tags || Array.isArray(tags)) throw new Error('Expected an object {id: affinity} or {tags: {id: affinity}}.');
+          let updated=0, unchanged=0, missing=[];
+          for(const id in tags){
+            if(!Object.prototype.hasOwnProperty.call(tags,id)) continue;
+            const aff=(tags[id]||'').toString().trim().toLowerCase();
+            const ing=data.ingredients.find(x=>x.id===id);
+            if(!ing){ missing.push(id); continue; }
+            if((ing.affinity||'')===aff){ unchanged++; continue; }
+            ing.affinity=aff; updated++;
+          }
+          if(updated===0 && missing.length===0){
+            out.innerHTML=`Nothing to change — all ${unchanged} listed affinities already matched.`;
+            return;
+          }
+          if(updated>0 && !(await saveKey('potion_ingredients', data.ingredients))) return;
+          if(updated>0){ renderIngList(); window.__anaCache=null; }
+          out.innerHTML=`Applied <b style="color:var(--teal-bright)">${updated}</b> tag${updated===1?'':'s'}`
+            +(unchanged?`, ${unchanged} unchanged`:'')
+            +(missing.length?`, <span style="color:var(--rust)">${missing.length} unknown id${missing.length===1?'':'s'} skipped (${esc(missing.slice(0,4).join(', '))}${missing.length>4?'…':''})</span>`:'')+'.';
+          if(updated>0) toast('Applied '+updated+' affinity tag'+(updated===1?'':'s')+'.');
+        }catch(e){ out.innerHTML=`<span style="color:var(--rust)">Couldn't read that file: ${esc(e.message)}</span>`; }
+      };
+      reader.readAsText(file);
+      ev.target.value='';
+    }
+
+    bootstrap();
+  </script>
+</body>
+</html>

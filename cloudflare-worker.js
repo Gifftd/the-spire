@@ -181,6 +181,131 @@ function filterForCharacter(mapData, characterId) {
   return out;
 }
 
+// ── Potion brewing resolution ──────────────────────────────────
+// Obojima (homebrew) brewing. 3 unique ingredients → sum each attribute;
+// the highest total picks the list (combat|utility|whimsy) and IS the potion
+// number (1-60). Rarity comes from the number band; DC from rarity. Outcome
+// depends on the margin (rollTotal - DC):
+//   +10 or more  → 'choose'   (player may pick any potion at the slot)
+//   0..+9        → 'success'  (the intended/official potion)
+//   -1..-5       → 'wrong'    (a random potion from the slot)
+//   -6..-9       → 'sludge'   (nothing brewed; ingredients still consumed)
+//   -10 or worse → 'negative' (a random negative potion)
+// Potions never leave the worker except as the resolved result (snoop-safe).
+function brewBand(number) {
+  return number <= 30 ? 'common' : number <= 50 ? 'uncommon' : 'rare';
+}
+function brewResolve(ingredients, potions, negatives, ids, rollTotal, chosenCategory, intendedPotionId) {
+  if (!Array.isArray(ids) || ids.length !== 3) return { error: 'Select exactly three ingredients.' };
+  if (new Set(ids).size !== 3) return { error: 'The three ingredients must be unique.' };
+  const byId = Object.fromEntries((ingredients || []).map(i => [i.id, i]));
+  const chosen = ids.map(id => byId[id]);
+  if (chosen.some(i => !i)) return { error: 'One or more ingredients are unknown.' };
+
+  const sums = {
+    combat:  chosen.reduce((s, i) => s + (+i.combat  || 0), 0),
+    utility: chosen.reduce((s, i) => s + (+i.utility || 0), 0),
+    whimsy:  chosen.reduce((s, i) => s + (+i.whimsy  || 0), 0),
+  };
+  const peak = Math.max(sums.combat, sums.utility, sums.whimsy);
+  const winners = ['combat', 'utility', 'whimsy'].filter(c => sums[c] === peak);
+  let category = winners[0];
+  if (winners.length > 1 && winners.includes(chosenCategory)) category = chosenCategory;
+
+  const number = sums[category];
+  const rarity = brewBand(number);
+  const DC  = rarity === 'common' ? 10 : rarity === 'uncommon' ? 15 : 20;
+  const muk = rarity === 'common' ? 15 : rarity === 'uncommon' ? 75 : 300;
+  const margin = (rollTotal | 0) - DC;
+  const slot = { category, number, rarity, DC, muk, sums, winners, tie: winners.length > 1, margin, rollTotal: rollTotal | 0 };
+
+  const slotPotions = (potions || []).filter(p => p.category === category && p.number === number);
+  const official = slotPotions.find(p => p.official) || slotPotions[0] || null;
+  const pick = arr => (arr && arr.length) ? arr[Math.floor(Math.random() * arr.length)] : null;
+  const normAff = s => (s || '').toString().trim().toLowerCase();
+
+  // Tally elemental affinities present in the 3 ingredients. Used to select a
+  // variant within the slot on a clean success.
+  const affTally = {};
+  chosen.forEach(i => { const a = normAff(i.affinity); if (a) affTally[a] = (affTally[a] || 0) + 1; });
+  const active = Object.keys(affTally);
+  slot.affinity = { tally: affTally, active };
+
+  let outcome, potion = null, options = null, chooseReason = null;
+  if (margin >= 10) {
+    outcome = 'choose'; options = slotPotions; chooseReason = 'mastery';
+  } else if (margin >= 0) {
+    outcome = 'success';
+    if (active.length === 0) {
+      // No affinity in ingredients → random version (random among slot variants).
+      potion = pick(slotPotions) || official;
+    } else if (active.length === 1) {
+      // One affinity in ingredients → the slot variant with that affinity, else official.
+      const aff = active[0];
+      const matching = slotPotions.filter(p => normAff(p.affinity) === aff);
+      if (matching.length === 0) {
+        potion = (intendedPotionId && slotPotions.find(p => p.id === intendedPotionId)) || official;
+      } else {
+        potion = matching.find(p => p.official) || matching[0];
+      }
+    } else {
+      // 2+ different affinities → player picks among the matching variants.
+      const matchingAny = slotPotions.filter(p => { const a = normAff(p.affinity); return a && active.indexOf(a) >= 0; });
+      if (matchingAny.length === 0) {
+        potion = (intendedPotionId && slotPotions.find(p => p.id === intendedPotionId)) || official;
+      } else if (matchingAny.length === 1) {
+        potion = matchingAny[0];
+      } else {
+        outcome = 'choose'; options = matchingAny; chooseReason = 'affinity'; potion = null;
+      }
+    }
+  } else if (margin >= -5) {
+    outcome = 'wrong'; potion = pick(slotPotions);
+  } else if (margin >= -9) {
+    outcome = 'sludge';
+  } else {
+    outcome = 'negative'; potion = pick(negatives);
+  }
+
+  // A slot with no authored potion can't yield one — degrade to sludge.
+  if ((outcome === 'success' || outcome === 'wrong') && !potion) { outcome = 'sludge'; }
+  if (outcome === 'choose' && (!options || options.length === 0)) { outcome = 'sludge'; options = null; chooseReason = null; }
+
+  return { slot, outcome, potion, options, chooseReason };
+}
+
+// ── Per-character recipe book ──────────────────────────────────
+// A recipe is a 3-ingredient combo + the potion it produced, stored per
+// character under the `potion_recipes` KV key: { [characterId]: [recipe...] }.
+// Deduped by (sorted ingredient ids + potion id), so a combo that can make
+// more than one potion (via a masterful "choose") yields one entry per potion.
+function recipeKey(ids, potionId) { return (ids || []).slice().sort().join('|') + '::' + potionId; }
+function addRecipe(recipesMap, characterId, ingredientIds, potion, source) {
+  if (!potion || !potion.id) return false;
+  if (!Array.isArray(recipesMap[characterId])) recipesMap[characterId] = [];
+  const key = recipeKey(ingredientIds, potion.id);
+  if (recipesMap[characterId].some(r => recipeKey(r.ingredientIds, r.potionId) === key)) return false;
+  recipesMap[characterId].push({
+    id: 'rcp-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    ingredientIds: ingredientIds.slice(),
+    category: potion.category, number: potion.number,
+    potionId: potion.id, potionName: potion.name,
+    source: source || 'brew', at: new Date().toISOString()
+  });
+  return true;
+}
+// Sum a combo's attributes (for validating a recipe combo → potion).
+function attrSums(ingredients, ids) {
+  const byId = Object.fromEntries((ingredients || []).map(i => [i.id, i]));
+  const chosen = (ids || []).map(id => byId[id]);
+  if (chosen.some(i => !i)) return null;
+  return {
+    combat:  chosen.reduce((s, i) => s + (+i.combat  || 0), 0),
+    utility: chosen.reduce((s, i) => s + (+i.utility || 0), 0),
+    whimsy:  chosen.reduce((s, i) => s + (+i.whimsy  || 0), 0),
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════
 export default {
   async fetch(request, env) {
@@ -317,6 +442,42 @@ export default {
         });
       }
 
+      // Player brewing data — full ingredient catalogue + this character's
+      // ingredient inventory. Potions/negatives are deliberately NOT included
+      // (they only ever surface as a resolved brew result).
+      if (type === 'brew_player') {
+        const characterId = url.searchParams.get('characterId') || '';
+        const code        = url.searchParams.get('code') || '';
+        if (!characterId || !code) return json({ error: 'characterId and code required' }, 400);
+        const chars = await kvGet(env, 'characters', []);
+        const me = chars.find(c => c.id === characterId);
+        if (!me || me.code !== code) return json({ error: 'invalid character or code' }, 401);
+        const ingredients = await kvGet(env, 'potion_ingredients', []);
+        const invAll = await kvGet(env, 'potion_inventories', {}) || {};
+        const recAll = await kvGet(env, 'potion_recipes', {}) || {};
+        return json({
+          character: { id: me.id, name: me.name, player: me.player || '' },
+          ingredients,
+          inventory: Array.isArray(invAll[characterId]) ? invAll[characterId] : [],
+          recipes: Array.isArray(recAll[characterId]) ? recAll[characterId] : []
+        });
+      }
+
+      // DM-only: everything the apothecary editor needs in one shot.
+      if (type === 'potion_data_dm') {
+        const auth = await verifyDMAuth(request, env);
+        if (!auth.ok) return json({ error: 'DM auth required' }, 401);
+        return json({
+          ingredients: await kvGet(env, 'potion_ingredients', []),
+          potions:     await kvGet(env, 'potions', []),
+          negatives:   await kvGet(env, 'negative_potions', []),
+          inventories: await kvGet(env, 'potion_inventories', {}) || {},
+          recipes:     await kvGet(env, 'potion_recipes', {}) || {},
+          library:     await kvGet(env, 'potion_library', []),
+          characters:  sanitizeCharacters(await kvGet(env, 'characters', []))
+        });
+      }
+
       return text('Not found', 404);
     }
 
@@ -382,8 +543,94 @@ export default {
       return json({ ok: true, character: { id: me.id, name: me.name, player: me.player || '' } });
     }
 
+    // ── Brew a potion (player or DM) ──────────────────────────
+    // Auth: player (characterId + code) OR DM headers (test-brew, no consume).
+    // Resolution + ingredient consumption happen server-side so the potion
+    // and negative lists never reach the browser except as the result.
+    if (body?.type === 'brew') {
+      const characterId = (body.characterId || '').toString();
+      const code        = (body.code || '').toString();
+      let isDM = false;
+      if (code && characterId) {
+        const chars = await kvGet(env, 'characters', []);
+        const me = chars.find(c => c.id === characterId);
+        if (!me || me.code !== code) return json({ error: 'invalid character or code' }, 401);
+      } else {
+        const auth = await verifyDMAuth(request, env);
+        if (!auth.ok) return json({ error: 'player code or DM auth required' }, 401);
+        isDM = true;
+      }
+
+      const ingredients = await kvGet(env, 'potion_ingredients', []);
+      const potions     = await kvGet(env, 'potions', []);
+      const negatives   = await kvGet(env, 'negative_potions', []);
+      const ids = Array.isArray(body.ingredientIds) ? body.ingredientIds.map(String) : [];
+      const res = brewResolve(ingredients, potions, negatives, ids, body.rollTotal, body.category, body.intendedPotionId);
+      if (res.error) return json({ error: res.error }, 400);
+
+      // Consume the three ingredients from the character's inventory. A failed
+      // or sludge brew still consumes. DM test-brews without an inventory don't.
+      let consumed = false, inventory = null;
+      if (characterId) {
+        const invAll = await kvGet(env, 'potion_inventories', {}) || {};
+        const inv = Array.isArray(invAll[characterId]) ? invAll[characterId] : [];
+        const holds = id => { const e = inv.find(x => x.ingredientId === id); return e && (e.qty || 0) > 0; };
+        const haveAll = ids.every(holds);
+        if (!haveAll && !isDM) return json({ error: 'You do not hold all three of those ingredients.' }, 400);
+        if (haveAll) {
+          ids.forEach(id => { const e = inv.find(x => x.ingredientId === id); if (e) e.qty = (e.qty || 0) - 1; });
+          invAll[characterId] = inv.filter(x => (x.qty || 0) > 0);
+          await kvPut(env, 'potion_inventories', invAll);
+          consumed = true;
+          inventory = invAll[characterId];
+        }
+      }
+
+      // Learn the recipe on a clean success (the intended/official potion).
+      // A masterful "choose" is recorded separately once the player picks
+      // (via record_recipe). Only real characters keep a recipe book.
+      let learned = false, recipes = null;
+      if (characterId) {
+        const recAll = await kvGet(env, 'potion_recipes', {}) || {};
+        if (res.outcome === 'success' && res.potion) {
+          learned = addRecipe(recAll, characterId, ids, res.potion, 'brew');
+          if (learned) await kvPut(env, 'potion_recipes', recAll);
+        }
+        recipes = Array.isArray(recAll[characterId]) ? recAll[characterId] : [];
+      }
+      return json({ ok: true, ...res, consumed, inventory, learned, recipes });
+    }
+
+    // ── Record a discovered recipe (player) ───────────────────
+    // Used when a masterful "choose" brew lets the player pick which potion
+    // they crafted. Server re-validates that the combo can actually produce
+    // the chosen potion before saving, so players can't fabricate recipes.
+    if (body?.type === 'record_recipe') {
+      const characterId = (body.characterId || '').toString();
+      const code        = (body.code || '').toString();
+      if (!characterId || !code) return json({ error: 'characterId and code required' }, 400);
+      const chars = await kvGet(env, 'characters', []);
+      const me = chars.find(c => c.id === characterId);
+      if (!me || me.code !== code) return json({ error: 'invalid character or code' }, 401);
+
+      const ingredients = await kvGet(env, 'potion_ingredients', []);
+      const potions     = await kvGet(env, 'potions', []);
+      const ids = Array.isArray(body.ingredientIds) ? body.ingredientIds.map(String) : [];
+      if (ids.length !== 3 || new Set(ids).size !== 3) return json({ error: 'Need three unique ingredients.' }, 400);
+      const potion = potions.find(p => p.id === body.potionId);
+      if (!potion) return json({ error: 'Unknown potion.' }, 400);
+      const sums = attrSums(ingredients, ids);
+      if (!sums) return json({ error: 'Unknown ingredient.' }, 400);
+      if (sums[potion.category] !== potion.number) return json({ error: 'That combo does not brew that potion.' }, 400);
+
+      const recAll = await kvGet(env, 'potion_recipes', {}) || {};
+      const learned = addRecipe(recAll, characterId, ids, potion, 'brew');
+      if (learned) await kvPut(env, 'potion_recipes', recAll);
+      return json({ ok: true, learned, recipes: Array.isArray(recAll[characterId]) ? recAll[characterId] : [] });
+    }
+
     // ── DM-only writes ────────────────────────────────────────
-    const DM_WRITE_TYPES = ['initiative_state','map_data','map_data_dm','characters','journals','npcs','timeline'];
+    const DM_WRITE_TYPES = ['initiative_state','map_data','map_data_dm','characters','journals','npcs','timeline','potion_ingredients','potions','negative_potions','potion_inventories','potion_recipes','potion_library'];
     if (DM_WRITE_TYPES.includes(body?.type)) {
       const auth = await verifyDMAuth(request, env);
       if (!auth.ok) return json({ error: 'DM auth required' }, 401);
