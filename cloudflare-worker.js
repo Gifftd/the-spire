@@ -473,6 +473,16 @@ export default {
         return json(await kvGet(env, 'bestiary', { monsters: [] }));
       }
 
+      // DM-only: custom (homebrew) monsters authored in the Menagerie editor.
+      // Stored separately from the imported `bestiary` so a re-import of source
+      // book content never touches the DM's homebrew. Always returns a bare
+      // array — the editor concatenates it onto the imported bestiary.
+      if (type === 'bestiary_custom') {
+        const auth = await verifyDMAuth(request, env);
+        if (!auth.ok) return json({ error: 'DM auth required' }, 401);
+        return json(await kvGet(env, 'bestiary_custom', []));
+      }
+
       // DM-only: everything the apothecary editor needs in one shot.
       if (type === 'potion_data_dm') {
         const auth = await verifyDMAuth(request, env);
@@ -640,7 +650,7 @@ export default {
     }
 
     // ── DM-only writes ────────────────────────────────────────
-    const DM_WRITE_TYPES = ['initiative_state','map_data','map_data_dm','characters','journals','npcs','timeline','potion_ingredients','potions','negative_potions','potion_inventories','potion_recipes','potion_library','bestiary'];
+    const DM_WRITE_TYPES = ['initiative_state','map_data','map_data_dm','characters','journals','npcs','timeline','potion_ingredients','potions','negative_potions','potion_inventories','potion_recipes','potion_library','bestiary','bestiary_custom'];
     if (DM_WRITE_TYPES.includes(body?.type)) {
       const auth = await verifyDMAuth(request, env);
       if (!auth.ok) return json({ error: 'DM auth required' }, 401);
