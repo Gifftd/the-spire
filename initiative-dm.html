@@ -278,6 +278,40 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
 .carry-check:hover { color: var(--ink); }
 .carry-preset { display: flex; gap: 6px; margin-bottom: 0.8rem; flex-wrap: wrap; }
 
+/* ── Bestiary picker ── */
+.bestiary-modal { max-width: 760px; }
+.bestiary-filters { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto; gap: 6px; margin-bottom: 0.8rem; }
+.bestiary-filters input, .bestiary-filters select { background: var(--bg); border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink); font-family: 'Crimson Text', serif; font-size: 0.88rem; padding: 5px 8px; }
+.bestiary-filters input:focus, .bestiary-filters select:focus { border-color: var(--gold); outline: none; }
+.bestiary-filters .clear-btn { font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.08em; padding: 4px 10px; background: none; border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink-faint); cursor: pointer; }
+.bestiary-filters .clear-btn:hover { color: var(--ink); border-color: var(--gold); }
+.bestiary-status { font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.08em; color: var(--ink-faint); margin-bottom: 0.4rem; }
+.bestiary-list { max-height: 52vh; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); }
+.bestiary-row { padding: 7px 10px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.bestiary-row:last-child { border-bottom: none; }
+.bestiary-row:hover { background: var(--surface); }
+.bestiary-row.expanded { background: var(--surface); }
+.bestiary-row-head { display: flex; align-items: center; gap: 10px; }
+.bestiary-row-nm { flex: 1; font-size: 0.92rem; color: var(--ink); min-width: 0; }
+.bestiary-row-nm small { display: block; font-family: 'Cinzel', serif; font-size: 0.54rem; color: var(--ink-faint); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 1px; }
+.bestiary-row-meta { display: flex; gap: 10px; font-family: 'Cinzel', serif; font-size: 0.66rem; color: var(--ink-dim); white-space: nowrap; }
+.bestiary-row-meta span { display: inline-flex; flex-direction: column; align-items: center; min-width: 38px; }
+.bestiary-row-meta span small { color: var(--ink-faint); font-size: 0.5rem; letter-spacing: 0.08em; }
+.bestiary-cr-chip { font-family: 'Cinzel', serif; font-size: 0.55rem; letter-spacing: 0.08em; padding: 2px 7px; border-radius: 8px; border: 1px solid var(--border-light); color: var(--ink-dim); white-space: nowrap; }
+.bestiary-cr-chip.t-low { color: var(--ink-dim); }
+.bestiary-cr-chip.t-mid { color: #88c8e0; border-color: #4a8090; }
+.bestiary-cr-chip.t-high { color: var(--gold); border-color: rgba(184,138,90,0.5); }
+.bestiary-cr-chip.t-epic { color: #e88; border-color: #844; }
+.bestiary-custom-chip { font-family: 'Cinzel', serif; font-size: 0.5rem; letter-spacing: 0.08em; padding: 1px 6px; border-radius: 8px; border: 1px solid var(--gold); color: var(--gold); background: rgba(184,138,90,0.10); margin-left: 6px; }
+.bestiary-add-form { display: none; padding: 0.6rem 0.2rem 0.2rem; margin-top: 8px; border-top: 1px dashed var(--border); }
+.bestiary-row.expanded .bestiary-add-form { display: block; }
+.bestiary-add-form .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-bottom: 8px; align-items: end; }
+.bestiary-add-form label { font-family: 'Cinzel', serif; font-size: 0.54rem; letter-spacing: 0.1em; color: var(--ink-faint); display: block; margin-bottom: 3px; }
+.bestiary-add-form input[type=number] { width: 100%; background: var(--bg); border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink); padding: 4px 6px; font-size: 0.9rem; }
+.bestiary-add-form .toggle { display: flex; align-items: center; gap: 6px; font-size: 0.84rem; color: var(--ink-dim); cursor: pointer; padding: 4px 0; }
+.bestiary-add-form .toggle input[type=checkbox] { accent-color: var(--gold); width: 13px; height: 13px; }
+.bestiary-empty-note { padding: 1.5rem 1rem; text-align: center; color: var(--ink-faint); font-style: italic; font-size: 0.9rem; }
+
 @media (max-width: 700px) {
   .main { grid-template-columns: 1fr; }
   .sidebar { border-left: none; border-top: 1px solid var(--border); }
@@ -329,6 +363,7 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
           Add as hidden
         </label>
         <button class="btn btn-gold" style="width:100%" onclick="addCombatant()">Add</button>
+        <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:6px" onclick="openBestiaryPicker()">📖 Add from Bestiary</button>
       </div>
     </div>
 
@@ -367,6 +402,31 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
     </div>
 
     <div id="sync-status-side" class="sync-status">—</div>
+  </div>
+</div>
+
+<!-- BESTIARY PICKER MODAL -->
+<div class="modal-backdrop hidden" id="bestiary-modal" onclick="if(event.target===this)closeBestiaryPicker()">
+  <div class="modal bestiary-modal">
+    <div class="modal-header">
+      <h2>📖 Add from Bestiary</h2>
+      <button class="modal-close" onclick="closeBestiaryPicker()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="bestiary-filters">
+        <input type="text" id="bp-search" placeholder="Search name…" oninput="renderBestiaryList()">
+        <select id="bp-type" onchange="renderBestiaryList()"><option value="">All types</option></select>
+        <select id="bp-size" onchange="renderBestiaryList()"><option value="">All sizes</option></select>
+        <select id="bp-cr-min" onchange="renderBestiaryList()"><option value="">CR ≥ any</option></select>
+        <select id="bp-cr-max" onchange="renderBestiaryList()"><option value="">CR ≤ any</option></select>
+        <button class="clear-btn" onclick="clearBestiaryFilters()">Clear</button>
+      </div>
+      <div class="bestiary-status" id="bp-status">Loading bestiary…</div>
+      <div class="bestiary-list" id="bp-list"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeBestiaryPicker()">Close</button>
+    </div>
   </div>
 </div>
 
@@ -716,6 +776,239 @@ function removeCombatant(id) {
   if (state.activeIndex >= state.combatants.length) state.activeIndex = 0;
   expandedIds.delete(id);
   savePCs(); render(); pushState();
+}
+
+// ═══════════════════════════════════════════════════════
+//  BESTIARY PICKER — pull monsters from the Menagerie
+// ═══════════════════════════════════════════════════════
+// Lazy-loaded on first open. Two stores: the imported bestiary (`bestiary`)
+// and the DM's authored homebrew (`bestiary_custom`). Browse / filter merges
+// the two; entries from `bestiary_custom` are tagged with `_custom`.
+const _BP = {
+  loaded: false,
+  loading: false,
+  monsters: [],
+  expandedId: null,
+};
+const BP_CR_OPTIONS = [
+  ['0','0'], ['0.125','1/8'], ['0.25','1/4'], ['0.5','1/2'],
+  ['1','1'], ['2','2'], ['3','3'], ['4','4'], ['5','5'],
+  ['6','6'], ['7','7'], ['8','8'], ['9','9'], ['10','10'],
+  ['11','11'], ['12','12'], ['13','13'], ['14','14'], ['15','15'],
+  ['16','16'], ['17','17'], ['18','18'], ['19','19'], ['20','20'],
+  ['21','21'], ['22','22'], ['23','23'], ['24','24'], ['25','25'],
+  ['26','26'], ['27','27'], ['28','28'], ['29','29'], ['30','30']
+];
+function bpEsc(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function bpCrTier(cr){
+  const c = +cr;
+  if (!isFinite(c)) return 't-low';
+  if (c <= 1) return 't-low';
+  if (c <= 5) return 't-mid';
+  if (c <= 15) return 't-high';
+  return 't-epic';
+}
+
+async function openBestiaryPicker(){
+  document.getElementById('bestiary-modal').classList.remove('hidden');
+  if (!_BP.loaded && !_BP.loading) await loadBestiary();
+  populateBestiaryFilterDropdowns();
+  renderBestiaryList();
+  setTimeout(() => document.getElementById('bp-search')?.focus(), 50);
+}
+function closeBestiaryPicker(){
+  document.getElementById('bestiary-modal').classList.add('hidden');
+  _BP.expandedId = null;
+}
+
+async function loadBestiary(){
+  _BP.loading = true;
+  const status = document.getElementById('bp-status');
+  status.textContent = 'Loading bestiary…';
+  try {
+    const [r, rc] = await Promise.all([
+      fetch(WORKER_URL + '?type=bestiary',        { cache:'no-store', headers: Auth.dmHeaders() }),
+      fetch(WORKER_URL + '?type=bestiary_custom', { cache:'no-store', headers: Auth.dmHeaders() })
+    ]);
+    if (r.status === 401 || rc.status === 401){
+      status.textContent = 'Your DM session expired — sign in again on the home page.';
+      _BP.loading = false;
+      return;
+    }
+    const imported = r.ok ? await r.json() : { monsters: [] };
+    const custom   = rc.ok ? await rc.json() : [];
+    const arr = Array.isArray(imported) ? imported : (Array.isArray(imported?.monsters) ? imported.monsters : []);
+    const cust = Array.isArray(custom) ? custom : (Array.isArray(custom?.monsters) ? custom.monsters : []);
+    _BP.monsters = arr.concat(cust.map(m => ({ ...m, _custom: true })));
+    _BP.loaded = true;
+  } catch(e){
+    status.textContent = 'Could not reach the worker. Try again after redeploying.';
+  }
+  _BP.loading = false;
+}
+
+function populateBestiaryFilterDropdowns(){
+  const types = Array.from(new Set(_BP.monsters.map(m => m.type).filter(Boolean))).sort();
+  const sizes = ['Tiny','Small','Medium','Large','Huge','Gargantuan'].filter(s => _BP.monsters.some(m => m.size === s));
+  const t = document.getElementById('bp-type');
+  const s = document.getElementById('bp-size');
+  if (t.options.length <= 1) t.innerHTML = '<option value="">All types</option>' + types.map(x => `<option value="${bpEsc(x)}">${bpEsc(x)}</option>`).join('');
+  if (s.options.length <= 1) s.innerHTML = '<option value="">All sizes</option>' + sizes.map(x => `<option value="${bpEsc(x)}">${bpEsc(x)}</option>`).join('');
+  const mn = document.getElementById('bp-cr-min');
+  const mx = document.getElementById('bp-cr-max');
+  if (mn.options.length <= 1) mn.innerHTML = '<option value="">CR ≥ any</option>' + BP_CR_OPTIONS.map(([v,l]) => `<option value="${v}">CR ≥ ${l}</option>`).join('');
+  if (mx.options.length <= 1) mx.innerHTML = '<option value="">CR ≤ any</option>' + BP_CR_OPTIONS.map(([v,l]) => `<option value="${v}">CR ≤ ${l}</option>`).join('');
+}
+
+function clearBestiaryFilters(){
+  ['bp-search','bp-type','bp-size','bp-cr-min','bp-cr-max'].forEach(id => document.getElementById(id).value = '');
+  renderBestiaryList();
+}
+
+function renderBestiaryList(){
+  const status = document.getElementById('bp-status');
+  const list = document.getElementById('bp-list');
+  if (!_BP.monsters.length){
+    status.textContent = _BP.loaded
+      ? 'No bestiary loaded. Import one in The Menagerie first.'
+      : (_BP.loading ? 'Loading bestiary…' : 'Open the picker to load.');
+    list.innerHTML = '';
+    return;
+  }
+  const q   = (document.getElementById('bp-search').value || '').trim().toLowerCase();
+  const tF  = document.getElementById('bp-type').value;
+  const sF  = document.getElementById('bp-size').value;
+  const lo  = parseFloat(document.getElementById('bp-cr-min').value);
+  const hi  = parseFloat(document.getElementById('bp-cr-max').value);
+  const filtered = _BP.monsters.filter(m => {
+    if (q && !(m.name||'').toLowerCase().includes(q)) return false;
+    if (tF && m.type !== tF) return false;
+    if (sF && m.size !== sF) return false;
+    const cr = +m.cr;
+    if (!isNaN(lo) && (!isFinite(cr) || cr < lo)) return false;
+    if (!isNaN(hi) && (!isFinite(cr) || cr > hi)) return false;
+    return true;
+  });
+  filtered.sort((a,b) => (+a.cr||0) - (+b.cr||0) || (a.name||'').localeCompare(b.name||''));
+  status.textContent = `${filtered.length} of ${_BP.monsters.length} monsters`;
+  if (!filtered.length){
+    list.innerHTML = '<div class="bestiary-empty-note">No monsters match those filters.</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(m => bestiaryRowHTML(m)).join('');
+}
+
+function bestiaryRowHTML(m){
+  const expanded = _BP.expandedId === m.id;
+  return `
+    <div class="bestiary-row${expanded?' expanded':''}" id="bprow-${bpEsc(m.id)}">
+      <div class="bestiary-row-head" onclick="toggleBestiaryRow('${bpEsc(m.id)}')">
+        <div class="bestiary-row-nm">${bpEsc(m.name)}${m._custom?'<span class="bestiary-custom-chip">Custom</span>':''}<small>${bpEsc(m.size||'')} ${bpEsc(m.type||'')}${m.alignment?` · ${bpEsc(m.alignment)}`:''}</small></div>
+        <div class="bestiary-row-meta">
+          <span>${m.ac ?? '—'}<small>AC</small></span>
+          <span>${m.hp ?? '—'}<small>HP</small></span>
+          <span>${m.initiative!=null ? (m.initiative>=0?'+':'')+m.initiative : '—'}<small>INIT</small></span>
+        </div>
+        <span class="bestiary-cr-chip ${bpCrTier(m.cr)}">CR ${bpEsc(m.crText || m.cr || '?')}</span>
+      </div>
+      ${expanded ? bestiaryAddFormHTML(m) : ''}
+    </div>
+  `;
+}
+
+function bestiaryAddFormHTML(m){
+  const safeId = bpEsc(m.id);
+  return `
+    <div class="bestiary-add-form">
+      <div class="row">
+        <div><label>Qty</label><input type="number" id="bp-qty-${safeId}" value="1" min="1" max="50"></div>
+        <div><label>HP override</label><input type="number" id="bp-hp-${safeId}" placeholder="${m.hp ?? ''}"></div>
+        <div><label>Init override</label><input type="number" id="bp-init-${safeId}" placeholder="—"></div>
+        <label class="toggle"><input type="checkbox" id="bp-rollhp-${safeId}" ${m.hpFormula?'checked':''} ${m.hpFormula?'':'disabled'}> Roll HP from <code>${bpEsc(m.hpFormula || 'formula')}</code></label>
+        <label class="toggle"><input type="checkbox" id="bp-rollinit-${safeId}" checked> Roll initiative</label>
+        <label class="toggle"><input type="checkbox" id="bp-hidden-${safeId}"> Hidden</label>
+      </div>
+      <div style="display:flex;justify-content:flex-end">
+        <button class="btn btn-gold btn-sm" onclick="addFromBestiary('${safeId}')">Add to combat</button>
+      </div>
+    </div>
+  `;
+}
+
+function toggleBestiaryRow(id){
+  _BP.expandedId = (_BP.expandedId === id) ? null : id;
+  renderBestiaryList();
+}
+
+// Parse and roll an HP formula like "12d8 + 12" or "2d6-1" or "3d8". Returns
+// null if it can't parse — callers fall back to the printed HP.
+function rollDiceFormula(formula){
+  if (!formula) return null;
+  const m = formula.replace(/\s+/g,'').match(/^(\d+)d(\d+)([+\-]\d+)?$/i);
+  if (!m) return null;
+  const n = parseInt(m[1], 10);
+  const sides = parseInt(m[2], 10);
+  const bonus = m[3] ? parseInt(m[3], 10) : 0;
+  let total = bonus;
+  for (let i = 0; i < n; i++) total += 1 + Math.floor(Math.random() * sides);
+  return Math.max(1, total);
+}
+
+function addFromBestiary(id){
+  const m = _BP.monsters.find(x => x.id === id);
+  if (!m) return;
+  const $ = sel => document.getElementById(sel);
+  const safeId = bpEsc(id);
+  const qty = Math.max(1, Math.min(50, parseInt($(`bp-qty-${safeId}`).value, 10) || 1));
+  const rollHp   = $(`bp-rollhp-${safeId}`).checked;
+  const rollInit = $(`bp-rollinit-${safeId}`).checked;
+  const hidden   = $(`bp-hidden-${safeId}`).checked;
+  const hpOverride   = parseInt($(`bp-hp-${safeId}`).value, 10);
+  const initOverride = parseInt($(`bp-init-${safeId}`).value, 10);
+
+  let spawned = 0;
+  for (let i = 0; i < qty; i++){
+    // HP: override → roll → printed
+    let hp;
+    if (Number.isFinite(hpOverride)) hp = hpOverride;
+    else if (rollHp && m.hpFormula){ hp = rollDiceFormula(m.hpFormula) ?? (m.hp ?? 10); }
+    else hp = (m.hp != null ? m.hp : 10);
+    // Initiative: override → roll(d20 + mod) → static initiativeScore → mod itself
+    let init;
+    if (Number.isFinite(initOverride)) init = initOverride;
+    else if (rollInit){
+      const mod = (m.initiative != null) ? m.initiative : (m.abilities?.dex?.mod ?? 0);
+      init = 1 + Math.floor(Math.random() * 20) + mod;
+    } else {
+      init = (m.initiativeScore != null) ? m.initiativeScore : ((m.initiative != null) ? m.initiative : 10);
+    }
+    const baseName = m.name || 'Monster';
+    const name = qty > 1 ? `${baseName} ${i+1}` : baseName;
+    const c = {
+      id: uid(),
+      name,
+      type: 'enemy',
+      init,
+      hp,
+      maxHp: hp,
+      ac: (m.ac != null) ? m.ac : 10,
+      conditions: [],
+      notes: '',
+      dead: false,
+      hidden,
+      // Reference tags so a future "view stat block" affordance can look the
+      // entry back up. Harmless to expose via initiative_state (no extra
+      // combat info beyond what AC/HP/name already leak).
+      bestiaryId: m.id,
+      bestiarySource: m._custom ? 'custom' : (m.source || 'imported')
+    };
+    state.combatants.push(c);
+    if (mode === 'combat') snapshotCombatant(c);
+    spawned++;
+  }
+  render();
+  pushState();
+  closeBestiaryPicker();
 }
 
 // ═══════════════════════════════════════════════════════
