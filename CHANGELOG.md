@@ -9,6 +9,45 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: lair-effects re-scrape patch
+
+Closes the gap the description-prose parser couldn't reach — 26 monsters
+(all the Adult/Ancient dragons, plus a handful of others) carried `xpInLair`
+but had no lair text anywhere in the raw scrape. A targeted re-scrape of
+`<h3 id="...Lairs">` sections on the affected DDB chapter pages, fed into the
+normalizer via a patch file, fills those in. The lair-effects coverage card
+goes from 2% → 6% on MM 2024.
+
+#### Re-scrape technique
+- Source pages on DDB store lair effects in a shared `<h3 id="...Lairs">`
+  section per lineage (`#BlackDragonLairs` covers both Adult and Ancient
+  Black Dragons; `#VampireLairs` covers Vampire and Vampire Umbral Lord;
+  etc.). Each effect is a `<p>` whose first child is `<strong>Name.</strong>`.
+- A Chrome-side snippet (not committed — matches the existing Obojima
+  technique) walks `<h3[id$="Lairs"]>` headings on whichever chapter page is
+  open, gathers `<p>` siblings until the next heading, and accumulates the
+  result into `localStorage` across visits. A final `__downloadLair()` call
+  emits `mm2024-lair-patch.json`.
+
+#### Added — `scripts/normalize_bestiary.py`
+- `candidate_lair_section_ids(m)` derives candidate section IDs from a
+  monster's name (strip "Adult"/"Ancient", drop "of Lore" / "Umbral Lord" /
+  "Captain" / "Stalker" suffixes), then falls back to its `group` field. The
+  first candidate present in the patch wins.
+- `apply_lair_patch()` merges the patch in after monster normalization;
+  monsters that already got effects from the description-prose parser are
+  skipped (idempotent re-runs are safe). Logs `_patch.applied` and
+  `_patch.stillMissing` on the output for traceability.
+- `SCHEMA_VERSION` bumped to 3.
+- Result on MM 2024: 23 of 26 gap monsters filled. 3 still missing —
+  Mummy Lord and Adult/Ancient White Dragon (pending a follow-up scrape of
+  `monsters-m` and `monsters-w`).
+
+#### Added — `.gitignore`
+- `mm2024-*.json` covers the new patch file (and any future MM 2024
+  satellites). The patch is third-party content and stays out of the public
+  repo.
+
 ### Menagerie: parse Lair Effects out of description prose
 
 The original scraper didn't capture the 2024 MM's "Lair Effects" section — it

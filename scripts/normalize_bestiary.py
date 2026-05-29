@@ -19,7 +19,15 @@ import re
 import sys
 from pathlib import Path
 
-SCHEMA_VERSION = 2  # +lairEffects on monsters that have lair text in description
+SCHEMA_VERSION = 3  # +lairEffects via patch file (covers monsters whose text the scraper missed)
+
+# Optional patch input: when present at the project root (default
+# `mm2024-lair-patch.json`), the file contributes lair-effects sections the
+# original DDB scrape dropped — monsters like the Adult/Ancient dragons whose
+# lair text lives in a separate <h3 id="...Lairs"> section on the source page
+# rather than inline in the monster's description. The patch is gitignored
+# (third-party content) and produced by `scripts/scrape_lair_effects.js`.
+PATCH_PATH_DEFAULT = "mm2024-lair-patch.json"
 
 SIZE_WORDS = {"Tiny", "Small", "Medium", "Large", "Huge", "Gargantuan"}
 
@@ -148,6 +156,62 @@ def normalize_size_and_type(m: dict) -> tuple[str, list[str], str, list[str]]:
     return size, sizes, primary_type, types
 
 
+def candidate_lair_section_ids(m: dict) -> list[str]:
+    """
+    Derive candidate `<h3 id="...">` section IDs from a monster's name + group.
+
+    The 2024 MM keys lair sections by lineage, not by individual statblock:
+    Adult Black Dragon and Ancient Black Dragon both reference
+    `#BlackDragonLairs`. We try (in order): the name minus an Adult/Ancient
+    prefix and any role suffix, the raw stripped name, the monster's `group`
+    field, and the unmodified name. The first key present in the patch wins.
+    """
+    cands: list[str] = []
+    name = m.get("name", "") or ""
+    group = (m.get("group") or "").strip()
+    stripped = re.sub(r"^(?:Adult|Ancient|Young)\s+", "", name)
+    # Drop trailing role/specialization suffixes (Sphinx of Lore → Sphinx,
+    # Vampire Umbral Lord → Vampire).
+    base = re.sub(r"\s+(?:of\s+\w+|Umbral\s+\w+|Lord|Captain|Stalker)$", "", stripped)
+    for cand in [stripped, base, group, name]:
+        if not cand:
+            continue
+        key = re.sub(r"[\s\-]+", "", cand) + "Lairs"
+        if key not in cands:
+            cands.append(key)
+    return cands
+
+
+def apply_lair_patch(monsters: list[dict], patch: dict) -> tuple[int, list[str]]:
+    """
+    Fill in `lairEffects` for monsters where the patch carries the relevant
+    section. Returns (n_applied, unmatched_names) — `unmatched_names` lists
+    monsters that have `xpInLair` set but couldn't be resolved via the patch
+    (and didn't already get effects from the description-prose parser).
+    """
+    sections = (patch or {}).get("sections", {}) if isinstance(patch, dict) else {}
+    n_applied = 0
+    unmatched: list[str] = []
+    for m in monsters:
+        # Only consider monsters with a lair (per `xpInLair`) that the prose
+        # parser couldn't already populate.
+        if not m.get("xpInLair"):
+            continue
+        if m.get("lairEffects"):
+            continue
+        section_id = next(
+            (k for k in candidate_lair_section_ids(m) if k in sections), None
+        )
+        if section_id:
+            effects = sections[section_id].get("effects", [])
+            if effects:
+                m["lairEffects"] = effects
+                n_applied += 1
+                continue
+        unmatched.append(m.get("name", "?"))
+    return n_applied, unmatched
+
+
 def normalize_monster(m: dict) -> dict:
     out = dict(m)  # preserve every original field
 
@@ -171,9 +235,12 @@ def normalize_monster(m: dict) -> dict:
     return out
 
 
-def normalize(raw: dict) -> dict:
+def normalize(raw: dict, patch: dict | None = None) -> dict:
     monsters = [normalize_monster(m) for m in raw.get("monsters", [])]
-    return {
+    patch_applied, patch_unmatched = (0, [])
+    if patch:
+        patch_applied, patch_unmatched = apply_lair_patch(monsters, patch)
+    out = {
         "schemaVersion": SCHEMA_VERSION,
         "source": raw.get("source"),
         "scrapedAt": raw.get("scrapedAt"),
@@ -182,6 +249,11 @@ def normalize(raw: dict) -> dict:
         "count": len(monsters),
         "monsters": monsters,
     }
+    out["_patch"] = {
+        "applied": patch_applied,
+        "stillMissing": patch_unmatched,
+    }
+    return out
 
 
 def main() -> int:
@@ -194,7 +266,14 @@ def main() -> int:
         return 1
 
     raw = json.loads(in_path.read_text(encoding="utf-8"))
-    norm = normalize(raw)
+    patch_path = here / PATCH_PATH_DEFAULT
+    patch = None
+    if patch_path.exists():
+        try:
+            patch = json.loads(patch_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            print(f"warning: could not parse {patch_path}: {e}", file=sys.stderr)
+    norm = normalize(raw, patch)
     out_path.write_text(
         json.dumps(norm, indent=2, ensure_ascii=False), encoding="utf-8"
     )
@@ -215,6 +294,24 @@ def main() -> int:
     print(f"  with condition immune:   {with_cond_imm}")
     print(f"  with vulnerabilities:    {with_vuln}")
     print(f"  with lair effects:       {with_lair_eff} ({total_lair_eff} effects total)")
+    if patch is not None:
+        info = norm.get("_patch") or {}
+        print(
+            f"  patch:                   {info.get('applied', 0)} monsters filled from {patch_path.name}"
+        )
+        miss = info.get("stillMissing") or []
+        if miss:
+            print(
+                f"    still missing (no patch match for these xpInLair monsters):"
+            )
+            for n in miss:
+                print(f"      - {n}")
+    elif (here / PATCH_PATH_DEFAULT).exists():
+        pass  # already warned during parse
+    else:
+        print(
+            f"  patch:                   no {PATCH_PATH_DEFAULT} found — skipped"
+        )
     return 0
 
 
