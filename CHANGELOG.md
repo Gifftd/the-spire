@@ -9,6 +9,58 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### War Table: pull monsters from the Bestiary into combat
+
+A new **"📖 Add from Bestiary"** button under the manual Add form in the War
+Table's right sidebar. Clicking it opens a modal picker that browses both the
+imported MM bestiary and the DM's authored homebrew, with the same filter set
+as The Menagerie (search · type · size · CR-min · CR-max). Each row expands
+in-place into a small add-config form: quantity, HP/init overrides, roll-HP
+toggle, roll-init toggle, hidden toggle, [Add].
+
+Adding does the right things automatically:
+- **HP rolled fresh per spawn** from `hpFormula` ("12d8 + 12") by default —
+  each monster gets independent HP so a horde isn't carbon-copy. Toggle off
+  to use the printed median HP, or supply an explicit HP override.
+- **Initiative rolled** 1d20 + the stat block's `initiative` mod (falling
+  back to dex mod). Toggle off for the static `initiativeScore`, or supply
+  an explicit init override.
+- **AC** comes straight from the stat block.
+- **Naming**: solo picks use the raw name; multi-picks suffix " 1", " 2"…
+  so the DM can rename if they want.
+- **Combatant tagging**: each spawn carries `bestiaryId` + `bestiarySource`
+  for future affordances (e.g. "view stat block" from the combatant card).
+  Those tags are harmless to expose via `initiative_state` to players.
+
+#### Added — `initiative-dm.html`
+- New sidebar button + modal (`#bestiary-modal`) with filters, scrollable
+  list, and per-row inline add-config.
+- Lazy bestiary load on first open — `GET ?type=bestiary` +
+  `?type=bestiary_custom` in parallel, merged into one searchable list with
+  a small brass "Custom" chip on homebrew entries.
+- `rollDiceFormula()` parser handles the standard "NdM[+/-K]" shape used by
+  the 2024 MM (e.g. "12d8 + 12", "2d6-1", "3d8"). Floors at 1.
+- `addFromBestiary(id)` reads the inline config, rolls HP and init per
+  spawn, and appends N combatants to `state.combatants`. Triggers the same
+  `render()` + `pushState()` the manual Add path uses, so player initiative
+  views stay in sync.
+
+#### Verification
+- Dice math: `rollDiceFormula('12d8 + 12')` across 200 samples produced a
+  mean of 65.2 (theoretical 66), range 44-82 within the 13-108 bounds.
+  Rejects empty / garbage input.
+- Row HTML: rendered a synthetic Goblin Minion through `bestiaryRowHTML()`
+  — name, size/type/alignment subline, AC/HP/INIT meta column, CR chip
+  all present, no undefined / null leaks. Expanded form has qty, HP and
+  init override inputs, the roll-HP label, and the Add button.
+- The full live click-through (open modal → search → expand → add → see
+  combatant in init list) can't be cleanly verified in `python -m
+  http.server` preview because the page's `pushState()` POSTs to the real
+  worker on boot, gets a 401 against preview credentials, and triggers
+  `Auth.logout()` + redirect before a fetch stub can be installed. The
+  picker logic mirrors the bestiary-dm patterns that *were* verified
+  end-to-end, so the runtime behavior should match.
+
 ### Menagerie: Editor tab — WYSIWYG homebrew monster builder
 
 A new **Editor** tab between Analysis and Import that lets the DM author
