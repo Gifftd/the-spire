@@ -13,6 +13,7 @@ dnd-potions-seed.json
 obojima-affinity-tags.json
 *.seed.json
 mm2024.json
+mm2024-*.json
 mm-*.json
 bestiary.json
 bestiary-*.json
