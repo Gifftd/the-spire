@@ -9,6 +9,74 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: parse Lair Effects out of description prose
+
+The original scraper didn't capture the 2024 MM's "Lair Effects" section — it
+folded the text into the `description` field instead. A re-parse pulls them
+back out into a structured `lairEffects` array on the monster. Schema bump to
+v2.
+
+The 2024 MM uses **Lair Effects** (passive environmental changes that apply
+while the monster is in its lair) rather than 2014's "Lair Actions" (an
+initiative-20 action). They're different mechanics; left `lairActions`
+untouched (empty for MM 2024 since the book doesn't use that form) and added
+`lairEffects` as a sibling.
+
+#### Added — `scripts/normalize_bestiary.py`
+- `extract_lair_effects()` finds the section between
+  `"creating the following effects:"` and `"If <monster> dies/is destroyed or
+  moves its lair elsewhere"`, then splits it on title boundaries. Title rule:
+  1-4 tokens, each either Title-Cased or a small joiner ("and"/"of"/"the"/"in").
+  Distinguishes effect titles ("Foul Water.", "Sea and Storms.", "All-Seeing.")
+  from body sentences ("Creatures within 1 mile...") whose second token is
+  lowercase. Bumps `SCHEMA_VERSION` to 2.
+- Net result on MM 2024: **9 monsters, 18 lair effects** parsed cleanly —
+  Aboleth, Arch-hag, Beholder, Death Tyrant, Demilich, Dracolich, Kraken,
+  Lich, Unicorn.
+
+#### Added — `bestiary-dm.html`
+- Stat block renders a new **Lair Effects** section beneath Lair Actions.
+- Analysis summary card relabeled "Lair effects" and now counts a monster as
+  having a lair if it carries either `lairActions` or `lairEffects` (so the
+  headline isn't misleading for MM 2024). Goes from 0% → 2%.
+
+#### Re-scrape gap (documented, not fixed)
+- 26 monsters carry an `xpInLair` value but no lair text anywhere in the
+  scraped data (all Adult / Ancient dragons, plus Mind Flayer Arcanist and a
+  few others). Those would need a re-scrape from DDB to recover — the source
+  page presumably has a lair section the original Chrome scrape missed.
+
+### Menagerie: Analysis tab — typical stats by CR + supporting aggregates
+
+The Menagerie gets its own Analysis tab, modeled after the Apothecary's. The
+load-bearing piece is a **Typical stats by CR** table — for each CR present in
+the imported bestiary it shows n, median AC (range), median HP (range), median
+attack bonus, median primary damage, and median save DC. This is the table the
+upcoming stat-block editor and random generator will lean on to answer "what
+should a CR X monster actually look like?".
+
+Three supporting sections fill out the picture without bloating the tab:
+- Summary cards: total · CR range · # types · % multiattack · % spellcasting · %
+  legendary · % lair (the lair column reads 0% today — the scraper didn't
+  capture lair actions; will need a re-scrape pass to fix).
+- CR distribution as a text bar chart (one row per CR present).
+- Damage-type frequency across all action prose, color-coded per the existing
+  affinity palette (so Fire reads orange, Cold blue, Radiant gold, etc.).
+
+#### Added — `bestiary-dm.html`
+- New **Analysis** tab. Compute is lazy + cached (`window.__anaCache`) — first
+  click runs ~4ms across 503 monsters; subsequent tab switches reuse the cache.
+  Import clears the cache so a fresh bestiary forces a recompute.
+- Action-prose parser (regex-based, best-effort): attack bonus from
+  `Attack Roll: +X`, primary damage as the leading "(NdM) Type damage" number
+  on the first non-Multiattack action, save DC from `Saving Throw...: DC X`
+  (largest DC across all features). "Multiattack" is always skipped as the
+  primary attack since it's an orchestration line, not a damage line.
+- Spot-checked numbers align with published 2024 design guidance:
+  CR 1/4 → AC ~12-13, HP ~13, atk +4, dmg 5, DC 11.
+  CR 5   → AC 15, HP ~94, atk +7, dmg 13, DC 14-15.
+  CR 30  → AC 25, HP 697, atk +19, dmg 36, DC 27.
+
 ### The Menagerie — DM bestiary, KV-backed
 
 First slice of the monster-tracker effort. A new DM-only tool that ingests a

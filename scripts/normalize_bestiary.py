@@ -19,9 +19,53 @@ import re
 import sys
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2  # +lairEffects on monsters that have lair text in description
 
 SIZE_WORDS = {"Tiny", "Small", "Medium", "Large", "Huge", "Gargantuan"}
+
+# Lair-effects parser. The 2024 MM uses "Lair Effects" (passive environment
+# changes) instead of 2014's "Lair Actions". The scraper rolled the effects
+# text into `description` instead of capturing them as a structured section,
+# but the format is consistent enough to extract by regex:
+#
+#   "...creating the following effects: <Title>. <body...> <Title>. <body...>
+#    If <monster> dies/is destroyed or moves its lair elsewhere, these effects
+#    end immediately..."
+#
+# A token in an effect title must be either Title-Cased ("Foul", "All-Seeing")
+# or one of a small joiner set ("and", "of", "the", "in") — this distinguishes
+# titles like "Sea and Storms." from body sentences like "Creatures within..."
+# whose second word is lowercase.
+_EFFECT_TOKEN = r"(?:[A-Z][\w\-’']*|and|of|the|in)"
+_EFFECT_NAME = rf"{_EFFECT_TOKEN}(?:\s+{_EFFECT_TOKEN}){{0,3}}"
+_RE_LAIR_START = re.compile(r"creating the following effects:\s*")
+_RE_LAIR_END = re.compile(
+    r"\.\s+If\s+\w+(?:\s+\w+){0,5}\s+(?:dies|is destroyed|moves its lair)"
+)
+_RE_EFFECT = re.compile(rf"(?:^|(?<=\.\s))({_EFFECT_NAME})\.\s+(?=[A-Z])")
+
+
+def extract_lair_effects(desc: str) -> list[dict]:
+    if not desc:
+        return []
+    m_start = _RE_LAIR_START.search(desc)
+    if not m_start:
+        return []
+    body = desc[m_start.end():]
+    m_end = _RE_LAIR_END.search(body)
+    if m_end:
+        # Keep the period that closes the last effect's body.
+        body = body[: m_end.start() + 1]
+    matches = list(_RE_EFFECT.finditer(body))
+    out = []
+    for i, m in enumerate(matches):
+        name = m.group(1)
+        b_start = m.end()
+        b_end = matches[i + 1].start() if i + 1 < len(matches) else len(body)
+        text = body[b_start:b_end].strip().rstrip(".")
+        if text:
+            out.append({"name": name, "body": text + "."})
+    return out
 
 
 def split_csv(text: str) -> list[str]:
@@ -119,6 +163,11 @@ def normalize_monster(m: dict) -> dict:
     out["damageImmunities"] = dmg_imm
     out["conditionImmunities"] = cond_imm
 
+    # Lair Effects — extract from description prose where the scraper left them.
+    # Doesn't touch existing `lairActions` (the 2014-style field), which the
+    # 2024 MM doesn't populate.
+    out["lairEffects"] = extract_lair_effects(m.get("description", "") or "")
+
     return out
 
 
@@ -157,12 +206,15 @@ def main() -> int:
     with_dmg_imm = sum(1 for m in ms if m["damageImmunities"])
     with_cond_imm = sum(1 for m in ms if m["conditionImmunities"])
     with_vuln = sum(1 for m in ms if m["vulnerabilities"])
+    with_lair_eff = sum(1 for m in ms if m["lairEffects"])
+    total_lair_eff = sum(len(m["lairEffects"]) for m in ms)
     print(f"wrote {out_path} ({len(ms)} monsters, schemaVersion={SCHEMA_VERSION})")
     print(f"  size/type repairs:       {fixed_type}")
     print(f"  with damage resistances: {with_res}")
     print(f"  with damage immunities:  {with_dmg_imm}")
     print(f"  with condition immune:   {with_cond_imm}")
     print(f"  with vulnerabilities:    {with_vuln}")
+    print(f"  with lair effects:       {with_lair_eff} ({total_lair_eff} effects total)")
     return 0
 
 

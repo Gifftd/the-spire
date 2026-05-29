@@ -98,6 +98,41 @@
     .toast.show{opacity:1}
     .toast.err{border-color:var(--rust);color:#e3a08e}
 
+    /* Analysis tab */
+    .ana-cards{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:1rem}
+    .ana-card{flex:1;min-width:140px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:0.7rem 0.9rem;text-align:center}
+    .ana-card .val{font-family:'Cinzel',serif;font-size:1.5rem;color:var(--teal-bright);line-height:1.1}
+    .ana-card .lbl{font-family:'Cinzel',serif;font-size:0.54rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-faint);margin-top:0.3rem}
+    .ana-section{margin-bottom:1.4rem}
+    .ana-section-h{font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass);margin-bottom:0.5rem}
+    .ana-table{width:100%;border-collapse:collapse;font-size:0.92rem;background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius)}
+    .ana-table th,.ana-table td{padding:6px 10px;text-align:left;border-bottom:1px solid var(--border)}
+    .ana-table th{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;color:var(--ink-faint);text-transform:uppercase;background:var(--panel)}
+    .ana-table td.num{text-align:right;font-family:'Cinzel',serif;color:var(--teal-bright)}
+    .ana-table td.cr{font-family:'Cinzel',serif;color:var(--brass-bright)}
+    .ana-table td .rng{color:var(--ink-faint);font-size:0.82rem;margin-left:4px}
+    .ana-table tr:last-child td{border-bottom:none}
+    .ana-bars{font-family:'Cinzel',serif;font-size:0.85rem;background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius);padding:0.6rem 0.9rem}
+    .ana-bars .bar-row{display:grid;grid-template-columns:60px 1fr 50px;gap:8px;align-items:center;padding:2px 0}
+    .ana-bars .bar-lbl{color:var(--brass);font-size:0.72rem;letter-spacing:0.08em}
+    .ana-bars .bar-fill{background:var(--teal-faint);height:14px;border-radius:2px;border:1px solid var(--teal-deep);position:relative}
+    .ana-bars .bar-fill > span{display:block;height:100%;background:linear-gradient(90deg,var(--teal-deep),var(--teal));border-radius:2px}
+    .ana-bars .bar-n{color:var(--teal-bright);font-size:0.78rem;text-align:right}
+    .ana-dmg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+    .ana-dmg .dt{background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;display:flex;justify-content:space-between;align-items:center;font-size:0.88rem}
+    .ana-dmg .dt-name{font-family:'Cinzel',serif;font-size:0.64rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-light)}
+    .ana-dmg .dt-n{font-family:'Cinzel',serif;color:var(--teal-bright);font-size:0.95rem}
+    .ana-dmg .dt.phys .dt-name{color:var(--ink-light)}
+    .ana-dmg .dt.fire .dt-name{color:#ff9a6e}
+    .ana-dmg .dt.cold .dt-name{color:#88c0ff}
+    .ana-dmg .dt.lightning .dt-name{color:#ffe060}
+    .ana-dmg .dt.thunder .dt-name{color:#a0c8ff}
+    .ana-dmg .dt.acid .dt-name,.ana-dmg .dt.poison .dt-name{color:#9ad080}
+    .ana-dmg .dt.radiant .dt-name{color:#ffe9a0}
+    .ana-dmg .dt.necrotic .dt-name{color:#b890c8}
+    .ana-dmg .dt.psychic .dt-name{color:#e090c0}
+    .ana-dmg .dt.force .dt-name{color:#c8a0ff}
+
     .footer{margin-top:2rem;text-align:center;padding-top:1.5rem;border-top:1px solid var(--border)}
     .footer-text{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--ink-faint)}
   </style>
@@ -117,6 +152,7 @@
     <div id="tool" style="display:none">
       <div class="tabs">
         <button class="tab active" data-tab="browse" onclick="switchTab('browse')">Browse</button>
+        <button class="tab" data-tab="analysis" onclick="switchTab('analysis')">Analysis</button>
         <button class="tab" data-tab="import" onclick="switchTab('import')">Import</button>
       </div>
 
@@ -144,6 +180,28 @@
             <div class="col-head"><span>Stat block</span><span id="sb-id" style="font-size:0.55rem;color:var(--ink-faint);letter-spacing:0.12em"></span></div>
             <div id="m-statblock"><div class="empty-note">Select a monster to view its stat block.</div></div>
           </div>
+        </div>
+      </div>
+
+      <!-- ANALYSIS -->
+      <div class="tab-panel" id="panel-analysis" style="display:none">
+        <div class="hint">Aggregate stats across the imported bestiary — built to anchor the future stat-block editor and generator. Numbers come from the structured fields and (for attack bonus, damage, save DC) regex-parsed action prose. The Typical Stats table is the load-bearing piece: it answers "what should a CR X monster actually look like?".</div>
+        <div class="toolbar" style="justify-content:space-between;align-items:center">
+          <button class="btn" onclick="runAnalysis()">Recompute</button>
+          <span id="ana-status" class="hint" style="margin:0">Switch to this tab to run the analysis.</span>
+        </div>
+        <div class="ana-section"><div id="ana-summary"></div></div>
+        <div class="ana-section">
+          <div class="ana-section-h">Typical stats by CR</div>
+          <div id="ana-cr-table"></div>
+        </div>
+        <div class="ana-section">
+          <div class="ana-section-h">CR distribution</div>
+          <div id="ana-cr-bars"></div>
+        </div>
+        <div class="ana-section">
+          <div class="ana-section-h">Damage types in action prose</div>
+          <div id="ana-damage-types"></div>
         </div>
       </div>
 
@@ -234,6 +292,7 @@
       document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
       document.querySelectorAll('.tab-panel').forEach(p=>p.style.display='none');
       document.getElementById('panel-'+name).style.display='';
+      if (name === 'analysis' && !window.__anaCache) runAnalysis();
     }
 
     function crTier(cr){
@@ -381,6 +440,7 @@
           ${featureBlock('Reactions', m.reactions)}
           ${featureBlock('Legendary Actions', m.legendaryActions)}
           ${featureBlock('Lair Actions', m.lairActions)}
+          ${featureBlock('Lair Effects', m.lairEffects)}
           ${m.description ? `<div class="desc">${esc(m.description)}</div>` : ''}
         </div>
       `;
@@ -420,6 +480,7 @@
       btn.textContent = 'Import to KV';
       if (ok){
         bestiary = seedData;
+        window.__anaCache = null;
         populateFilters();
         renderList();
         renderSource();
@@ -428,6 +489,256 @@
       } else {
         btn.disabled = false;
       }
+    }
+
+    /* ── Analysis ──
+     * Compute aggregate stats once and cache. Numbers come from structured
+     * fields where possible; attack bonus, average damage, and save DC are
+     * parsed from action prose with regex (best-effort — actions with no
+     * "Attack Roll: +X" or "(NdM) Type damage" pattern simply don't contribute).
+     * "Primary" attack = the first non-Multiattack action with a damage entry.
+     */
+    const DAMAGE_TYPES = ['Bludgeoning','Piercing','Slashing','Acid','Cold','Fire','Force','Lightning','Necrotic','Poison','Psychic','Radiant','Thunder'];
+    const RX_ATK   = /Attack Roll:\s*([+\-]\d+)/i;
+    const RX_DMG   = /(\d+)\s*\(\s*(\d+)d(\d+)(?:\s*([+\-])\s*(\d+))?\s*\)\s+(\w+)\s+damage/gi;
+    const RX_SAVE  = /Saving Throw[^:]*:\s*DC\s*(\d+)/i;
+    const RX_MULTI = /^multiattack$/i;
+    const RX_SPELL = /spellcasting/i;
+
+    function actionDamage(body){
+      // First numeric damage entry in the body: returns avg (the leading number).
+      RX_DMG.lastIndex = 0;
+      const m = RX_DMG.exec(body || '');
+      return m ? parseInt(m[1], 10) : null;
+    }
+    function actionAttack(body){
+      const m = (body || '').match(RX_ATK);
+      return m ? parseInt(m[1], 10) : null;
+    }
+    function actionSaveDC(body){
+      const m = (body || '').match(RX_SAVE);
+      return m ? parseInt(m[1], 10) : null;
+    }
+    function allDamageTypes(body){
+      // Every "(...) <Type> damage" occurrence in this action.
+      const types = [];
+      RX_DMG.lastIndex = 0;
+      let m;
+      while ((m = RX_DMG.exec(body || '')) !== null){
+        const t = (m[6] || '').replace(/^(.)/, s => s.toUpperCase());
+        if (DAMAGE_TYPES.includes(t)) types.push(t);
+      }
+      return types;
+    }
+
+    function primaryAttackStats(m){
+      // First non-Multiattack action with a damage entry — that's the monster's
+      // canonical attack for "what does a CR X hit for?".
+      const actions = Array.isArray(m.actions) ? m.actions : [];
+      for (const a of actions){
+        if (RX_MULTI.test(a.name || '')) continue;
+        const dmg = actionDamage(a.body || '');
+        const atk = actionAttack(a.body || '');
+        if (dmg != null || atk != null) return { atk, dmg };
+      }
+      return { atk: null, dmg: null };
+    }
+    function bestSaveDC(m){
+      // Largest save DC referenced in any action — the headline "save against this" number.
+      let best = null;
+      const sources = [...(m.actions||[]), ...(m.traits||[]), ...(m.bonusActions||[]), ...(m.reactions||[]), ...(m.legendaryActions||[])];
+      for (const a of sources){
+        const dc = actionSaveDC(a.body || '');
+        if (dc != null && (best == null || dc > best)) best = dc;
+      }
+      return best;
+    }
+    function hasSpellcasting(m){
+      const sources = [...(m.actions||[]), ...(m.traits||[]), ...(m.bonusActions||[])];
+      return sources.some(a => RX_SPELL.test(a.name || '') || RX_SPELL.test(a.body || ''));
+    }
+    function hasMultiattack(m){
+      return (m.actions || []).some(a => RX_MULTI.test(a.name || ''));
+    }
+
+    function median(arr){
+      if (!arr.length) return null;
+      const s = arr.slice().sort((a,b) => a - b);
+      const mid = (s.length - 1) / 2;
+      return s.length % 2 ? s[Math.floor(mid)] : (s[mid - 0.5] + s[mid + 0.5]) / 2;
+    }
+    function minmax(arr){
+      if (!arr.length) return [null, null];
+      let lo = arr[0], hi = arr[0];
+      for (const v of arr){ if (v < lo) lo = v; if (v > hi) hi = v; }
+      return [lo, hi];
+    }
+    function fmtCR(cr){
+      return cr === 0.125 ? '1/8' : cr === 0.25 ? '1/4' : cr === 0.5 ? '1/2' : String(cr);
+    }
+
+    function computeAnalysis(monsters){
+      const byCr = new Map();
+      const dmgTypeCounts = Object.fromEntries(DAMAGE_TYPES.map(t => [t, 0]));
+      let nMulti = 0, nLegendary = 0, nSpell = 0, nLair = 0;
+
+      for (const m of monsters){
+        const cr = +m.cr;
+        if (!isFinite(cr)) continue;
+
+        if (hasMultiattack(m)) nMulti++;
+        if (Array.isArray(m.legendaryActions) && m.legendaryActions.length) nLegendary++;
+        // 2024 MM uses Lair Effects (passive environmental) instead of 2014 Lair
+        // Actions; both fields are summed so the headline number isn't misleading.
+        if ((Array.isArray(m.lairActions) && m.lairActions.length) ||
+            (Array.isArray(m.lairEffects) && m.lairEffects.length)) nLair++;
+        if (hasSpellcasting(m)) nSpell++;
+
+        for (const a of (m.actions || [])){
+          for (const t of allDamageTypes(a.body || '')){
+            dmgTypeCounts[t] = (dmgTypeCounts[t] || 0) + 1;
+          }
+        }
+
+        const { atk, dmg } = primaryAttackStats(m);
+        const dc = bestSaveDC(m);
+        const bucket = byCr.get(cr) || { cr, n: 0, ac: [], hp: [], atk: [], dmg: [], dc: [] };
+        bucket.n++;
+        if (m.ac != null) bucket.ac.push(+m.ac);
+        if (m.hp != null) bucket.hp.push(+m.hp);
+        if (atk != null) bucket.atk.push(atk);
+        if (dmg != null) bucket.dmg.push(dmg);
+        if (dc != null) bucket.dc.push(dc);
+        byCr.set(cr, bucket);
+      }
+
+      const crRows = [...byCr.values()].sort((a, b) => a.cr - b.cr).map(b => ({
+        cr: b.cr,
+        crText: fmtCR(b.cr),
+        n: b.n,
+        acMed: median(b.ac),
+        acRng: minmax(b.ac),
+        hpMed: median(b.hp),
+        hpRng: minmax(b.hp),
+        atkMed: median(b.atk),
+        dmgMed: median(b.dmg),
+        dcMed: median(b.dc)
+      }));
+
+      const total = monsters.length;
+      const crVals = monsters.map(m => +m.cr).filter(isFinite);
+      const [crLo, crHi] = minmax(crVals);
+      const typeCount = new Set(monsters.map(m => m.type).filter(Boolean)).size;
+
+      return {
+        total,
+        crLo, crHi,
+        typeCount,
+        nMulti, nLegendary, nSpell, nLair,
+        crRows,
+        dmgTypeCounts
+      };
+    }
+
+    function pct(n, total){ return total ? Math.round(100 * n / total) : 0; }
+
+    function runAnalysis(){
+      const ms = asMonsters(bestiary);
+      const status = document.getElementById('ana-status');
+      if (!ms.length){
+        document.getElementById('ana-summary').innerHTML = '<div class="empty-note">Nothing to analyze — import a bestiary first.</div>';
+        document.getElementById('ana-cr-table').innerHTML = '';
+        document.getElementById('ana-cr-bars').innerHTML = '';
+        document.getElementById('ana-damage-types').innerHTML = '';
+        status.textContent = 'Empty bestiary.';
+        return;
+      }
+      status.textContent = 'Computing…';
+      // Yield to the browser so the status message paints before the (millisecond-scale) compute.
+      setTimeout(() => {
+        const t0 = performance.now();
+        const r = computeAnalysis(ms);
+        window.__anaCache = r;
+        renderSummary(r);
+        renderCrTable(r);
+        renderCrBars(r);
+        renderDamageTypes(r);
+        status.textContent = `Recomputed across ${r.total} monsters in ${(performance.now() - t0).toFixed(0)}ms.`;
+      }, 10);
+    }
+
+    function renderSummary(r){
+      const cards = [
+        { val: r.total, lbl: 'Monsters' },
+        { val: `${fmtCR(r.crLo)} – ${fmtCR(r.crHi)}`, lbl: 'CR range' },
+        { val: r.typeCount, lbl: 'Types' },
+        { val: pct(r.nMulti, r.total) + '%', lbl: 'Multiattack' },
+        { val: pct(r.nSpell, r.total) + '%', lbl: 'Spellcasting' },
+        { val: pct(r.nLegendary, r.total) + '%', lbl: 'Legendary' },
+        { val: pct(r.nLair, r.total) + '%', lbl: 'Lair effects' }
+      ];
+      document.getElementById('ana-summary').innerHTML =
+        '<div class="ana-cards">' +
+        cards.map(c => `<div class="ana-card"><div class="val">${esc(c.val)}</div><div class="lbl">${esc(c.lbl)}</div></div>`).join('') +
+        '</div>';
+    }
+
+    function rngStr(lo, hi){
+      if (lo == null || hi == null) return '';
+      return lo === hi ? '' : `<span class="rng">(${lo}–${hi})</span>`;
+    }
+    function fmtNum(n){ return n == null ? '—' : (Math.round(n * 10) / 10).toString(); }
+    function fmtSigned(n){ return n == null ? '—' : (n >= 0 ? '+' : '') + Math.round(n); }
+
+    function renderCrTable(r){
+      const rows = r.crRows.map(b => `
+        <tr>
+          <td class="cr">CR ${esc(b.crText)}</td>
+          <td class="num">${b.n}</td>
+          <td class="num">${fmtNum(b.acMed)}${rngStr(b.acRng[0], b.acRng[1])}</td>
+          <td class="num">${fmtNum(b.hpMed)}${rngStr(b.hpRng[0], b.hpRng[1])}</td>
+          <td class="num">${fmtSigned(b.atkMed)}</td>
+          <td class="num">${fmtNum(b.dmgMed)}</td>
+          <td class="num">${fmtNum(b.dcMed)}</td>
+        </tr>
+      `).join('');
+      document.getElementById('ana-cr-table').innerHTML = `
+        <table class="ana-table">
+          <thead><tr>
+            <th>CR</th><th style="text-align:right">n</th>
+            <th style="text-align:right">AC (median, range)</th>
+            <th style="text-align:right">HP (median, range)</th>
+            <th style="text-align:right">Atk bonus</th>
+            <th style="text-align:right">Primary damage</th>
+            <th style="text-align:right">Save DC</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+
+    function renderCrBars(r){
+      const max = r.crRows.reduce((m, b) => Math.max(m, b.n), 0);
+      const html = r.crRows.map(b => {
+        const w = max ? Math.round(100 * b.n / max) : 0;
+        return `<div class="bar-row">
+          <span class="bar-lbl">CR ${esc(b.crText)}</span>
+          <span class="bar-fill"><span style="width:${w}%"></span></span>
+          <span class="bar-n">${b.n}</span>
+        </div>`;
+      }).join('');
+      document.getElementById('ana-cr-bars').innerHTML = `<div class="ana-bars">${html}</div>`;
+    }
+
+    function renderDamageTypes(r){
+      const entries = Object.entries(r.dmgTypeCounts).sort((a, b) => b[1] - a[1]);
+      const html = entries.map(([t, n]) => `
+        <div class="dt ${t.toLowerCase()}">
+          <span class="dt-name">${esc(t)}</span>
+          <span class="dt-n">${n}</span>
+        </div>
+      `).join('');
+      document.getElementById('ana-damage-types').innerHTML = `<div class="ana-dmg">${html}</div>`;
     }
 
     async function saveKey(type, payload){
