@@ -9,6 +9,68 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: Editor tab — WYSIWYG homebrew monster builder
+
+A new **Editor** tab between Analysis and Import that lets the DM author
+homebrew monsters with a live stat-block preview. Custom monsters live in
+their own `bestiary_custom` KV key, separate from the imported MM bestiary,
+so re-imports of source-book content never trample homebrew work. They show
+up in Browse with a small brass "Custom" chip and merge into the Analysis
+compute alongside everything else.
+
+#### Added — `cloudflare-worker.js`
+- New DM-gated **GET `?type=bestiary_custom`** endpoint returning the bare
+  array of custom monsters.
+- `'bestiary_custom'` added to `DM_WRITE_TYPES`. Requires a manual redeploy
+  before saves persist.
+
+#### Added — `bestiary-dm.html`
+- **Editor** tab with a two-pane layout: form on the left (scrollable), live
+  preview on the right (sticky). The preview reuses the same
+  `renderStatblock()` function the Browse tab uses, so what you see in the
+  preview is exactly what gets saved.
+- Form covers the full stat-block schema:
+  identity (name · size · type · subtype · alignment · CR), defense
+  (AC · AC text · HP · HP formula · speed for walk/fly/swim/burrow/climb
+  with a hover toggle · initiative bonus), abilities grid (6 ability cells
+  with auto-mod display and a save-bonus override per ability — the save
+  follows the mod until the user deviates, then stays user-set), traits /
+  defenses / senses (skills · senses · languages · resistances · damage
+  immunities · condition immunities · vulnerabilities · gear), six feature
+  sections (traits · actions · bonus actions · reactions · legendary
+  actions · lair effects), and a description textarea.
+- Each feature section has add / move-up / move-down / remove controls and
+  paints a list of `{name, body}` row editors.
+- **"Fill from CR median" button** wires the Editor into the Analysis tab's
+  compute — fills empty AC and HP from the current CR's median (so it
+  doesn't trample anything you've typed). Surfaces the suggested attack
+  bonus, primary damage, and save DC for that CR cohort in a toast for the
+  DM to use when authoring actions. Computes the analysis synchronously if
+  the cache isn't warm yet (~4ms over 503 monsters).
+- XP and PB derive automatically from CR via a baked-in 2024-MM XP table
+  and the standard PB-by-CR thresholds.
+- Custom monsters' speed array is round-tripped through `speedText` so the
+  preview's `(hover)` suffix renders the same as imported monsters.
+- **Top strip** shows clickable chips for every saved custom monster (click
+  to load into the form, current selection highlighted) and a "+ New
+  monster" button.
+- Save / Duplicate / Delete buttons. Delete prompts a `confirm()`. Duplicate
+  copies the current edit, clears the id, and renames the working copy to
+  `<name> (copy)` so the next Save mints a new entry instead of overwriting.
+- **Browse** and **Analysis** tabs now operate on
+  `allMonsters() = bestiary + customMonsters` — the Browse list, filters,
+  CR sort, and Analysis cohort medians all include custom monsters
+  automatically. Custom rows in Browse carry a small "Custom" chip next
+  to the name. The source line picks up a `+ N custom` suffix when present.
+
+#### Verification
+- Stubbed worker, ran end-to-end in a local preview: authored a CR 5
+  "Glass Stalker" (Aberration · Neutral Evil), clicked **Fill from CR
+  median** → AC autofilled to 15, HP to 94 (matches the Typical-stats-by-CR
+  row from Analysis), added an action with the standard 2024 prose pattern,
+  saved, switched to Browse, searched, confirmed the row carried the custom
+  chip, and the stat block re-rendered identically to the editor preview.
+
 ### Menagerie: lair-effects re-scrape patch
 
 Closes the gap the description-prose parser couldn't reach — 26 monsters

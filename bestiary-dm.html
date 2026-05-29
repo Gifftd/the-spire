@@ -98,6 +98,50 @@
     .toast.show{opacity:1}
     .toast.err{border-color:var(--rust);color:#e3a08e}
 
+    /* Editor tab */
+    .ed-layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:1.25rem;align-items:start}
+    @media (max-width:1020px){.ed-layout{grid-template-columns:1fr}}
+    .ed-strip{display:flex;flex-wrap:wrap;gap:6px;padding:6px 8px;background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:0.9rem;align-items:center}
+    .ed-strip .lbl{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-faint);margin-right:6px}
+    .ed-chip{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.06em;padding:4px 9px;border-radius:10px;border:1px solid var(--border-light);color:var(--ink-light);background:var(--panel);cursor:pointer;white-space:nowrap}
+    .ed-chip:hover{border-color:var(--teal);color:var(--teal-bright)}
+    .ed-chip.active{border-color:var(--brass);background:rgba(184,138,90,0.15);color:var(--brass-bright)}
+    .ed-form{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:0.9rem 1rem;max-height:78vh;overflow-y:auto}
+    .ed-preview-wrap{position:sticky;top:0.5rem;max-height:88vh;overflow-y:auto}
+    .ed-sec{margin-bottom:1rem;padding-bottom:0.7rem;border-bottom:1px solid var(--border)}
+    .ed-sec:last-child{border-bottom:none}
+    .ed-sec-h{display:flex;justify-content:space-between;align-items:center;font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass);margin-bottom:0.5rem}
+    .ed-grid{display:grid;gap:0.5rem 0.6rem}
+    .ed-grid.c2{grid-template-columns:repeat(2,1fr)}
+    .ed-grid.c3{grid-template-columns:repeat(3,1fr)}
+    .ed-grid.c4{grid-template-columns:repeat(4,1fr)}
+    .ed-grid.c5{grid-template-columns:repeat(5,1fr)}
+    .ed-fg{display:flex;flex-direction:column;gap:3px;min-width:0}
+    .ed-fg label{font-family:'Cinzel',serif;font-size:0.54rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint)}
+    .ed-fg input,.ed-fg select,.ed-fg textarea{font-size:0.92rem;padding:5px 8px}
+    .ed-fg input[readonly]{color:var(--ink-faint);background:var(--panel)}
+    .ed-fg textarea{min-height:60px;line-height:1.45}
+    .ed-abil{display:grid;grid-template-columns:repeat(6,1fr);gap:0.5rem;text-align:center}
+    .ed-abil .ab-cell{background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius);padding:5px}
+    .ed-abil .ab-cell .lbl{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--brass);margin-bottom:2px}
+    .ed-abil .ab-cell input[type=number]{width:100%;text-align:center;font-family:'Cinzel',serif;font-size:0.95rem;padding:3px}
+    .ed-abil .ab-cell .mod{font-size:0.78rem;color:var(--ink-light);margin-top:2px}
+    .ed-abil .ab-cell .save-row{display:flex;justify-content:center;align-items:center;gap:3px;margin-top:3px;font-size:0.66rem;color:var(--teal-bright);font-family:'Cinzel',serif}
+    .ed-feat-list{display:flex;flex-direction:column;gap:0.5rem}
+    .ed-feat{background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius);padding:0.5rem 0.6rem}
+    .ed-feat-top{display:flex;gap:6px;align-items:center;margin-bottom:5px}
+    .ed-feat-top input{flex:1;font-weight:600}
+    .ed-feat textarea{font-size:0.88rem;min-height:50px}
+    .ed-feat-actions{display:flex;gap:4px}
+    .ed-feat-actions button{padding:3px 8px;font-size:0.55rem}
+    .ed-empty{padding:0.6rem;font-style:italic;color:var(--ink-faint);font-size:0.88rem;text-align:center}
+    .ed-toolbar{display:flex;flex-wrap:wrap;gap:6px;padding-bottom:0.6rem;margin-bottom:0.6rem;border-bottom:1px solid var(--border);align-items:center;justify-content:space-between}
+    .ed-toolbar .left{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+    .ed-toolbar .right{display:flex;gap:6px;flex-wrap:wrap}
+    .ed-toolbar .title{font-family:'Cinzel',serif;font-size:0.78rem;letter-spacing:0.06em;color:var(--brass-bright)}
+    .ed-derived{font-family:'Cinzel',serif;font-size:0.7rem;color:var(--ink-light);padding:4px 6px;background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius)}
+    .custom-chip{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--brass);color:var(--brass);background:rgba(184,138,90,0.10);margin-left:6px}
+
     /* Analysis tab */
     .ana-cards{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:1rem}
     .ana-card{flex:1;min-width:140px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:0.7rem 0.9rem;text-align:center}
@@ -153,6 +197,7 @@
       <div class="tabs">
         <button class="tab active" data-tab="browse" onclick="switchTab('browse')">Browse</button>
         <button class="tab" data-tab="analysis" onclick="switchTab('analysis')">Analysis</button>
+        <button class="tab" data-tab="editor" onclick="switchTab('editor')">Editor</button>
         <button class="tab" data-tab="import" onclick="switchTab('import')">Import</button>
       </div>
 
@@ -179,6 +224,126 @@
           <div>
             <div class="col-head"><span>Stat block</span><span id="sb-id" style="font-size:0.55rem;color:var(--ink-faint);letter-spacing:0.12em"></span></div>
             <div id="m-statblock"><div class="empty-note">Select a monster to view its stat block.</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- EDITOR -->
+      <div class="tab-panel" id="panel-editor" style="display:none">
+        <div class="ed-strip" id="ed-chips">
+          <span class="lbl">Custom (<span id="ed-count">0</span>)</span>
+          <span id="ed-chips-list"></span>
+          <button class="btn brass sm" onclick="newCustom()">+ New monster</button>
+        </div>
+        <div class="ed-layout">
+          <!-- FORM -->
+          <div class="ed-form" id="ed-form-wrap">
+            <div class="ed-toolbar">
+              <div class="left">
+                <span class="title" id="ed-title">New monster</span>
+              </div>
+              <div class="right">
+                <button class="btn ghost sm" onclick="fillFromCRMedian()" title="Use the Analysis-tab CR medians to populate empty defense/attack fields for the current CR">Fill from CR median</button>
+                <button class="btn ghost sm" onclick="duplicateCustom()" id="ed-dup-btn" style="display:none">⎘ Duplicate</button>
+                <button class="btn danger sm" onclick="deleteCustom()" id="ed-del-btn" style="display:none">Delete</button>
+                <button class="btn brass sm" onclick="saveCustom()" id="ed-save-btn">Save</button>
+              </div>
+            </div>
+
+            <div class="ed-sec">
+              <div class="ed-sec-h"><span>Identity</span></div>
+              <div class="ed-grid c3">
+                <div class="ed-fg"><label>Name</label><input id="ed-name" oninput="syncEditor()"></div>
+                <div class="ed-fg"><label>Size</label><select id="ed-size" onchange="syncEditor()">
+                  <option>Tiny</option><option>Small</option><option selected>Medium</option><option>Large</option><option>Huge</option><option>Gargantuan</option>
+                </select></div>
+                <div class="ed-fg"><label>Type</label><input id="ed-type" placeholder="Beast / Humanoid / …" oninput="syncEditor()"></div>
+                <div class="ed-fg"><label>Subtype</label><input id="ed-subtype" placeholder="e.g. Chromatic, Demon" oninput="syncEditor()"></div>
+                <div class="ed-fg"><label>Alignment</label><input id="ed-alignment" placeholder="Neutral" oninput="syncEditor()"></div>
+                <div class="ed-fg"><label>CR</label><select id="ed-cr" onchange="syncEditor()"></select></div>
+              </div>
+              <div class="ed-grid c3" style="margin-top:0.5rem">
+                <div class="ed-derived" id="ed-xp">XP: —</div>
+                <div class="ed-derived" id="ed-pb">PB: —</div>
+                <div class="ed-derived" id="ed-id">id: (new)</div>
+              </div>
+            </div>
+
+            <div class="ed-sec">
+              <div class="ed-sec-h"><span>Defense</span></div>
+              <div class="ed-grid c4">
+                <div class="ed-fg"><label>AC</label><input id="ed-ac" type="number" oninput="syncEditor()"></div>
+                <div class="ed-fg"><label>AC text (optional)</label><input id="ed-acText" placeholder="e.g. 15 (natural)" oninput="syncEditor()"></div>
+                <div class="ed-fg"><label>HP</label><input id="ed-hp" type="number" oninput="syncEditor()"></div>
+                <div class="ed-fg"><label>HP formula</label><input id="ed-hpFormula" placeholder="e.g. 3d8+3" oninput="syncEditor()"></div>
+              </div>
+              <div class="ed-grid c5" style="margin-top:0.5rem">
+                <div class="ed-fg"><label>Walk (ft.)</label><input id="ed-spd-walk" type="number" oninput="syncEditor()"></div>
+                <div class="ed-fg"><label>Fly</label><input id="ed-spd-fly" type="number" oninput="syncEditor()"></div>
+                <div class="ed-fg"><label>Swim</label><input id="ed-spd-swim" type="number" oninput="syncEditor()"></div>
+                <div class="ed-fg"><label>Burrow</label><input id="ed-spd-burrow" type="number" oninput="syncEditor()"></div>
+                <div class="ed-fg"><label>Climb</label><input id="ed-spd-climb" type="number" oninput="syncEditor()"></div>
+              </div>
+              <div class="ed-grid c2" style="margin-top:0.5rem">
+                <div class="ed-fg"><label><input type="checkbox" id="ed-hover" onchange="syncEditor()"> Hover (adds "(hover)" to Fly)</label></div>
+                <div class="ed-fg"><label>Initiative bonus</label><input id="ed-initiative" type="number" oninput="syncEditor()"></div>
+              </div>
+            </div>
+
+            <div class="ed-sec">
+              <div class="ed-sec-h"><span>Abilities</span></div>
+              <div class="ed-abil" id="ed-abilities"></div>
+            </div>
+
+            <div class="ed-sec">
+              <div class="ed-sec-h"><span>Traits, defenses, senses</span></div>
+              <div class="ed-grid c2">
+                <div class="ed-fg"><label>Skills</label><input id="ed-skills" placeholder="Perception +5, Stealth +7" oninput="syncEditor()"></div>
+                <div class="ed-fg"><label>Senses</label><input id="ed-sensesText" placeholder="Darkvision 60 ft., Passive Perception 14" oninput="syncEditor()"></div>
+                <div class="ed-fg"><label>Languages</label><input id="ed-languagesText" placeholder="Common, Goblin" oninput="syncEditor()"></div>
+                <div class="ed-fg"><label>Resistances</label><input id="ed-resistances" placeholder="Fire, Cold" oninput="syncEditor()"></div>
+                <div class="ed-fg"><label>Damage Immunities</label><input id="ed-damageImmunities" placeholder="Poison" oninput="syncEditor()"></div>
+                <div class="ed-fg"><label>Condition Immunities</label><input id="ed-conditionImmunities" placeholder="Charmed, Frightened" oninput="syncEditor()"></div>
+                <div class="ed-fg"><label>Vulnerabilities</label><input id="ed-vulnerabilities" placeholder="Thunder" oninput="syncEditor()"></div>
+                <div class="ed-fg"><label>Gear</label><input id="ed-gear" placeholder="Greatsword, Plate Armor" oninput="syncEditor()"></div>
+              </div>
+            </div>
+
+            <div class="ed-sec" id="ed-feat-section-traits">
+              <div class="ed-sec-h"><span>Traits (<span id="ed-traits-n">0</span>)</span><button class="btn ghost sm" onclick="addFeature('traits')">+ Add trait</button></div>
+              <div class="ed-feat-list" id="ed-traits-list"></div>
+            </div>
+            <div class="ed-sec">
+              <div class="ed-sec-h"><span>Actions (<span id="ed-actions-n">0</span>)</span><button class="btn ghost sm" onclick="addFeature('actions')">+ Add action</button></div>
+              <div class="ed-feat-list" id="ed-actions-list"></div>
+            </div>
+            <div class="ed-sec">
+              <div class="ed-sec-h"><span>Bonus Actions (<span id="ed-bonusActions-n">0</span>)</span><button class="btn ghost sm" onclick="addFeature('bonusActions')">+ Add</button></div>
+              <div class="ed-feat-list" id="ed-bonusActions-list"></div>
+            </div>
+            <div class="ed-sec">
+              <div class="ed-sec-h"><span>Reactions (<span id="ed-reactions-n">0</span>)</span><button class="btn ghost sm" onclick="addFeature('reactions')">+ Add</button></div>
+              <div class="ed-feat-list" id="ed-reactions-list"></div>
+            </div>
+            <div class="ed-sec">
+              <div class="ed-sec-h"><span>Legendary Actions (<span id="ed-legendaryActions-n">0</span>)</span><button class="btn ghost sm" onclick="addFeature('legendaryActions')">+ Add</button></div>
+              <div class="ed-feat-list" id="ed-legendaryActions-list"></div>
+            </div>
+            <div class="ed-sec">
+              <div class="ed-sec-h"><span>Lair Effects (<span id="ed-lairEffects-n">0</span>)</span><button class="btn ghost sm" onclick="addFeature('lairEffects')">+ Add</button></div>
+              <div class="ed-feat-list" id="ed-lairEffects-list"></div>
+            </div>
+
+            <div class="ed-sec">
+              <div class="ed-sec-h"><span>Description / lore</span></div>
+              <div class="ed-fg"><textarea id="ed-description" rows="5" oninput="syncEditor()"></textarea></div>
+            </div>
+          </div>
+
+          <!-- LIVE PREVIEW -->
+          <div class="ed-preview-wrap">
+            <div class="col-head"><span>Live preview</span></div>
+            <div id="ed-preview"></div>
           </div>
         </div>
       </div>
@@ -232,6 +397,9 @@
     // bestiary: { schemaVersion, source, scrapedAt, normalizedAt, count, monsters:[...] }
     // tolerate either an envelope or a bare array
     let bestiary = { monsters: [] };
+    // bestiary_custom: bare array of monsters authored in the Editor. Stored
+    // under a separate KV key so re-imports of the source book never touch it.
+    let customMonsters = [];
     let seedData = null;
     let activeId = null;
 
@@ -257,6 +425,16 @@
       if (d && Array.isArray(d.monsters)) return d.monsters;
       return [];
     }
+    // The view across Browse / Analysis / lookups: imported bestiary + custom.
+    function allMonsters(){
+      return asMonsters(bestiary).concat(customMonsters.map(m => ({ ...m, _custom: true })));
+    }
+    function isCustomId(id){
+      return typeof id === 'string' && id.startsWith('custom-');
+    }
+    function findMonster(id){
+      return allMonsters().find(m => m.id === id);
+    }
 
     async function bootstrap(){
       const ident = Auth.identity();
@@ -264,11 +442,21 @@
       if (!Auth.requireRole('dm', { reason:'The Menagerie is for the DM only.' })) return;
       const stateEl = document.getElementById('state');
       try {
-        const r = await fetch(WORKER_URL + '?type=bestiary', { cache:'no-store', headers: Auth.dmHeaders() });
-        if (r.status === 401){ stateEl.textContent='Your DM session expired — sign in again on the home page.'; stateEl.classList.add('error'); return; }
+        const [r, rc] = await Promise.all([
+          fetch(WORKER_URL + '?type=bestiary',        { cache:'no-store', headers: Auth.dmHeaders() }),
+          fetch(WORKER_URL + '?type=bestiary_custom', { cache:'no-store', headers: Auth.dmHeaders() })
+        ]);
+        if (r.status === 401 || rc.status === 401){ stateEl.textContent='Your DM session expired — sign in again on the home page.'; stateEl.classList.add('error'); return; }
         if (!r.ok) throw new Error('HTTP '+r.status);
         const d = await r.json();
         bestiary = (d && typeof d === 'object') ? d : { monsters: [] };
+        // bestiary_custom endpoint is newer — tolerate a non-existent route by
+        // just leaving customMonsters as []. Worker still needs the new GET +
+        // DM_WRITE_TYPES entry to actually persist edits.
+        if (rc.ok){
+          const dc = await rc.json();
+          customMonsters = Array.isArray(dc) ? dc : (Array.isArray(dc?.monsters) ? dc.monsters : []);
+        }
       } catch(e){
         stateEl.textContent = 'Could not reach the worker. (If you just added the bestiary endpoint, redeploy the worker first.)';
         stateEl.classList.add('error');
@@ -279,13 +467,18 @@
       populateFilters();
       renderList();
       renderSource();
+      initEditor();
     }
 
     function renderSource(){
       const ms = asMonsters(bestiary);
       const src = bestiary && bestiary.source ? bestiary.source : '';
       const when = bestiary && bestiary.normalizedAt ? bestiary.normalizedAt.split('T')[0] : '';
-      document.getElementById('m-source').textContent = ms.length ? [src, when].filter(Boolean).join(' · ') : 'empty — import a file';
+      const parts = [];
+      if (ms.length) parts.push([src, when].filter(Boolean).join(' · '));
+      else parts.push('empty — import a file');
+      if (customMonsters.length) parts.push(`+ ${customMonsters.length} custom`);
+      document.getElementById('m-source').textContent = parts.join('  ');
     }
 
     function switchTab(name){
@@ -306,7 +499,7 @@
 
     /* ── Filters ── */
     function populateFilters(){
-      const ms = asMonsters(bestiary);
+      const ms = allMonsters();
       const types = Array.from(new Set(ms.map(m => m.type).filter(Boolean))).sort();
       const sizes = ['Tiny','Small','Medium','Large','Huge','Gargantuan'].filter(s => ms.some(m => m.size === s));
       const tSel = document.getElementById('m-type-filter');
@@ -331,7 +524,7 @@
 
     /* ── List ── */
     function renderList(){
-      const all = asMonsters(bestiary);
+      const all = allMonsters();
       const q = (document.getElementById('m-search').value || '').trim().toLowerCase();
       const typeF = document.getElementById('m-type-filter').value;
       const sizeF = document.getElementById('m-size-filter').value;
@@ -355,7 +548,7 @@
       }
       listEl.innerHTML = filtered.map(m => `
         <div class="row${m.id===activeId?' active':''}" onclick="selectMonster('${esc(m.id)}')">
-          <div class="nm">${esc(m.name)}<small>${esc(m.size||'')} ${esc(m.type||'')}</small></div>
+          <div class="nm">${esc(m.name)}${m._custom?'<span class="custom-chip">Custom</span>':''}<small>${esc(m.size||'')} ${esc(m.type||'')}</small></div>
           <span class="cr-chip ${crTier(m.cr)}">CR ${esc(m.crText || m.cr || '?')}</span>
         </div>
       `).join('');
@@ -364,7 +557,7 @@
     function selectMonster(id){
       activeId = id;
       renderList();
-      const m = asMonsters(bestiary).find(x => x.id === id);
+      const m = findMonster(id);
       if (!m){ document.getElementById('m-statblock').innerHTML = '<div class="empty-note">Not found.</div>'; return; }
       document.getElementById('sb-id').textContent = m.source || '';
       document.getElementById('m-statblock').innerHTML = renderStatblock(m);
@@ -643,7 +836,7 @@
     function pct(n, total){ return total ? Math.round(100 * n / total) : 0; }
 
     function runAnalysis(){
-      const ms = asMonsters(bestiary);
+      const ms = allMonsters();
       const status = document.getElementById('ana-status');
       if (!ms.length){
         document.getElementById('ana-summary').innerHTML = '<div class="empty-note">Nothing to analyze — import a bestiary first.</div>';
@@ -739,6 +932,388 @@
         </div>
       `).join('');
       document.getElementById('ana-damage-types').innerHTML = `<div class="ana-dmg">${html}</div>`;
+    }
+
+    /* ── Editor ──
+     * Lets the DM author homebrew monsters; saved under `bestiary_custom` so
+     * source-book re-imports never touch them. Live preview reuses the same
+     * renderStatblock() the Browse tab uses, so what you see is what saves.
+     */
+    const ABIL_KEYS = ['str','dex','con','int','wis','cha'];
+    const FEATURE_SECTIONS = ['traits','actions','bonusActions','reactions','legendaryActions','lairEffects'];
+    // Standard 2024 MM XP-by-CR table.
+    const XP_BY_CR = {
+      0:10, 0.125:25, 0.25:50, 0.5:100,
+      1:200, 2:450, 3:700, 4:1100, 5:1800,
+      6:2300, 7:2900, 8:3900, 9:5000, 10:5900,
+      11:7200, 12:8400, 13:10000, 14:11500, 15:13000,
+      16:15000, 17:18000, 18:20000, 19:22000, 20:25000,
+      21:33000, 22:41000, 23:50000, 24:62000, 25:75000,
+      26:90000, 27:105000, 28:120000, 29:135000, 30:155000
+    };
+    function pbForCR(cr){
+      const c = +cr;
+      if (c <= 4) return 2;
+      if (c <= 8) return 3;
+      if (c <= 12) return 4;
+      if (c <= 16) return 5;
+      if (c <= 20) return 6;
+      if (c <= 24) return 7;
+      if (c <= 28) return 8;
+      return 9;
+    }
+
+    let editingId = null;          // null = new, or id of an existing custom monster
+    let currentEdit = blankMonster();
+
+    function genId(){
+      return 'custom-' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+    }
+
+    function blankMonster(){
+      return {
+        id: '', name: '', size: 'Medium', type: '', subtype: '', alignment: '',
+        ac: null, acText: '', hp: null, hpFormula: '',
+        initiative: null, initiativeScore: null,
+        speed: { walk: 30 }, speedText: '',
+        abilities: Object.fromEntries(ABIL_KEYS.map(k => [k, { score: 10, mod: 0, save: 0 }])),
+        skills: {}, sensesText: '', senses: {},
+        languagesText: '', languages: [],
+        resistancesText: '', resistances: [],
+        immunitiesText: '', damageImmunities: [], conditionImmunities: [],
+        vulnerabilitiesText: '', vulnerabilities: [],
+        gear: [],
+        traits: [], actions: [], bonusActions: [], reactions: [],
+        legendaryActions: [], lairActions: [], lairEffects: [],
+        crText: '1', cr: 1, xp: XP_BY_CR[1], pb: pbForCR(1),
+        description: '',
+        source: 'custom'
+      };
+    }
+
+    function initEditor(){
+      // CR dropdown — same option set Browse uses, but selectable.
+      const cr = document.getElementById('ed-cr');
+      cr.innerHTML = CR_OPTIONS.map(([v,l]) => `<option value="${v}">CR ${l}</option>`).join('');
+      cr.value = '1';
+      // Abilities grid.
+      const ab = document.getElementById('ed-abilities');
+      ab.innerHTML = ABIL_KEYS.map(k => `
+        <div class="ab-cell">
+          <div class="lbl">${k.toUpperCase()}</div>
+          <input type="number" id="ed-ab-${k}" value="10" oninput="onAbilityChange('${k}')">
+          <div class="mod" id="ed-mod-${k}">+0</div>
+          <div class="save-row">SAVE <input type="number" id="ed-save-${k}" value="0" style="width:42px;text-align:center" oninput="syncEditor()"></div>
+        </div>
+      `).join('');
+      newCustom();
+      renderChips();
+    }
+
+    function onAbilityChange(k){
+      // Keep mod display + auto-bump save when the user hasn't deviated from prior mod.
+      const score = parseInt(document.getElementById('ed-ab-'+k).value || '10', 10);
+      const newMod = Math.floor((score - 10) / 2);
+      const prevMod = currentEdit.abilities[k]?.mod ?? 0;
+      const saveEl = document.getElementById('ed-save-'+k);
+      const prevSave = parseInt(saveEl.value || '0', 10);
+      if (prevSave === prevMod) saveEl.value = String(newMod);
+      document.getElementById('ed-mod-'+k).textContent = (newMod>=0?'+':'') + newMod;
+      syncEditor();
+    }
+
+    function syncEditor(){
+      // Read every form field into currentEdit, refresh derived bits, re-render preview.
+      const $ = id => document.getElementById(id);
+      const numOrNull = v => { const n = parseInt(v,10); return isFinite(n) ? n : null; };
+      const splitCsv = s => (s||'').split(',').map(x => x.trim()).filter(Boolean);
+
+      const crStr = $('ed-cr').value || '1';
+      const cr = parseFloat(crStr);
+      const crText = ({'0.125':'1/8','0.25':'1/4','0.5':'1/2'})[crStr] || crStr;
+
+      currentEdit.name = $('ed-name').value.trim();
+      currentEdit.size = $('ed-size').value;
+      currentEdit.type = $('ed-type').value.trim();
+      currentEdit.subtype = $('ed-subtype').value.trim();
+      currentEdit.alignment = $('ed-alignment').value.trim();
+      currentEdit.cr = cr;
+      currentEdit.crText = crText;
+      currentEdit.xp = XP_BY_CR[cr] ?? 0;
+      currentEdit.pb = pbForCR(cr);
+
+      currentEdit.ac = numOrNull($('ed-ac').value);
+      currentEdit.acText = $('ed-acText').value.trim() || (currentEdit.ac != null ? 'AC ' + currentEdit.ac : '');
+      currentEdit.hp = numOrNull($('ed-hp').value);
+      currentEdit.hpFormula = $('ed-hpFormula').value.trim();
+      currentEdit.initiative = numOrNull($('ed-initiative').value);
+
+      const sp = {};
+      for (const k of ['walk','fly','swim','burrow','climb']){
+        const v = numOrNull($('ed-spd-'+k).value);
+        if (v != null) sp[k] = v;
+      }
+      const hover = $('ed-hover').checked;
+      if (hover && sp.fly != null) sp.hover = true;
+      currentEdit.speed = sp;
+      // Reconstruct speedText so the preview renderer (which prefers speedText) shows it.
+      const speedBits = [];
+      if (sp.walk != null) speedBits.push(`${sp.walk} ft.`);
+      for (const k of ['fly','swim','burrow','climb']){
+        if (sp[k] != null) speedBits.push(`${k[0].toUpperCase()+k.slice(1)} ${sp[k]} ft.${(k==='fly' && hover)?' (hover)':''}`);
+      }
+      currentEdit.speedText = speedBits.join(', ');
+
+      for (const k of ABIL_KEYS){
+        const score = parseInt($('ed-ab-'+k).value || '10', 10);
+        const mod = Math.floor((score - 10) / 2);
+        const save = parseInt($('ed-save-'+k).value || '0', 10);
+        currentEdit.abilities[k] = { score, mod, save };
+      }
+
+      currentEdit.sensesText = $('ed-sensesText').value.trim();
+      currentEdit.languagesText = $('ed-languagesText').value.trim();
+      currentEdit.languages = splitCsv($('ed-languagesText').value);
+      currentEdit.resistancesText = $('ed-resistances').value.trim();
+      currentEdit.resistances = splitCsv($('ed-resistances').value);
+      currentEdit.damageImmunities = splitCsv($('ed-damageImmunities').value);
+      currentEdit.conditionImmunities = splitCsv($('ed-conditionImmunities').value);
+      currentEdit.immunitiesText = [
+        currentEdit.damageImmunities.join(', '),
+        currentEdit.conditionImmunities.join(', ')
+      ].filter(Boolean).join('; ');
+      currentEdit.vulnerabilitiesText = $('ed-vulnerabilities').value.trim();
+      currentEdit.vulnerabilities = splitCsv($('ed-vulnerabilities').value);
+      currentEdit.gear = splitCsv($('ed-gear').value);
+
+      // Skills: parse "Perception +5, Stealth +7" → { Perception:5, Stealth:7 }
+      currentEdit.skills = {};
+      for (const tok of splitCsv($('ed-skills').value)){
+        const m = tok.match(/^(.+?)\s+([+\-]?\d+)$/);
+        if (m) currentEdit.skills[m[1]] = parseInt(m[2], 10);
+      }
+
+      currentEdit.description = $('ed-description').value;
+
+      // Update derived UI bits.
+      $('ed-xp').textContent = 'XP: ' + (currentEdit.xp ? currentEdit.xp.toLocaleString() : '—');
+      $('ed-pb').textContent = 'PB: +' + currentEdit.pb;
+      $('ed-id').textContent = 'id: ' + (editingId || '(new)');
+      $('ed-title').textContent = currentEdit.name || 'New monster';
+      for (const sec of FEATURE_SECTIONS) $(`ed-${sec}-n`).textContent = String((currentEdit[sec]||[]).length);
+
+      renderPreview();
+    }
+
+    function renderPreview(){
+      document.getElementById('ed-preview').innerHTML = renderStatblock(currentEdit);
+    }
+
+    function loadFormFromEdit(){
+      // Reverse of syncEditor: paint currentEdit's values into the form fields.
+      const $ = id => document.getElementById(id);
+      const m = currentEdit;
+      $('ed-name').value = m.name || '';
+      $('ed-size').value = m.size || 'Medium';
+      $('ed-type').value = m.type || '';
+      $('ed-subtype').value = m.subtype || '';
+      $('ed-alignment').value = m.alignment || '';
+      $('ed-cr').value = String(m.cr ?? 1);
+      $('ed-ac').value = m.ac ?? '';
+      $('ed-acText').value = m.acText || '';
+      $('ed-hp').value = m.hp ?? '';
+      $('ed-hpFormula').value = m.hpFormula || '';
+      $('ed-initiative').value = m.initiative ?? '';
+      const sp = m.speed || {};
+      for (const k of ['walk','fly','swim','burrow','climb']) $('ed-spd-'+k).value = sp[k] ?? '';
+      $('ed-hover').checked = !!sp.hover;
+      for (const k of ABIL_KEYS){
+        const a = (m.abilities && m.abilities[k]) || { score:10, mod:0, save:0 };
+        $('ed-ab-'+k).value = a.score ?? 10;
+        $('ed-save-'+k).value = a.save ?? a.mod ?? 0;
+        $('ed-mod-'+k).textContent = ((a.mod ?? 0)>=0?'+':'') + (a.mod ?? 0);
+      }
+      const skills = m.skills || {};
+      $('ed-skills').value = Object.entries(skills).map(([k,v]) => `${k} ${v>=0?'+':''}${v}`).join(', ');
+      $('ed-sensesText').value = m.sensesText || '';
+      $('ed-languagesText').value = m.languagesText || (m.languages||[]).join(', ');
+      $('ed-resistances').value = (m.resistances||[]).join(', ') || m.resistancesText || '';
+      $('ed-damageImmunities').value = (m.damageImmunities||[]).join(', ');
+      $('ed-conditionImmunities').value = (m.conditionImmunities||[]).join(', ');
+      $('ed-vulnerabilities').value = (m.vulnerabilities||[]).join(', ') || m.vulnerabilitiesText || '';
+      $('ed-gear').value = (m.gear||[]).join(', ');
+      $('ed-description').value = m.description || '';
+      for (const sec of FEATURE_SECTIONS) renderFeatureList(sec);
+      $('ed-del-btn').style.display = editingId ? '' : 'none';
+      $('ed-dup-btn').style.display = editingId ? '' : 'none';
+    }
+
+    function renderFeatureList(section){
+      const list = document.getElementById('ed-'+section+'-list');
+      const items = currentEdit[section] || [];
+      if (!items.length){
+        list.innerHTML = `<div class="ed-empty">No ${section.replace(/([A-Z])/g,' $1').toLowerCase()} yet.</div>`;
+        return;
+      }
+      list.innerHTML = items.map((f, i) => `
+        <div class="ed-feat">
+          <div class="ed-feat-top">
+            <input value="${esc(f.name||'')}" placeholder="Feature name" oninput="updateFeature('${section}',${i},'name',this.value)">
+            <div class="ed-feat-actions">
+              <button class="btn ghost sm" onclick="moveFeature('${section}',${i},-1)" ${i===0?'disabled':''}>↑</button>
+              <button class="btn ghost sm" onclick="moveFeature('${section}',${i},1)" ${i===items.length-1?'disabled':''}>↓</button>
+              <button class="btn danger sm" onclick="removeFeature('${section}',${i})">×</button>
+            </div>
+          </div>
+          <textarea oninput="updateFeature('${section}',${i},'body',this.value)" placeholder="Body text — describe the trait or action.">${esc(f.body||'')}</textarea>
+        </div>
+      `).join('');
+    }
+
+    function addFeature(section){
+      if (!Array.isArray(currentEdit[section])) currentEdit[section] = [];
+      currentEdit[section].push({ name: '', body: '' });
+      renderFeatureList(section);
+      syncEditor();
+    }
+    function removeFeature(section, idx){
+      currentEdit[section].splice(idx, 1);
+      renderFeatureList(section);
+      syncEditor();
+    }
+    function moveFeature(section, idx, delta){
+      const list = currentEdit[section];
+      const j = idx + delta;
+      if (j < 0 || j >= list.length) return;
+      [list[idx], list[j]] = [list[j], list[idx]];
+      renderFeatureList(section);
+      syncEditor();
+    }
+    function updateFeature(section, idx, field, val){
+      const f = currentEdit[section][idx];
+      if (!f) return;
+      f[field] = val;
+      // No re-render of the list (would steal focus); preview-only update.
+      renderPreview();
+    }
+
+    function renderChips(){
+      const list = document.getElementById('ed-chips-list');
+      document.getElementById('ed-count').textContent = customMonsters.length;
+      if (!customMonsters.length){
+        list.innerHTML = '<span class="lbl" style="font-style:italic">none yet — click "+ New" to start</span>';
+        return;
+      }
+      list.innerHTML = customMonsters.map(m =>
+        `<span class="ed-chip${m.id===editingId?' active':''}" onclick="loadCustom('${esc(m.id)}')">${esc(m.name||'(unnamed)')} <small>CR ${esc(m.crText||m.cr||'?')}</small></span>`
+      ).join(' ');
+    }
+
+    function newCustom(){
+      editingId = null;
+      currentEdit = blankMonster();
+      loadFormFromEdit();
+      syncEditor();
+      renderChips();
+    }
+
+    function loadCustom(id){
+      const found = customMonsters.find(m => m.id === id);
+      if (!found) return;
+      editingId = id;
+      // Deep clone so edits don't mutate the saved version until Save.
+      currentEdit = JSON.parse(JSON.stringify(found));
+      loadFormFromEdit();
+      syncEditor();
+      renderChips();
+    }
+
+    async function saveCustom(){
+      // Persist currentEdit. New monsters get an id stamped here.
+      if (!currentEdit.name.trim()){
+        toast('Give the monster a name first.', true);
+        document.getElementById('ed-name').focus();
+        return;
+      }
+      const btn = document.getElementById('ed-save-btn');
+      btn.disabled = true;
+      const original = btn.textContent;
+      btn.textContent = 'Saving…';
+      const next = customMonsters.slice();
+      const toSave = JSON.parse(JSON.stringify(currentEdit));
+      if (editingId){
+        const i = next.findIndex(m => m.id === editingId);
+        toSave.id = editingId;
+        if (i >= 0) next[i] = toSave; else next.push(toSave);
+      } else {
+        toSave.id = genId();
+        next.push(toSave);
+      }
+      const ok = await saveKey('bestiary_custom', next);
+      btn.disabled = false;
+      btn.textContent = original;
+      if (!ok) return;
+      customMonsters = next;
+      editingId = toSave.id;
+      currentEdit = JSON.parse(JSON.stringify(toSave));
+      // Keep filter/source/list in sync with the new custom monster.
+      populateFilters();
+      renderList();
+      renderSource();
+      renderChips();
+      loadFormFromEdit();
+      syncEditor();
+      toast('Saved.');
+    }
+
+    async function deleteCustom(){
+      if (!editingId) return;
+      const m = customMonsters.find(x => x.id === editingId);
+      if (!m) return;
+      if (!confirm(`Delete custom monster "${m.name}"? This can't be undone.`)) return;
+      const next = customMonsters.filter(x => x.id !== editingId);
+      const ok = await saveKey('bestiary_custom', next);
+      if (!ok) return;
+      customMonsters = next;
+      populateFilters();
+      renderList();
+      renderSource();
+      newCustom();
+      toast('Deleted.');
+    }
+
+    function duplicateCustom(){
+      if (!editingId) return;
+      editingId = null;
+      currentEdit.id = '';
+      currentEdit.name = (currentEdit.name || 'Monster') + ' (copy)';
+      loadFormFromEdit();
+      syncEditor();
+      renderChips();
+      toast('Duplicate ready — Save to persist.');
+    }
+
+    /* Fill defense/attack from the Analysis CR-median cohort. */
+    function fillFromCRMedian(){
+      // Compute synchronously if needed — runAnalysis() defers via setTimeout
+      // for UI responsiveness, but computeAnalysis itself is sync and fast.
+      if (!window.__anaCache) window.__anaCache = computeAnalysis(allMonsters());
+      const cache = window.__anaCache;
+      if (!cache) { toast('Analysis not ready yet — try again in a moment.', true); return; }
+      const row = cache.crRows.find(r => r.cr === currentEdit.cr);
+      if (!row || row.n === 0){ toast(`No CR ${currentEdit.crText} cohort in the bestiary to learn from.`, true); return; }
+      const $ = id => document.getElementById(id);
+      // Only fill empties — don't trample anything the user already typed.
+      let touched = 0;
+      const setIf = (sel, val) => { const el = $(sel); if (!el.value && val != null){ el.value = Math.round(val); touched++; } };
+      setIf('ed-ac', row.acMed);
+      setIf('ed-hp', row.hpMed);
+      // Save DC isn't a single form field; report it for reference in a toast.
+      const atkBlurb = row.atkMed != null ? `atk +${Math.round(row.atkMed)}` : '';
+      const dmgBlurb = row.dmgMed != null ? `dmg ${Math.round(row.dmgMed)}` : '';
+      const dcBlurb  = row.dcMed  != null ? `DC ${Math.round(row.dcMed)}` : '';
+      syncEditor();
+      toast(`Filled CR ${currentEdit.crText} medians (n=${row.n}). Suggested: ${[atkBlurb,dmgBlurb,dcBlurb].filter(Boolean).join(', ')}.`);
     }
 
     async function saveKey(type, payload){
