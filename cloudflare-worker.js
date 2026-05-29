@@ -463,6 +463,16 @@ export default {
         });
       }
 
+      // DM-only: full bestiary (monsters scraped + normalized from source books).
+      // Copyrighted content — never served to players. The list-shape ({monsters,...})
+      // is whatever the DM imported; consumers should tolerate either an envelope
+      // or a bare array.
+      if (type === 'bestiary') {
+        const auth = await verifyDMAuth(request, env);
+        if (!auth.ok) return json({ error: 'DM auth required' }, 401);
+        return json(await kvGet(env, 'bestiary', { monsters: [] }));
+      }
+
       // DM-only: everything the apothecary editor needs in one shot.
       if (type === 'potion_data_dm') {
         const auth = await verifyDMAuth(request, env);
@@ -630,7 +640,7 @@ export default {
     }
 
     // ── DM-only writes ────────────────────────────────────────
-    const DM_WRITE_TYPES = ['initiative_state','map_data','map_data_dm','characters','journals','npcs','timeline','potion_ingredients','potions','negative_potions','potion_inventories','potion_recipes','potion_library'];
+    const DM_WRITE_TYPES = ['initiative_state','map_data','map_data_dm','characters','journals','npcs','timeline','potion_ingredients','potions','negative_potions','potion_inventories','potion_recipes','potion_library','bestiary'];
     if (DM_WRITE_TYPES.includes(body?.type)) {
       const auth = await verifyDMAuth(request, env);
       if (!auth.ok) return json({ error: 'DM auth required' }, 401);

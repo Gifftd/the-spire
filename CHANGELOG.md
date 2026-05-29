@@ -7,7 +7,58 @@ Dates are YYYY-MM-DD.
 
 ---
 
-## [Unreleased] — 2026-05-28
+## [Unreleased] — 2026-05-29
+
+### The Menagerie — DM bestiary, KV-backed
+
+First slice of the monster-tracker effort. A new DM-only tool that ingests a
+normalized bestiary (output of the new `scripts/normalize_bestiary.py`), stores
+it under a `bestiary` KV key, and presents a 5e-style stat block browser with
+search and CR/type/size filters. Followups (analysis tab, WYSIWYG editor,
+random generator, "add to encounter" wiring into the War Table) build on this
+foundation.
+
+#### Added — `cloudflare-worker.js`
+- New **GET `type=bestiary`** endpoint, DM-gated. Returns the stored bestiary
+  envelope (or `{monsters:[]}` when empty). The data is from copyrighted source
+  books and is never served to players directly.
+- `'bestiary'` added to `DM_WRITE_TYPES` so DM POSTs save into KV.
+- **Requires a manual worker redeploy** to take effect.
+
+#### Added — `bestiary-dm.html` (new)
+- **Browse** tab: filterable monster list (name search · type · size · CR-min ·
+  CR-max), sorted by CR then name. Selecting a row renders a full stat block:
+  header line, AC/HP/Speed/Initiative, ability grid with saves, skills,
+  resistances / damage immunities / condition immunities / vulnerabilities,
+  senses, languages, CR · XP · PB, gear, traits, actions, bonus actions,
+  reactions, legendary actions, lair actions, and the source description.
+- **Import** tab: pick a `bestiary.json` file → preview the monster count →
+  push the whole envelope into the `bestiary` KV key. Tolerates either an
+  envelope (`{monsters:[...]}`) or a bare array.
+- Tolerant of incomplete fields (missing skills/senses/etc. degrade quietly).
+
+#### Added — `scripts/normalize_bestiary.py` (new)
+- One-shot normalizer that converts a raw DDB bestiary scrape (e.g.
+  `mm2024.json`) into the canonical schema. Additive — every original field is
+  preserved; structured siblings are added next to them. Re-runnable.
+- Repairs 63 "Medium or Small Humanoid"-style scrape artifacts: `size` keeps the
+  primary; `sizes` carries the list; `type` is the cleaned type word; `types`
+  is the list (so dual-type entries like *Celestial or Fiend* parse cleanly).
+- Splits the unparsed `resistancesText` / `immunitiesText` / `vulnerabilitiesText`
+  strings into structured arrays (`resistances`, `damageImmunities`,
+  `conditionImmunities`, `vulnerabilities`), keeping parentheticals attached
+  (e.g. `"Charmed (with Mind Blank)"`).
+- Stamps `schemaVersion: 1` and a `normalizedAt` timestamp on the output.
+
+#### Added — `home.html`
+- New DM tool card **The Menagerie** pointing at `bestiary-dm.html`, with a
+  small "wild beast head" SVG icon to match the slate-and-brass card style.
+
+#### Added — `.gitignore`
+- Added `mm2024.json`, `mm-*.json`, `bestiary.json`, `bestiary-*.json` to the
+  third-party-content block. The repo is public — book scrapes and the
+  normalized bestiary stay local; the data only ever leaves your machine to
+  reach your own worker's KV.
 
 ### Apply affinity tags from file — bulk-tag ingredients
 
