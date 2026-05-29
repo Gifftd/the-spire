@@ -1,0 +1,170 @@
+#!/usr/bin/env python3
+"""
+Normalize a raw DDB bestiary scrape into the project's canonical schema.
+
+Input  (default): ./mm2024.json   — output of the Chrome-side scraper
+Output (default): ./bestiary.json — what the DM will Import into KV
+
+The normalizer is additive: every raw field is preserved, structured siblings
+are added next to them. Re-runnable.
+
+Usage:
+    python3 scripts/normalize_bestiary.py
+    python3 scripts/normalize_bestiary.py mm2024.json bestiary.json
+"""
+
+import datetime
+import json
+import re
+import sys
+from pathlib import Path
+
+SCHEMA_VERSION = 1
+
+SIZE_WORDS = {"Tiny", "Small", "Medium", "Large", "Huge", "Gargantuan"}
+
+
+def split_csv(text: str) -> list[str]:
+    """Split a comma list, trim, drop empties. Parentheticals stay attached."""
+    if not text:
+        return []
+    # Don't split commas inside parentheses.
+    out, buf, depth = [], [], 0
+    for ch in text:
+        if ch == "(":
+            depth += 1
+            buf.append(ch)
+        elif ch == ")":
+            depth = max(0, depth - 1)
+            buf.append(ch)
+        elif ch == "," and depth == 0:
+            piece = "".join(buf).strip()
+            if piece:
+                out.append(piece)
+            buf = []
+        else:
+            buf.append(ch)
+    tail = "".join(buf).strip()
+    if tail:
+        out.append(tail)
+    return out
+
+
+def parse_immunities(text: str) -> tuple[list[str], list[str]]:
+    """
+    DDB packs damage immunities and condition immunities into one string,
+    separated by ';'. Example:
+        "Poison, Thunder; Exhaustion, Grappled, Paralyzed"
+    Either half can be absent.
+    """
+    if not text:
+        return [], []
+    parts = text.split(";", 1)
+    damage = split_csv(parts[0]) if len(parts) >= 1 else []
+    cond = split_csv(parts[1]) if len(parts) == 2 else []
+    return damage, cond
+
+
+def normalize_size_and_type(m: dict) -> tuple[str, list[str], str, list[str]]:
+    """
+    Repair the 'Medium or Small Humanoid' parse artifact.
+
+    DDB headers like "Medium or Small Humanoid" got split as
+    size="Medium", type="or Small Humanoid". When that pattern is detected,
+    we strip the prefix and produce a sizes list.
+
+    Also splits dual-types like "Celestial or Fiend" into a types list.
+
+    Returns (primarySize, sizes, primaryType, types).
+    """
+    size = m.get("size", "") or ""
+    typ = (m.get("type", "") or "").strip()
+    sizes = [size] if size else []
+
+    # 'or Small Humanoid' / 'or Gargantuan Undead' / 'or Large Dragon'
+    mo = re.match(r"^or\s+(Tiny|Small|Medium|Large|Huge|Gargantuan)\s+(.+)$", typ)
+    if mo:
+        sizes.append(mo.group(1))
+        typ = mo.group(2).strip()
+
+    # 'Celestial or Fiend' (dual type, single size)
+    if " or " in typ:
+        parts = [p.strip() for p in typ.split(" or ") if p.strip()]
+        # Don't fragment "Swarm of Tiny Beasts" — those have no ' or '.
+        types = parts
+        primary_type = parts[0]
+    else:
+        types = [typ] if typ else []
+        primary_type = typ
+
+    # Dedupe while preserving order.
+    sizes = list(dict.fromkeys(sizes))
+    types = list(dict.fromkeys(types))
+
+    return size, sizes, primary_type, types
+
+
+def normalize_monster(m: dict) -> dict:
+    out = dict(m)  # preserve every original field
+
+    size, sizes, typ, types = normalize_size_and_type(m)
+    out["size"] = size
+    out["sizes"] = sizes
+    out["type"] = typ
+    out["types"] = types
+
+    out["resistances"] = split_csv(m.get("resistancesText", ""))
+    out["vulnerabilities"] = split_csv(m.get("vulnerabilitiesText", ""))
+    dmg_imm, cond_imm = parse_immunities(m.get("immunitiesText", ""))
+    out["damageImmunities"] = dmg_imm
+    out["conditionImmunities"] = cond_imm
+
+    return out
+
+
+def normalize(raw: dict) -> dict:
+    monsters = [normalize_monster(m) for m in raw.get("monsters", [])]
+    return {
+        "schemaVersion": SCHEMA_VERSION,
+        "source": raw.get("source"),
+        "scrapedAt": raw.get("scrapedAt"),
+        "normalizedAt": datetime.datetime.now(datetime.timezone.utc)
+        .strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "count": len(monsters),
+        "monsters": monsters,
+    }
+
+
+def main() -> int:
+    here = Path(__file__).resolve().parent.parent
+    in_path = Path(sys.argv[1]) if len(sys.argv) > 1 else here / "mm2024.json"
+    out_path = Path(sys.argv[2]) if len(sys.argv) > 2 else here / "bestiary.json"
+
+    if not in_path.exists():
+        print(f"input not found: {in_path}", file=sys.stderr)
+        return 1
+
+    raw = json.loads(in_path.read_text(encoding="utf-8"))
+    norm = normalize(raw)
+    out_path.write_text(
+        json.dumps(norm, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    # Summary so the user can spot-check at a glance.
+    ms = norm["monsters"]
+    fixed_type = sum(1 for m in ms if m.get("sizes") and len(m["sizes"]) > 1)
+    with_res = sum(1 for m in ms if m["resistances"])
+    with_dmg_imm = sum(1 for m in ms if m["damageImmunities"])
+    with_cond_imm = sum(1 for m in ms if m["conditionImmunities"])
+    with_vuln = sum(1 for m in ms if m["vulnerabilities"])
+    print(f"wrote {out_path} ({len(ms)} monsters, schemaVersion={SCHEMA_VERSION})")
+    print(f"  size/type repairs:       {fixed_type}")
+    print(f"  with damage resistances: {with_res}")
+    print(f"  with damage immunities:  {with_dmg_imm}")
+    print(f"  with condition immune:   {with_cond_imm}")
+    print(f"  with vulnerabilities:    {with_vuln}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

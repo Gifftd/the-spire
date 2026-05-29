@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Spire — The Menagerie (DM)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#080c10;--panel:#131c22;--panel-deep:#0d141a;--panel-light:#1c2730;
+      --border:#2c4048;--border-light:#3e5862;
+      --teal:#4a9595;--teal-bright:#7ec5c5;--teal-deep:#2a5454;--teal-faint:#1b3838;
+      --ink:#dde3e5;--ink-light:#a3adb3;--ink-faint:#6c787f;
+      --brass:#b88a5a;--brass-bright:#d8b888;--rust:#a85d4a;
+      --radius:4px;
+    }
+    body{background:var(--bg);background-image:radial-gradient(ellipse at 20% 10%, rgba(184,138,90,0.08) 0%, transparent 55%),radial-gradient(ellipse at 80% 90%, rgba(74,149,149,0.06) 0%, transparent 55%);min-height:100vh;color:var(--ink);font-family:'Crimson Text',Georgia,serif;padding:1.5rem 1rem 4rem}
+    .wrap{max-width:1180px;margin:0 auto}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding-bottom:1rem;margin-bottom:1.25rem;border-bottom:1px solid var(--border);flex-wrap:wrap}
+    .topbar h1{font-family:'Cinzel',serif;font-size:1.4rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--ink)}
+    .topbar h1 .accent{color:var(--brass-bright);font-weight:400}
+    .topbar-meta{display:flex;align-items:center;gap:8px;font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-faint)}
+    .role.dm{padding:2px 8px;border-radius:10px;border:1px solid rgba(184,138,90,0.45);background:rgba(184,138,90,0.10);color:var(--brass);font-size:0.55rem}
+    .home-link{font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-light);text-decoration:none;padding:6px 12px;border:1px solid var(--border-light);border-radius:var(--radius)}
+    .home-link:hover{border-color:var(--brass);color:var(--brass-bright)}
+
+    .tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:1.25rem;border-bottom:1px solid var(--border)}
+    .tab{font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-light);background:none;border:none;border-bottom:2px solid transparent;padding:9px 15px;cursor:pointer}
+    .tab:hover{color:var(--brass-bright)}
+    .tab.active{color:var(--brass-bright);border-bottom-color:var(--brass)}
+
+    .layout{display:grid;grid-template-columns:minmax(280px,1fr) minmax(0,1.5fr);gap:1.25rem;align-items:start}
+    @media (max-width:900px){.layout{grid-template-columns:1fr}}
+    .col-head{font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--brass);margin-bottom:0.6rem;display:flex;justify-content:space-between;align-items:center}
+
+    .toolbar{display:flex;gap:6px;margin-bottom:0.6rem;flex-wrap:wrap}
+    input,select,textarea{background:var(--panel-deep);border:1px solid var(--border);border-radius:2px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.95rem;padding:7px 10px;outline:none}
+    input:focus,select:focus,textarea:focus{border-color:var(--teal)}
+    .toolbar input{flex:1;min-width:140px}
+    .toolbar select{min-width:90px}
+
+    .list{max-height:640px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--panel-deep)}
+    .row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer}
+    .row:last-child{border-bottom:none}
+    .row:hover{background:var(--panel-light)}
+    .row.active{background:var(--teal-faint)}
+    .row .nm{flex:1;font-size:0.95rem;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .row .nm small{display:block;font-family:'Cinzel',serif;font-size:0.55rem;color:var(--ink-faint);letter-spacing:0.06em;text-transform:uppercase;margin-top:1px}
+    .cr-chip{font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.08em;text-transform:uppercase;padding:2px 7px;border-radius:8px;border:1px solid var(--border-light);color:var(--ink-light);white-space:nowrap}
+    .cr-chip.t-low{color:var(--ink-light);border-color:var(--border-light)}
+    .cr-chip.t-mid{color:var(--teal-bright);border-color:var(--teal)}
+    .cr-chip.t-high{color:var(--brass-bright);border-color:var(--brass)}
+    .cr-chip.t-epic{color:#e3a08e;border-color:var(--rust)}
+
+    .btn{font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;padding:9px 16px;border-radius:var(--radius);border:1px solid var(--teal);background:var(--teal-deep);color:#eafafa;cursor:pointer;transition:all 0.15s}
+    .btn:hover{background:var(--teal)}
+    .btn:disabled{opacity:0.4;cursor:not-allowed}
+    .btn.brass{border-color:var(--brass);background:rgba(184,138,90,0.18);color:var(--brass-bright)}
+    .btn.brass:hover{background:rgba(184,138,90,0.32)}
+    .btn.ghost{background:none;border-color:var(--border-light);color:var(--ink-light)}
+    .btn.ghost:hover{border-color:var(--teal);color:var(--teal-bright)}
+    .btn.sm{padding:4px 10px;font-size:0.6rem}
+
+    .empty-note{padding:1.5rem 1rem;text-align:center;color:var(--ink-faint);font-style:italic;font-size:0.92rem}
+    .hint{font-size:0.9rem;color:var(--ink-faint);font-style:italic;line-height:1.5;margin-bottom:0.8rem}
+    .warn{border:1px solid rgba(168,93,74,0.5);background:rgba(168,93,74,0.08);border-radius:var(--radius);padding:0.8rem 0.9rem;color:#e3a08e;font-size:0.92rem;line-height:1.5;margin-bottom:0.9rem}
+
+    /* Stat block */
+    .statblock{background:var(--panel);border:1px solid var(--border);border-top:3px solid var(--brass);border-radius:var(--radius);padding:1.1rem 1.2rem;font-size:0.95rem;line-height:1.5}
+    .statblock h2{font-family:'Cinzel',serif;font-size:1.25rem;font-weight:700;letter-spacing:0.06em;color:var(--brass-bright);margin-bottom:0.15rem}
+    .statblock .sub-line{font-style:italic;color:var(--ink-light);font-size:0.92rem;margin-bottom:0.7rem}
+    .statblock .divider{height:1px;background:var(--brass);opacity:0.5;margin:0.7rem 0}
+    .sb-kv{display:flex;flex-wrap:wrap;gap:0.4rem 1.2rem;font-size:0.93rem}
+    .sb-kv > div{min-width:0}
+    .sb-kv b{font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--brass);margin-right:0.3rem;font-weight:600}
+    .abilities{display:grid;grid-template-columns:repeat(6,1fr);gap:0.4rem;text-align:center;margin:0.4rem 0}
+    .ab{background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius);padding:0.4rem 0.2rem}
+    .ab .lbl{font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--brass);margin-bottom:0.15rem}
+    .ab .score{font-family:'Cinzel',serif;font-size:1.05rem;color:var(--ink)}
+    .ab .mod{font-size:0.85rem;color:var(--ink-light)}
+    .ab .save{display:block;font-size:0.7rem;color:var(--teal-bright);margin-top:1px}
+    .sb-section h4{font-family:'Cinzel',serif;font-size:0.78rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--brass);margin:0.6rem 0 0.3rem;padding-bottom:0.2rem;border-bottom:1px solid var(--border)}
+    .feature{margin-bottom:0.5rem}
+    .feature b{color:var(--brass-bright);font-style:italic;font-weight:600}
+    .desc{margin-top:0.8rem;padding-top:0.7rem;border-top:1px dashed var(--border);color:var(--ink-light);font-size:0.92rem;white-space:pre-wrap}
+
+    /* Import */
+    .form{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;max-width:680px}
+    .form h3{font-family:'Cinzel',serif;font-size:0.78rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--brass-bright);margin-bottom:0.8rem}
+    .fg{margin-bottom:0.7rem;display:flex;flex-direction:column;gap:4px}
+    .fg label{font-family:'Cinzel',serif;font-size:0.56rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint)}
+    .form-actions{display:flex;gap:8px;margin-top:0.8rem;flex-wrap:wrap}
+
+    .state{text-align:center;padding:3rem 1rem;color:var(--ink-faint);font-style:italic}
+    .state.error{color:var(--rust)}
+    .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel-light);border:1px solid var(--teal);border-radius:var(--radius);padding:10px 18px;color:var(--ink);font-size:0.9rem;box-shadow:0 4px 16px rgba(0,0,0,0.5);opacity:0;transition:opacity 0.2s;pointer-events:none;z-index:50}
+    .toast.show{opacity:1}
+    .toast.err{border-color:var(--rust);color:#e3a08e}
+
+    .footer{margin-top:2rem;text-align:center;padding-top:1.5rem;border-top:1px solid var(--border)}
+    .footer-text{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--ink-faint)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <h1>The <span class="accent">Menagerie</span></h1>
+      <div class="topbar-meta">
+        <span id="role-line">— loading —</span>
+        <a href="home.html" class="home-link">⌂ Home</a>
+      </div>
+    </div>
+
+    <div id="state" class="state">Opening the bestiary…</div>
+
+    <div id="tool" style="display:none">
+      <div class="tabs">
+        <button class="tab active" data-tab="browse" onclick="switchTab('browse')">Browse</button>
+        <button class="tab" data-tab="import" onclick="switchTab('import')">Import</button>
+      </div>
+
+      <!-- BROWSE -->
+      <div class="tab-panel" id="panel-browse">
+        <div class="layout">
+          <div>
+            <div class="col-head">
+              <span>Monsters (<span id="m-count">0</span>)</span>
+              <span id="m-source" style="font-size:0.55rem;color:var(--ink-faint);letter-spacing:0.12em">—</span>
+            </div>
+            <div class="toolbar">
+              <input type="text" id="m-search" placeholder="Search name…" oninput="renderList()">
+              <select id="m-type-filter" onchange="renderList()"><option value="">All types</option></select>
+              <select id="m-size-filter" onchange="renderList()"><option value="">All sizes</option></select>
+            </div>
+            <div class="toolbar">
+              <select id="m-cr-min" onchange="renderList()"><option value="">CR ≥ any</option></select>
+              <select id="m-cr-max" onchange="renderList()"><option value="">CR ≤ any</option></select>
+              <button class="btn ghost sm" onclick="clearFilters()">Clear</button>
+            </div>
+            <div class="list" id="m-list"></div>
+          </div>
+          <div>
+            <div class="col-head"><span>Stat block</span><span id="sb-id" style="font-size:0.55rem;color:var(--ink-faint);letter-spacing:0.12em"></span></div>
+            <div id="m-statblock"><div class="empty-note">Select a monster to view its stat block.</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- IMPORT -->
+      <div class="tab-panel" id="panel-import" style="display:none">
+        <div class="form">
+          <h3>Import bestiary</h3>
+          <div class="warn"><b>Overwrites</b> the entire bestiary in KV with the contents of the chosen file. Bestiary entries are DM-only and never reach players directly.</div>
+          <div class="hint">Pick the <code>bestiary.json</code> file (output of <code>scripts/normalize_bestiary.py</code>). The file stays on your machine — only its parsed contents go up to your worker's KV.</div>
+          <div class="fg"><label>Bestiary file</label><input type="file" id="import-file" accept="application/json,.json" onchange="loadSeed(event)"></div>
+          <div id="import-preview" class="hint"></div>
+          <div class="form-actions">
+            <button class="btn brass" id="import-btn" onclick="doImport()" disabled>Import to KV</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer"><p class="footer-text">The Spire · The Menagerie</p></div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script src="auth.js"></script>
+  <script>
+    const WORKER_URL = (window.Auth && window.Auth.WORKER_URL) || 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+    function esc(s){return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+    // bestiary: { schemaVersion, source, scrapedAt, normalizedAt, count, monsters:[...] }
+    // tolerate either an envelope or a bare array
+    let bestiary = { monsters: [] };
+    let seedData = null;
+    let activeId = null;
+
+    // CR sort table: 1/8 < 1/4 < 1/2 < 1 < 2 ...
+    const CR_OPTIONS = [
+      ['0','0'], ['0.125','1/8'], ['0.25','1/4'], ['0.5','1/2'],
+      ['1','1'], ['2','2'], ['3','3'], ['4','4'], ['5','5'],
+      ['6','6'], ['7','7'], ['8','8'], ['9','9'], ['10','10'],
+      ['11','11'], ['12','12'], ['13','13'], ['14','14'], ['15','15'],
+      ['16','16'], ['17','17'], ['18','18'], ['19','19'], ['20','20'],
+      ['21','21'], ['22','22'], ['23','23'], ['24','24'], ['25','25'],
+      ['26','26'], ['27','27'], ['28','28'], ['29','29'], ['30','30']
+    ];
+
+    function toast(msg, isErr){
+      const t = document.getElementById('toast');
+      t.textContent = msg; t.className = 'toast show' + (isErr?' err':'');
+      clearTimeout(t._t); t._t = setTimeout(()=>{ t.className='toast'; }, 2600);
+    }
+
+    function asMonsters(d){
+      if (Array.isArray(d)) return d;
+      if (d && Array.isArray(d.monsters)) return d.monsters;
+      return [];
+    }
+
+    async function bootstrap(){
+      const ident = Auth.identity();
+      document.getElementById('role-line').innerHTML = `${esc(ident.display||'DM')} <span class="role dm">DM</span>`;
+      if (!Auth.requireRole('dm', { reason:'The Menagerie is for the DM only.' })) return;
+      const stateEl = document.getElementById('state');
+      try {
+        const r = await fetch(WORKER_URL + '?type=bestiary', { cache:'no-store', headers: Auth.dmHeaders() });
+        if (r.status === 401){ stateEl.textContent='Your DM session expired — sign in again on the home page.'; stateEl.classList.add('error'); return; }
+        if (!r.ok) throw new Error('HTTP '+r.status);
+        const d = await r.json();
+        bestiary = (d && typeof d === 'object') ? d : { monsters: [] };
+      } catch(e){
+        stateEl.textContent = 'Could not reach the worker. (If you just added the bestiary endpoint, redeploy the worker first.)';
+        stateEl.classList.add('error');
+        return;
+      }
+      stateEl.style.display='none';
+      document.getElementById('tool').style.display='';
+      populateFilters();
+      renderList();
+      renderSource();
+    }
+
+    function renderSource(){
+      const ms = asMonsters(bestiary);
+      const src = bestiary && bestiary.source ? bestiary.source : '';
+      const when = bestiary && bestiary.normalizedAt ? bestiary.normalizedAt.split('T')[0] : '';
+      document.getElementById('m-source').textContent = ms.length ? [src, when].filter(Boolean).join(' · ') : 'empty — import a file';
+    }
+
+    function switchTab(name){
+      document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+      document.querySelectorAll('.tab-panel').forEach(p=>p.style.display='none');
+      document.getElementById('panel-'+name).style.display='';
+    }
+
+    function crTier(cr){
+      const c = +cr;
+      if (!isFinite(c)) return 't-low';
+      if (c <= 1) return 't-low';
+      if (c <= 5) return 't-mid';
+      if (c <= 15) return 't-high';
+      return 't-epic';
+    }
+
+    /* ── Filters ── */
+    function populateFilters(){
+      const ms = asMonsters(bestiary);
+      const types = Array.from(new Set(ms.map(m => m.type).filter(Boolean))).sort();
+      const sizes = ['Tiny','Small','Medium','Large','Huge','Gargantuan'].filter(s => ms.some(m => m.size === s));
+      const tSel = document.getElementById('m-type-filter');
+      const sSel = document.getElementById('m-size-filter');
+      tSel.innerHTML = '<option value="">All types</option>' + types.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+      sSel.innerHTML = '<option value="">All sizes</option>' + sizes.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+
+      const minSel = document.getElementById('m-cr-min');
+      const maxSel = document.getElementById('m-cr-max');
+      minSel.innerHTML = '<option value="">CR ≥ any</option>' + CR_OPTIONS.map(([v,l]) => `<option value="${v}">CR ≥ ${l}</option>`).join('');
+      maxSel.innerHTML = '<option value="">CR ≤ any</option>' + CR_OPTIONS.map(([v,l]) => `<option value="${v}">CR ≤ ${l}</option>`).join('');
+    }
+
+    function clearFilters(){
+      document.getElementById('m-search').value = '';
+      document.getElementById('m-type-filter').value = '';
+      document.getElementById('m-size-filter').value = '';
+      document.getElementById('m-cr-min').value = '';
+      document.getElementById('m-cr-max').value = '';
+      renderList();
+    }
+
+    /* ── List ── */
+    function renderList(){
+      const all = asMonsters(bestiary);
+      const q = (document.getElementById('m-search').value || '').trim().toLowerCase();
+      const typeF = document.getElementById('m-type-filter').value;
+      const sizeF = document.getElementById('m-size-filter').value;
+      const crMin = parseFloat(document.getElementById('m-cr-min').value);
+      const crMax = parseFloat(document.getElementById('m-cr-max').value);
+      const filtered = all.filter(m => {
+        if (q && !(m.name||'').toLowerCase().includes(q)) return false;
+        if (typeF && m.type !== typeF) return false;
+        if (sizeF && m.size !== sizeF) return false;
+        const cr = +m.cr;
+        if (!isNaN(crMin) && (!isFinite(cr) || cr < crMin)) return false;
+        if (!isNaN(crMax) && (!isFinite(cr) || cr > crMax)) return false;
+        return true;
+      });
+      filtered.sort((a,b) => (+a.cr||0) - (+b.cr||0) || (a.name||'').localeCompare(b.name||''));
+      document.getElementById('m-count').textContent = filtered.length;
+      const listEl = document.getElementById('m-list');
+      if (!filtered.length){
+        listEl.innerHTML = '<div class="empty-note">No monsters match.</div>';
+        return;
+      }
+      listEl.innerHTML = filtered.map(m => `
+        <div class="row${m.id===activeId?' active':''}" onclick="selectMonster('${esc(m.id)}')">
+          <div class="nm">${esc(m.name)}<small>${esc(m.size||'')} ${esc(m.type||'')}</small></div>
+          <span class="cr-chip ${crTier(m.cr)}">CR ${esc(m.crText || m.cr || '?')}</span>
+        </div>
+      `).join('');
+    }
+
+    function selectMonster(id){
+      activeId = id;
+      renderList();
+      const m = asMonsters(bestiary).find(x => x.id === id);
+      if (!m){ document.getElementById('m-statblock').innerHTML = '<div class="empty-note">Not found.</div>'; return; }
+      document.getElementById('sb-id').textContent = m.source || '';
+      document.getElementById('m-statblock').innerHTML = renderStatblock(m);
+    }
+
+    /* ── Stat block ── */
+    function renderStatblock(m){
+      const a = m.abilities || {};
+      const ab = (k) => {
+        const s = a[k] || {};
+        const mod = (s.mod>=0?'+':'') + (s.mod ?? 0);
+        const sv = (s.save !== undefined && s.save !== s.mod) ? `<span class="save">Save ${s.save>=0?'+':''}${s.save}</span>` : '';
+        return `<div class="ab"><div class="lbl">${k.toUpperCase()}</div><div class="score">${s.score ?? '—'}</div><div class="mod">${mod}</div>${sv}</div>`;
+      };
+
+      const subline = [
+        [m.size, m.sizes && m.sizes.length>1 ? `or ${m.sizes.slice(1).join('/')}` : ''].filter(Boolean).join(' '),
+        m.type,
+        m.subtype ? `(${m.subtype})` : '',
+        m.alignment ? `· ${m.alignment}` : ''
+      ].filter(Boolean).join(' ');
+
+      // The scraped text fields are already book-formatted ("10 ft., Fly 90 ft. (hover)",
+      // "Darkvision 60 ft., Passive Perception 17"). Prefer them over reconstructing
+      // from the structured objects, which lose nuance like the (hover) suffix.
+      const speedStr = m.speedText || '—';
+      const sensesStr = m.sensesText || '—';
+
+      const skills = m.skills && Object.keys(m.skills).length
+        ? Object.entries(m.skills).map(([k,v]) => `${k} ${v>=0?'+':''}${v}`).join(', ')
+        : '';
+
+      const langs = Array.isArray(m.languages) && m.languages.length ? m.languages.join(', ') : (m.languagesText || '—');
+
+      const kvRow = (label, val) => val ? `<div><b>${label}</b>${esc(val)}</div>` : '';
+      const arr = (label, list) => Array.isArray(list) && list.length ? `<div><b>${label}</b>${esc(list.join(', '))}</div>` : '';
+
+      const featureBlock = (title, list) => {
+        if (!Array.isArray(list) || !list.length) return '';
+        return `<div class="sb-section"><h4>${title}</h4>` +
+          list.map(f => `<div class="feature"><b>${esc(f.name||'')}.</b> ${esc(f.body||'')}</div>`).join('') +
+          `</div>`;
+      };
+
+      return `
+        <div class="statblock">
+          <h2>${esc(m.name)}</h2>
+          <div class="sub-line">${esc(subline)}</div>
+          <div class="divider"></div>
+          <div class="sb-kv">
+            ${kvRow('AC', m.acText || (m.ac!=null?String(m.ac):''))}
+            ${kvRow('HP', m.hp!=null ? `${m.hp}${m.hpFormula?` (${m.hpFormula})`:''}` : '')}
+            ${kvRow('Speed', speedStr)}
+            ${kvRow('Initiative', m.initiative!=null ? `${m.initiative>=0?'+':''}${m.initiative}${m.initiativeScore?` (${m.initiativeScore})`:''}` : '')}
+          </div>
+          <div class="divider"></div>
+          <div class="abilities">${['str','dex','con','int','wis','cha'].map(ab).join('')}</div>
+          <div class="divider"></div>
+          <div class="sb-kv">
+            ${kvRow('Skills', skills)}
+            ${arr('Resistances', m.resistances)}
+            ${arr('Damage Immunities', m.damageImmunities)}
+            ${arr('Condition Immunities', m.conditionImmunities)}
+            ${arr('Vulnerabilities', m.vulnerabilities)}
+            ${kvRow('Senses', sensesStr)}
+            ${kvRow('Languages', langs)}
+            ${kvRow('CR', `${m.crText || m.cr || '?'}${m.xp?` (${m.xp.toLocaleString()} XP`:''}${m.pb?`, PB +${m.pb})`: (m.xp?')':'')}`)}
+            ${arr('Gear', m.gear)}
+          </div>
+          ${featureBlock('Traits', m.traits)}
+          ${featureBlock('Actions', m.actions)}
+          ${featureBlock('Bonus Actions', m.bonusActions)}
+          ${featureBlock('Reactions', m.reactions)}
+          ${featureBlock('Legendary Actions', m.legendaryActions)}
+          ${featureBlock('Lair Actions', m.lairActions)}
+          ${m.description ? `<div class="desc">${esc(m.description)}</div>` : ''}
+        </div>
+      `;
+    }
+
+    /* ── Import ── */
+    function loadSeed(ev){
+      const file = ev.target.files && ev.target.files[0];
+      const prev = document.getElementById('import-preview');
+      const btn = document.getElementById('import-btn');
+      if (!file){ seedData = null; btn.disabled = true; prev.textContent = ''; return; }
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const d = JSON.parse(reader.result);
+          const ms = asMonsters(d);
+          if (!ms.length) throw new Error('No monsters found in that file.');
+          // Preserve the envelope if it has one; otherwise wrap.
+          seedData = (d && !Array.isArray(d) && Array.isArray(d.monsters))
+            ? d
+            : { schemaVersion: 1, monsters: ms, count: ms.length, importedAt: new Date().toISOString() };
+          prev.innerHTML = `Ready to import: <b>${ms.length}</b> monsters${d.source?` from <b>${esc(d.source)}</b>`:''}.`;
+          btn.disabled = false;
+        } catch(e){
+          seedData = null; btn.disabled = true;
+          prev.innerHTML = `<span style="color:var(--rust)">Couldn't read that file: ${esc(e.message)}</span>`;
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    async function doImport(){
+      if (!seedData) return;
+      const btn = document.getElementById('import-btn');
+      btn.disabled = true; btn.textContent = 'Importing…';
+      const ok = await saveKey('bestiary', seedData);
+      btn.textContent = 'Import to KV';
+      if (ok){
+        bestiary = seedData;
+        populateFilters();
+        renderList();
+        renderSource();
+        toast('Bestiary imported.');
+        document.getElementById('import-preview').innerHTML = '<b style="color:var(--teal-bright)">Done.</b> The Menagerie is stocked.';
+      } else {
+        btn.disabled = false;
+      }
+    }
+
+    async function saveKey(type, payload){
+      const r = await fetch(WORKER_URL, { method:'POST', headers: Auth.dmHeaders(), body: JSON.stringify({ type, payload }) });
+      if (r.status === 401){ toast('DM session expired — sign in again.', true); return false; }
+      let b={}; try{ b=await r.json(); }catch{}
+      if (!r.ok || b.error){ toast(b.error || ('Save failed (HTTP '+r.status+')'), true); return false; }
+      return true;
+    }
+
+    bootstrap();
+  </script>
+</body>
+</html>
