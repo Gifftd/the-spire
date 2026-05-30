@@ -286,11 +286,11 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
 .bestiary-filters .clear-btn { font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.08em; padding: 4px 10px; background: none; border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink-faint); cursor: pointer; }
 .bestiary-filters .clear-btn:hover { color: var(--ink); border-color: var(--gold); }
 .bestiary-status { font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.08em; color: var(--ink-faint); margin-bottom: 0.4rem; }
-.bestiary-list { max-height: 52vh; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); }
+.bestiary-list { max-height: 30vh; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); }
 .bestiary-row { padding: 7px 10px; border-bottom: 1px solid var(--border); cursor: pointer; }
 .bestiary-row:last-child { border-bottom: none; }
 .bestiary-row:hover { background: var(--surface); }
-.bestiary-row.expanded { background: var(--surface); }
+.bestiary-row.in-picks { background: rgba(184,138,90,0.08); }
 .bestiary-row-head { display: flex; align-items: center; gap: 10px; }
 .bestiary-row-nm { flex: 1; font-size: 0.92rem; color: var(--ink); min-width: 0; }
 .bestiary-row-nm small { display: block; font-family: 'Cinzel', serif; font-size: 0.54rem; color: var(--ink-faint); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 1px; }
@@ -303,14 +303,49 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
 .bestiary-cr-chip.t-high { color: var(--gold); border-color: rgba(184,138,90,0.5); }
 .bestiary-cr-chip.t-epic { color: #e88; border-color: #844; }
 .bestiary-custom-chip { font-family: 'Cinzel', serif; font-size: 0.5rem; letter-spacing: 0.08em; padding: 1px 6px; border-radius: 8px; border: 1px solid var(--gold); color: var(--gold); background: rgba(184,138,90,0.10); margin-left: 6px; }
-.bestiary-add-form { display: none; padding: 0.6rem 0.2rem 0.2rem; margin-top: 8px; border-top: 1px dashed var(--border); }
-.bestiary-row.expanded .bestiary-add-form { display: block; }
-.bestiary-add-form .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-bottom: 8px; align-items: end; }
-.bestiary-add-form label { font-family: 'Cinzel', serif; font-size: 0.54rem; letter-spacing: 0.1em; color: var(--ink-faint); display: block; margin-bottom: 3px; }
-.bestiary-add-form input[type=number] { width: 100%; background: var(--bg); border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink); padding: 4px 6px; font-size: 0.9rem; }
-.bestiary-add-form .toggle { display: flex; align-items: center; gap: 6px; font-size: 0.84rem; color: var(--ink-dim); cursor: pointer; padding: 4px 0; }
-.bestiary-add-form .toggle input[type=checkbox] { accent-color: var(--gold); width: 13px; height: 13px; }
 .bestiary-empty-note { padding: 1.5rem 1rem; text-align: center; color: var(--ink-faint); font-style: italic; font-size: 0.9rem; }
+
+/* Picks cart */
+.bestiary-cart-head { display: flex; justify-content: space-between; align-items: center; font-family: 'Cinzel', serif; font-size: 0.66rem; letter-spacing: 0.1em; color: var(--gold); margin: 0.8rem 0 0.3rem; text-transform: uppercase; }
+.bestiary-cart-head .clear-picks { font-family: 'Cinzel', serif; font-size: 0.55rem; letter-spacing: 0.08em; padding: 3px 8px; background: none; border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink-faint); cursor: pointer; }
+.bestiary-cart-head .clear-picks:hover { color: var(--ink); border-color: var(--gold); }
+.bestiary-cart { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); max-height: 20vh; overflow-y: auto; }
+.bestiary-cart .empty { padding: 0.7rem; text-align: center; color: var(--ink-faint); font-style: italic; font-size: 0.85rem; }
+.pick-row { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.pick-row:last-child { border-bottom: none; }
+.pick-head { display: flex; align-items: center; gap: 8px; }
+.pick-nm { flex: 1; font-size: 0.88rem; color: var(--ink); min-width: 0; }
+.pick-nm small { display: block; font-family: 'Cinzel', serif; font-size: 0.52rem; color: var(--ink-faint); letter-spacing: 0.08em; }
+.pick-qty { display: flex; align-items: center; gap: 4px; }
+.pick-qty button { width: 22px; height: 22px; border-radius: 3px; border: 1px solid var(--border-light); background: var(--surface); color: var(--ink); cursor: pointer; font-size: 0.9rem; line-height: 1; padding: 0; }
+.pick-qty button:hover { border-color: var(--gold); }
+.pick-qty .q { min-width: 26px; text-align: center; font-family: 'Cinzel', serif; color: var(--gold); }
+.pick-xp { font-family: 'Cinzel', serif; font-size: 0.7rem; color: var(--ink-dim); min-width: 65px; text-align: right; }
+.pick-toggle { background: none; border: none; color: var(--ink-faint); font-size: 0.85rem; cursor: pointer; padding: 0 4px; }
+.pick-toggle:hover { color: var(--ink); }
+.pick-remove { background: none; border: none; color: var(--ink-faint); font-size: 0.9rem; cursor: pointer; padding: 0 4px; }
+.pick-remove:hover { color: #e88; }
+.pick-opts { display: none; padding: 6px 0 0; margin-top: 6px; border-top: 1px dashed var(--border); grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 6px; align-items: end; }
+.pick-row.expanded .pick-opts { display: grid; }
+.pick-opts label { font-family: 'Cinzel', serif; font-size: 0.52rem; letter-spacing: 0.08em; color: var(--ink-faint); display: block; margin-bottom: 2px; }
+.pick-opts input[type=number] { width: 100%; background: var(--bg); border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink); padding: 3px 5px; font-size: 0.85rem; }
+.pick-opts .toggle { display: flex; align-items: center; gap: 5px; font-size: 0.78rem; color: var(--ink-dim); cursor: pointer; }
+.pick-opts .toggle input[type=checkbox] { accent-color: var(--gold); width: 12px; height: 12px; }
+
+/* Party config + XP summary */
+.bestiary-party { display: grid; grid-template-columns: auto 70px auto 70px 1fr; gap: 8px; align-items: center; margin-top: 0.6rem; padding: 8px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.85rem; color: var(--ink-dim); }
+.bestiary-party label { font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.08em; color: var(--ink-faint); }
+.bestiary-party input { background: var(--surface); border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink); padding: 4px 6px; font-size: 0.85rem; width: 100%; }
+.bestiary-budget { margin-top: 0.5rem; padding: 8px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.85rem; }
+.bestiary-budget .total { font-family: 'Cinzel', serif; font-size: 1rem; color: var(--gold); margin-bottom: 4px; }
+.bestiary-budget .thresholds { display: flex; gap: 10px; flex-wrap: wrap; font-family: 'Cinzel', serif; font-size: 0.66rem; color: var(--ink-dim); }
+.bestiary-budget .thresholds span { padding: 2px 7px; border: 1px solid var(--border-light); border-radius: 8px; }
+.bestiary-budget .thresholds span.hit { border-color: var(--gold); color: var(--gold); background: rgba(184,138,90,0.10); }
+.bestiary-budget .verdict { margin-top: 5px; font-size: 0.82rem; }
+.bestiary-budget .verdict.low { color: #9ad080; }
+.bestiary-budget .verdict.moderate { color: #88c8e0; }
+.bestiary-budget .verdict.high { color: var(--gold); }
+.bestiary-budget .verdict.over { color: #e88; }
 
 @media (max-width: 700px) {
   .main { grid-template-columns: 1fr; }
@@ -423,9 +458,29 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
       </div>
       <div class="bestiary-status" id="bp-status">Loading bestiary…</div>
       <div class="bestiary-list" id="bp-list"></div>
+
+      <div class="bestiary-cart-head">
+        <span>Picks (<span id="bp-pick-count">0</span>) — click a row above to add</span>
+        <button class="clear-picks" onclick="clearAllPicks()">Clear all</button>
+      </div>
+      <div class="bestiary-cart" id="bp-cart"></div>
+
+      <div class="bestiary-party">
+        <label>Party size</label>
+        <input type="number" id="bp-party-size" min="1" max="12" value="4" oninput="onPartyChange()">
+        <label>Avg level</label>
+        <input type="number" id="bp-party-level" min="1" max="20" value="5" oninput="onPartyChange()">
+        <span id="bp-party-note" style="font-size:0.78rem;color:var(--ink-faint);font-style:italic">2024 DMG XP thresholds, per-character × party size.</span>
+      </div>
+      <div class="bestiary-budget" id="bp-budget">
+        <div class="total">Total XP: <span id="bp-xp-total">0</span></div>
+        <div class="thresholds" id="bp-thresholds"></div>
+        <div class="verdict" id="bp-verdict"></div>
+      </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeBestiaryPicker()">Close</button>
+      <button class="btn btn-ghost" onclick="closeBestiaryPicker()">Cancel</button>
+      <button class="btn btn-gold" id="bp-load-btn" onclick="loadAllPicks()" disabled>Load 0 monsters</button>
     </div>
   </div>
 </div>
@@ -784,11 +839,24 @@ function removeCombatant(id) {
 // Lazy-loaded on first open. Two stores: the imported bestiary (`bestiary`)
 // and the DM's authored homebrew (`bestiary_custom`). Browse / filter merges
 // the two; entries from `bestiary_custom` are tagged with `_custom`.
+// _BP.picks: ordered list of { id, qty, rollHp, rollInit, hidden, hpOverride, initOverride, expanded }
 const _BP = {
   loaded: false,
   loading: false,
   monsters: [],
-  expandedId: null,
+  picks: [],
+  party: { size: 4, level: 5 },  // overwritten from localStorage on first open
+};
+
+// 2024 DMG XP thresholds, per character. Party total = level threshold × size.
+const XP_THRESHOLDS = {
+  1:{l:50,m:75,h:100},     2:{l:100,m:150,h:200},   3:{l:150,m:225,h:400},
+  4:{l:250,m:375,h:500},   5:{l:500,m:750,h:1100},  6:{l:600,m:1000,h:1400},
+  7:{l:750,m:1300,h:1700}, 8:{l:1000,m:1700,h:2100},9:{l:1300,m:2000,h:2600},
+  10:{l:1600,m:2300,h:3100}, 11:{l:1900,m:2900,h:4100}, 12:{l:2200,m:3700,h:4700},
+  13:{l:2600,m:4200,h:5400}, 14:{l:2900,m:4900,h:6200}, 15:{l:3300,m:5400,h:7800},
+  16:{l:3800,m:6100,h:9800}, 17:{l:4500,m:7200,h:11700},18:{l:5000,m:8700,h:14200},
+  19:{l:5500,m:10700,h:17200},20:{l:6400,m:13200,h:22000}
 };
 const BP_CR_OPTIONS = [
   ['0','0'], ['0.125','1/8'], ['0.25','1/4'], ['0.5','1/2'],
@@ -811,14 +879,24 @@ function bpCrTier(cr){
 
 async function openBestiaryPicker(){
   document.getElementById('bestiary-modal').classList.remove('hidden');
+  // Restore party config across sessions.
+  try {
+    const saved = JSON.parse(localStorage.getItem('init_party_config') || 'null');
+    if (saved && typeof saved === 'object'){
+      if (Number.isFinite(saved.size))  _BP.party.size  = saved.size;
+      if (Number.isFinite(saved.level)) _BP.party.level = saved.level;
+    }
+  } catch {}
+  document.getElementById('bp-party-size').value  = _BP.party.size;
+  document.getElementById('bp-party-level').value = _BP.party.level;
   if (!_BP.loaded && !_BP.loading) await loadBestiary();
   populateBestiaryFilterDropdowns();
   renderBestiaryList();
+  renderPicks();
   setTimeout(() => document.getElementById('bp-search')?.focus(), 50);
 }
 function closeBestiaryPicker(){
   document.getElementById('bestiary-modal').classList.add('hidden');
-  _BP.expandedId = null;
 }
 
 async function loadBestiary(){
@@ -899,45 +977,20 @@ function renderBestiaryList(){
 }
 
 function bestiaryRowHTML(m){
-  const expanded = _BP.expandedId === m.id;
+  const inPicks = !!_BP.picks.find(p => p.id === m.id);
   return `
-    <div class="bestiary-row${expanded?' expanded':''}" id="bprow-${bpEsc(m.id)}">
-      <div class="bestiary-row-head" onclick="toggleBestiaryRow('${bpEsc(m.id)}')">
+    <div class="bestiary-row${inPicks?' in-picks':''}" id="bprow-${bpEsc(m.id)}" onclick="addPick('${bpEsc(m.id)}')">
+      <div class="bestiary-row-head">
         <div class="bestiary-row-nm">${bpEsc(m.name)}${m._custom?'<span class="bestiary-custom-chip">Custom</span>':''}<small>${bpEsc(m.size||'')} ${bpEsc(m.type||'')}${m.alignment?` · ${bpEsc(m.alignment)}`:''}</small></div>
         <div class="bestiary-row-meta">
           <span>${m.ac ?? '—'}<small>AC</small></span>
           <span>${m.hp ?? '—'}<small>HP</small></span>
-          <span>${m.initiative!=null ? (m.initiative>=0?'+':'')+m.initiative : '—'}<small>INIT</small></span>
+          <span>${m.xp ? m.xp.toLocaleString() : '—'}<small>XP</small></span>
         </div>
         <span class="bestiary-cr-chip ${bpCrTier(m.cr)}">CR ${bpEsc(m.crText || m.cr || '?')}</span>
       </div>
-      ${expanded ? bestiaryAddFormHTML(m) : ''}
     </div>
   `;
-}
-
-function bestiaryAddFormHTML(m){
-  const safeId = bpEsc(m.id);
-  return `
-    <div class="bestiary-add-form">
-      <div class="row">
-        <div><label>Qty</label><input type="number" id="bp-qty-${safeId}" value="1" min="1" max="50"></div>
-        <div><label>HP override</label><input type="number" id="bp-hp-${safeId}" placeholder="${m.hp ?? ''}"></div>
-        <div><label>Init override</label><input type="number" id="bp-init-${safeId}" placeholder="—"></div>
-        <label class="toggle"><input type="checkbox" id="bp-rollhp-${safeId}" ${m.hpFormula?'checked':''} ${m.hpFormula?'':'disabled'}> Roll HP from <code>${bpEsc(m.hpFormula || 'formula')}</code></label>
-        <label class="toggle"><input type="checkbox" id="bp-rollinit-${safeId}" checked> Roll initiative</label>
-        <label class="toggle"><input type="checkbox" id="bp-hidden-${safeId}"> Hidden</label>
-      </div>
-      <div style="display:flex;justify-content:flex-end">
-        <button class="btn btn-gold btn-sm" onclick="addFromBestiary('${safeId}')">Add to combat</button>
-      </div>
-    </div>
-  `;
-}
-
-function toggleBestiaryRow(id){
-  _BP.expandedId = (_BP.expandedId === id) ? null : id;
-  renderBestiaryList();
 }
 
 // Parse and roll an HP formula like "12d8 + 12" or "2d6-1" or "3d8". Returns
@@ -954,58 +1007,209 @@ function rollDiceFormula(formula){
   return Math.max(1, total);
 }
 
-function addFromBestiary(id){
+// ───── Picks cart ─────
+// Clicking a row in the bestiary list calls this. First click adds the
+// monster with default options; subsequent clicks just bump qty.
+function addPick(id){
   const m = _BP.monsters.find(x => x.id === id);
   if (!m) return;
-  const $ = sel => document.getElementById(sel);
-  const safeId = bpEsc(id);
-  const qty = Math.max(1, Math.min(50, parseInt($(`bp-qty-${safeId}`).value, 10) || 1));
-  const rollHp   = $(`bp-rollhp-${safeId}`).checked;
-  const rollInit = $(`bp-rollinit-${safeId}`).checked;
-  const hidden   = $(`bp-hidden-${safeId}`).checked;
-  const hpOverride   = parseInt($(`bp-hp-${safeId}`).value, 10);
-  const initOverride = parseInt($(`bp-init-${safeId}`).value, 10);
-
-  let spawned = 0;
-  for (let i = 0; i < qty; i++){
-    // HP: override → roll → printed
-    let hp;
-    if (Number.isFinite(hpOverride)) hp = hpOverride;
-    else if (rollHp && m.hpFormula){ hp = rollDiceFormula(m.hpFormula) ?? (m.hp ?? 10); }
-    else hp = (m.hp != null ? m.hp : 10);
-    // Initiative: override → roll(d20 + mod) → static initiativeScore → mod itself
-    let init;
-    if (Number.isFinite(initOverride)) init = initOverride;
-    else if (rollInit){
-      const mod = (m.initiative != null) ? m.initiative : (m.abilities?.dex?.mod ?? 0);
-      init = 1 + Math.floor(Math.random() * 20) + mod;
-    } else {
-      init = (m.initiativeScore != null) ? m.initiativeScore : ((m.initiative != null) ? m.initiative : 10);
-    }
-    const baseName = m.name || 'Monster';
-    const name = qty > 1 ? `${baseName} ${i+1}` : baseName;
-    const c = {
-      id: uid(),
-      name,
-      type: 'enemy',
-      init,
-      hp,
-      maxHp: hp,
-      ac: (m.ac != null) ? m.ac : 10,
-      conditions: [],
-      notes: '',
-      dead: false,
-      hidden,
-      // Reference tags so a future "view stat block" affordance can look the
-      // entry back up. Harmless to expose via initiative_state (no extra
-      // combat info beyond what AC/HP/name already leak).
-      bestiaryId: m.id,
-      bestiarySource: m._custom ? 'custom' : (m.source || 'imported')
-    };
-    state.combatants.push(c);
-    if (mode === 'combat') snapshotCombatant(c);
-    spawned++;
+  const existing = _BP.picks.find(p => p.id === id);
+  if (existing){
+    existing.qty = Math.min(50, existing.qty + 1);
+  } else {
+    _BP.picks.push({
+      id,
+      qty: 1,
+      rollHp: !!m.hpFormula,    // default: roll if we have a formula
+      rollInit: true,
+      hidden: false,
+      hpOverride: null,
+      initOverride: null,
+      expanded: false
+    });
   }
+  renderBestiaryList();   // re-paints "in-picks" highlight
+  renderPicks();
+}
+
+function updatePick(id, field, val){
+  const p = _BP.picks.find(x => x.id === id);
+  if (!p) return;
+  if (field === 'qty'){
+    p.qty = Math.max(0, Math.min(50, parseInt(val, 10) || 0));
+    if (p.qty === 0){ removePick(id); return; }
+  } else if (field === 'hpOverride' || field === 'initOverride'){
+    const n = parseInt(val, 10);
+    p[field] = Number.isFinite(n) ? n : null;
+  } else {
+    p[field] = !!val;
+  }
+  renderPicks();
+}
+
+function removePick(id){
+  _BP.picks = _BP.picks.filter(p => p.id !== id);
+  renderBestiaryList();
+  renderPicks();
+}
+
+function clearAllPicks(){
+  _BP.picks = [];
+  renderBestiaryList();
+  renderPicks();
+}
+
+function togglePickExpanded(id){
+  const p = _BP.picks.find(x => x.id === id);
+  if (!p) return;
+  p.expanded = !p.expanded;
+  renderPicks();
+}
+
+function totalPickedXP(){
+  let total = 0;
+  for (const p of _BP.picks){
+    const m = _BP.monsters.find(x => x.id === p.id);
+    const xp = m && Number.isFinite(m.xp) ? m.xp : 0;
+    total += xp * p.qty;
+  }
+  return total;
+}
+function totalPickedCount(){
+  return _BP.picks.reduce((a, p) => a + p.qty, 0);
+}
+
+function renderPicks(){
+  document.getElementById('bp-pick-count').textContent = String(_BP.picks.length);
+  const cart = document.getElementById('bp-cart');
+  if (!_BP.picks.length){
+    cart.innerHTML = '<div class="empty">No picks yet — click a monster above to add it here.</div>';
+  } else {
+    cart.innerHTML = _BP.picks.map(p => {
+      const m = _BP.monsters.find(x => x.id === p.id) || { name: '(missing)' };
+      const safeId = bpEsc(p.id);
+      const xpEach = Number.isFinite(m.xp) ? m.xp : 0;
+      const xpTotal = xpEach * p.qty;
+      return `
+        <div class="pick-row${p.expanded?' expanded':''}">
+          <div class="pick-head">
+            <div class="pick-nm">${bpEsc(m.name)}${m._custom?'<span class="bestiary-custom-chip">Custom</span>':''}<small>CR ${bpEsc(m.crText || m.cr || '?')} · ${xpEach.toLocaleString()} XP ea</small></div>
+            <div class="pick-qty">
+              <button onclick="updatePick('${safeId}','qty',${p.qty-1})">−</button>
+              <span class="q">${p.qty}</span>
+              <button onclick="updatePick('${safeId}','qty',${p.qty+1})">+</button>
+            </div>
+            <div class="pick-xp">${xpTotal.toLocaleString()} XP</div>
+            <button class="pick-toggle" onclick="togglePickExpanded('${safeId}')" title="Toggle per-pick options">⚙</button>
+            <button class="pick-remove" onclick="removePick('${safeId}')" title="Remove">×</button>
+          </div>
+          <div class="pick-opts">
+            <div><label>HP override</label><input type="number" placeholder="${m.hp ?? ''}" value="${p.hpOverride ?? ''}" oninput="updatePick('${safeId}','hpOverride',this.value)"></div>
+            <div><label>Init override</label><input type="number" placeholder="roll" value="${p.initOverride ?? ''}" oninput="updatePick('${safeId}','initOverride',this.value)"></div>
+            <label class="toggle"><input type="checkbox" ${p.rollHp?'checked':''} ${m.hpFormula?'':'disabled'} onchange="updatePick('${safeId}','rollHp',this.checked)"> Roll HP${m.hpFormula?` (${bpEsc(m.hpFormula)})`:' (no formula)'}</label>
+            <label class="toggle"><input type="checkbox" ${p.rollInit?'checked':''} onchange="updatePick('${safeId}','rollInit',this.checked)"> Roll init</label>
+            <label class="toggle"><input type="checkbox" ${p.hidden?'checked':''} onchange="updatePick('${safeId}','hidden',this.checked)"> Hidden</label>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+  renderBudget();
+  const total = totalPickedCount();
+  const btn = document.getElementById('bp-load-btn');
+  btn.disabled = total === 0;
+  btn.textContent = total === 0 ? 'Load 0 monsters'
+                  : total === 1 ? 'Load 1 monster into combat'
+                                : `Load ${total} monsters into combat`;
+}
+
+function onPartyChange(){
+  const sz = parseInt(document.getElementById('bp-party-size').value, 10);
+  const lv = parseInt(document.getElementById('bp-party-level').value, 10);
+  if (Number.isFinite(sz)) _BP.party.size  = Math.max(1, Math.min(12, sz));
+  if (Number.isFinite(lv)) _BP.party.level = Math.max(1, Math.min(20, lv));
+  try { localStorage.setItem('init_party_config', JSON.stringify(_BP.party)); } catch {}
+  renderBudget();
+}
+
+function renderBudget(){
+  const xp = totalPickedXP();
+  document.getElementById('bp-xp-total').textContent = xp.toLocaleString();
+  const lvl  = _BP.party.level;
+  const size = _BP.party.size;
+  const t = XP_THRESHOLDS[lvl];
+  const thr = document.getElementById('bp-thresholds');
+  const verdict = document.getElementById('bp-verdict');
+  if (!t){
+    thr.innerHTML = '';
+    verdict.textContent = '';
+    return;
+  }
+  const low  = t.l * size;
+  const mod  = t.m * size;
+  const high = t.h * size;
+  // Difficulty band: ≤ low = Low, ≤ mod = Moderate, ≤ high = High, > high = Over
+  const band = xp <= low ? 'low' : xp <= mod ? 'moderate' : xp <= high ? 'high' : 'over';
+  const hit = b => band === b ? ' hit' : '';
+  thr.innerHTML = `
+    <span class="${hit('low')}">Low ${low.toLocaleString()}</span>
+    <span class="${hit('moderate')}">Moderate ${mod.toLocaleString()}</span>
+    <span class="${hit('high')}">High ${high.toLocaleString()}</span>
+  `;
+  verdict.className = 'verdict ' + band;
+  verdict.textContent = ({
+    low:      `Low difficulty — short on threat for a party of ${size} at level ${lvl}.`,
+    moderate: `Moderate difficulty — a meaningful resource drain.`,
+    high:     `High difficulty — risk of PC deaths without smart play.`,
+    over:     `Over the High threshold by ${(xp - high).toLocaleString()} XP — potential party wipe territory.`
+  })[band];
+}
+
+function loadAllPicks(){
+  if (!_BP.picks.length) return;
+  let spawned = 0;
+  for (const p of _BP.picks){
+    const m = _BP.monsters.find(x => x.id === p.id);
+    if (!m) continue;
+    for (let i = 0; i < p.qty; i++){
+      // HP: explicit override → roll from formula → printed median
+      let hp;
+      if (Number.isFinite(p.hpOverride))               hp = p.hpOverride;
+      else if (p.rollHp && m.hpFormula)                hp = rollDiceFormula(m.hpFormula) ?? (m.hp ?? 10);
+      else                                              hp = (m.hp != null ? m.hp : 10);
+      // Initiative: explicit override → 1d20 + mod → static initiativeScore → mod
+      let init;
+      if (Number.isFinite(p.initOverride)) init = p.initOverride;
+      else if (p.rollInit){
+        const mod = (m.initiative != null) ? m.initiative : (m.abilities?.dex?.mod ?? 0);
+        init = 1 + Math.floor(Math.random() * 20) + mod;
+      } else {
+        init = (m.initiativeScore != null) ? m.initiativeScore : ((m.initiative != null) ? m.initiative : 10);
+      }
+      const baseName = m.name || 'Monster';
+      const name = p.qty > 1 ? `${baseName} ${i+1}` : baseName;
+      const c = {
+        id: uid(),
+        name,
+        type: 'enemy',
+        init,
+        hp,
+        maxHp: hp,
+        ac: (m.ac != null) ? m.ac : 10,
+        conditions: [],
+        notes: '',
+        dead: false,
+        hidden: p.hidden,
+        bestiaryId: m.id,
+        bestiarySource: m._custom ? 'custom' : (m.source || 'imported')
+      };
+      state.combatants.push(c);
+      if (mode === 'combat') snapshotCombatant(c);
+      spawned++;
+    }
+  }
+  // Empty the cart so the next picker open starts fresh.
+  _BP.picks = [];
   render();
   pushState();
   closeBestiaryPicker();

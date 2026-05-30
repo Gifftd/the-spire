@@ -9,6 +9,50 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### War Table: multi-pick + XP budget for the Bestiary picker
+
+The picker shifts from "click a row, configure inline, add immediately" to a
+**cart-style flow**: click rows to add them to a Picks list below the
+bestiary, tweak quantities and per-pick options there, then load the whole
+batch at once with a single button. A running **XP total** + **2024 DMG
+difficulty thresholds** (Low / Moderate / High, per character × party size)
+live at the bottom of the modal so the DM can build an encounter to
+intentional difficulty rather than eyeballing it.
+
+#### Added — `initiative-dm.html`
+- Bestiary rows now show **XP per monster** in the meta column (replacing the
+  per-monster init bonus, which had less value at pick time). Clicking a row
+  adds it to the cart with sensible defaults (roll HP if a formula exists,
+  roll init, not hidden); subsequent clicks bump qty.
+- **Picks cart**: scrollable list below the bestiary. Each pick shows the
+  monster name + per-monster XP + total XP, a `−/+ qty` stepper (qty=0
+  removes), a remove ×, and a gear toggle that expands an inline options
+  row (HP override, init override, roll-HP, roll-init, hidden).
+- **Party config** (size + average level), persisted to `localStorage` as
+  `init_party_config`. Default 4 chars at level 5 until overridden.
+- **XP budget** panel: total XP picked, three threshold chips (Low /
+  Moderate / High = per-char threshold × party size), and a one-line
+  verdict colored to match the band. The chip for the band currently hit
+  is highlighted gold.
+- **Load button** at the modal footer disables when nothing is picked and
+  labels itself "Load N monster(s) into combat". Spawning iterates the
+  cart, rolls per-spawn HP and init, and posts everything in a single
+  `pushState()` so the player init view updates once.
+- Removed the old per-row expand UI (`bestiary-add-form` styles + the
+  `addFromBestiary(id)` one-shot function) — superseded by the cart.
+
+#### Verification
+- XP math: 4 Goblins (50 ea) + 1 Ogre (700) = 900 → "low" band against
+  party-of-4 level-5 thresholds (Low 2,000 / Mod 3,000 / High 4,400).
+  Pushing an Adult Gold Dragon (20,000 XP) onto the cart → 20,900 → "over"
+  band. A pick whose monster carries no XP value contributes 0, not NaN.
+- Row markup: meta column shows XP (50) instead of INIT, the row click
+  binds to `addPick('<id>')`, and the `in-picks` class renders when the
+  monster is in the cart.
+- Same caveat as the prior War Table change applies for the full live
+  click-through (page's pushState→401→logout race kills fetch-stub
+  verification); the unit tests above isolate everything that's new.
+
 ### War Table: pull monsters from the Bestiary into combat
 
 A new **"📖 Add from Bestiary"** button under the manual Add form in the War
