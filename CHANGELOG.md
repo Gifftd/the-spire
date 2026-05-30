@@ -9,6 +9,60 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### War Table: save and recall encounter presets
+
+Caps the picker work: a DM can save a built-up Picks cart as a named
+**encounter preset** under a new `encounters` KV key, then reload that exact
+pick list (monsters · quantities · per-pick options · party config) into the
+cart on a later session. Stored in KV (not localStorage) so encounters
+follow the DM across devices, mirroring the homebrew-monsters pattern.
+
+#### Added — `cloudflare-worker.js`
+- New DM-gated **GET `?type=encounters`** endpoint returning the bare
+  array of saved encounter presets.
+- `'encounters'` added to `DM_WRITE_TYPES`. Requires a manual redeploy
+  before saves persist.
+
+#### Added — `initiative-dm.html`
+- New **Saved encounters** section in the picker modal, between the
+  bestiary list and the picks cart. Shows each preset with name, monster
+  count, XP total, and the party config it was saved for. Clicking the
+  row (or the explicit **Load** button) overlays the saved picks back
+  into the cart; **×** deletes (with confirm).
+- **💾 Save current as…** button next to the section header. Disabled
+  when the cart is empty; otherwise prompts for a name, packages the
+  current picks + party config + denormalized totals, and POSTs the
+  full encounter array back to KV. The transient `expanded` flag is
+  stripped — it's UI state, not part of the preset.
+- Encounters fetched alongside the bestiary on first picker open (added
+  to the parallel `loadBestiary()` Promise.all). The endpoint is
+  tolerated as missing (e.g. before the worker redeploy) — picker
+  still works, save flow surfaces a clear "worker may need to be
+  redeployed" alert if the POST 4xxs.
+- Load includes a confirm() if the cart already has picks so the DM
+  doesn't accidentally clobber in-progress work. Also restores the
+  preset's party config and re-persists it to localStorage so the
+  budget panel snaps to match.
+
+#### Preset shape
+```js
+{
+  id: 'enc-<timestamp>-<rand>',
+  name: 'Goblin Ambush',
+  picks: [ { id, qty, rollHp, rollInit, hidden, hpOverride, initOverride }, ... ],
+  party: { size, level },
+  totalXp: 900,        // denormalized for fast list view
+  monsterCount: 5,     // denormalized
+  createdAt: ISO
+}
+```
+
+#### Verification limit
+Same caveat as the prior War Table changes — the page's boot-time
+`pushState()` 401-races the fetch stub install in local preview, so the
+full click-through couldn't be verified there. CRUD shape mirrors the
+`bestiary_custom` editor save/load that *was* verified end-to-end.
+
 ### War Table: multi-pick + XP budget for the Bestiary picker
 
 The picker shifts from "click a row, configure inline, add immediately" to a

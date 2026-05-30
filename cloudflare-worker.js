@@ -483,6 +483,16 @@ export default {
         return json(await kvGet(env, 'bestiary_custom', []));
       }
 
+      // DM-only: saved encounter presets — bundles of bestiary picks (name,
+      // qty, per-pick options) the DM can reload into the War Table picker.
+      // Bare array. Entries carry denormalized totals so the picker list view
+      // doesn't have to re-look-up the bestiary just to render the catalogue.
+      if (type === 'encounters') {
+        const auth = await verifyDMAuth(request, env);
+        if (!auth.ok) return json({ error: 'DM auth required' }, 401);
+        return json(await kvGet(env, 'encounters', []));
+      }
+
       // DM-only: everything the apothecary editor needs in one shot.
       if (type === 'potion_data_dm') {
         const auth = await verifyDMAuth(request, env);
@@ -650,7 +660,7 @@ export default {
     }
 
     // ── DM-only writes ────────────────────────────────────────
-    const DM_WRITE_TYPES = ['initiative_state','map_data','map_data_dm','characters','journals','npcs','timeline','potion_ingredients','potions','negative_potions','potion_inventories','potion_recipes','potion_library','bestiary','bestiary_custom'];
+    const DM_WRITE_TYPES = ['initiative_state','map_data','map_data_dm','characters','journals','npcs','timeline','potion_ingredients','potions','negative_potions','potion_inventories','potion_recipes','potion_library','bestiary','bestiary_custom','encounters'];
     if (DM_WRITE_TYPES.includes(body?.type)) {
       const auth = await verifyDMAuth(request, env);
       if (!auth.ok) return json({ error: 'DM auth required' }, 401);
