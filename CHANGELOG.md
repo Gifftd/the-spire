@@ -9,6 +9,63 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: auto-tag bestiary with role + terrain (random-generator prep)
+
+Phase 1 of the random monster generator. Every monster in the bestiary now
+gets a Flee Mortals **role** (one of Ambusher / Artillery / Brute /
+Controller / Defender / Leader / Skirmisher / Soldier / Support) and a
+**terrain** list drawn from a 12-entry vocabulary (arctic, coastal, desert,
+forest, grassland, hill, mountain, swamp, underdark, underwater, urban,
+planar). These tags are the inputs the upcoming Generate tab will use to
+filter and procedurally compose new stat blocks.
+
+#### Added — `scripts/tag_bestiary.py`
+
+- Reads `bestiary.json` at the project root, computes `role` and
+  `terrain[]` for each monster, writes the file back in place.
+- Idempotent: a `roleManual: true` or `terrainManual: true` flag on any
+  monster preserves its current tag (the Editor sets these when a DM
+  corrects a chip — re-running the tagger never clobbers human input).
+- Bumps `schemaVersion` to 5 and stashes the taxonomy under `_taxonomy`
+  on the root envelope, so the page can render the chip pickers from
+  the same source of truth.
+
+#### Heuristics
+
+- **Role** is a priority-ordered ladder fed by the same action
+  classifier the Analysis tab uses (`Melee/Ranged Attack Roll`,
+  `Saving Throw: DC`, `Multiattack: makes N attacks`). Order:
+  Ambusher → Support/Leader → Brute (Giants/Dragons/big-HP melee) →
+  Controller → Artillery → Defender → Skirmisher → Soldier. Save effects
+  living in traits, bonus actions, or reactions (Petrifying Gaze,
+  Frightful Presence, Death Burst) are counted toward `save_acts` so
+  monsters defined by passive save-DC abilities read as controllers.
+  Multi-effect bodies like Beholder Eye Rays inflate the count by every
+  additional "Saving Throw" mention in the same action.
+- **Terrain** combines (a) name + description keyword matches against a
+  per-terrain regex library, (b) speed signals (swim 30+ → underwater,
+  burrow 20+ → underdark), (c) dragon color → terrain table for the ten
+  chromatic/metallic/gem colors, and (d) creature-type defaults for
+  monsters that hit nothing else.
+- Word-boundary matching everywhere — early drafts caught
+  "magic**ally**" in `magically shoots` and wrongly flagged the Beholder
+  as a Leader.
+
+#### Spot-check accuracy
+
+Across 31 canonical monsters (Adult Red Dragon, Lich, Mind Flayer,
+Beholder, Vampire, Hill/Stone/Storm Giant, Knight, Hobgoblin, Priest,
+Aboleth, Dryad, Druid, Banshee, Medusa, Owlbear, Iron/Stone Golem,
+Manticore, Archmage, Mage, etc.) the classifier scores **29 / 31 = 93%**
+matching the expected Flee Mortals role. The two misses (Bandit Captain
+and Medusa with no explicit Petrifying Gaze trait) and the
+underrepresented Artillery bucket — most spellcasters route to
+Controller because we can't introspect spell lists — are documented as
+expected gaps; the Editor's manual-override path will let DMs correct
+specific monsters without breaking on re-runs.
+
+---
+
 ### War Table: view stat block on a combatant card
 
 Closes the bestiary → tracker loop. Combatants spawned via the Bestiary
