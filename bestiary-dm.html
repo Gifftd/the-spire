@@ -199,6 +199,35 @@
     .ability-chip.wis{color:#dac;border-color:#85a}
     .ability-chip.cha{color:#fac;border-color:#a48}
 
+    /* Template-picker modal */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:200;padding:1rem}
+    .modal-backdrop.hidden{display:none}
+    .tpl-modal{background:var(--panel);border:1px solid var(--border-light);border-radius:var(--radius);max-width:640px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.8)}
+    .tpl-header{display:flex;align-items:center;justify-content:space-between;padding:0.9rem 1.1rem;border-bottom:1px solid var(--border)}
+    .tpl-header h2{font-family:'Cinzel',serif;font-size:0.85rem;letter-spacing:0.1em;color:var(--brass-bright);text-transform:uppercase;font-weight:700}
+    .tpl-close{background:none;border:none;color:var(--ink-faint);font-size:1.1rem;cursor:pointer;padding:2px 6px}
+    .tpl-close:hover{color:var(--ink)}
+    .tpl-body{padding:0.9rem 1.1rem;overflow-y:auto;flex:1}
+    .tpl-footer{padding:0.7rem 1.1rem;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+    .tpl-kind-row{display:grid;grid-template-columns:120px 1fr;gap:8px;align-items:center;padding-bottom:0.7rem;margin-bottom:0.7rem;border-bottom:1px solid var(--border)}
+    .tpl-kind-row label{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint)}
+    .tpl-form{display:grid;gap:0.6rem}
+    .tpl-form .row{display:grid;gap:0.5rem;align-items:end}
+    .tpl-form .row.c2{grid-template-columns:1fr 1fr}
+    .tpl-form .row.c3{grid-template-columns:repeat(3,1fr)}
+    .tpl-form .row.c4{grid-template-columns:repeat(4,1fr)}
+    .tpl-form .fg{display:flex;flex-direction:column;gap:3px;min-width:0}
+    .tpl-form .fg label{font-family:'Cinzel',serif;font-size:0.54rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint)}
+    .tpl-form .fg input,.tpl-form .fg select,.tpl-form .fg textarea{font-size:0.92rem;padding:5px 8px;background:var(--panel-deep);border:1px solid var(--border);border-radius:2px;color:var(--ink);outline:none}
+    .tpl-form .fg input:focus,.tpl-form .fg select:focus{border-color:var(--teal)}
+    .tpl-form .fg textarea{min-height:60px;line-height:1.45;resize:vertical}
+    .tpl-help{font-size:0.84rem;color:var(--ink-faint);font-style:italic;margin-bottom:0.4rem}
+    .tpl-preview{background:var(--panel-deep);border:1px solid var(--border);border-top:2px solid var(--brass);border-radius:var(--radius);padding:0.7rem 0.8rem;margin-top:0.6rem;font-size:0.92rem;line-height:1.5}
+    .tpl-preview .name{font-family:'Cinzel',serif;color:var(--brass-bright);font-weight:600;margin-bottom:0.3rem}
+    .tpl-preview .body{color:var(--ink-light)}
+    .tpl-preview-h{font-family:'Cinzel',serif;font-size:0.58rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--brass);margin-bottom:0.3rem}
+    .tpl-derived{font-family:'Cinzel',serif;font-size:0.7rem;color:var(--teal-bright);padding:3px 8px;background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius);display:inline-block}
+
     .footer{margin-top:2rem;text-align:center;padding-top:1.5rem;border-top:1px solid var(--border)}
     .footer-text{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--ink-faint)}
   </style>
@@ -336,7 +365,13 @@
               <div class="ed-feat-list" id="ed-traits-list"></div>
             </div>
             <div class="ed-sec">
-              <div class="ed-sec-h"><span>Actions (<span id="ed-actions-n">0</span>)</span><button class="btn ghost sm" onclick="addFeature('actions')">+ Add action</button></div>
+              <div class="ed-sec-h">
+                <span>Actions (<span id="ed-actions-n">0</span>)</span>
+                <span style="display:flex;gap:6px">
+                  <button class="btn ghost sm" onclick="openTemplateModal()" title="Compose a 2024 MM-shaped action from a template (Melee/Ranged/Save/Multiattack/Spellcasting)">+ From template…</button>
+                  <button class="btn ghost sm" onclick="addFeature('actions')">+ Add blank</button>
+                </span>
+              </div>
               <div class="ed-feat-list" id="ed-actions-list"></div>
             </div>
             <div class="ed-sec">
@@ -432,6 +467,37 @@
 
     <div class="footer"><p class="footer-text">The Spire · The Menagerie</p></div>
   </div>
+  <!-- TEMPLATE PICKER MODAL -->
+  <div class="modal-backdrop hidden" id="tpl-modal" onclick="if(event.target===this)closeTemplateModal()">
+    <div class="tpl-modal">
+      <div class="tpl-header">
+        <h2>Action template</h2>
+        <button class="tpl-close" onclick="closeTemplateModal()">✕</button>
+      </div>
+      <div class="tpl-body">
+        <div class="tpl-help">Pick a template and fill in the parameters. The preview shows the exact phrasing that will be added — you can hand-edit after.</div>
+        <div class="tpl-kind-row">
+          <label>Template</label>
+          <select id="tpl-kind" onchange="onTemplateKindChange()">
+            <option value="melee_attack">Melee Weapon Attack</option>
+            <option value="ranged_attack">Ranged Weapon Attack</option>
+            <option value="flex_attack">Melee or Ranged (Flex) Attack</option>
+            <option value="save_effect">Save Effect (DC-based)</option>
+            <option value="multiattack">Multiattack</option>
+            <option value="spellcasting">Spellcasting Block</option>
+          </select>
+        </div>
+        <div class="tpl-form" id="tpl-form"></div>
+        <div class="tpl-preview-h">Preview</div>
+        <div class="tpl-preview" id="tpl-preview"><div class="name">—</div><div class="body">Fill the fields above.</div></div>
+      </div>
+      <div class="tpl-footer">
+        <button class="btn ghost" onclick="closeTemplateModal()">Cancel</button>
+        <button class="btn brass" id="tpl-add-btn" onclick="composeFromTemplate()">Add action</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <script src="auth.js"></script>
@@ -1685,6 +1751,398 @@
       const dcBlurb  = row.dcMed  != null ? `DC ${Math.round(row.dcMed)}` : '';
       syncEditor();
       toast(`Filled CR ${currentEdit.crText} medians (n=${row.n}). Suggested: ${[atkBlurb,dmgBlurb,dcBlurb].filter(Boolean).join(', ')}.`);
+    }
+
+    /* ── Action templates ──
+     * Six structured forms that compose into 2024 MM-shaped action prose:
+     *   - melee_attack, ranged_attack, flex_attack
+     *   - save_effect (covers normal + recharge)
+     *   - multiattack
+     *   - spellcasting
+     * Each template's `defaults(monster)` seeds the form based on the
+     * monster's current CR/PB/abilities. `compose(fields, monster)` produces
+     * `{ name, body }` matching the book's phrasing as closely as possible.
+     * The DM can hand-edit any field after the action is added.
+     */
+    const DMG_TYPES = ['Slashing','Piercing','Bludgeoning','Acid','Cold','Fire','Force','Lightning','Necrotic','Poison','Psychic','Radiant','Thunder'];
+    const SAVE_ABILITIES = ['str','dex','con','int','wis','cha'];
+    const RECHARGE_OPTIONS = [
+      { value: '',     label: 'None' },
+      { value: '5-6',  label: 'Recharge 5–6' },
+      { value: '6',    label: 'Recharge 6' },
+      { value: '4-6',  label: 'Recharge 4–6' },
+      { value: '1/Day',label: '1/Day' },
+      { value: '2/Day',label: '2/Day' },
+      { value: '3/Day',label: '3/Day' }
+    ];
+
+    function avgFromDice(dice){
+      // Parse "NdM", "NdM+K", "NdM - K", "NdM+0" etc. Returns floor of expected value.
+      const m = (dice || '').replace(/\s+/g,'').match(/^(\d+)d(\d+)([+\-]\d+)?$/i);
+      if (!m) return null;
+      const n = parseInt(m[1], 10), sides = parseInt(m[2], 10);
+      const bonus = m[3] ? parseInt(m[3], 10) : 0;
+      return Math.floor(n * (sides + 1) / 2 + bonus);
+    }
+
+    function attackBonusFor(ability, monster){
+      const mod = monster?.abilities?.[ability]?.mod ?? 0;
+      const pb = monster?.pb ?? 2;
+      return mod + pb;
+    }
+    function saveDCFor(ability, monster){
+      const mod = monster?.abilities?.[ability]?.mod ?? 0;
+      const pb = monster?.pb ?? 2;
+      return 8 + pb + mod;
+    }
+    function rechargeMarker(recharge){
+      if (!recharge) return '';
+      if (/^\d\/Day$/.test(recharge)) return ` (${recharge})`;
+      return ` (Recharge ${recharge.replace('-', '–')})`;  // en-dash to match book typography
+    }
+    function damageEntry(dice, type){
+      const avg = avgFromDice(dice);
+      if (avg == null || !type) return null;
+      return `${avg} (${dice.replace(/\s+/g,'')}) ${type} damage`;
+    }
+
+    const TEMPLATES = {
+      melee_attack: {
+        label: 'Melee Weapon Attack',
+        defaults: (m) => ({
+          weaponName: '',
+          ability: 'str',
+          reach: 5,
+          damageDice: '1d6+3',
+          damageType: 'Slashing',
+          riderDice: '',
+          riderType: '',
+          recharge: ''
+        }),
+        renderForm: (f, m) => `
+          <div class="row c2">
+            <div class="fg"><label>Attack name</label><input id="tplf-weaponName" placeholder="e.g. Greatsword, Tentacle, Bite" value="${esc(f.weaponName||'')}"></div>
+            <div class="fg"><label>Ability</label><select id="tplf-ability">${SAVE_ABILITIES.map(a => `<option value="${a}" ${a===f.ability?'selected':''}>${a.toUpperCase()}</option>`).join('')}</select></div>
+          </div>
+          <div class="row c3">
+            <div class="fg"><label>Reach (ft)</label><input id="tplf-reach" type="number" min="5" value="${f.reach}"></div>
+            <div class="fg"><label>Damage dice</label><input id="tplf-damageDice" placeholder="2d6+4" value="${esc(f.damageDice||'')}"></div>
+            <div class="fg"><label>Damage type</label><select id="tplf-damageType">${DMG_TYPES.map(d => `<option ${d===f.damageType?'selected':''}>${d}</option>`).join('')}</select></div>
+          </div>
+          <div class="row c3">
+            <div class="fg"><label>Rider damage (optional)</label><input id="tplf-riderDice" placeholder="e.g. 2d10" value="${esc(f.riderDice||'')}"></div>
+            <div class="fg"><label>Rider type</label><select id="tplf-riderType"><option value="">—</option>${DMG_TYPES.map(d => `<option ${d===f.riderType?'selected':''}>${d}</option>`).join('')}</select></div>
+            <div class="fg"><label>Recharge / limit</label><select id="tplf-recharge">${RECHARGE_OPTIONS.map(o => `<option value="${o.value}" ${o.value===f.recharge?'selected':''}>${o.label}</option>`).join('')}</select></div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:0.3rem">
+            <span class="tpl-derived">Attack: +${attackBonusFor(f.ability, m)}</span>
+            <span class="tpl-derived">Damage avg: ${avgFromDice(f.damageDice) ?? '—'}</span>
+            ${f.riderDice ? `<span class="tpl-derived">Rider avg: ${avgFromDice(f.riderDice) ?? '—'}</span>` : ''}
+          </div>
+        `,
+        compose: (f, m) => {
+          const atk = attackBonusFor(f.ability, m);
+          const dmg = damageEntry(f.damageDice, f.damageType);
+          const rider = (f.riderDice && f.riderType) ? damageEntry(f.riderDice, f.riderType) : null;
+          let body = `Melee Attack Roll: ${atk >= 0 ? '+' : ''}${atk}, reach ${f.reach} ft. Hit: ${dmg || '— damage'}${rider ? ` plus ${rider}` : ''}.`;
+          const name = (f.weaponName || 'Attack') + rechargeMarker(f.recharge);
+          return { name, body };
+        }
+      },
+
+      ranged_attack: {
+        label: 'Ranged Weapon Attack',
+        defaults: (m) => ({
+          weaponName: '',
+          ability: 'dex',
+          rangeShort: 30,
+          rangeLong: 120,
+          damageDice: '1d8+2',
+          damageType: 'Piercing',
+          riderDice: '',
+          riderType: '',
+          recharge: ''
+        }),
+        renderForm: (f, m) => `
+          <div class="row c2">
+            <div class="fg"><label>Attack name</label><input id="tplf-weaponName" placeholder="e.g. Longbow, Wind Javelin" value="${esc(f.weaponName||'')}"></div>
+            <div class="fg"><label>Ability</label><select id="tplf-ability">${SAVE_ABILITIES.map(a => `<option value="${a}" ${a===f.ability?'selected':''}>${a.toUpperCase()}</option>`).join('')}</select></div>
+          </div>
+          <div class="row c4">
+            <div class="fg"><label>Short range (ft)</label><input id="tplf-rangeShort" type="number" value="${f.rangeShort}"></div>
+            <div class="fg"><label>Long range (ft)</label><input id="tplf-rangeLong" type="number" value="${f.rangeLong}"></div>
+            <div class="fg"><label>Damage dice</label><input id="tplf-damageDice" placeholder="1d8+2" value="${esc(f.damageDice||'')}"></div>
+            <div class="fg"><label>Damage type</label><select id="tplf-damageType">${DMG_TYPES.map(d => `<option ${d===f.damageType?'selected':''}>${d}</option>`).join('')}</select></div>
+          </div>
+          <div class="row c3">
+            <div class="fg"><label>Rider damage (optional)</label><input id="tplf-riderDice" placeholder="e.g. 1d4" value="${esc(f.riderDice||'')}"></div>
+            <div class="fg"><label>Rider type</label><select id="tplf-riderType"><option value="">—</option>${DMG_TYPES.map(d => `<option ${d===f.riderType?'selected':''}>${d}</option>`).join('')}</select></div>
+            <div class="fg"><label>Recharge / limit</label><select id="tplf-recharge">${RECHARGE_OPTIONS.map(o => `<option value="${o.value}" ${o.value===f.recharge?'selected':''}>${o.label}</option>`).join('')}</select></div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:0.3rem">
+            <span class="tpl-derived">Attack: +${attackBonusFor(f.ability, m)}</span>
+            <span class="tpl-derived">Damage avg: ${avgFromDice(f.damageDice) ?? '—'}</span>
+          </div>
+        `,
+        compose: (f, m) => {
+          const atk = attackBonusFor(f.ability, m);
+          const dmg = damageEntry(f.damageDice, f.damageType);
+          const rider = (f.riderDice && f.riderType) ? damageEntry(f.riderDice, f.riderType) : null;
+          let body = `Ranged Attack Roll: ${atk >= 0 ? '+' : ''}${atk}, range ${f.rangeShort}/${f.rangeLong} ft. Hit: ${dmg || '— damage'}${rider ? ` plus ${rider}` : ''}.`;
+          const name = (f.weaponName || 'Attack') + rechargeMarker(f.recharge);
+          return { name, body };
+        }
+      },
+
+      flex_attack: {
+        label: 'Melee or Ranged (Flex) Attack',
+        defaults: (m) => ({
+          weaponName: '',
+          ability: 'str',
+          reach: 5,
+          rangeShort: 30,
+          rangeLong: 120,
+          damageDice: '1d6+3',
+          damageType: 'Piercing',
+          riderDice: '',
+          riderType: '',
+          recharge: ''
+        }),
+        renderForm: (f, m) => `
+          <div class="row c2">
+            <div class="fg"><label>Attack name</label><input id="tplf-weaponName" placeholder="e.g. Handaxe, Javelin" value="${esc(f.weaponName||'')}"></div>
+            <div class="fg"><label>Ability</label><select id="tplf-ability">${SAVE_ABILITIES.map(a => `<option value="${a}" ${a===f.ability?'selected':''}>${a.toUpperCase()}</option>`).join('')}</select></div>
+          </div>
+          <div class="row c3">
+            <div class="fg"><label>Reach (ft)</label><input id="tplf-reach" type="number" min="5" value="${f.reach}"></div>
+            <div class="fg"><label>Range short</label><input id="tplf-rangeShort" type="number" value="${f.rangeShort}"></div>
+            <div class="fg"><label>Range long</label><input id="tplf-rangeLong" type="number" value="${f.rangeLong}"></div>
+          </div>
+          <div class="row c3">
+            <div class="fg"><label>Damage dice</label><input id="tplf-damageDice" placeholder="1d6+3" value="${esc(f.damageDice||'')}"></div>
+            <div class="fg"><label>Damage type</label><select id="tplf-damageType">${DMG_TYPES.map(d => `<option ${d===f.damageType?'selected':''}>${d}</option>`).join('')}</select></div>
+            <div class="fg"><label>Recharge / limit</label><select id="tplf-recharge">${RECHARGE_OPTIONS.map(o => `<option value="${o.value}" ${o.value===f.recharge?'selected':''}>${o.label}</option>`).join('')}</select></div>
+          </div>
+          <div class="row c2">
+            <div class="fg"><label>Rider damage (optional)</label><input id="tplf-riderDice" placeholder="e.g. 1d4" value="${esc(f.riderDice||'')}"></div>
+            <div class="fg"><label>Rider type</label><select id="tplf-riderType"><option value="">—</option>${DMG_TYPES.map(d => `<option ${d===f.riderType?'selected':''}>${d}</option>`).join('')}</select></div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:0.3rem">
+            <span class="tpl-derived">Attack: +${attackBonusFor(f.ability, m)}</span>
+            <span class="tpl-derived">Damage avg: ${avgFromDice(f.damageDice) ?? '—'}</span>
+          </div>
+        `,
+        compose: (f, m) => {
+          const atk = attackBonusFor(f.ability, m);
+          const dmg = damageEntry(f.damageDice, f.damageType);
+          const rider = (f.riderDice && f.riderType) ? damageEntry(f.riderDice, f.riderType) : null;
+          let body = `Melee or Ranged Attack Roll: ${atk >= 0 ? '+' : ''}${atk}, reach ${f.reach} ft. or range ${f.rangeShort}/${f.rangeLong} ft. Hit: ${dmg || '— damage'}${rider ? ` plus ${rider}` : ''}.`;
+          const name = (f.weaponName || 'Attack') + rechargeMarker(f.recharge);
+          return { name, body };
+        }
+      },
+
+      save_effect: {
+        label: 'Save Effect',
+        defaults: (m) => ({
+          actionName: '',
+          targetSave: 'dex',
+          dcAbility: 'con',
+          target: 'each creature in a 30-foot Cone',
+          damageDice: '6d6',
+          damageType: 'Fire',
+          failureSuffix: '',
+          successHalf: true,
+          successSuffix: '',
+          recharge: '5-6'
+        }),
+        renderForm: (f, m) => `
+          <div class="row c2">
+            <div class="fg"><label>Action name</label><input id="tplf-actionName" placeholder="e.g. Fire Breath, Frightful Presence" value="${esc(f.actionName||'')}"></div>
+            <div class="fg"><label>Recharge / limit</label><select id="tplf-recharge">${RECHARGE_OPTIONS.map(o => `<option value="${o.value}" ${o.value===f.recharge?'selected':''}>${o.label}</option>`).join('')}</select></div>
+          </div>
+          <div class="row c2">
+            <div class="fg"><label>Target's save ability</label><select id="tplf-targetSave">${SAVE_ABILITIES.map(a => `<option value="${a}" ${a===f.targetSave?'selected':''}>${a.toUpperCase()}</option>`).join('')}</select></div>
+            <div class="fg"><label>Monster ability driving DC</label><select id="tplf-dcAbility">${SAVE_ABILITIES.map(a => `<option value="${a}" ${a===f.dcAbility?'selected':''}>${a.toUpperCase()}</option>`).join('')}</select></div>
+          </div>
+          <div class="fg"><label>Target / area</label><input id="tplf-target" placeholder="e.g. each creature in a 30-foot Cone" value="${esc(f.target||'')}"></div>
+          <div class="row c2">
+            <div class="fg"><label>Damage dice (optional)</label><input id="tplf-damageDice" placeholder="e.g. 6d6" value="${esc(f.damageDice||'')}"></div>
+            <div class="fg"><label>Damage type</label><select id="tplf-damageType">${DMG_TYPES.map(d => `<option ${d===f.damageType?'selected':''}>${d}</option>`).join('')}</select></div>
+          </div>
+          <div class="fg"><label>Extra failure clause (optional)</label><textarea id="tplf-failureSuffix" placeholder="e.g. The target has the Frightened condition until the end of its next turn.">${esc(f.failureSuffix||'')}</textarea></div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.88rem;color:var(--ink-light)"><input type="checkbox" id="tplf-successHalf" ${f.successHalf?'checked':''}> Success: half damage</label>
+          <div class="fg"><label>Extra success clause (optional)</label><textarea id="tplf-successSuffix" placeholder="e.g. No damage and no effect.">${esc(f.successSuffix||'')}</textarea></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:0.3rem">
+            <span class="tpl-derived">DC: ${saveDCFor(f.dcAbility, m)}</span>
+            ${f.damageDice ? `<span class="tpl-derived">Damage avg: ${avgFromDice(f.damageDice) ?? '—'}</span>` : ''}
+          </div>
+        `,
+        compose: (f, m) => {
+          const dc = saveDCFor(f.dcAbility, m);
+          const saveAbil = ({ str:'Strength', dex:'Dexterity', con:'Constitution', int:'Intelligence', wis:'Wisdom', cha:'Charisma' })[f.targetSave] || 'Dexterity';
+          const dmg = (f.damageDice && f.damageType) ? damageEntry(f.damageDice, f.damageType) : null;
+          let failure = '';
+          if (dmg) failure = dmg + '.';
+          if (f.failureSuffix) failure = (failure ? failure + ' ' : '') + f.failureSuffix.trim();
+          let success = '';
+          if (f.successHalf && dmg) success = 'Half damage only.';
+          if (f.successSuffix) success = (success ? success + ' ' : '') + f.successSuffix.trim();
+          let body = `${saveAbil} Saving Throw: DC ${dc}, ${f.target}.`;
+          if (failure) body += ` Failure: ${failure}`;
+          if (success) body += ` Success: ${success}`;
+          const name = (f.actionName || 'Effect') + rechargeMarker(f.recharge);
+          return { name, body };
+        }
+      },
+
+      multiattack: {
+        label: 'Multiattack',
+        defaults: (m) => ({
+          count: 2,
+          attackName: '',
+          preamble: '',
+          coda: ''
+        }),
+        renderForm: (f, m) => `
+          <div class="row c2">
+            <div class="fg"><label>Attack count</label><input id="tplf-count" type="number" min="1" max="10" value="${f.count}"></div>
+            <div class="fg"><label>Attack name (must match an action above)</label><input id="tplf-attackName" placeholder="e.g. Tentacle, Bite, Greatsword" value="${esc(f.attackName||'')}"></div>
+          </div>
+          <div class="fg"><label>Preamble (optional)</label><input id="tplf-preamble" placeholder='e.g. "uses Spellcasting, then"' value="${esc(f.preamble||'')}"></div>
+          <div class="fg"><label>Coda (optional)</label><input id="tplf-coda" placeholder='e.g. "and uses Animal Spirit if available"' value="${esc(f.coda||'')}"></div>
+          <div class="tpl-help" style="margin-top:0.3rem">The monster's name is inserted automatically: "The &lt;monster&gt; makes …".</div>
+        `,
+        compose: (f, m) => {
+          const cnt = Math.max(1, Math.min(10, parseInt(f.count, 10) || 2));
+          const countWord = ({1:'one',2:'two',3:'three',4:'four',5:'five',6:'six',7:'seven',8:'eight',9:'nine',10:'ten'})[cnt] || String(cnt);
+          const noun = (m.name || 'creature').toLowerCase();
+          const attack = (f.attackName || 'Slam').trim();
+          // Naive pluralization — matches book pattern (Tentacle attacks, Slam attacks, Bite attacks).
+          let body = `The ${noun} `;
+          if (f.preamble) body += f.preamble.replace(/[.,;]+$/,'').trim() + ', then ';
+          body += `makes ${countWord} ${attack} attacks`;
+          if (f.coda) body += ' ' + f.coda.replace(/^,\s*/, '').trim();
+          body = body.trim().replace(/\.+$/, '') + '.';
+          return { name: 'Multiattack', body };
+        }
+      },
+
+      spellcasting: {
+        label: 'Spellcasting Block',
+        defaults: (m) => ({
+          spellAbility: 'cha',
+          atWill: '',
+          oneDay: '',
+          twoDay: '',
+          threeDay: ''
+        }),
+        renderForm: (f, m) => `
+          <div class="row c2">
+            <div class="fg"><label>Spellcasting ability</label><select id="tplf-spellAbility">${SAVE_ABILITIES.map(a => `<option value="${a}" ${a===f.spellAbility?'selected':''}>${a.toUpperCase()}</option>`).join('')}</select></div>
+            <div></div>
+          </div>
+          <div class="fg"><label>At-Will (comma-separated)</label><input id="tplf-atWill" placeholder="e.g. Mage Hand, Message, Gust of Wind" value="${esc(f.atWill||'')}"></div>
+          <div class="fg"><label>1/Day each</label><input id="tplf-oneDay" placeholder="e.g. Lightning Bolt" value="${esc(f.oneDay||'')}"></div>
+          <div class="fg"><label>2/Day each</label><input id="tplf-twoDay" placeholder="e.g. Fireball" value="${esc(f.twoDay||'')}"></div>
+          <div class="fg"><label>3/Day each</label><input id="tplf-threeDay" placeholder="" value="${esc(f.threeDay||'')}"></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:0.3rem">
+            <span class="tpl-derived">Spell save DC: ${saveDCFor(f.spellAbility, m)}</span>
+            <span class="tpl-derived">Spell attack: +${attackBonusFor(f.spellAbility, m)}</span>
+          </div>
+        `,
+        compose: (f, m) => {
+          const ab = ({ str:'Strength', dex:'Dexterity', con:'Constitution', int:'Intelligence', wis:'Wisdom', cha:'Charisma' })[f.spellAbility] || 'Charisma';
+          const dc = saveDCFor(f.spellAbility, m);
+          const noun = (m.name || 'creature').toLowerCase();
+          const lines = [`The ${noun} casts one of the following spells, requiring no Material components and using ${ab} as the spellcasting ability (spell save DC ${dc}):`];
+          if (f.atWill)   lines.push(`At Will: ${f.atWill.trim()}`);
+          if (f.oneDay)   lines.push(`1/Day Each: ${f.oneDay.trim()}`);
+          if (f.twoDay)   lines.push(`2/Day Each: ${f.twoDay.trim()}`);
+          if (f.threeDay) lines.push(`3/Day Each: ${f.threeDay.trim()}`);
+          return { name: 'Spellcasting', body: lines.join('\n') };
+        }
+      }
+    };
+
+    // Modal state.
+    let _tpl = { kind: 'melee_attack', fields: null };
+
+    function openTemplateModal(){
+      _tpl.kind = 'melee_attack';
+      _tpl.fields = TEMPLATES[_tpl.kind].defaults(currentEdit);
+      document.getElementById('tpl-kind').value = _tpl.kind;
+      document.getElementById('tpl-modal').classList.remove('hidden');
+      renderTemplateForm();
+    }
+    function closeTemplateModal(){
+      document.getElementById('tpl-modal').classList.add('hidden');
+    }
+    function onTemplateKindChange(){
+      _tpl.kind = document.getElementById('tpl-kind').value;
+      _tpl.fields = TEMPLATES[_tpl.kind].defaults(currentEdit);
+      renderTemplateForm();
+    }
+    function renderTemplateForm(){
+      const tpl = TEMPLATES[_tpl.kind];
+      const formEl = document.getElementById('tpl-form');
+      formEl.innerHTML = tpl.renderForm(_tpl.fields, currentEdit);
+      // Wire every form input to syncTemplateForm so the preview + derived chips update live.
+      formEl.querySelectorAll('input, select, textarea').forEach(el => {
+        el.addEventListener('input', syncTemplateForm);
+        el.addEventListener('change', syncTemplateForm);
+      });
+      renderTemplatePreview();
+    }
+    function readTemplateFields(){
+      // Collect every tplf-* input back into _tpl.fields.
+      const out = {};
+      document.querySelectorAll('[id^=tplf-]').forEach(el => {
+        const key = el.id.slice('tplf-'.length);
+        if (el.type === 'checkbox') out[key] = el.checked;
+        else if (el.type === 'number') out[key] = parseInt(el.value, 10);
+        else out[key] = el.value;
+      });
+      _tpl.fields = { ..._tpl.fields, ...out };
+    }
+    function syncTemplateForm(){
+      readTemplateFields();
+      // Re-render to refresh the derived chips (attack bonus, DC, damage avg) — they live inside the form HTML.
+      const formEl = document.getElementById('tpl-form');
+      const focusId = document.activeElement && document.activeElement.id;
+      const selStart = document.activeElement && (document.activeElement.selectionStart ?? null);
+      const selEnd   = document.activeElement && (document.activeElement.selectionEnd ?? null);
+      formEl.innerHTML = TEMPLATES[_tpl.kind].renderForm(_tpl.fields, currentEdit);
+      formEl.querySelectorAll('input, select, textarea').forEach(el => {
+        el.addEventListener('input', syncTemplateForm);
+        el.addEventListener('change', syncTemplateForm);
+      });
+      // Restore focus + caret position so typing doesn't jump.
+      if (focusId){
+        const el = document.getElementById(focusId);
+        if (el){
+          el.focus();
+          if (selStart != null && typeof el.setSelectionRange === 'function'){
+            try { el.setSelectionRange(selStart, selEnd); } catch {}
+          }
+        }
+      }
+      renderTemplatePreview();
+    }
+    function renderTemplatePreview(){
+      const { name, body } = TEMPLATES[_tpl.kind].compose(_tpl.fields, currentEdit);
+      document.getElementById('tpl-preview').innerHTML =
+        `<div class="name">${esc(name || '—')}</div><div class="body">${esc(body || '').replace(/\n/g, '<br>')}</div>`;
+    }
+    function composeFromTemplate(){
+      readTemplateFields();
+      const { name, body } = TEMPLATES[_tpl.kind].compose(_tpl.fields, currentEdit);
+      if (!Array.isArray(currentEdit.actions)) currentEdit.actions = [];
+      currentEdit.actions.push({ name, body });
+      renderFeatureList('actions');
+      syncEditor();
+      closeTemplateModal();
+      toast(`Added "${name}" to actions.`);
     }
 
     async function saveKey(type, payload){
