@@ -9,6 +9,74 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: action classifier + action-breakdown analysis (Phase 1)
+
+First half of the template-driven editor work. A regex classifier walks every
+action body in the imported bestiary and tags it with structured metadata
+(kind, attack bonus, damage entries, save ability + DC, recharge marker,
+inferred Str/Dex/Con/etc.). The Analysis tab gets a new **Action breakdown**
+section showing what archetypes actually exist in the corpus — the basis
+for Phase 2's template set.
+
+#### Classifier shape — `bestiary-dm.html`
+
+`classifyAction(action, monster) → { kind, attackBonus, damageEntries,
+inferredAbility, saveAbility, saveDC, saveInferredAbility, recharge, perDay,
+multiCount, reach, range }`
+
+Action kinds covered:
+- `multiattack`, `melee_attack`, `ranged_attack`, `flex_attack` (melee or ranged),
+  `save_effect`, `spellcasting`, `recharge_attack`, `recharge_save`, `utility`
+
+Inference helpers:
+- **`inferAttackAbility(bonus, monster, kind)`** — matches the printed attack
+  bonus to `(mod + PB)` for some ability. Tiebreaker prefers Str for melee
+  and Dex for ranged.
+- **`inferSaveAbility(dc, monster)`** — inverts `DC = 8 + PB + mod` to find
+  the ability that powers the save. Tiebreaker prefers Con (the 2024 MM
+  default for breath weapons / area saves), then Wis/Cha/Int/Str/Dex.
+  Initial tiebreaker order was wrong (Wis/Cha first) and mis-attributed
+  dragon-wyrmling breath weapons to CHA; verified with a sample inspection
+  pass and fixed before commit.
+
+#### Surfaces — `bestiary-dm.html` (Analysis tab)
+- **Action kinds (overall)** — horizontal bar chart of total counts.
+- **Attack ability (Str vs Dex)** — same shape, scoped to attack actions.
+- **Action kinds × CR tier** — compact matrix (rows: 0–2, 3–5, 6–10, 11–15,
+  16–20, 21+; cols: every nonzero kind).
+- **Save effects by CR tier** — n, median DC, top inferred save ability with
+  count.
+- **Recharge / per-day** — % of monsters in each CR tier carrying at least
+  one recharge action, plus total recharge action count.
+- **Top action archetypes** — top-20 `(kind × ability × primary damage type)`
+  tuples, sorted by frequency.
+
+#### Spot-check numbers (full MM 2024)
+- 503 monsters → 1,320 actions classified in ~7ms.
+- Action kinds: Melee 506 · Multiattack 307 · Spellcasting 126 · Save 106 ·
+  Save-recharge 97 · Ranged 79 · Flex 63 · Utility 34 · Attack-recharge 2.
+- Attack ability split: STR 429 · DEX 178 · CHA/INT/WIS small (spell-attack-
+  style cases) · CON 3 · Unknown 0.
+- Top archetypes:
+  - Melee · STR · Slashing — 146
+  - Melee · STR · Piercing — 111
+  - Melee · STR · Bludgeoning — 81
+  - Melee · DEX · Piercing — 51
+  - Melee · DEX · Slashing — 32
+  - Save effect · CON · (no damage) — 31
+  - Ranged · DEX · Piercing — 30
+- Recharge scales with CR: 14% of CR 0–2 monsters → 65% of CR 16+.
+- Every CR tier shows **CON** as the top save ability for save effects
+  (matches 2024 MM canon: breath weapons / area saves are Con-built).
+
+#### Phase 2 hook (not built yet)
+
+These results suggest an ~8-template editor set covers ~95% of the corpus:
+melee STR attack · melee DEX attack · ranged DEX attack · flex STR attack ·
+save effect (CON) · recharge save (CON) · multiattack ("makes N attacks") ·
+spellcasting block. Phase 2 will pick that taxonomy up and add a
+"Quick add from template…" picker to the editor's feature sections.
+
 ### War Table: save and recall encounter presets
 
 Caps the picker work: a DM can save a built-up Picks cart as a named
