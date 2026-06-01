@@ -17,6 +17,11 @@ mm2024-*.json
 mm-*.json
 bestiary.json
 bestiary-*.json
+# Source PDFs of owned third-party bestiaries — kept locally for the
+# scrape pipeline; never committed.
+*.pdf
+tob*.json
+tob-*.json
 
 # macOS
 .DS_Store
@@ -29,3 +34,7 @@ bestiary-*.json
 
 # Node (in case any tooling appears later)
 node_modules/
+
+# Python bytecode cache from the bestiary scripts
+__pycache__/
+*.pyc
