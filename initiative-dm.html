@@ -364,6 +364,28 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
 .bestiary-budget .verdict.high { color: var(--gold); }
 .bestiary-budget .verdict.over { color: #e88; }
 
+/* ── Inline stat block view inside the combatant card's expanded area ── */
+.sb-toggle-row { margin-top: 10px; display: flex; justify-content: flex-end; }
+.sb-panel { margin-top: 8px; background: var(--bg); border: 1px solid var(--border-light); border-top: 2px solid var(--gold); border-radius: var(--radius); padding: 0.7rem 0.85rem; display: none; }
+.sb-panel.show { display: block; }
+.sb-panel h2 { font-family: 'Cinzel', serif; font-size: 1rem; font-weight: 700; letter-spacing: 0.04em; color: var(--gold); margin: 0 0 2px; }
+.sb-panel .sub-line { font-style: italic; color: var(--ink-dim); font-size: 0.84rem; margin-bottom: 0.4rem; }
+.sb-panel .divider { height: 1px; background: var(--gold); opacity: 0.45; margin: 0.5rem 0; }
+.sb-panel .sb-kv { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; font-size: 0.86rem; color: var(--ink-dim); }
+.sb-panel .sb-kv b { font-family: 'Cinzel', serif; font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); margin-right: 0.25rem; font-weight: 600; }
+.sb-panel .abilities { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.3rem; text-align: center; margin: 0.3rem 0; }
+.sb-panel .ab { background: var(--surface); border: 1px solid var(--border); border-radius: 2px; padding: 0.3rem 0.15rem; }
+.sb-panel .ab .lbl { font-family: 'Cinzel', serif; font-size: 0.5rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); }
+.sb-panel .ab .score { font-family: 'Cinzel', serif; font-size: 0.9rem; color: var(--ink); }
+.sb-panel .ab .mod { font-size: 0.78rem; color: var(--ink-dim); }
+.sb-panel .ab .save { display: block; font-size: 0.62rem; color: #88c8e0; margin-top: 1px; }
+.sb-panel .sb-section h4 { font-family: 'Cinzel', serif; font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); margin: 0.5rem 0 0.25rem; padding-bottom: 0.15rem; border-bottom: 1px solid var(--border); }
+.sb-panel .feature { margin-bottom: 0.4rem; font-size: 0.86rem; color: var(--ink-dim); line-height: 1.45; }
+.sb-panel .feature b { color: var(--gold); font-style: italic; font-weight: 600; }
+.sb-panel .desc { margin-top: 0.6rem; padding-top: 0.5rem; border-top: 1px dashed var(--border); color: var(--ink-faint); font-size: 0.82rem; white-space: pre-wrap; line-height: 1.4; }
+.sb-panel .sb-empty { padding: 0.6rem; text-align: center; color: var(--ink-faint); font-style: italic; font-size: 0.85rem; }
+.sb-panel .sb-loading { padding: 0.6rem; text-align: center; color: var(--gold); font-style: italic; font-size: 0.85rem; }
+
 @media (max-width: 700px) {
   .main { grid-template-columns: 1fr; }
   .sidebar { border-left: none; border-top: 1px solid var(--border); }
@@ -663,6 +685,9 @@ let state = {
 
 let combatLog   = {};  // { id: { name, type, startHp, maxHp, endHp, conditionsApplied, notes } }
 let expandedIds = new Set();
+// Combatant cards whose stat-block panel is currently open. Only valid for
+// combatants spawned via the Bestiary picker (`bestiaryId` set).
+let statblockOpenIds = new Set();
 let addType     = 'pc';
 let dragSrc     = null;
 let syncTimer   = null;
@@ -853,6 +878,7 @@ function removeCombatant(id) {
   state.combatants = state.combatants.filter(x => x.id !== id);
   if (state.activeIndex >= state.combatants.length) state.activeIndex = 0;
   expandedIds.delete(id);
+  statblockOpenIds.delete(id);
   savePCs(); render(); pushState();
 }
 
@@ -1311,6 +1337,99 @@ function renderBudget(){
   })[band];
 }
 
+// ───── Combatant stat-block view ─────
+// Pulls a monster's full stat block out of the loaded bestiary and renders
+// it inline inside the combatant card's expanded area. Only works for
+// combatants with a `bestiaryId` set (added via the picker). Bestiary loads
+// lazily on first open — re-uses the picker's load path so it's free if the
+// picker has already been used in this session.
+async function toggleStatblock(combatantId){
+  if (statblockOpenIds.has(combatantId)) {
+    statblockOpenIds.delete(combatantId);
+    render();
+    return;
+  }
+  statblockOpenIds.add(combatantId);
+  render();   // immediately show the panel in "loading" state
+  // Ensure the bestiary is loaded — same path the picker uses.
+  if (!_BP.loaded && !_BP.loading) {
+    await loadBestiary();
+    render();   // re-render to swap loading → real stat block
+  }
+}
+
+function findCombatantStatblock(c){
+  if (!c || !c.bestiaryId) return null;
+  return _BP.monsters.find(m => m.id === c.bestiaryId) || null;
+}
+
+// Adapted from bestiary-dm.html's renderStatblock, sized for inline display
+// inside a combatant card. Same field coverage; tighter spacing.
+function statblockHTML(m){
+  if (!m) return '';
+  const esc = bpEsc;
+  const a = m.abilities || {};
+  const ab = (k) => {
+    const s = a[k] || {};
+    const mod = (s.mod>=0?'+':'') + (s.mod ?? 0);
+    const sv = (s.save !== undefined && s.save !== s.mod)
+      ? `<span class="save">Save ${s.save>=0?'+':''}${s.save}</span>` : '';
+    return `<div class="ab"><div class="lbl">${k.toUpperCase()}</div><div class="score">${s.score ?? '—'}</div><div class="mod">${mod}</div>${sv}</div>`;
+  };
+  const subline = [
+    [m.size, m.sizes && m.sizes.length>1 ? `or ${m.sizes.slice(1).join('/')}` : ''].filter(Boolean).join(' '),
+    m.type,
+    m.subtype ? `(${m.subtype})` : '',
+    m.alignment ? `· ${m.alignment}` : ''
+  ].filter(Boolean).join(' ');
+  const speedStr = m.speedText || '—';
+  const sensesStr = m.sensesText || '—';
+  const skills = m.skills && Object.keys(m.skills).length
+    ? Object.entries(m.skills).map(([k,v]) => `${k} ${v>=0?'+':''}${v}`).join(', ') : '';
+  const langs = Array.isArray(m.languages) && m.languages.length ? m.languages.join(', ') : (m.languagesText || '—');
+  const kvRow = (label, val) => val ? `<div><b>${label}</b>${esc(val)}</div>` : '';
+  const arr = (label, list) => Array.isArray(list) && list.length ? `<div><b>${label}</b>${esc(list.join(', '))}</div>` : '';
+  const featureBlock = (title, list) => {
+    if (!Array.isArray(list) || !list.length) return '';
+    return `<div class="sb-section"><h4>${title}</h4>` +
+      list.map(f => `<div class="feature"><b>${esc(f.name||'')}.</b> ${esc(f.body||'')}</div>`).join('') +
+      `</div>`;
+  };
+  return `
+    <h2>${esc(m.name)}</h2>
+    <div class="sub-line">${esc(subline)}</div>
+    <div class="divider"></div>
+    <div class="sb-kv">
+      ${kvRow('AC', m.acText || (m.ac!=null?String(m.ac):''))}
+      ${kvRow('HP', m.hp!=null ? `${m.hp}${m.hpFormula?` (${m.hpFormula})`:''}` : '')}
+      ${kvRow('Speed', speedStr)}
+      ${kvRow('Initiative', m.initiative!=null ? `${m.initiative>=0?'+':''}${m.initiative}${m.initiativeScore?` (${m.initiativeScore})`:''}` : '')}
+    </div>
+    <div class="divider"></div>
+    <div class="abilities">${['str','dex','con','int','wis','cha'].map(ab).join('')}</div>
+    <div class="divider"></div>
+    <div class="sb-kv">
+      ${kvRow('Skills', skills)}
+      ${arr('Resistances', m.resistances)}
+      ${arr('Damage Immunities', m.damageImmunities)}
+      ${arr('Condition Immunities', m.conditionImmunities)}
+      ${arr('Vulnerabilities', m.vulnerabilities)}
+      ${kvRow('Senses', sensesStr)}
+      ${kvRow('Languages', langs)}
+      ${kvRow('CR', `${m.crText || m.cr || '?'}${m.xp?` (${m.xp.toLocaleString()} XP`:''}${m.pb?`, PB +${m.pb})`: (m.xp?')':'')}`)}
+      ${arr('Gear', m.gear)}
+    </div>
+    ${featureBlock('Traits', m.traits)}
+    ${featureBlock('Actions', m.actions)}
+    ${featureBlock('Bonus Actions', m.bonusActions)}
+    ${featureBlock('Reactions', m.reactions)}
+    ${featureBlock('Legendary Actions', m.legendaryActions)}
+    ${featureBlock('Lair Actions', m.lairActions)}
+    ${featureBlock('Lair Effects', m.lairEffects)}
+    ${m.description ? `<div class="desc">${esc(m.description)}</div>` : ''}
+  `;
+}
+
 function loadAllPicks(){
   if (!_BP.picks.length) return;
   let spawned = 0;
@@ -1553,6 +1672,22 @@ function render() {
           <span class="exp-label">DM NOTES (NOT SHOWN TO PLAYERS)</span>
           <textarea class="notes-input" onclick="event.stopPropagation()" onchange="setNotes(${c.id},this.value)" placeholder="Secret notes…">${c.notes}</textarea>
         </div>
+        ${c.bestiaryId ? `
+        <div class="sb-toggle-row">
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();toggleStatblock(${c.id})">
+            ${statblockOpenIds.has(c.id) ? '▾ Hide stat block' : '📖 View stat block'}
+          </button>
+        </div>
+        ${statblockOpenIds.has(c.id) ? `
+          <div class="sb-panel show" onclick="event.stopPropagation()">
+            ${(() => {
+              if (!_BP.loaded) return '<div class="sb-loading">Loading bestiary…</div>';
+              const m = findCombatantStatblock(c);
+              return m ? statblockHTML(m)
+                       : `<div class="sb-empty">Stat block not found in bestiary (id <code>${bpEsc(c.bestiaryId)}</code>). It may have been removed from KV.</div>`;
+            })()}
+          </div>` : ''}
+        ` : ''}
       </div>
     `;
 

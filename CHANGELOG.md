@@ -9,6 +9,50 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### War Table: view stat block on a combatant card
+
+Closes the bestiary → tracker loop. Combatants spawned via the Bestiary
+picker already carry `bestiaryId` + `bestiarySource` tags; the DM-side
+combatant card now uses those to surface the full stat block inline. No
+worker changes, no player-side leak — the panel only appears on
+initiative-dm.html.
+
+#### Added — `initiative-dm.html`
+
+- New **"📖 View stat block"** button at the bottom of the expanded
+  combatant card. Only rendered when `c.bestiaryId` is set (PCs and
+  manually-typed enemies don't get the button).
+- `statblockOpenIds` Set, mirroring the existing `expandedIds` pattern,
+  tracks which combatants have their stat block panel open.
+- `toggleStatblock(combatantId)` opens/closes the panel and lazy-loads
+  the bestiary on first open via the existing `_BP.loadBestiary()` path
+  — free if the picker has already been used in this session.
+- `findCombatantStatblock(c)` looks the monster up in `_BP.monsters` by
+  `bestiaryId`. Gracefully reports a missing-id case (e.g. the monster
+  was removed from KV after the combatant was spawned).
+- `statblockHTML(monster)` — adapted from the Menagerie's Browse stat
+  block. Same field coverage (header line, AC/HP/Speed/Initiative,
+  ability grid with proficient-save chips, skills, all four
+  resistance/immunity/vulnerability lines, senses/languages, CR/XP/PB,
+  gear, traits, actions, bonus actions, reactions, legendary, lair
+  actions, lair effects, description) but tighter spacing for inline
+  display inside the card.
+- `removeCombatant(id)` now also deletes the id from `statblockOpenIds`
+  so stale entries don't linger.
+- New CSS scoped to `.sb-panel` — gold-topped panel that matches the
+  War Table's existing card aesthetic. Stat-block typography is
+  smaller than the Menagerie's standalone version to fit inside the
+  combatant card without crowding.
+
+#### Verified
+- All eight wiring identifiers present in source (state set, toggle,
+  render, find, button, loading state, cleanup, CSS).
+- `statblockHTML()` invoked on a synthetic Adult Black Dragon
+  (CR 14 / DEX save +7 / Acid immunity / Bite +11 / one Legendary
+  Action / lore description): all fields render correctly, no
+  `undefined`/`null` leaks, save-proficiency chip ("Save +7") appears
+  because the save bonus differs from the raw DEX mod.
+
 ### Menagerie: Import gains a Merge mode (default) — no more accidental overwrites
 
 The Import tab used to fully overwrite the `bestiary` KV value with whatever
