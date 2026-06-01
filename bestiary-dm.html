@@ -502,8 +502,19 @@
       <div class="tab-panel" id="panel-import" style="display:none">
         <div class="form">
           <h3>Import bestiary</h3>
-          <div class="warn"><b>Overwrites</b> the entire bestiary in KV with the contents of the chosen file. Bestiary entries are DM-only and never reach players directly.</div>
-          <div class="hint">Pick the <code>bestiary.json</code> file (output of <code>scripts/normalize_bestiary.py</code>). The file stays on your machine — only its parsed contents go up to your worker's KV.</div>
+          <div class="hint">Pick the <code>bestiary.json</code> file (output of <code>scripts/normalize_bestiary.py</code>). The file stays on your machine — only its parsed contents go up to your worker's KV. Bestiary entries are DM-only and never reach players directly.</div>
+          <div class="fg"><label>Import mode</label>
+            <div style="display:flex;flex-direction:column;gap:5px;font-size:0.92rem;color:var(--ink-light)">
+              <label style="display:flex;align-items:center;gap:7px;cursor:pointer">
+                <input type="radio" name="import-mode" value="merge" checked onchange="onImportModeChange()">
+                <span><b>Merge new</b> — only add monsters whose <code>id</code> isn't already in KV. Existing entries are left alone. <span style="color:var(--teal-bright)">Default — safe for re-imports.</span></span>
+              </label>
+              <label style="display:flex;align-items:center;gap:7px;cursor:pointer">
+                <input type="radio" name="import-mode" value="replace" onchange="onImportModeChange()">
+                <span><b>Replace all</b> — overwrite the entire bestiary with the file's contents. Use this only for a clean reset.</span>
+              </label>
+            </div>
+          </div>
           <div class="fg"><label>Bestiary file</label><input type="file" id="import-file" accept="application/json,.json" onchange="loadSeed(event)"></div>
           <div id="import-preview" class="hint"></div>
           <div class="form-actions">
@@ -848,11 +859,57 @@
     }
 
     /* ── Import ── */
-    function loadSeed(ev){
-      const file = ev.target.files && ev.target.files[0];
+    function getImportMode(){
+      const r = document.querySelector('input[name="import-mode"]:checked');
+      return r ? r.value : 'merge';
+    }
+
+    function computeMergeDelta(existingMonsters, newMonsters){
+      // Match on canonical `id` field. Both my MM scrape and ToB extractor
+      // mint IDs from the monster name, so cross-source collisions would
+      // genuinely mean the same creature. If you want both, do Replace.
+      const existingIds = new Set((existingMonsters || []).map(m => m.id));
+      const toAdd = [];
+      const skipped = [];
+      for (const m of newMonsters){
+        if (m.id && existingIds.has(m.id)) skipped.push(m);
+        else toAdd.push(m);
+      }
+      return { toAdd, skipped };
+    }
+
+    function refreshImportPreview(){
       const prev = document.getElementById('import-preview');
       const btn = document.getElementById('import-btn');
-      if (!file){ seedData = null; btn.disabled = true; prev.textContent = ''; return; }
+      if (!seedData){ prev.textContent = ''; btn.disabled = true; return; }
+      const newMonsters = asMonsters(seedData);
+      const mode = getImportMode();
+      const sourceTag = seedData.source ? ` from <b>${esc(seedData.source)}</b>` : '';
+      if (mode === 'replace'){
+        prev.innerHTML = `<b>Replace</b> the entire bestiary with this file's <b>${newMonsters.length}</b> monsters${sourceTag}. The current ${asMonsters(bestiary).length} entries will be discarded.`;
+        btn.textContent = `Replace KV with ${newMonsters.length} monsters`;
+      } else {
+        const { toAdd, skipped } = computeMergeDelta(asMonsters(bestiary), newMonsters);
+        const parts = [];
+        parts.push(`Add <b>${toAdd.length}</b> new monsters${sourceTag}`);
+        if (skipped.length) parts.push(`skip <b>${skipped.length}</b> already in KV (by id)`);
+        prev.innerHTML = `<b>Merge:</b> ${parts.join(', ')}.`;
+        btn.textContent = toAdd.length
+          ? `Add ${toAdd.length} new monsters to KV`
+          : 'Nothing new to add';
+        btn.disabled = toAdd.length === 0;
+        return;
+      }
+      btn.disabled = false;
+    }
+
+    function onImportModeChange(){
+      refreshImportPreview();
+    }
+
+    function loadSeed(ev){
+      const file = ev.target.files && ev.target.files[0];
+      if (!file){ seedData = null; refreshImportPreview(); return; }
       const reader = new FileReader();
       reader.onload = () => {
         try {
@@ -863,11 +920,12 @@
           seedData = (d && !Array.isArray(d) && Array.isArray(d.monsters))
             ? d
             : { schemaVersion: 1, monsters: ms, count: ms.length, importedAt: new Date().toISOString() };
-          prev.innerHTML = `Ready to import: <b>${ms.length}</b> monsters${d.source?` from <b>${esc(d.source)}</b>`:''}.`;
-          btn.disabled = false;
+          refreshImportPreview();
         } catch(e){
-          seedData = null; btn.disabled = true;
+          seedData = null;
+          const prev = document.getElementById('import-preview');
           prev.innerHTML = `<span style="color:var(--rust)">Couldn't read that file: ${esc(e.message)}</span>`;
+          document.getElementById('import-btn').disabled = true;
         }
       };
       reader.readAsText(file);
@@ -876,18 +934,67 @@
     async function doImport(){
       if (!seedData) return;
       const btn = document.getElementById('import-btn');
-      btn.disabled = true; btn.textContent = 'Importing…';
-      const ok = await saveKey('bestiary', seedData);
-      btn.textContent = 'Import to KV';
+      const originalLabel = btn.textContent;
+      const mode = getImportMode();
+      btn.disabled = true; btn.textContent = mode === 'replace' ? 'Replacing…' : 'Merging…';
+
+      let payload;
+      let summaryHTML;
+      if (mode === 'replace'){
+        payload = seedData;
+        summaryHTML = `<b style="color:var(--teal-bright)">Done.</b> The Menagerie now holds ${asMonsters(seedData).length} monsters.`;
+      } else {
+        const { toAdd, skipped } = computeMergeDelta(asMonsters(bestiary), asMonsters(seedData));
+        if (!toAdd.length){
+          // Nothing new — short-circuit, don't burn a KV write.
+          btn.textContent = originalLabel;
+          btn.disabled = true;
+          document.getElementById('import-preview').innerHTML =
+            `<b style="color:var(--ink-faint)">Nothing to do.</b> All ${asMonsters(seedData).length} monsters in this file are already in KV.`;
+          toast('Nothing new to import.');
+          return;
+        }
+        // Build a merged envelope: preserve the existing bestiary's envelope
+        // metadata (source/scrapedAt/normalizedAt for the primary book),
+        // append the new monsters, refresh the count, stamp a mergedAt.
+        const baseEnv = (bestiary && typeof bestiary === 'object' && !Array.isArray(bestiary)) ? bestiary : {};
+        const mergedMonsters = asMonsters(bestiary).concat(toAdd);
+        payload = {
+          ...baseEnv,
+          monsters: mergedMonsters,
+          count: mergedMonsters.length,
+          mergedAt: new Date().toISOString()
+        };
+        // Carry forward the new file's _sources if both envelopes have one.
+        if (baseEnv._sources || seedData._sources){
+          const merged = { ...(baseEnv._sources || {}) };
+          // Count newly-added monsters by their `source` field.
+          for (const m of toAdd){
+            const s = m.source || 'unknown';
+            merged[s] = (merged[s] || 0) + 1;
+          }
+          payload._sources = merged;
+        }
+        summaryHTML = `<b style="color:var(--teal-bright)">Done.</b> Added ${toAdd.length} new monsters` +
+          (skipped.length ? ` (${skipped.length} already in KV were skipped)` : '') +
+          `. Bestiary is now ${mergedMonsters.length} entries.`;
+      }
+
+      const ok = await saveKey('bestiary', payload);
       if (ok){
-        bestiary = seedData;
+        bestiary = payload;
         window.__anaCache = null;
         populateFilters();
         renderList();
         renderSource();
-        toast('Bestiary imported.');
-        document.getElementById('import-preview').innerHTML = '<b style="color:var(--teal-bright)">Done.</b> The Menagerie is stocked.';
+        document.getElementById('import-preview').innerHTML = summaryHTML;
+        toast(mode === 'replace' ? 'Bestiary replaced.' : 'New monsters added.');
+        btn.textContent = originalLabel;
+        // After a successful import, the file's still selected. Recompute
+        // so the next click would be a no-op.
+        refreshImportPreview();
       } else {
+        btn.textContent = originalLabel;
         btn.disabled = false;
       }
     }
