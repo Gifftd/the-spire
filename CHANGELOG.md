@@ -9,6 +9,49 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: load an existing monster into the editor as a copy
+
+Two new entry points for the "I like this monster, but I want to riff on it"
+workflow. The source monster is never touched — both paths deep-clone the
+monster into the editor's working state with the source `id` stripped, so
+the next Save mints a fresh entry in `bestiary_custom`.
+
+#### Path 1 — Browse → "📋 Edit a copy"
+
+A small button at the top of the Browse-tab stat block view. Click it on
+any monster (imported or custom) and the page switches to the Editor tab
+with the monster pre-loaded as `"<name> (copy)"` and a blank id, ready
+to tweak.
+
+#### Path 2 — Editor → "📋 From existing…"
+
+A new button in the Editor's chip strip next to "+ New monster". Opens a
+small picker modal with a name search and a scrollable list of every
+monster (imported + custom) sorted by CR. Click a row → it loads into the
+editor and the modal closes. The picker caps the rendered list at 200
+entries to keep the DOM small; further results are reachable via the
+search filter.
+
+#### Added — `bestiary-dm.html`
+- `cloneMonsterToEditor(monsterId)` — deep-clones the monster, strips the
+  `_custom` runtime tag, clears the `id`, suffixes the name with `" (copy)"`,
+  sets `source: 'custom'`, swaps `currentEdit` + clears `editingId`,
+  refreshes the form, and switches to the Editor tab.
+- `openClonePicker()` / `closeClonePicker()` / `renderCloneList()` /
+  `pickCloneSource(id)` — the small picker modal and its filter.
+- Modal markup `#clone-modal` reuses the existing `.modal-backdrop` +
+  `.tpl-modal` styles; just three new clone-specific selectors
+  (`.clone-search`, `.clone-list`, `.clone-row`).
+
+#### Verified
+- Browse path: searched "Aboleth", opened stat block, clicked "📋 Edit a
+  copy". Tab switched to Editor, name became "Aboleth (copy)", id empty,
+  source "custom", all 4 actions copied (Multiattack first).
+- Editor path: clicked "📋 From existing…", filtered to "Adult Black
+  Dragon", clicked the row. Modal closed; editor showed
+  "Adult Black Dragon (copy)" with AC 19, HP 195, Multiattack as first
+  action, editingId=null so Save will mint a fresh entry.
+
 ### Menagerie: action templates extended to Bonus/Reaction/Legendary sections
 
 The "+ From template…" button — previously Actions-only — now sits on

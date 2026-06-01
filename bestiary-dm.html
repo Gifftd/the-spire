@@ -228,6 +228,17 @@
     .tpl-preview-h{font-family:'Cinzel',serif;font-size:0.58rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--brass);margin-bottom:0.3rem}
     .tpl-derived{font-family:'Cinzel',serif;font-size:0.7rem;color:var(--teal-bright);padding:3px 8px;background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius);display:inline-block}
 
+    /* Clone picker modal */
+    .clone-modal{max-width:560px}
+    .clone-search{width:100%;margin-bottom:0.6rem;padding:7px 10px;background:var(--panel-deep);border:1px solid var(--border);border-radius:2px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.95rem;outline:none}
+    .clone-search:focus{border-color:var(--teal)}
+    .clone-list{max-height:50vh;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--panel-deep)}
+    .clone-row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--border);cursor:pointer}
+    .clone-row:last-child{border-bottom:none}
+    .clone-row:hover{background:var(--panel-light)}
+    .clone-nm{flex:1;font-size:0.92rem;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .clone-nm small{display:block;font-family:'Cinzel',serif;font-size:0.54rem;color:var(--ink-faint);letter-spacing:0.06em;text-transform:uppercase;margin-top:1px}
+
     .footer{margin-top:2rem;text-align:center;padding-top:1.5rem;border-top:1px solid var(--border)}
     .footer-text{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--ink-faint)}
   </style>
@@ -285,6 +296,7 @@
           <span class="lbl">Custom (<span id="ed-count">0</span>)</span>
           <span id="ed-chips-list"></span>
           <button class="btn brass sm" onclick="newCustom()">+ New monster</button>
+          <button class="btn ghost sm" onclick="openClonePicker()" title="Load any existing monster (imported or custom) into the editor as a new copy you can edit and save">📋 From existing…</button>
         </div>
         <div class="ed-layout">
           <!-- FORM -->
@@ -485,6 +497,24 @@
 
     <div class="footer"><p class="footer-text">The Spire · The Menagerie</p></div>
   </div>
+  <!-- CLONE-TO-EDITOR PICKER MODAL -->
+  <div class="modal-backdrop hidden" id="clone-modal" onclick="if(event.target===this)closeClonePicker()">
+    <div class="tpl-modal clone-modal">
+      <div class="tpl-header">
+        <h2>Load from existing monster</h2>
+        <button class="tpl-close" onclick="closeClonePicker()">✕</button>
+      </div>
+      <div class="tpl-body">
+        <div class="tpl-help">Pick any monster (imported or custom) — it'll load into the editor as a new copy. Save mints a fresh custom entry; the source monster is untouched.</div>
+        <input class="clone-search" id="clone-search" placeholder="Search name…" oninput="renderCloneList()">
+        <div class="clone-list" id="clone-list"></div>
+      </div>
+      <div class="tpl-footer">
+        <button class="btn ghost" onclick="closeClonePicker()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- TEMPLATE PICKER MODAL -->
   <div class="modal-backdrop hidden" id="tpl-modal" onclick="if(event.target===this)closeTemplateModal()">
     <div class="tpl-modal">
@@ -692,7 +722,35 @@
       const m = findMonster(id);
       if (!m){ document.getElementById('m-statblock').innerHTML = '<div class="empty-note">Not found.</div>'; return; }
       document.getElementById('sb-id').textContent = m.source || '';
-      document.getElementById('m-statblock').innerHTML = renderStatblock(m);
+      document.getElementById('m-statblock').innerHTML =
+        `<div style="display:flex;justify-content:flex-end;margin-bottom:0.4rem">
+           <button class="btn ghost sm" onclick="cloneMonsterToEditor('${esc(m.id)}')" title="Open this monster in the Editor as a new custom copy">📋 Edit a copy</button>
+         </div>` +
+        renderStatblock(m);
+    }
+
+    /* ── Clone an existing monster into the Editor ──
+     * Deep-clones, strips the source id so saveCustom() mints a fresh one,
+     * marks it as a custom entry, suffixes the name with " (copy)", and
+     * switches to the Editor tab. The cloned monster sits in currentEdit
+     * with editingId=null, so the user can edit and then Save → it lands in
+     * bestiary_custom alongside their other homebrew.
+     */
+    function cloneMonsterToEditor(monsterId){
+      const src = findMonster(monsterId);
+      if (!src){ toast('Could not find that monster.', true); return; }
+      const clone = JSON.parse(JSON.stringify(src));
+      delete clone._custom;                 // strip the runtime "custom" tag
+      clone.id = '';                        // saveCustom() will stamp a new one
+      clone.name = (clone.name || 'Monster') + ' (copy)';
+      clone.source = 'custom';
+      editingId = null;
+      currentEdit = clone;
+      loadFormFromEdit();
+      syncEditor();
+      renderChips();
+      window.switchTab('editor');
+      toast(`Loaded "${src.name}" as a copy — edit, then Save to mint a new monster.`);
     }
 
     /* ── Stat block ── */
@@ -1772,6 +1830,43 @@
       const dcBlurb  = row.dcMed  != null ? `DC ${Math.round(row.dcMed)}` : '';
       syncEditor();
       toast(`Filled CR ${currentEdit.crText} medians (n=${row.n}). Suggested: ${[atkBlurb,dmgBlurb,dcBlurb].filter(Boolean).join(', ')}.`);
+    }
+
+    /* ── Clone picker modal (Editor-side entry point) ──
+     * Lets the DM pull any imported or custom monster into the editor as a
+     * starting point for a new homebrew. Wraps cloneMonsterToEditor().
+     */
+    function openClonePicker(){
+      document.getElementById('clone-modal').classList.remove('hidden');
+      document.getElementById('clone-search').value = '';
+      renderCloneList();
+      setTimeout(() => document.getElementById('clone-search')?.focus(), 50);
+    }
+    function closeClonePicker(){
+      document.getElementById('clone-modal').classList.add('hidden');
+    }
+    function renderCloneList(){
+      const q = (document.getElementById('clone-search').value || '').trim().toLowerCase();
+      const all = allMonsters();
+      const filtered = all.filter(m => !q || (m.name || '').toLowerCase().includes(q));
+      filtered.sort((a,b) => (+a.cr || 0) - (+b.cr || 0) || (a.name || '').localeCompare(b.name || ''));
+      const list = document.getElementById('clone-list');
+      if (!filtered.length){
+        list.innerHTML = '<div class="empty-note">No monsters match.</div>';
+        return;
+      }
+      // Cap to a reasonable preview to keep the DOM small; user can refine with search.
+      const shown = filtered.slice(0, 200);
+      list.innerHTML = shown.map(m => `
+        <div class="clone-row" onclick="pickCloneSource('${esc(m.id)}')">
+          <div class="clone-nm">${esc(m.name)}${m._custom ? '<span class="custom-chip">Custom</span>' : ''}<small>${esc(m.size || '')} ${esc(m.type || '')}</small></div>
+          <span class="cr-chip ${crTier(m.cr)}">CR ${esc(m.crText || m.cr || '?')}</span>
+        </div>
+      `).join('') + (filtered.length > shown.length ? `<div class="empty-note" style="font-size:0.8rem">Showing first ${shown.length} of ${filtered.length} — narrow with search.</div>` : '');
+    }
+    function pickCloneSource(id){
+      closeClonePicker();
+      cloneMonsterToEditor(id);
     }
 
     /* ── Action templates ──
