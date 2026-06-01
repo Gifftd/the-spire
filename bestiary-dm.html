@@ -142,6 +142,16 @@
     .ed-toolbar .title{font-family:'Cinzel',serif;font-size:0.78rem;letter-spacing:0.06em;color:var(--brass-bright)}
     .ed-derived{font-family:'Cinzel',serif;font-size:0.7rem;color:var(--ink-light);padding:4px 6px;background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius)}
     .custom-chip{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--brass);color:var(--brass);background:rgba(184,138,90,0.10);margin-left:6px}
+    .role-chip{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.08em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--teal);color:var(--teal-bright);background:rgba(60,153,150,0.08);margin-left:6px;white-space:nowrap}
+    .terrain-chip{font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:0.08em;text-transform:uppercase;padding:1px 5px;border-radius:8px;border:1px solid var(--border-light);color:var(--ink-faint);background:rgba(255,255,255,0.02);margin-left:4px;white-space:nowrap}
+    .terrain-strip{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+    .terrain-pick{display:flex;flex-wrap:wrap;gap:6px;padding:6px;border:1px solid var(--border-light);border-radius:6px;background:rgba(0,0,0,0.15)}
+    .terrain-pick label{font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-light);padding:3px 7px;border-radius:8px;border:1px solid var(--border-light);background:rgba(255,255,255,0.02);cursor:pointer;display:flex;align-items:center;gap:4px}
+    .terrain-pick label:hover{border-color:var(--teal);color:var(--teal-bright)}
+    .terrain-pick input[type=checkbox]{display:none}
+    .terrain-pick input[type=checkbox]:checked + span{color:var(--teal-bright)}
+    .terrain-pick label:has(input:checked){border-color:var(--teal);background:rgba(60,153,150,0.12);color:var(--teal-bright)}
+    .tag-manual{font-size:0.5rem;color:var(--ink-faint);letter-spacing:0.05em;margin-left:6px}
 
     /* Analysis tab */
     .ana-cards{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:1rem}
@@ -280,6 +290,21 @@
             <div class="toolbar">
               <select id="m-cr-min" onchange="renderList()"><option value="">CR ≥ any</option></select>
               <select id="m-cr-max" onchange="renderList()"><option value="">CR ≤ any</option></select>
+              <select id="m-role-filter" onchange="renderList()">
+                <option value="">All roles</option>
+                <option>Ambusher</option><option>Artillery</option><option>Brute</option>
+                <option>Controller</option><option>Defender</option><option>Leader</option>
+                <option>Skirmisher</option><option>Soldier</option><option>Support</option>
+              </select>
+              <select id="m-terrain-filter" onchange="renderList()">
+                <option value="">All terrains</option>
+                <option value="arctic">Arctic</option><option value="coastal">Coastal</option>
+                <option value="desert">Desert</option><option value="forest">Forest</option>
+                <option value="grassland">Grassland</option><option value="hill">Hill</option>
+                <option value="mountain">Mountain</option><option value="swamp">Swamp</option>
+                <option value="underdark">Underdark</option><option value="underwater">Underwater</option>
+                <option value="urban">Urban</option><option value="planar">Planar</option>
+              </select>
               <button class="btn ghost sm" onclick="clearFilters()">Clear</button>
             </div>
             <div class="list" id="m-list"></div>
@@ -330,6 +355,38 @@
                 <div class="ed-derived" id="ed-xp">XP: —</div>
                 <div class="ed-derived" id="ed-pb">PB: —</div>
                 <div class="ed-derived" id="ed-id">id: (new)</div>
+              </div>
+            </div>
+
+            <div class="ed-sec">
+              <div class="ed-sec-h"><span>Tags (Flee Mortals role + terrain)</span><span id="ed-tag-manual" class="tag-manual"></span></div>
+              <div class="ed-grid c2">
+                <div class="ed-fg">
+                  <label>Role <span style="font-size:0.6rem;color:var(--ink-faint)">— defines combat function for the generator</span></label>
+                  <select id="ed-role" onchange="syncEditor()">
+                    <option value="">(auto)</option>
+                    <option>Ambusher</option><option>Artillery</option><option>Brute</option>
+                    <option>Controller</option><option>Defender</option><option>Leader</option>
+                    <option>Skirmisher</option><option>Soldier</option><option>Support</option>
+                  </select>
+                </div>
+                <div class="ed-fg">
+                  <label>Terrain <span style="font-size:0.6rem;color:var(--ink-faint)">— check all that apply</span></label>
+                  <div class="terrain-pick" id="ed-terrain-pick">
+                    <label><input type="checkbox" value="arctic" onchange="syncEditor()"><span>Arctic</span></label>
+                    <label><input type="checkbox" value="coastal" onchange="syncEditor()"><span>Coastal</span></label>
+                    <label><input type="checkbox" value="desert" onchange="syncEditor()"><span>Desert</span></label>
+                    <label><input type="checkbox" value="forest" onchange="syncEditor()"><span>Forest</span></label>
+                    <label><input type="checkbox" value="grassland" onchange="syncEditor()"><span>Grassland</span></label>
+                    <label><input type="checkbox" value="hill" onchange="syncEditor()"><span>Hill</span></label>
+                    <label><input type="checkbox" value="mountain" onchange="syncEditor()"><span>Mountain</span></label>
+                    <label><input type="checkbox" value="swamp" onchange="syncEditor()"><span>Swamp</span></label>
+                    <label><input type="checkbox" value="underdark" onchange="syncEditor()"><span>Underdark</span></label>
+                    <label><input type="checkbox" value="underwater" onchange="syncEditor()"><span>Underwater</span></label>
+                    <label><input type="checkbox" value="urban" onchange="syncEditor()"><span>Urban</span></label>
+                    <label><input type="checkbox" value="planar" onchange="syncEditor()"><span>Planar</span></label>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -710,6 +767,8 @@
       document.getElementById('m-size-filter').value = '';
       document.getElementById('m-cr-min').value = '';
       document.getElementById('m-cr-max').value = '';
+      const rf = document.getElementById('m-role-filter'); if (rf) rf.value = '';
+      const tf = document.getElementById('m-terrain-filter'); if (tf) tf.value = '';
       renderList();
     }
 
@@ -721,6 +780,8 @@
       const sizeF = document.getElementById('m-size-filter').value;
       const crMin = parseFloat(document.getElementById('m-cr-min').value);
       const crMax = parseFloat(document.getElementById('m-cr-max').value);
+      const roleF = (document.getElementById('m-role-filter')||{}).value || '';
+      const terrF = (document.getElementById('m-terrain-filter')||{}).value || '';
       const filtered = all.filter(m => {
         if (q && !(m.name||'').toLowerCase().includes(q)) return false;
         if (typeF && m.type !== typeF) return false;
@@ -728,6 +789,8 @@
         const cr = +m.cr;
         if (!isNaN(crMin) && (!isFinite(cr) || cr < crMin)) return false;
         if (!isNaN(crMax) && (!isFinite(cr) || cr > crMax)) return false;
+        if (roleF && m.role !== roleF) return false;
+        if (terrF && !((m.terrain||[]).includes(terrF))) return false;
         return true;
       });
       filtered.sort((a,b) => (+a.cr||0) - (+b.cr||0) || (a.name||'').localeCompare(b.name||''));
@@ -737,12 +800,21 @@
         listEl.innerHTML = '<div class="empty-note">No monsters match.</div>';
         return;
       }
-      listEl.innerHTML = filtered.map(m => `
+      listEl.innerHTML = filtered.map(m => {
+        const terrChips = (m.terrain || []).slice(0,2).map(t =>
+          `<span class="terrain-chip">${esc(t)}</span>`).join('');
+        const more = (m.terrain || []).length > 2
+          ? `<span class="terrain-chip" title="${esc((m.terrain||[]).slice(2).join(', '))}">+${(m.terrain||[]).length-2}</span>`
+          : '';
+        const roleChip = m.role ? `<span class="role-chip" title="${m.roleManual?'Manually set — survives re-tagger':'Auto-tagged'}">${esc(m.role)}</span>` : '';
+        return `
         <div class="row${m.id===activeId?' active':''}" onclick="selectMonster('${esc(m.id)}')">
-          <div class="nm">${esc(m.name)}${m._custom?'<span class="custom-chip">Custom</span>':''}<small>${esc(m.size||'')} ${esc(m.type||'')}</small></div>
+          <div class="nm">${esc(m.name)}${m._custom?'<span class="custom-chip">Custom</span>':''}${roleChip}<small>${esc(m.size||'')} ${esc(m.type||'')}</small>
+            <div class="terrain-strip">${terrChips}${more}</div>
+          </div>
           <span class="cr-chip ${crTier(m.cr)}">CR ${esc(m.crText || m.cr || '?')}</span>
-        </div>
-      `).join('');
+        </div>`;
+      }).join('');
     }
 
     function selectMonster(id){
@@ -1720,6 +1792,36 @@
       currentEdit.xp = XP_BY_CR[cr] ?? 0;
       currentEdit.pb = pbForCR(cr);
 
+      // Role + terrain tags. Setting either one marks it manual so the
+      // Python tagger preserves the DM's choice on its next re-run.
+      const roleVal = $('ed-role').value;
+      const prevRole = currentEdit.role || '';
+      currentEdit.role = roleVal || null;
+      if (roleVal && roleVal !== prevRole) currentEdit.roleManual = true;
+      else if (!roleVal) delete currentEdit.roleManual;
+
+      const terrainPicks = Array.from(
+        document.querySelectorAll('#ed-terrain-pick input[type=checkbox]:checked')
+      ).map(cb => cb.value);
+      const prevTerr = (currentEdit.terrain || []).join(',');
+      currentEdit.terrain = terrainPicks;
+      if (terrainPicks.length && prevTerr !== terrainPicks.join(',')) {
+        currentEdit.terrainManual = true;
+      } else if (!terrainPicks.length) {
+        delete currentEdit.terrainManual;
+      }
+
+      // Render a small "manual" indicator beside the section header
+      const manualBits = [];
+      if (currentEdit.roleManual) manualBits.push('role');
+      if (currentEdit.terrainManual) manualBits.push('terrain');
+      const manualEl = $('ed-tag-manual');
+      if (manualEl) {
+        manualEl.textContent = manualBits.length
+          ? `manual: ${manualBits.join(' + ')} — won't be overwritten by re-tagger`
+          : '';
+      }
+
       currentEdit.ac = numOrNull($('ed-ac').value);
       currentEdit.acText = $('ed-acText').value.trim() || (currentEdit.ac != null ? 'AC ' + currentEdit.ac : '');
 
@@ -1831,6 +1933,23 @@
       $('ed-subtype').value = m.subtype || '';
       $('ed-alignment').value = m.alignment || '';
       $('ed-cr').value = String(m.cr ?? 1);
+
+      // Role + terrain — paint from currentEdit. Manual flags drive the
+      // small "manual" indicator next to the section header.
+      $('ed-role').value = m.role || '';
+      const terr = new Set(m.terrain || []);
+      for (const cb of document.querySelectorAll('#ed-terrain-pick input[type=checkbox]')) {
+        cb.checked = terr.has(cb.value);
+      }
+      const manualBits = [];
+      if (m.roleManual) manualBits.push('role');
+      if (m.terrainManual) manualBits.push('terrain');
+      const manualEl = $('ed-tag-manual');
+      if (manualEl) {
+        manualEl.textContent = manualBits.length
+          ? `manual: ${manualBits.join(' + ')} — won't be overwritten by re-tagger`
+          : '';
+      }
       $('ed-ac').value = m.ac ?? '';
       $('ed-acText').value = m.acText || '';
       // HP — if the monster has structured-HP fields, use them; otherwise try
