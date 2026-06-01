@@ -9,6 +9,56 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: action templates extended to Bonus/Reaction/Legendary sections
+
+The "+ From template…" button — previously Actions-only — now sits on
+**Bonus Actions**, **Reactions**, and **Legendary Actions** section headers
+too. Composed entries land in the right section array; the modal title and
+the primary button label both update to "Add to <Section>" so it's clear
+where the result is going.
+
+Two **section-specific wrappers** layer on top of the existing six
+templates without changing them:
+
+- **Reactions**: a *Trigger* textarea above the template form. When filled,
+  the composed body is reframed as `Trigger: <text>\nResponse: <body>` —
+  matches the 2024 MM reaction phrasing.
+- **Legendary Actions**: a *Cost (actions)* numeric field (1–3, default 1).
+  When > 1, the composed action name gets a `(Costs N Actions)` suffix.
+
+#### New template — `Use Existing Action`
+
+The most common Legendary pattern in the 2024 MM is "The X uses its Y."
+A seventh template captures it: pick an existing action from this monster
+(autocomplete via datalist, same shape as the Multiattack picker), and the
+template emits `name: "<Action>"` + `body: "The <monster> uses its
+<Action>."`. Recharge markers are stripped from the picked name.
+
+The Legendary section defaults to this template when the modal opens —
+the most common case becomes one click + Compose.
+
+#### Added — `bestiary-dm.html`
+- `openTemplateModal(targetSection)` accepts a section name. `_tpl.targetSection`
+  drives the modal title, the primary button label, and where the composed
+  result lands.
+- `renderSectionWrapper()` paints the Trigger / Cost fields conditionally.
+  `applySectionWrapping(name, body)` runs after the template's own compose,
+  so all six existing templates work in any section automatically.
+- `composeFromTemplate()` now pushes to `currentEdit[_tpl.targetSection]`
+  rather than `currentEdit.actions`.
+- Each of the four section headers has matching "+ From template…" + "+ Add
+  blank" buttons.
+
+#### Verified
+- Title + button: "Add to Reactions" / "Add to Legendary Actions" / "Add to
+  Bonus Actions" — all correct per opened section.
+- Reactions get Trigger:/Response: framing applied; bonus actions get no
+  wrapping (`tpl-section-wrap` is empty for them).
+- Legendary cost defaults to 1 (no suffix), bumping to 2 emits
+  `"Bite (Costs 2 Actions)"`.
+- "Use Existing Action" default kind activates when opening Legendary;
+  composes `"The glass hydra uses its Bite."` from a single Bite action.
+
 ### Menagerie: Multiattack template picks from this monster's defined attacks
 
 Small UX win on top of the Phase 2 composer. The Multiattack template's

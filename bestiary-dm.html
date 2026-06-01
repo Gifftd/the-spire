@@ -368,22 +368,40 @@
               <div class="ed-sec-h">
                 <span>Actions (<span id="ed-actions-n">0</span>)</span>
                 <span style="display:flex;gap:6px">
-                  <button class="btn ghost sm" onclick="openTemplateModal()" title="Compose a 2024 MM-shaped action from a template (Melee/Ranged/Save/Multiattack/Spellcasting)">+ From template…</button>
+                  <button class="btn ghost sm" onclick="openTemplateModal('actions')" title="Compose a 2024 MM-shaped action from a template (Melee/Ranged/Save/Multiattack/Spellcasting)">+ From template…</button>
                   <button class="btn ghost sm" onclick="addFeature('actions')">+ Add blank</button>
                 </span>
               </div>
               <div class="ed-feat-list" id="ed-actions-list"></div>
             </div>
             <div class="ed-sec">
-              <div class="ed-sec-h"><span>Bonus Actions (<span id="ed-bonusActions-n">0</span>)</span><button class="btn ghost sm" onclick="addFeature('bonusActions')">+ Add</button></div>
+              <div class="ed-sec-h">
+                <span>Bonus Actions (<span id="ed-bonusActions-n">0</span>)</span>
+                <span style="display:flex;gap:6px">
+                  <button class="btn ghost sm" onclick="openTemplateModal('bonusActions')">+ From template…</button>
+                  <button class="btn ghost sm" onclick="addFeature('bonusActions')">+ Add blank</button>
+                </span>
+              </div>
               <div class="ed-feat-list" id="ed-bonusActions-list"></div>
             </div>
             <div class="ed-sec">
-              <div class="ed-sec-h"><span>Reactions (<span id="ed-reactions-n">0</span>)</span><button class="btn ghost sm" onclick="addFeature('reactions')">+ Add</button></div>
+              <div class="ed-sec-h">
+                <span>Reactions (<span id="ed-reactions-n">0</span>)</span>
+                <span style="display:flex;gap:6px">
+                  <button class="btn ghost sm" onclick="openTemplateModal('reactions')">+ From template…</button>
+                  <button class="btn ghost sm" onclick="addFeature('reactions')">+ Add blank</button>
+                </span>
+              </div>
               <div class="ed-feat-list" id="ed-reactions-list"></div>
             </div>
             <div class="ed-sec">
-              <div class="ed-sec-h"><span>Legendary Actions (<span id="ed-legendaryActions-n">0</span>)</span><button class="btn ghost sm" onclick="addFeature('legendaryActions')">+ Add</button></div>
+              <div class="ed-sec-h">
+                <span>Legendary Actions (<span id="ed-legendaryActions-n">0</span>)</span>
+                <span style="display:flex;gap:6px">
+                  <button class="btn ghost sm" onclick="openTemplateModal('legendaryActions')">+ From template…</button>
+                  <button class="btn ghost sm" onclick="addFeature('legendaryActions')">+ Add blank</button>
+                </span>
+              </div>
               <div class="ed-feat-list" id="ed-legendaryActions-list"></div>
             </div>
             <div class="ed-sec">
@@ -471,7 +489,7 @@
   <div class="modal-backdrop hidden" id="tpl-modal" onclick="if(event.target===this)closeTemplateModal()">
     <div class="tpl-modal">
       <div class="tpl-header">
-        <h2>Action template</h2>
+        <h2 id="tpl-title">Action template</h2>
         <button class="tpl-close" onclick="closeTemplateModal()">✕</button>
       </div>
       <div class="tpl-body">
@@ -485,15 +503,18 @@
             <option value="save_effect">Save Effect (DC-based)</option>
             <option value="multiattack">Multiattack</option>
             <option value="spellcasting">Spellcasting Block</option>
+            <option value="use_existing">Use Existing Action</option>
           </select>
         </div>
+        <!-- Section-level wrapper fields (Trigger for Reactions, Cost for Legendary) -->
+        <div id="tpl-section-wrap"></div>
         <div class="tpl-form" id="tpl-form"></div>
         <div class="tpl-preview-h">Preview</div>
         <div class="tpl-preview" id="tpl-preview"><div class="name">—</div><div class="body">Fill the fields above.</div></div>
       </div>
       <div class="tpl-footer">
         <button class="btn ghost" onclick="closeTemplateModal()">Cancel</button>
-        <button class="btn brass" id="tpl-add-btn" onclick="composeFromTemplate()">Add action</button>
+        <button class="btn brass" id="tpl-add-btn" onclick="composeFromTemplate()">Add</button>
       </div>
     </div>
   </div>
@@ -2059,6 +2080,37 @@
         }
       },
 
+      use_existing: {
+        label: 'Use Existing Action',
+        defaults: (m) => {
+          // For the most common Legendary pattern: "The X uses its <action>."
+          const named = (Array.isArray(m.actions) ? m.actions : []).map(a => ({
+            full: a.name || '', base: (a.name || '').replace(/\s*\(.*?\)\s*$/, '').trim() || (a.name || '')
+          }));
+          return { actionName: named[0]?.base || '' };
+        },
+        renderForm: (f, m) => {
+          const named = (Array.isArray(m.actions) ? m.actions : []).map(a => ({
+            full: a.name || '', base: (a.name || '').replace(/\s*\(.*?\)\s*$/, '').trim() || (a.name || '')
+          }));
+          const datalist = named.length
+            ? `<datalist id="tplf-actionName-list">${named.map(a => `<option value="${esc(a.base)}">${esc(a.full)}</option>`).join('')}</datalist>`
+            : '';
+          const help = named.length
+            ? `Picks one of this monster's existing actions and composes the standard "uses its X" body. Recharge markers are stripped automatically.`
+            : `No actions defined yet — add some via "+ From template…" on the Actions section first, or type a name freely here.`;
+          return `
+            <div class="fg"><label>Action to reference</label><input id="tplf-actionName" list="tplf-actionName-list" placeholder="e.g. Bite, Tentacle" value="${esc(f.actionName || '')}">${datalist}</div>
+            <div class="tpl-help">${help}</div>
+          `;
+        },
+        compose: (f, m) => {
+          const noun = (m.name || 'creature').toLowerCase();
+          const action = (f.actionName || 'Attack').trim();
+          return { name: action, body: `The ${noun} uses its ${action}.` };
+        }
+      },
+
       spellcasting: {
         label: 'Spellcasting Block',
         defaults: (m) => ({
@@ -2096,14 +2148,31 @@
       }
     };
 
-    // Modal state.
-    let _tpl = { kind: 'melee_attack', fields: null };
+    // Modal state — `targetSection` controls which array on currentEdit the
+    // composed action lands in, AND drives the section-wrapper fields
+    // (Trigger for reactions, Cost for legendary).
+    let _tpl = { kind: 'melee_attack', fields: null, targetSection: 'actions', trigger: '', legendaryCost: 1 };
 
-    function openTemplateModal(){
-      _tpl.kind = 'melee_attack';
+    const SECTION_LABELS = {
+      actions: 'Actions',
+      bonusActions: 'Bonus Actions',
+      reactions: 'Reactions',
+      legendaryActions: 'Legendary Actions'
+    };
+
+    function openTemplateModal(targetSection){
+      _tpl.targetSection = targetSection || 'actions';
+      // Default kind per section — most Legendary entries reuse an existing
+      // action; everything else gets the most common archetype.
+      _tpl.kind = (_tpl.targetSection === 'legendaryActions') ? 'use_existing' : 'melee_attack';
       _tpl.fields = TEMPLATES[_tpl.kind].defaults(currentEdit);
+      _tpl.trigger = '';
+      _tpl.legendaryCost = 1;
       document.getElementById('tpl-kind').value = _tpl.kind;
+      document.getElementById('tpl-title').textContent = 'Add to ' + (SECTION_LABELS[_tpl.targetSection] || 'Actions');
+      document.getElementById('tpl-add-btn').textContent = 'Add to ' + (SECTION_LABELS[_tpl.targetSection] || 'Actions');
       document.getElementById('tpl-modal').classList.remove('hidden');
+      renderSectionWrapper();
       renderTemplateForm();
     }
     function closeTemplateModal(){
@@ -2113,6 +2182,37 @@
       _tpl.kind = document.getElementById('tpl-kind').value;
       _tpl.fields = TEMPLATES[_tpl.kind].defaults(currentEdit);
       renderTemplateForm();
+    }
+    function renderSectionWrapper(){
+      // Trigger field for reactions, Cost field for legendary. Other sections
+      // get no wrapper.
+      const wrap = document.getElementById('tpl-section-wrap');
+      if (_tpl.targetSection === 'reactions'){
+        wrap.innerHTML = `
+          <div class="tpl-form" style="margin-bottom:0.7rem;padding-bottom:0.7rem;border-bottom:1px solid var(--border)">
+            <div class="fg">
+              <label>Trigger (Reaction)</label>
+              <textarea id="tpl-trigger" placeholder='e.g. "A creature the X can see within 5 ft. hits the X with an attack roll."' oninput="onSectionWrapperChange()">${esc(_tpl.trigger || '')}</textarea>
+            </div>
+          </div>`;
+      } else if (_tpl.targetSection === 'legendaryActions'){
+        wrap.innerHTML = `
+          <div class="tpl-form" style="margin-bottom:0.7rem;padding-bottom:0.7rem;border-bottom:1px solid var(--border)">
+            <div class="fg" style="max-width:160px">
+              <label>Cost (legendary actions)</label>
+              <input id="tpl-legendaryCost" type="number" min="1" max="3" value="${_tpl.legendaryCost}" oninput="onSectionWrapperChange()">
+            </div>
+          </div>`;
+      } else {
+        wrap.innerHTML = '';
+      }
+    }
+    function onSectionWrapperChange(){
+      const trig = document.getElementById('tpl-trigger');
+      if (trig) _tpl.trigger = trig.value;
+      const cost = document.getElementById('tpl-legendaryCost');
+      if (cost) _tpl.legendaryCost = Math.max(1, Math.min(3, parseInt(cost.value, 10) || 1));
+      renderTemplatePreview();
     }
     function renderTemplateForm(){
       const tpl = TEMPLATES[_tpl.kind];
@@ -2160,20 +2260,36 @@
       }
       renderTemplatePreview();
     }
+    function applySectionWrapping(name, body){
+      // Wrap the template's compose output per the target section's conventions.
+      // Reactions get Trigger:/Response: framing; Legendary names get a
+      // "(Costs N Actions)" suffix when the cost exceeds 1.
+      if (_tpl.targetSection === 'reactions' && _tpl.trigger && _tpl.trigger.trim()){
+        body = `Trigger: ${_tpl.trigger.trim()}\nResponse: ${body}`;
+      }
+      if (_tpl.targetSection === 'legendaryActions'){
+        const cost = parseInt(_tpl.legendaryCost, 10) || 1;
+        if (cost > 1) name = `${name} (Costs ${cost} Actions)`;
+      }
+      return { name, body };
+    }
     function renderTemplatePreview(){
-      const { name, body } = TEMPLATES[_tpl.kind].compose(_tpl.fields, currentEdit);
+      const composed = TEMPLATES[_tpl.kind].compose(_tpl.fields, currentEdit);
+      const { name, body } = applySectionWrapping(composed.name, composed.body);
       document.getElementById('tpl-preview').innerHTML =
         `<div class="name">${esc(name || '—')}</div><div class="body">${esc(body || '').replace(/\n/g, '<br>')}</div>`;
     }
     function composeFromTemplate(){
       readTemplateFields();
-      const { name, body } = TEMPLATES[_tpl.kind].compose(_tpl.fields, currentEdit);
-      if (!Array.isArray(currentEdit.actions)) currentEdit.actions = [];
-      currentEdit.actions.push({ name, body });
-      renderFeatureList('actions');
+      const composed = TEMPLATES[_tpl.kind].compose(_tpl.fields, currentEdit);
+      const { name, body } = applySectionWrapping(composed.name, composed.body);
+      const sec = _tpl.targetSection || 'actions';
+      if (!Array.isArray(currentEdit[sec])) currentEdit[sec] = [];
+      currentEdit[sec].push({ name, body });
+      renderFeatureList(sec);
       syncEditor();
       closeTemplateModal();
-      toast(`Added "${name}" to actions.`);
+      toast(`Added "${name}" to ${SECTION_LABELS[sec] || sec}.`);
     }
 
     async function saveKey(type, payload){
