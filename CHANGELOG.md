@@ -9,6 +9,50 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: Import gains a Merge mode (default) — no more accidental overwrites
+
+The Import tab used to fully overwrite the `bestiary` KV value with whatever
+file the DM picked. That made re-imports destructive: a freshly normalized
+file from one book would wipe content from other books already in KV.
+
+Replaced the binary overwrite with a **two-mode import**:
+
+- **Merge new** *(default)* — Only adds monsters whose `id` isn't already in
+  KV. Existing entries are left exactly as they are. Safe for re-imports
+  and for layering multiple books on top of each other (MM + ToB + future
+  homebrew packs etc.).
+- **Replace all** — The original behavior, kept as an explicit fallback for
+  a clean reset.
+
+#### Added — `bestiary-dm.html`
+
+- Radio toggle at the top of the Import panel with both modes labeled and
+  explained in-place.
+- `computeMergeDelta(existingMonsters, newMonsters)` — partitions the file's
+  monsters into `toAdd` (new id) vs `skipped` (id already in KV).
+- `refreshImportPreview()` — both the preview text and the action button
+  label update live as the mode toggles or the file changes:
+  - Merge: `"Merge: Add N new monsters from <source>, skip M already in KV (by id)."` + button `"Add N new monsters to KV"` (disabled when N=0).
+  - Replace: `"Replace the entire bestiary with this file's N monsters from <source>. The current K entries will be discarded."` + button `"Replace KV with N monsters"`.
+- `doImport()` in merge mode short-circuits with a `"Nothing to do"` notice
+  and skips the KV write when there's nothing new — avoids burning a write
+  on no-op re-imports.
+- Merge payload preserves the existing envelope's `source` / `scrapedAt` /
+  `normalizedAt` metadata and stamps a `mergedAt`. The `_sources` summary
+  map auto-updates to reflect the post-merge per-source counts.
+
+#### Verified end-to-end (against a stubbed bestiary of 819 MM+ToB monsters)
+- Re-importing the same `bestiary.json` → merge preview says "Add 0,
+  skip 819", button disabled.
+- Importing a synthetic supplement with 2 brand-new IDs + 1 id that
+  matches an existing MM entry → preview says "Add 2, skip 1", button
+  enabled. After the click, the posted payload contains 821 monsters
+  (819 + 2 new), the duplicate is NOT present, and `_sources` correctly
+  reads `{mm-2024:503, tob-v1:316, tob-supplement:2}`.
+- Switching to Replace mode with the supplement loaded → button label
+  flips to `"Replace KV with 3 monsters"` and preview clearly warns
+  "current 821 entries will be discarded".
+
 ### Menagerie: Tome of Beasts scrape — 316 third-party monsters merged in
 
 The bestiary grows from 503 to **819 monsters**. The original Kobold Press
