@@ -9,6 +9,66 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: structured damage + HP that auto-derive from stats
+
+Pushes the auto-recalculation through one level deeper. Two changes:
+
+1. **Attack damage** is now structured as `dice (NdM) + ability mod + magic
+   bonus`. The composed expression — including the `+5` inside `2d10+5` —
+   recomputes when the driving ability mod changes. Previously only the
+   attack roll bonus updated; the damage formula was preserved verbatim.
+2. **HP** can be entered as **structured hit dice** (count · size · magic
+   bonus). The HP value and the `NdM + K` formula are derived from
+   `count × (size + 1)/2 + count × CON_mod + magic`. When CON changes, HP
+   recomputes.
+
+#### Damage shape (attack templates)
+
+Each of `melee_attack`, `ranged_attack`, `flex_attack` now stores:
+- `damageDice: 'NdM'` — just dice, no inline bonus
+- `damageBonus: int` — explicit "magic" or non-stat-tied bonus
+- `useAbilityMod: bool` — when true, the attack's ability mod is added
+
+Compose builds the final string: `NdM + (useAbilityMod ? mod : 0) +
+magicBonus`. A new "Add ability mod to damage" checkbox in each template's
+form makes the linkage explicit and toggleable.
+
+**Backward compat**: a heuristic `isLiteralDiceFormula(dice)` checks whether
+the stored dice contains `+/-`. If yes, treat it as an old-style literal and
+compose verbatim (no auto-recompute). New templates produce the new shape
+going forward; previously composed actions on the same monster keep their
+behavior until re-composed.
+
+#### HP shape (Defense panel)
+
+- New blank-monster fields: `hpStructured` (bool), `hitDiceCount`,
+  `hitDieSize`, `hpMagicBonus`.
+- New form row in the Defense panel — a "Use structured hit dice" checkbox
+  + hit-dice-count + hit-die-size + magic HP bonus inputs + a derived chip
+  showing `HP X · formula NdM + K`.
+- When the toggle is on, the `HP` and `HP formula` inputs become read-only
+  and auto-fill from the derivation each `syncEditor()` pass.
+- `parseHpFormula(str)` round-trips imported `hpFormula` strings (e.g.
+  `"20d10 + 40"`) back into structured fields on `loadFormFromEdit`. The
+  back-derived "magic" portion is `totalBonus - count × CON_mod` — anything
+  the formula has on top of the CON contribution stays as the explicit bonus.
+- `hitDieSizeFor(size)` defaults the die: Tiny=d4, Small=d6, Medium=d8,
+  Large=d10, Huge=d12, Gargantuan=d20.
+- `statSnapshot()` now includes the structured-HP fields so the
+  existing "stat changed → recalc" path also covers HP.
+
+#### Verified end-to-end
+
+CR 10 monster (PB +4), STR 20 (+5), CON 18 (+4), structured hit dice 12d10
+with 0 magic bonus. Bite composed via melee template: dice `2d10`,
+useAbilityMod=true, magicBonus=0.
+
+- Initial: HP `114 (12d10 + 48)` · Bite `+9 to hit ... 16 (2d10+5) Slashing`.
+- STR 20 → 18 (mod +5 → +4): Bite `+9 → +8`; damage `16 (2d10+5) → 15 (2d10+4)`;
+  HP unchanged.
+- CON 18 → 14 (mod +4 → +2): HP `114 → 90`; formula `12d10 + 48 → 12d10 + 24`;
+  Bite unchanged (no STR/CON dependency).
+
 ### Menagerie: auto-recalculate templated actions when stats change
 
 When the DM changes an ability score, the monster's CR, or the monster's
