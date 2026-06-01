@@ -341,6 +341,23 @@
                 <div class="ed-fg"><label>HP</label><input id="ed-hp" type="number" oninput="syncEditor()"></div>
                 <div class="ed-fg"><label>HP formula</label><input id="ed-hpFormula" placeholder="e.g. 3d8+3" oninput="syncEditor()"></div>
               </div>
+              <div class="ed-grid c5" style="margin-top:0.5rem;align-items:end">
+                <div class="ed-fg" style="grid-column:1 / span 5;display:flex;flex-direction:row;align-items:center;gap:8px">
+                  <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;color:var(--ink-light);cursor:pointer">
+                    <input type="checkbox" id="ed-hpStructured" onchange="syncEditor()">
+                    Use structured hit dice — HP auto-derives from <code>count·(size+1)/2 + count·CON_mod + magic</code> and tracks CON changes.
+                  </label>
+                </div>
+              </div>
+              <div class="ed-grid c4" id="ed-hp-structured-row" style="margin-top:0.5rem;display:none">
+                <div class="ed-fg"><label>Hit dice (count)</label><input id="ed-hitDiceCount" type="number" min="1" oninput="syncEditor()"></div>
+                <div class="ed-fg"><label>Hit die size</label><select id="ed-hitDieSize" onchange="syncEditor()">
+                  <option value="4">d4 (Tiny)</option><option value="6">d6 (Small)</option><option value="8">d8 (Medium)</option>
+                  <option value="10">d10 (Large)</option><option value="12">d12 (Huge)</option><option value="20">d20 (Gargantuan)</option>
+                </select></div>
+                <div class="ed-fg"><label>Magic HP bonus</label><input id="ed-hpMagicBonus" type="number" oninput="syncEditor()"></div>
+                <div class="ed-derived" id="ed-hp-derived">HP: — · formula —</div>
+              </div>
               <div class="ed-grid c5" style="margin-top:0.5rem">
                 <div class="ed-fg"><label>Walk (ft.)</label><input id="ed-spd-walk" type="number" oninput="syncEditor()"></div>
                 <div class="ed-fg"><label>Fly</label><input id="ed-spd-fly" type="number" oninput="syncEditor()"></div>
@@ -1487,10 +1504,43 @@
       return 'custom-' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
     }
 
+    // Standard 2024 MM hit-die size by creature size.
+    const HIT_DIE_BY_SIZE = { 'Tiny': 4, 'Small': 6, 'Medium': 8, 'Large': 10, 'Huge': 12, 'Gargantuan': 20 };
+    function hitDieSizeFor(size){ return HIT_DIE_BY_SIZE[size] || 8; }
+
+    // Compute HP avg + HP formula string from structured hit dice + CON mod.
+    // HP = count × (size+1)/2 (floored) + count × conMod + magicBonus.
+    // The bonus inside the formula = count × conMod + magicBonus.
+    function deriveStructuredHP(count, size, conMod, magicBonus){
+      const n = parseInt(count, 10);
+      const m = parseInt(size, 10);
+      if (!isFinite(n) || n < 1 || !isFinite(m) || m < 2) return { hp: null, formula: '' };
+      const conBonus = (parseInt(conMod, 10) || 0) * n;
+      const magic = parseInt(magicBonus, 10) || 0;
+      const totalBonus = conBonus + magic;
+      const hpAvg = Math.floor(n * (m + 1) / 2) + totalBonus;
+      let formula = `${n}d${m}`;
+      if (totalBonus !== 0) formula += `${totalBonus > 0 ? ' + ' : ' - '}${Math.abs(totalBonus)}`;
+      return { hp: Math.max(1, hpAvg), formula };
+    }
+    // Parse an existing hpFormula like "20d10 + 40" or "3d8 - 1" or "5d6"
+    // back into structured fields. Returns null if it can't parse.
+    function parseHpFormula(formulaStr){
+      const m = (formulaStr || '').replace(/\s+/g, '').match(/^(\d+)d(\d+)([+\-]\d+)?$/i);
+      if (!m) return null;
+      return { count: parseInt(m[1], 10), size: parseInt(m[2], 10), totalBonus: m[3] ? parseInt(m[3], 10) : 0 };
+    }
+
     function blankMonster(){
       return {
         id: '', name: '', size: 'Medium', type: '', subtype: '', alignment: '',
-        ac: null, acText: '', hp: null, hpFormula: '',
+        ac: null, acText: '',
+        hp: null, hpFormula: '',
+        // Structured-HP fields (new). When `hpStructured` is true, hp + hpFormula
+        // are DERIVED on every syncEditor() from these + CON mod. When false,
+        // hp + hpFormula are the DM's freeform values.
+        hpStructured: true,
+        hitDiceCount: 1, hitDieSize: 8, hpMagicBonus: 0,
         initiative: null, initiativeScore: null,
         speed: { walk: 30 }, speedText: '',
         abilities: Object.fromEntries(ABIL_KEYS.map(k => [k, { score: 10, mod: 0, save: 0 }])),
@@ -1565,8 +1615,36 @@
 
       currentEdit.ac = numOrNull($('ed-ac').value);
       currentEdit.acText = $('ed-acText').value.trim() || (currentEdit.ac != null ? 'AC ' + currentEdit.ac : '');
-      currentEdit.hp = numOrNull($('ed-hp').value);
-      currentEdit.hpFormula = $('ed-hpFormula').value.trim();
+
+      // HP: if structured mode is on, derive from hit dice + CON; otherwise
+      // honor the DM's freeform HP and formula inputs.
+      currentEdit.hpStructured = $('ed-hpStructured').checked;
+      currentEdit.hitDiceCount = numOrNull($('ed-hitDiceCount').value);
+      currentEdit.hitDieSize = numOrNull($('ed-hitDieSize').value);
+      currentEdit.hpMagicBonus = parseInt($('ed-hpMagicBonus').value, 10) || 0;
+      $('ed-hp-structured-row').style.display = currentEdit.hpStructured ? '' : 'none';
+      $('ed-hp').readOnly = !!currentEdit.hpStructured;
+      $('ed-hpFormula').readOnly = !!currentEdit.hpStructured;
+      $('ed-hp').style.opacity = currentEdit.hpStructured ? '0.7' : '1';
+      $('ed-hpFormula').style.opacity = currentEdit.hpStructured ? '0.7' : '1';
+      if (currentEdit.hpStructured && currentEdit.hitDiceCount != null && currentEdit.hitDieSize != null){
+        // Read the CON mod the way the abilities block stored it just above —
+        // we haven't written abilities yet in this syncEditor pass, so we must
+        // compute it from the form value, not from currentEdit.abilities.
+        const conScore = parseInt($('ed-ab-con').value || '10', 10);
+        const conMod = Math.floor((conScore - 10) / 2);
+        const derived = deriveStructuredHP(currentEdit.hitDiceCount, currentEdit.hitDieSize, conMod, currentEdit.hpMagicBonus);
+        currentEdit.hp = derived.hp;
+        currentEdit.hpFormula = derived.formula;
+        // Reflect derived values back into the read-only inputs.
+        $('ed-hp').value = derived.hp ?? '';
+        $('ed-hpFormula').value = derived.formula;
+        $('ed-hp-derived').textContent = `HP: ${derived.hp ?? '—'} · formula ${derived.formula || '—'}`;
+      } else {
+        currentEdit.hp = numOrNull($('ed-hp').value);
+        currentEdit.hpFormula = $('ed-hpFormula').value.trim();
+        $('ed-hp-derived').textContent = '—';
+      }
       currentEdit.initiative = numOrNull($('ed-initiative').value);
 
       const sp = {};
@@ -1648,6 +1726,39 @@
       $('ed-cr').value = String(m.cr ?? 1);
       $('ed-ac').value = m.ac ?? '';
       $('ed-acText').value = m.acText || '';
+      // HP — if the monster has structured-HP fields, use them; otherwise try
+      // to parse the existing formula. Fallback: show freeform inputs.
+      let hpStructured = !!m.hpStructured;
+      let hdCount = m.hitDiceCount, hdSize = m.hitDieSize, magicBonus = m.hpMagicBonus || 0;
+      if (!hpStructured && m.hpFormula){
+        const parsed = parseHpFormula(m.hpFormula);
+        if (parsed){
+          hdCount = parsed.count;
+          hdSize = parsed.size;
+          // Back-derive the magic bonus by subtracting count × CON_mod from the
+          // formula's total bonus. CON mod comes from the abilities block.
+          const conMod = (m.abilities?.con?.mod) ?? 0;
+          magicBonus = parsed.totalBonus - parsed.count * conMod;
+          hpStructured = true;
+        }
+      }
+      // Default a brand-new monster (no name yet, no formula) to structured mode
+      // with size-appropriate hit die.
+      if (!m.hpFormula && !m.hpStructured){
+        hpStructured = true;
+        hdCount = hdCount || 1;
+        hdSize = hdSize || hitDieSizeFor(m.size);
+        magicBonus = 0;
+      }
+      $('ed-hpStructured').checked = hpStructured;
+      $('ed-hitDiceCount').value = hdCount ?? '';
+      $('ed-hitDieSize').value = String(hdSize ?? hitDieSizeFor(m.size));
+      $('ed-hpMagicBonus').value = magicBonus;
+      $('ed-hp-structured-row').style.display = hpStructured ? '' : 'none';
+      $('ed-hp').readOnly = !!hpStructured;
+      $('ed-hpFormula').readOnly = !!hpStructured;
+      $('ed-hp').style.opacity = hpStructured ? '0.7' : '1';
+      $('ed-hpFormula').style.opacity = hpStructured ? '0.7' : '1';
       $('ed-hp').value = m.hp ?? '';
       $('ed-hpFormula').value = m.hpFormula || '';
       $('ed-initiative').value = m.initiative ?? '';
@@ -1941,6 +2052,24 @@
       return `${avg} (${dice.replace(/\s+/g,'')}) ${type} damage`;
     }
 
+    // Build a damage dice expression "NdM[+/-K]" from structured parts. K is
+    // (useAbilityMod ? abilityMod : 0) + magicBonus. Pure function so it
+    // reruns cleanly on stat change.
+    function buildDamageDice(diceOnly, ability, useAbilityMod, magicBonus, monster){
+      const abilMod = useAbilityMod ? (monster?.abilities?.[ability]?.mod ?? 0) : 0;
+      const totalBonus = (abilMod | 0) + (parseInt(magicBonus, 10) || 0);
+      const cleanDice = (diceOnly || '').replace(/\s+/g, '');
+      if (!cleanDice) return '';
+      if (totalBonus === 0) return cleanDice;
+      return `${cleanDice}${totalBonus > 0 ? '+' : '-'}${Math.abs(totalBonus)}`;
+    }
+    // Backwards-compat: if the stored damageDice already contains +/-, treat
+    // it as a literal old-style formula (compose old templates without
+    // double-counting the bonus). New templates pass just "NdM".
+    function isLiteralDiceFormula(dice){
+      return /[+\-]/.test(String(dice || ''));
+    }
+
     // Pull every action with an attack roll out of the monster — used by the
     // Multiattack template's datalist so the DM can pick from already-defined
     // attacks. Strips any trailing parenthetical from the name so
@@ -1963,22 +2092,33 @@
           weaponName: '',
           ability: 'str',
           reach: 5,
-          damageDice: '1d6+3',
+          // New structured shape: dice = "NdM" only; bonus = abil_mod (if
+          // useAbilityMod) + magicBonus. Legacy "NdM+K" strings are detected
+          // by isLiteralDiceFormula and used verbatim for backwards compat.
+          damageDice: '1d6',
+          damageBonus: 0,
+          useAbilityMod: true,
           damageType: 'Slashing',
           riderDice: '',
           riderType: '',
           recharge: ''
         }),
-        renderForm: (f, m) => `
+        renderForm: (f, m) => {
+          const builtDice = isLiteralDiceFormula(f.damageDice)
+            ? f.damageDice
+            : buildDamageDice(f.damageDice, f.ability, f.useAbilityMod, f.damageBonus, m);
+          return `
           <div class="row c2">
             <div class="fg"><label>Attack name</label><input id="tplf-weaponName" placeholder="e.g. Greatsword, Tentacle, Bite" value="${esc(f.weaponName||'')}"></div>
             <div class="fg"><label>Ability</label><select id="tplf-ability">${SAVE_ABILITIES.map(a => `<option value="${a}" ${a===f.ability?'selected':''}>${a.toUpperCase()}</option>`).join('')}</select></div>
           </div>
-          <div class="row c3">
+          <div class="row c4">
             <div class="fg"><label>Reach (ft)</label><input id="tplf-reach" type="number" min="5" value="${f.reach}"></div>
-            <div class="fg"><label>Damage dice</label><input id="tplf-damageDice" placeholder="2d6+4" value="${esc(f.damageDice||'')}"></div>
+            <div class="fg"><label>Damage dice (NdM)</label><input id="tplf-damageDice" placeholder="2d6" value="${esc(f.damageDice||'')}"></div>
+            <div class="fg"><label>Magic bonus</label><input id="tplf-damageBonus" type="number" value="${f.damageBonus ?? 0}"></div>
             <div class="fg"><label>Damage type</label><select id="tplf-damageType">${DMG_TYPES.map(d => `<option ${d===f.damageType?'selected':''}>${d}</option>`).join('')}</select></div>
           </div>
+          <label class="toggle" style="display:flex;align-items:center;gap:6px;font-size:0.84rem;color:var(--ink-light);margin-top:0.2rem"><input type="checkbox" id="tplf-useAbilityMod" ${f.useAbilityMod?'checked':''}> Add ability mod to damage (auto-updates if the stat changes)</label>
           <div class="row c3">
             <div class="fg"><label>Rider damage (optional)</label><input id="tplf-riderDice" placeholder="e.g. 2d10" value="${esc(f.riderDice||'')}"></div>
             <div class="fg"><label>Rider type</label><select id="tplf-riderType"><option value="">—</option>${DMG_TYPES.map(d => `<option ${d===f.riderType?'selected':''}>${d}</option>`).join('')}</select></div>
@@ -1986,13 +2126,18 @@
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:0.3rem">
             <span class="tpl-derived">Attack: +${attackBonusFor(f.ability, m)}</span>
-            <span class="tpl-derived">Damage avg: ${avgFromDice(f.damageDice) ?? '—'}</span>
+            <span class="tpl-derived">Damage formula: ${esc(builtDice || '—')}</span>
+            <span class="tpl-derived">Damage avg: ${avgFromDice(builtDice) ?? '—'}</span>
             ${f.riderDice ? `<span class="tpl-derived">Rider avg: ${avgFromDice(f.riderDice) ?? '—'}</span>` : ''}
           </div>
-        `,
+        `;
+        },
         compose: (f, m) => {
           const atk = attackBonusFor(f.ability, m);
-          const dmg = damageEntry(f.damageDice, f.damageType);
+          const builtDice = isLiteralDiceFormula(f.damageDice)
+            ? f.damageDice
+            : buildDamageDice(f.damageDice, f.ability, f.useAbilityMod, f.damageBonus, m);
+          const dmg = damageEntry(builtDice, f.damageType);
           const rider = (f.riderDice && f.riderType) ? damageEntry(f.riderDice, f.riderType) : null;
           let body = `Melee Attack Roll: ${atk >= 0 ? '+' : ''}${atk}, reach ${f.reach} ft. Hit: ${dmg || '— damage'}${rider ? ` plus ${rider}` : ''}.`;
           const name = (f.weaponName || 'Attack') + rechargeMarker(f.recharge);
@@ -2007,13 +2152,19 @@
           ability: 'dex',
           rangeShort: 30,
           rangeLong: 120,
-          damageDice: '1d8+2',
+          damageDice: '1d8',
+          damageBonus: 0,
+          useAbilityMod: true,
           damageType: 'Piercing',
           riderDice: '',
           riderType: '',
           recharge: ''
         }),
-        renderForm: (f, m) => `
+        renderForm: (f, m) => {
+          const builtDice = isLiteralDiceFormula(f.damageDice)
+            ? f.damageDice
+            : buildDamageDice(f.damageDice, f.ability, f.useAbilityMod, f.damageBonus, m);
+          return `
           <div class="row c2">
             <div class="fg"><label>Attack name</label><input id="tplf-weaponName" placeholder="e.g. Longbow, Wind Javelin" value="${esc(f.weaponName||'')}"></div>
             <div class="fg"><label>Ability</label><select id="tplf-ability">${SAVE_ABILITIES.map(a => `<option value="${a}" ${a===f.ability?'selected':''}>${a.toUpperCase()}</option>`).join('')}</select></div>
@@ -2021,22 +2172,31 @@
           <div class="row c4">
             <div class="fg"><label>Short range (ft)</label><input id="tplf-rangeShort" type="number" value="${f.rangeShort}"></div>
             <div class="fg"><label>Long range (ft)</label><input id="tplf-rangeLong" type="number" value="${f.rangeLong}"></div>
-            <div class="fg"><label>Damage dice</label><input id="tplf-damageDice" placeholder="1d8+2" value="${esc(f.damageDice||'')}"></div>
+            <div class="fg"><label>Damage dice (NdM)</label><input id="tplf-damageDice" placeholder="1d8" value="${esc(f.damageDice||'')}"></div>
             <div class="fg"><label>Damage type</label><select id="tplf-damageType">${DMG_TYPES.map(d => `<option ${d===f.damageType?'selected':''}>${d}</option>`).join('')}</select></div>
           </div>
           <div class="row c3">
+            <div class="fg"><label>Magic bonus</label><input id="tplf-damageBonus" type="number" value="${f.damageBonus ?? 0}"></div>
+            <label class="toggle" style="display:flex;align-items:center;gap:6px;font-size:0.84rem;color:var(--ink-light);margin-top:1.2rem"><input type="checkbox" id="tplf-useAbilityMod" ${f.useAbilityMod?'checked':''}> Add ability mod</label>
+            <div class="fg"><label>Recharge / limit</label><select id="tplf-recharge">${RECHARGE_OPTIONS.map(o => `<option value="${o.value}" ${o.value===f.recharge?'selected':''}>${o.label}</option>`).join('')}</select></div>
+          </div>
+          <div class="row c2">
             <div class="fg"><label>Rider damage (optional)</label><input id="tplf-riderDice" placeholder="e.g. 1d4" value="${esc(f.riderDice||'')}"></div>
             <div class="fg"><label>Rider type</label><select id="tplf-riderType"><option value="">—</option>${DMG_TYPES.map(d => `<option ${d===f.riderType?'selected':''}>${d}</option>`).join('')}</select></div>
-            <div class="fg"><label>Recharge / limit</label><select id="tplf-recharge">${RECHARGE_OPTIONS.map(o => `<option value="${o.value}" ${o.value===f.recharge?'selected':''}>${o.label}</option>`).join('')}</select></div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:0.3rem">
             <span class="tpl-derived">Attack: +${attackBonusFor(f.ability, m)}</span>
-            <span class="tpl-derived">Damage avg: ${avgFromDice(f.damageDice) ?? '—'}</span>
+            <span class="tpl-derived">Damage formula: ${esc(builtDice || '—')}</span>
+            <span class="tpl-derived">Damage avg: ${avgFromDice(builtDice) ?? '—'}</span>
           </div>
-        `,
+        `;
+        },
         compose: (f, m) => {
           const atk = attackBonusFor(f.ability, m);
-          const dmg = damageEntry(f.damageDice, f.damageType);
+          const builtDice = isLiteralDiceFormula(f.damageDice)
+            ? f.damageDice
+            : buildDamageDice(f.damageDice, f.ability, f.useAbilityMod, f.damageBonus, m);
+          const dmg = damageEntry(builtDice, f.damageType);
           const rider = (f.riderDice && f.riderType) ? damageEntry(f.riderDice, f.riderType) : null;
           let body = `Ranged Attack Roll: ${atk >= 0 ? '+' : ''}${atk}, range ${f.rangeShort}/${f.rangeLong} ft. Hit: ${dmg || '— damage'}${rider ? ` plus ${rider}` : ''}.`;
           const name = (f.weaponName || 'Attack') + rechargeMarker(f.recharge);
@@ -2052,13 +2212,19 @@
           reach: 5,
           rangeShort: 30,
           rangeLong: 120,
-          damageDice: '1d6+3',
+          damageDice: '1d6',
+          damageBonus: 0,
+          useAbilityMod: true,
           damageType: 'Piercing',
           riderDice: '',
           riderType: '',
           recharge: ''
         }),
-        renderForm: (f, m) => `
+        renderForm: (f, m) => {
+          const builtDice = isLiteralDiceFormula(f.damageDice)
+            ? f.damageDice
+            : buildDamageDice(f.damageDice, f.ability, f.useAbilityMod, f.damageBonus, m);
+          return `
           <div class="row c2">
             <div class="fg"><label>Attack name</label><input id="tplf-weaponName" placeholder="e.g. Handaxe, Javelin" value="${esc(f.weaponName||'')}"></div>
             <div class="fg"><label>Ability</label><select id="tplf-ability">${SAVE_ABILITIES.map(a => `<option value="${a}" ${a===f.ability?'selected':''}>${a.toUpperCase()}</option>`).join('')}</select></div>
@@ -2068,23 +2234,30 @@
             <div class="fg"><label>Range short</label><input id="tplf-rangeShort" type="number" value="${f.rangeShort}"></div>
             <div class="fg"><label>Range long</label><input id="tplf-rangeLong" type="number" value="${f.rangeLong}"></div>
           </div>
-          <div class="row c3">
-            <div class="fg"><label>Damage dice</label><input id="tplf-damageDice" placeholder="1d6+3" value="${esc(f.damageDice||'')}"></div>
+          <div class="row c4">
+            <div class="fg"><label>Damage dice (NdM)</label><input id="tplf-damageDice" placeholder="1d6" value="${esc(f.damageDice||'')}"></div>
+            <div class="fg"><label>Magic bonus</label><input id="tplf-damageBonus" type="number" value="${f.damageBonus ?? 0}"></div>
             <div class="fg"><label>Damage type</label><select id="tplf-damageType">${DMG_TYPES.map(d => `<option ${d===f.damageType?'selected':''}>${d}</option>`).join('')}</select></div>
             <div class="fg"><label>Recharge / limit</label><select id="tplf-recharge">${RECHARGE_OPTIONS.map(o => `<option value="${o.value}" ${o.value===f.recharge?'selected':''}>${o.label}</option>`).join('')}</select></div>
           </div>
+          <label class="toggle" style="display:flex;align-items:center;gap:6px;font-size:0.84rem;color:var(--ink-light);margin-top:0.2rem"><input type="checkbox" id="tplf-useAbilityMod" ${f.useAbilityMod?'checked':''}> Add ability mod to damage (auto-updates if the stat changes)</label>
           <div class="row c2">
             <div class="fg"><label>Rider damage (optional)</label><input id="tplf-riderDice" placeholder="e.g. 1d4" value="${esc(f.riderDice||'')}"></div>
             <div class="fg"><label>Rider type</label><select id="tplf-riderType"><option value="">—</option>${DMG_TYPES.map(d => `<option ${d===f.riderType?'selected':''}>${d}</option>`).join('')}</select></div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:0.3rem">
             <span class="tpl-derived">Attack: +${attackBonusFor(f.ability, m)}</span>
-            <span class="tpl-derived">Damage avg: ${avgFromDice(f.damageDice) ?? '—'}</span>
+            <span class="tpl-derived">Damage formula: ${esc(builtDice || '—')}</span>
+            <span class="tpl-derived">Damage avg: ${avgFromDice(builtDice) ?? '—'}</span>
           </div>
-        `,
+        `;
+        },
         compose: (f, m) => {
           const atk = attackBonusFor(f.ability, m);
-          const dmg = damageEntry(f.damageDice, f.damageType);
+          const builtDice = isLiteralDiceFormula(f.damageDice)
+            ? f.damageDice
+            : buildDamageDice(f.damageDice, f.ability, f.useAbilityMod, f.damageBonus, m);
+          const dmg = damageEntry(builtDice, f.damageType);
           const rider = (f.riderDice && f.riderType) ? damageEntry(f.riderDice, f.riderType) : null;
           let body = `Melee or Ranged Attack Roll: ${atk >= 0 ? '+' : ''}${atk}, reach ${f.reach} ft. or range ${f.rangeShort}/${f.rangeLong} ft. Hit: ${dmg || '— damage'}${rider ? ` plus ${rider}` : ''}.`;
           const name = (f.weaponName || 'Attack') + rechargeMarker(f.recharge);
@@ -2433,7 +2606,14 @@
         cr: monster.cr,
         pb: monster.pb,
         name: monster.name,
-        mods: ['str','dex','con','int','wis','cha'].map(k => a[k]?.mod ?? 0)
+        mods: ['str','dex','con','int','wis','cha'].map(k => a[k]?.mod ?? 0),
+        // Structured-HP inputs go in the snapshot too — when count/size/magic
+        // change while in structured mode, templated actions that reference
+        // damage dependent on stats won't change, but the HP recompute above
+        // in syncEditor will still run. (Templated action recalc only triggers
+        // on the abilities + cr + pb + name part of the snapshot, but adding
+        // HP fields here keeps future stat-derived features consistent.)
+        hp: [monster.hpStructured, monster.hitDiceCount, monster.hitDieSize, monster.hpMagicBonus]
       });
     }
     function recalcTemplatedActions(){
