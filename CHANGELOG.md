@@ -9,6 +9,88 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: Tome of Beasts scrape — 316 third-party monsters merged in
+
+The bestiary grows from 503 to **819 monsters**. The original Kobold Press
+*Tome of Beasts* (2017 PDF, 2014 5e edition, owned by the DM) gets a fresh
+extractor that pulls every stat block, transforms the 2014 phrasing to
+2024 shape, and concatenates the result into the same `bestiary.json` the
+worker serves — distinguishable by an explicit `source: 'tob-v1'` tag on
+each ToB entry alongside `source: 'mm-2024'` for the WotC content.
+
+Schema bumped to v4. The PDF itself + the intermediate `tob.json` stay
+gitignored (`*.pdf`, `tob*.json`) — the repo is public, the content is
+copyrighted.
+
+#### Added — `scripts/extract_tob.py` (new)
+
+A column-aware two-pass PDF parser:
+
+1. **Column-isolation extraction.** Each two-column page is split at x≈290.
+   Words within each column are clustered into lines by y-coordinate, then
+   the reading flow is concatenated as all-of-left-col then all-of-right-col
+   so stat-block fields that wrap across lines reassemble in order.
+2. **Anchor detection.** A monster anchor is a `<size> <type>, <alignment>`
+   line whose next non-empty line starts with `Armor Class`.
+3. **Multi-line field gather.** Continuation lines (long resistance lists,
+   etc.) get glued onto their parent label until the next known label,
+   section header, or page boundary appears. Fixes the 2014-MM-style wraps
+   that defeated the naive parser.
+4. **Trait + section parsing.** After `Challenge`, walk forward parsing
+   feature names (`<Title Case>. <body>` or `<Title>: <body>`). Section
+   headers (`ACTIONS`/`REACTIONS`/`LEGENDARY ACTIONS`/`BONUS ACTIONS`/
+   `LAIR ACTIONS`/`REGIONAL EFFECTS`) route entries to the right array.
+5. **Lore-bleed gate.** If a feature's body lacks game-mechanic markers
+   (no `Attack Roll`, no DC, no damage dice, no recharge, no save ability),
+   stop parsing — we've crossed into the next monster's lore prose
+   (paragraphs like "Forest Guardians.", "Creatures of Pure Reason.").
+6. **2014 → 2024 prose transform.** `Melee Weapon Attack: +9 to hit, ...,
+   one target. Hit:` → `Melee Attack Roll: +9, ... Hit:`. Damage types and
+   condition names get Title Cased. Unicode minus signs normalized to
+   hyphens.
+7. **Title-case helper preserves spaces around parens.** Splits on parens
+   and re-joins with single spaces so "Thunder (only when in ethereal
+   form)" doesn't collapse to "Thunder(only when in ethereal form)".
+
+Result on the full book: **316 monsters extracted** across 409 bestiary
+pages (page 8 - 416). 100% have valid CR / AC / HP / abilities; 310/316
+have actions, 295/316 have traits, 23 have legendary actions. Cosmetic
+imperfections (Mirror Hag has 0 actions, Spellcasting traits sometimes
+split into "Cantrips"/"1st Level" sub-features, lair-action sections that
+use bullet formatting are not yet parsed) are documented in the script
+and hand-cleanable through the editor's "Edit a copy" flow.
+
+#### Added — `scripts/normalize_bestiary.py`
+- New `normalize(raw, patch, extras=[envelopes])` shape — the normalizer
+  accepts a list of additional pre-shaped bestiary envelopes and
+  concatenates their monsters through the same normalization pipeline
+  (size/type repair, resistance string → array, lair-effect extraction).
+- `main()` looks for `tob.json` at the project root and includes it
+  automatically when present. Each entry's pre-existing `source` tag
+  passes through untouched.
+- `parse_immunities` now splits on the LAST `;` instead of the first.
+  ToB's multi-clause damage immunities (e.g.
+  `"Poison; Bludgeoning, Piercing, Slashing (Nonmagical); Charmed, ..."`)
+  now route the damage and condition halves correctly. The MM 2024 format
+  has at most one `;` so this also works there — verified on the Air
+  Elemental and Aboleth that the existing immunity arrays are unchanged.
+- Output includes a `_sources` summary so consumers can show
+  per-source counts at a glance.
+- Schema bumped to v4 to signal the additional `source`-tagged
+  concatenated monsters.
+
+#### Added — `.gitignore`
+- `__pycache__/` and `*.pyc` for the bestiary scripts' bytecode cache.
+
+#### Verified
+- Normalized output: **819 monsters** (`{'mm-2024': 503, 'tob-v1': 316}`).
+- Spot-checks: Nihilith (CR 12) parses with 6 actions / 1 reaction / 3
+  legendary, condition immunities cleanly 9 items long. Algorith (CR 10)
+  has 4 actions (Multiattack, Logic Razor, Cone of Negation (Recharge
+  5–6), Reality Bomb (5/Day)). Young Flame Dragon (CR 9) carries Bite +
+  Claw + Fire Breath (Recharge 5–6). Air Elemental unchanged
+  (regression-free against the new last-`;` split).
+
 ### Menagerie: structured damage + HP that auto-derive from stats
 
 Pushes the auto-recalculation through one level deeper. Two changes:

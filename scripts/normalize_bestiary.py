@@ -19,7 +19,7 @@ import re
 import sys
 from pathlib import Path
 
-SCHEMA_VERSION = 3  # +lairEffects via patch file (covers monsters whose text the scraper missed)
+SCHEMA_VERSION = 4  # +tob-v1 monsters concatenated into the same bestiary envelope
 
 # Optional patch input: when present at the project root (default
 # `mm2024-lair-patch.json`), the file contributes lair-effects sections the
@@ -28,6 +28,13 @@ SCHEMA_VERSION = 3  # +lairEffects via patch file (covers monsters whose text th
 # rather than inline in the monster's description. The patch is gitignored
 # (third-party content) and produced by `scripts/scrape_lair_effects.js`.
 PATCH_PATH_DEFAULT = "mm2024-lair-patch.json"
+
+# Optional secondary input: when present at the project root, every monster
+# in this file is normalized with the same pipeline and CONCATENATED into the
+# main bestiary output. The source tag on each entry (e.g. 'tob-v1') is
+# preserved so the editor / browse / picker can filter by it later.
+# Produced by `scripts/extract_tob.py` from the Tome of Beasts PDF.
+TOB_PATH_DEFAULT = "tob.json"
 
 SIZE_WORDS = {"Tiny", "Small", "Medium", "Large", "Huge", "Gargantuan"}
 
@@ -104,17 +111,22 @@ def split_csv(text: str) -> list[str]:
 
 def parse_immunities(text: str) -> tuple[list[str], list[str]]:
     """
-    DDB packs damage immunities and condition immunities into one string,
+    Damage immunities + condition immunities are packed into one string,
     separated by ';'. Example:
         "Poison, Thunder; Exhaustion, Grappled, Paralyzed"
     Either half can be absent.
+
+    Splits on the LAST ';' so multi-clause damage immunities (e.g.
+    "Poison; Bludgeoning, Piercing, Slashing (Nonmagical Attacks);
+    Charmed, Frightened") get parsed correctly. The MM 2024 format has at
+    most one ';' so this also works there.
     """
     if not text:
         return [], []
-    parts = text.split(";", 1)
-    damage = split_csv(parts[0]) if len(parts) >= 1 else []
-    cond = split_csv(parts[1]) if len(parts) == 2 else []
-    return damage, cond
+    if ";" not in text:
+        return split_csv(text), []
+    head, _, tail = text.rpartition(";")
+    return split_csv(head), split_csv(tail)
 
 
 def normalize_size_and_type(m: dict) -> tuple[str, list[str], str, list[str]]:
@@ -235,11 +247,37 @@ def normalize_monster(m: dict) -> dict:
     return out
 
 
-def normalize(raw: dict, patch: dict | None = None) -> dict:
+def normalize(raw: dict, patch: dict | None = None,
+              extras: list[dict] | None = None) -> dict:
+    """
+    Normalize a primary bestiary scrape (e.g. mm2024.json), optionally apply
+    a lair-effects patch, and optionally concatenate additional pre-shaped
+    bestiary envelopes (e.g. tob.json) into the same output.
+
+    `extras` is a list of envelope dicts (each with its own `monsters` list).
+    Their entries are normalized via the same `normalize_monster` pipeline
+    so resistance arrays, size/type repairs, and lair-effect extraction all
+    apply uniformly. The lair-patch is NOT applied to extras — it's specific
+    to the MM 2024 chapter pages.
+
+    The output preserves each entry's existing `source` tag, so concatenated
+    monsters from different books are distinguishable downstream.
+    """
     monsters = [normalize_monster(m) for m in raw.get("monsters", [])]
     patch_applied, patch_unmatched = (0, [])
     if patch:
         patch_applied, patch_unmatched = apply_lair_patch(monsters, patch)
+
+    # Append normalized monsters from each extra source. Each extra envelope
+    # gets recorded in the output's `_sources` map so the count by source is
+    # legible at a glance.
+    sources_summary = {raw.get("source") or "primary": len(monsters)}
+    for ex in extras or []:
+        ex_label = ex.get("source") or "extra"
+        ex_monsters = [normalize_monster(m) for m in ex.get("monsters", [])]
+        monsters.extend(ex_monsters)
+        sources_summary[ex_label] = sources_summary.get(ex_label, 0) + len(ex_monsters)
+
     out = {
         "schemaVersion": SCHEMA_VERSION,
         "source": raw.get("source"),
@@ -253,6 +291,7 @@ def normalize(raw: dict, patch: dict | None = None) -> dict:
         "applied": patch_applied,
         "stillMissing": patch_unmatched,
     }
+    out["_sources"] = sources_summary
     return out
 
 
@@ -273,7 +312,21 @@ def main() -> int:
             patch = json.loads(patch_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as e:
             print(f"warning: could not parse {patch_path}: {e}", file=sys.stderr)
-    norm = normalize(raw, patch)
+
+    # Optional secondary bestiary envelopes — pre-shaped JSON files produced by
+    # other scrapers (currently just `tob.json` from extract_tob.py). Each one
+    # gets normalized through the same pipeline and concatenated into the
+    # output. Sources stay tagged per-monster so the bestiary can filter.
+    extras = []
+    tob_path = here / TOB_PATH_DEFAULT
+    if tob_path.exists():
+        try:
+            extras.append(json.loads(tob_path.read_text(encoding="utf-8")))
+            print(f"  including {tob_path.name}")
+        except json.JSONDecodeError as e:
+            print(f"warning: could not parse {tob_path}: {e}", file=sys.stderr)
+
+    norm = normalize(raw, patch, extras=extras)
     out_path.write_text(
         json.dumps(norm, indent=2, ensure_ascii=False), encoding="utf-8"
     )
@@ -288,6 +341,8 @@ def main() -> int:
     with_lair_eff = sum(1 for m in ms if m["lairEffects"])
     total_lair_eff = sum(len(m["lairEffects"]) for m in ms)
     print(f"wrote {out_path} ({len(ms)} monsters, schemaVersion={SCHEMA_VERSION})")
+    if "_sources" in norm and len(norm["_sources"]) > 1:
+        print(f"  sources: " + ", ".join(f"{k}={v}" for k, v in norm["_sources"].items()))
     print(f"  size/type repairs:       {fixed_type}")
     print(f"  with damage resistances: {with_res}")
     print(f"  with damage immunities:  {with_dmg_imm}")
