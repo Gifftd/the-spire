@@ -485,8 +485,9 @@ def infer_role(m):
         return 'Brute'
 
     # ── Controller ────────────────────────────────────────────────
-    # Multiple distinct save-effect actions = clear controller signal
-    # (Eye Rays-style multi-save bodies already inflate save_acts above)
+    # Save-DC primary. Multiple distinct save effects (or one multi-effect
+    # body like Eye Rays — save_acts is already inflated for those) is the
+    # clearest signal.
     if s['save_acts'] >= 3:
         return 'Controller'
     if s['save_acts'] >= 2 and total_atks <= s['save_acts']:
@@ -494,21 +495,26 @@ def infer_role(m):
     # Save-only profile (no weapon attacks at all)
     if s['save_acts'] >= 1 and total_atks == 0:
         return 'Controller'
-    # Pure caster — no weapon attacks
-    if s['has_spell'] and total_atks == 0:
-        return 'Controller'
-    # Caster with limited weapon poke (1-2 attacks) and a save effect
+    # Caster who pairs a save effect with limited weapon poke — Banshee
+    # (Wail), Aboleth (Dominate Mind), Sea Hag, Dryad, etc.
     if s['has_spell'] and total_atks <= 2 and s['save_acts'] >= 1:
         return 'Controller'
-    # Caster with limited weapon poke and innate-spell trait (covers
-    # Dryad, Banshee, Sea Hag): treat as Controller when light on offense
-    if s['has_spell'] and total_atks <= 2 and not is_giant_type:
-        return 'Controller'
+    # Pure caster — no weapon, no saves — defer to Artillery below.
 
     # ── Artillery ─────────────────────────────────────────────────
-    # Ranged-primary (archers, spell-slinger fixed-target casters)
+    # Ranged-primary (archers, ranged-spell artillery, sling/bow attackers)
     if s['ranged'] > s['melee'] and s['ranged'] >= 1:
         return 'Artillery'
+    # Spellcaster with an explicit ranged attack option — covers Druid
+    # (Verdant Wisp), Aarakocra Aeromancer, Bog Sage, Flameskull, etc.
+    # No save effects detected → not a Controller; the ranged option
+    # signals shoot-from-range play pattern.
+    if s['has_spell'] and s['save_acts'] == 0 and s['ranged'] >= 1:
+        return 'Artillery'
+    # Pure caster — no weapon, no melee. Defaults to Controller above for
+    # has_spell + total_atks==0; this catches the rare residual.
+    if s['has_spell'] and total_atks == 0:
+        return 'Controller'
 
     # ── Defender ──────────────────────────────────────────────────
     # Very rare archetype. Require well-above-band AC + above-band HP +
@@ -536,6 +542,14 @@ def infer_role(m):
     if (s['melee'] >= 1 and s['ranged'] >= 1
             and s['multi_count'] >= 2 and walk >= 40):
         return 'Skirmisher'
+
+    # ── Caster fallback → Controller ──────────────────────────────
+    # Lich, Mage, Archmage — has Spellcasting, no detected save effects,
+    # no ranged option (their flex attacks count as melee). They'd
+    # otherwise drop to Soldier; route them to Controller since their
+    # action economy is spell-dominant.
+    if s['has_spell'] and total_atks <= 2 and not is_giant_type:
+        return 'Controller'
 
     # ── Soldier ───────────────────────────────────────────────────
     if s['melee'] >= 1:
