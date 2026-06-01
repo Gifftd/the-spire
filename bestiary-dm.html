@@ -177,6 +177,28 @@
     .ana-dmg .dt.psychic .dt-name{color:#e090c0}
     .ana-dmg .dt.force .dt-name{color:#c8a0ff}
 
+    /* Action breakdown subsection */
+    .ana-grid-2col{display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start}
+    @media (max-width:900px){.ana-grid-2col{grid-template-columns:1fr}}
+    .ana-kind-list{background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius);padding:0.5rem 0.7rem;font-size:0.9rem}
+    .ana-kind-row{display:grid;grid-template-columns:120px 1fr 60px;gap:8px;align-items:center;padding:3px 0}
+    .ana-kind-row .kind-name{font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.08em;color:var(--brass)}
+    .ana-kind-row .kind-fill{background:var(--teal-faint);height:12px;border-radius:2px;border:1px solid var(--teal-deep);position:relative}
+    .ana-kind-row .kind-fill > span{display:block;height:100%;background:linear-gradient(90deg,var(--teal-deep),var(--teal));border-radius:2px}
+    .ana-kind-row .kind-n{font-family:'Cinzel',serif;color:var(--teal-bright);font-size:0.75rem;text-align:right}
+    .ana-archetype-list{background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius);font-size:0.9rem}
+    .ana-archetype-row{display:flex;align-items:center;gap:10px;padding:5px 10px;border-bottom:1px solid var(--border)}
+    .ana-archetype-row:last-child{border-bottom:none}
+    .ana-archetype-row .desc{flex:1;color:var(--ink)}
+    .ana-archetype-row .n{font-family:'Cinzel',serif;color:var(--teal-bright);font-size:0.85rem;min-width:36px;text-align:right}
+    .ability-chip{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--border-light);color:var(--ink-light);margin-right:4px}
+    .ability-chip.str{color:#e88;border-color:#844}
+    .ability-chip.dex{color:#8e8;border-color:#484}
+    .ability-chip.con{color:#fb8;border-color:#a64}
+    .ability-chip.int{color:#8af;border-color:#458}
+    .ability-chip.wis{color:#dac;border-color:#85a}
+    .ability-chip.cha{color:#fac;border-color:#a48}
+
     .footer{margin-top:2rem;text-align:center;padding-top:1.5rem;border-top:1px solid var(--border)}
     .footer-text{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--ink-faint)}
   </style>
@@ -367,6 +389,29 @@
         <div class="ana-section">
           <div class="ana-section-h">Damage types in action prose</div>
           <div id="ana-damage-types"></div>
+        </div>
+
+        <div class="ana-section">
+          <div class="ana-section-h">Action breakdown — kinds, abilities, archetypes</div>
+          <div class="hint" style="margin-bottom:0.4rem">Every action body is classified by a regex pass: multiattack, melee/ranged/flex attack, save effect, spellcasting block, recharge ability, utility. For attacks the underlying ability (Str vs Dex) is inferred by matching <code>mod + PB</code> to the printed attack bonus; for saves by inverting <code>DC = 8 + PB + mod</code>. Numbers feed the upcoming template-driven editor.</div>
+          <div class="ana-grid-2col">
+            <div>
+              <div class="ana-section-h" style="font-size:0.62rem;margin:0.4rem 0 0.3rem">Action kinds (overall)</div>
+              <div id="ana-act-kinds"></div>
+            </div>
+            <div>
+              <div class="ana-section-h" style="font-size:0.62rem;margin:0.4rem 0 0.3rem">Attack ability (Str vs Dex), all attacks</div>
+              <div id="ana-act-ability"></div>
+            </div>
+          </div>
+          <div class="ana-section-h" style="font-size:0.62rem;margin:0.7rem 0 0.3rem">Action kinds by CR tier</div>
+          <div id="ana-act-kinds-by-tier"></div>
+          <div class="ana-section-h" style="font-size:0.62rem;margin:0.7rem 0 0.3rem">Save effects — which ability the DC is built on, by CR tier</div>
+          <div id="ana-save-by-tier"></div>
+          <div class="ana-section-h" style="font-size:0.62rem;margin:0.7rem 0 0.3rem">Recharge &amp; per-day usage</div>
+          <div id="ana-recharge"></div>
+          <div class="ana-section-h" style="font-size:0.62rem;margin:0.7rem 0 0.3rem">Top action archetypes (kind × ability × primary damage type)</div>
+          <div id="ana-archetypes"></div>
         </div>
       </div>
 
@@ -770,6 +815,162 @@
       return cr === 0.125 ? '1/8' : cr === 0.25 ? '1/4' : cr === 0.5 ? '1/2' : String(cr);
     }
 
+    /* ── Action classifier ──
+     * Walks every action body once and tags it with structured metadata. Used
+     * by the Analysis tab today to surface archetype frequencies, and by the
+     * upcoming template-driven editor to know what kinds of actions exist.
+     *
+     * Conservative — anything we can't pattern-match falls into 'utility' /
+     * 'other' rather than being mis-tagged.
+     */
+    const ACTION_KINDS = ['multiattack','melee_attack','ranged_attack','flex_attack','save_effect','spellcasting','recharge_attack','recharge_save','utility'];
+    const KIND_LABELS = {
+      multiattack: 'Multiattack', melee_attack: 'Melee attack', ranged_attack: 'Ranged attack',
+      flex_attack: 'Melee or ranged', save_effect: 'Save effect',
+      spellcasting: 'Spellcasting', recharge_attack: 'Attack (recharge)', recharge_save: 'Save (recharge)',
+      utility: 'Utility / other'
+    };
+    const ABIL_KEYS_FULL = { Strength:'str', Dexterity:'dex', Constitution:'con', Intelligence:'int', Wisdom:'wis', Charisma:'cha' };
+    const NUM_WORDS = { one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10 };
+
+    const CR_TIER_BUCKETS = [
+      { name: '0–2',   lo: 0,    hi: 2 },
+      { name: '3–5',   lo: 3,    hi: 5 },
+      { name: '6–10',  lo: 6,    hi: 10 },
+      { name: '11–15', lo: 11,   hi: 15 },
+      { name: '16–20', lo: 16,   hi: 20 },
+      { name: '21+',   lo: 21,   hi: 99 }
+    ];
+    function tierForCR(cr){
+      const c = +cr;
+      return CR_TIER_BUCKETS.find(t => c >= t.lo && c <= t.hi) || CR_TIER_BUCKETS[0];
+    }
+
+    function parseDamageClauses(body){
+      // Match: "7 (1d8 + 3) Bludgeoning damage" — handles negative, optional space, +/-
+      const out = [];
+      const re = /(\d+)\s*\(\s*(\d+d\d+(?:\s*[+\-]\s*\d+)?)\s*\)\s+(\w+)\s+damage/g;
+      let m;
+      while ((m = re.exec(body || '')) !== null){
+        out.push({ avg: parseInt(m[1], 10), dice: m[2].replace(/\s+/g, ''), type: m[3] });
+      }
+      return out;
+    }
+
+    function inferAttackAbility(attackBonus, monster, kind){
+      // Match the attack bonus to (mod + PB) for some ability.
+      if (attackBonus == null) return null;
+      const pb = monster.pb || 2;
+      const a = monster.abilities || {};
+      // Prefer the "natural" ability for the attack kind on ties.
+      const preferred = (kind === 'ranged_attack') ? 'dex' : 'str';
+      const order = preferred === 'str' ? ['str','dex','con','int','wis','cha'] : ['dex','str','con','int','wis','cha'];
+      let exact = null, near = null;
+      for (const k of order){
+        const v = a[k]; if (!v) continue;
+        const total = (v.mod || 0) + pb;
+        if (total === attackBonus && exact == null) exact = k;
+        if (Math.abs(total - attackBonus) <= 1 && near == null) near = k;
+      }
+      return exact || near || null;
+    }
+
+    function inferSaveAbility(dc, monster){
+      // DC = 8 + PB + mod → mod = DC - 8 - PB
+      if (dc == null) return null;
+      const pb = monster.pb || 2;
+      const a = monster.abilities || {};
+      const target = dc - 8 - pb;
+      // 2024 MM canon: most monster save DCs are Constitution-built (breath
+      // weapons, area effects, poison). After Con, mental abilities
+      // (Wis/Cha/Int) are most likely for charm/fear-style saves. Str/Dex
+      // for grapple-on-hit-style mechanics. This order matters at the
+      // tiebreaker step where multiple abilities share the same mod.
+      const order = ['con','wis','cha','int','str','dex'];
+      let exact = null, near = null;
+      for (const k of order){
+        const v = a[k]; if (!v) continue;
+        if ((v.mod || 0) === target && exact == null) exact = k;
+        if (Math.abs((v.mod || 0) - target) <= 1 && near == null) near = k;
+      }
+      return exact || near || null;
+    }
+
+    function classifyAction(action, monster){
+      const name = (action.name || '').trim();
+      const body = (action.body || '').trim();
+      const out = {
+        name, body,
+        kind: 'utility',
+        recharge: null,     // '5-6', '6', '4-6'
+        perDay: null,       // 1, 2, 3
+        attackBonus: null,
+        reach: null,
+        range: null,        // { short, long }
+        damageEntries: [],
+        inferredAbility: null,
+        saveAbility: null,
+        saveDC: null,
+        saveInferredAbility: null,
+        multiCount: null
+      };
+      // Recharge / per-day markers live in the action NAME.
+      const rec = name.match(/\(Recharge\s+([0-9–\-]+)\)/i);
+      if (rec) out.recharge = rec[1].replace(/–/g, '-');
+      const pd = name.match(/\((\d+)\s*\/\s*Day\)/i);
+      if (pd) out.perDay = parseInt(pd[1], 10);
+
+      // Multiattack — strict name match. Body usually starts "The X makes Y <foo> attacks".
+      if (/^multiattack$/i.test(name) || /^multiattack\b/i.test(name)){
+        out.kind = 'multiattack';
+        const mc = body.match(/\bmakes\s+(one|two|three|four|five|six|seven|eight|nine|ten)\b/i);
+        if (mc) out.multiCount = NUM_WORDS[mc[1].toLowerCase()];
+        return out;
+      }
+      // Spellcasting block — named "Spellcasting" or body explicitly mentions it.
+      if (/^spellcasting$/i.test(name) || /\bspellcasting ability\b/i.test(body)){
+        out.kind = 'spellcasting';
+        return out;
+      }
+
+      // Attack action — order matters: flex match first so "Melee or Ranged" doesn't false-positive into melee.
+      const mFlex   = body.match(/Melee or Ranged Attack Roll:\s*([+\-]\d+)/);
+      const mMelee  = !mFlex  && body.match(/Melee Attack Roll:\s*([+\-]\d+)/);
+      const mRanged = !mFlex && !mMelee && body.match(/Ranged Attack Roll:\s*([+\-]\d+)/);
+      const atkMatch = mFlex || mMelee || mRanged;
+      if (atkMatch){
+        out.kind = mFlex ? 'flex_attack' : mMelee ? 'melee_attack' : 'ranged_attack';
+        out.attackBonus = parseInt(atkMatch[1], 10);
+        const reach = body.match(/reach (\d+) ft\./);
+        if (reach) out.reach = parseInt(reach[1], 10);
+        const rng = body.match(/range (\d+)\/(\d+) ft\./);
+        if (rng) out.range = { short: parseInt(rng[1],10), long: parseInt(rng[2],10) };
+        else {
+          const r1 = body.match(/range (\d+) ft\./);
+          if (r1) out.range = { short: parseInt(r1[1],10), long: parseInt(r1[1],10) };
+        }
+        out.damageEntries = parseDamageClauses(body);
+        out.inferredAbility = inferAttackAbility(out.attackBonus, monster, out.kind);
+        if (out.recharge) out.kind = 'recharge_attack';
+        return out;
+      }
+
+      // Save effect — "<Ability> Saving Throw: DC X"
+      const sv = body.match(/(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) Saving Throw:\s*DC\s*(\d+)/);
+      if (sv){
+        out.kind = 'save_effect';
+        out.saveAbility = ABIL_KEYS_FULL[sv[1]];
+        out.saveDC = parseInt(sv[2], 10);
+        out.damageEntries = parseDamageClauses(body);
+        out.saveInferredAbility = inferSaveAbility(out.saveDC, monster);
+        if (out.recharge) out.kind = 'recharge_save';
+        return out;
+      }
+
+      // Default — utility.
+      return out;
+    }
+
     function computeAnalysis(monsters){
       const byCr = new Map();
       const dmgTypeCounts = Object.fromEntries(DAMAGE_TYPES.map(t => [t, 0]));
@@ -823,13 +1024,100 @@
       const [crLo, crHi] = minmax(crVals);
       const typeCount = new Set(monsters.map(m => m.type).filter(Boolean)).size;
 
+      // ── Action breakdown ──
+      // Classify every action body once; build aggregations on top.
+      const classified = [];
+      for (const m of monsters){
+        for (const a of (m.actions || [])){
+          classified.push({ monster: m, action: a, ...classifyAction(a, m) });
+        }
+      }
+
+      const kindCounts = {};
+      for (const k of ACTION_KINDS) kindCounts[k] = 0;
+      for (const c of classified) kindCounts[c.kind] = (kindCounts[c.kind] || 0) + 1;
+
+      // Attack-ability frequency across all attack actions (melee + ranged + flex + recharge_attack).
+      const ATTACK_KINDS = new Set(['melee_attack','ranged_attack','flex_attack','recharge_attack']);
+      const abilCounts = { str:0, dex:0, con:0, int:0, wis:0, cha:0, unknown:0 };
+      for (const c of classified){
+        if (!ATTACK_KINDS.has(c.kind)) continue;
+        abilCounts[c.inferredAbility || 'unknown']++;
+      }
+
+      // Kind × CR-tier matrix.
+      const kindByTier = {};
+      for (const t of CR_TIER_BUCKETS) kindByTier[t.name] = Object.fromEntries(ACTION_KINDS.map(k => [k, 0]));
+      for (const c of classified){
+        const t = tierForCR(c.monster.cr).name;
+        kindByTier[t][c.kind] = (kindByTier[t][c.kind] || 0) + 1;
+      }
+
+      // Save effects — DC + ability by tier (medians).
+      const saveByTier = {};
+      for (const t of CR_TIER_BUCKETS) saveByTier[t.name] = { n: 0, dcs: [], abil: {} };
+      for (const c of classified){
+        if (c.kind !== 'save_effect' && c.kind !== 'recharge_save') continue;
+        const t = tierForCR(c.monster.cr).name;
+        const row = saveByTier[t];
+        row.n++;
+        if (c.saveDC != null) row.dcs.push(c.saveDC);
+        const ab = c.saveInferredAbility || 'unknown';
+        row.abil[ab] = (row.abil[ab] || 0) + 1;
+      }
+      const saveSummary = CR_TIER_BUCKETS.map(t => {
+        const row = saveByTier[t.name];
+        const medDC = median(row.dcs);
+        const topAbil = Object.entries(row.abil).sort((a,b) => b[1]-a[1])[0];
+        return { tier: t.name, n: row.n, medDC, topAbil: topAbil ? topAbil[0] : null, topAbilN: topAbil ? topAbil[1] : 0 };
+      });
+
+      // Recharge usage — count of actions with recharge token, by tier.
+      // Also: any monster with at least one recharge action — useful for "how often do CR X monsters get a recharge ability"
+      const rechargeByTier = {};
+      for (const t of CR_TIER_BUCKETS) rechargeByTier[t.name] = { actions: 0, monsters: new Set() };
+      for (const c of classified){
+        if (!c.recharge && !c.perDay) continue;
+        const t = tierForCR(c.monster.cr).name;
+        const row = rechargeByTier[t];
+        if (c.recharge) row.actions++;
+        row.monsters.add(c.monster.id);
+      }
+      const rechargeSummary = CR_TIER_BUCKETS.map(t => {
+        const tot = monsters.filter(m => tierForCR(m.cr).name === t.name).length;
+        const r = rechargeByTier[t.name];
+        return { tier: t.name, monstersInTier: tot, monstersWithRecharge: r.monsters.size, actionCount: r.actions };
+      });
+
+      // Top archetype — (kind, ability, primary damage type) frequency.
+      const arch = {};
+      for (const c of classified){
+        if (!ATTACK_KINDS.has(c.kind) && c.kind !== 'save_effect' && c.kind !== 'recharge_save') continue;
+        const ab = (ATTACK_KINDS.has(c.kind)) ? (c.inferredAbility || '?') : (c.saveInferredAbility || '?');
+        const dmgType = c.damageEntries[0]?.type || (c.kind === 'save_effect' || c.kind === 'recharge_save' ? 'NoDmg' : '?');
+        const key = `${c.kind}|${ab}|${dmgType}`;
+        arch[key] = (arch[key] || 0) + 1;
+      }
+      const topArchetypes = Object.entries(arch)
+        .sort((a,b) => b[1]-a[1])
+        .slice(0, 20)
+        .map(([k, n]) => { const [kind, ab, dt] = k.split('|'); return { kind, ability: ab, damageType: dt, n }; });
+
       return {
         total,
         crLo, crHi,
         typeCount,
         nMulti, nLegendary, nSpell, nLair,
         crRows,
-        dmgTypeCounts
+        dmgTypeCounts,
+        // action breakdown
+        classifiedCount: classified.length,
+        kindCounts,
+        abilCounts,
+        kindByTier,
+        saveSummary,
+        rechargeSummary,
+        topArchetypes
       };
     }
 
@@ -840,9 +1128,8 @@
       const status = document.getElementById('ana-status');
       if (!ms.length){
         document.getElementById('ana-summary').innerHTML = '<div class="empty-note">Nothing to analyze — import a bestiary first.</div>';
-        document.getElementById('ana-cr-table').innerHTML = '';
-        document.getElementById('ana-cr-bars').innerHTML = '';
-        document.getElementById('ana-damage-types').innerHTML = '';
+        ['ana-cr-table','ana-cr-bars','ana-damage-types','ana-act-kinds','ana-act-ability','ana-act-kinds-by-tier','ana-save-by-tier','ana-recharge','ana-archetypes']
+          .forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
         status.textContent = 'Empty bestiary.';
         return;
       }
@@ -856,7 +1143,13 @@
         renderCrTable(r);
         renderCrBars(r);
         renderDamageTypes(r);
-        status.textContent = `Recomputed across ${r.total} monsters in ${(performance.now() - t0).toFixed(0)}ms.`;
+        renderActionKinds(r);
+        renderActionAbility(r);
+        renderActionKindsByTier(r);
+        renderSaveByTier(r);
+        renderRechargeSummary(r);
+        renderArchetypes(r);
+        status.textContent = `Recomputed across ${r.total} monsters · ${r.classifiedCount} actions classified in ${(performance.now() - t0).toFixed(0)}ms.`;
       }, 10);
     }
 
@@ -932,6 +1225,84 @@
         </div>
       `).join('');
       document.getElementById('ana-damage-types').innerHTML = `<div class="ana-dmg">${html}</div>`;
+    }
+
+    /* ── Action-breakdown renderers ── */
+    function renderActionKinds(r){
+      const entries = Object.entries(r.kindCounts).sort((a,b) => b[1]-a[1]);
+      const max = entries.reduce((acc, [,n]) => Math.max(acc, n), 0);
+      const rows = entries.map(([k, n]) => {
+        const w = max ? Math.round(100 * n / max) : 0;
+        return `<div class="ana-kind-row"><span class="kind-name">${esc(KIND_LABELS[k] || k)}</span><span class="kind-fill"><span style="width:${w}%"></span></span><span class="kind-n">${n}</span></div>`;
+      }).join('');
+      document.getElementById('ana-act-kinds').innerHTML = `<div class="ana-kind-list">${rows}</div>`;
+    }
+    function renderActionAbility(r){
+      const entries = Object.entries(r.abilCounts).filter(([,n]) => n > 0).sort((a,b) => b[1]-a[1]);
+      const max = entries.reduce((acc, [,n]) => Math.max(acc, n), 0);
+      const rows = entries.map(([k, n]) => {
+        const w = max ? Math.round(100 * n / max) : 0;
+        const label = k === 'unknown' ? 'Unknown' : k.toUpperCase();
+        return `<div class="ana-kind-row"><span class="kind-name">${esc(label)}</span><span class="kind-fill"><span style="width:${w}%"></span></span><span class="kind-n">${n}</span></div>`;
+      }).join('');
+      document.getElementById('ana-act-ability').innerHTML = `<div class="ana-kind-list">${rows}</div>`;
+    }
+    function renderActionKindsByTier(r){
+      // Compact table: rows = tiers, cols = kinds (visible kinds only).
+      const visibleKinds = ACTION_KINDS.filter(k => r.kindCounts[k] > 0);
+      const headerCells = visibleKinds.map(k => `<th style="text-align:right">${esc(KIND_LABELS[k] || k)}</th>`).join('');
+      const tierRows = CR_TIER_BUCKETS.map(t => {
+        const cells = visibleKinds.map(k => {
+          const n = (r.kindByTier[t.name] && r.kindByTier[t.name][k]) || 0;
+          return `<td class="num">${n || '·'}</td>`;
+        }).join('');
+        return `<tr><td class="cr">CR ${esc(t.name)}</td>${cells}</tr>`;
+      }).join('');
+      document.getElementById('ana-act-kinds-by-tier').innerHTML = `
+        <table class="ana-table">
+          <thead><tr><th>Tier</th>${headerCells}</tr></thead>
+          <tbody>${tierRows}</tbody>
+        </table>`;
+    }
+    function renderSaveByTier(r){
+      const rows = r.saveSummary.map(s => `
+        <tr>
+          <td class="cr">CR ${esc(s.tier)}</td>
+          <td class="num">${s.n || '·'}</td>
+          <td class="num">${s.medDC != null ? Math.round(s.medDC) : '—'}</td>
+          <td>${s.topAbil ? `<span class="ability-chip ${esc(s.topAbil)}">${esc(s.topAbil.toUpperCase())}</span> (${s.topAbilN})` : '—'}</td>
+        </tr>
+      `).join('');
+      document.getElementById('ana-save-by-tier').innerHTML = `
+        <table class="ana-table">
+          <thead><tr><th>Tier</th><th style="text-align:right">Save actions</th><th style="text-align:right">Median DC</th><th>Top save ability (n)</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    }
+    function renderRechargeSummary(r){
+      const rows = r.rechargeSummary.map(s => {
+        const pct = s.monstersInTier ? Math.round(100 * s.monstersWithRecharge / s.monstersInTier) : 0;
+        return `<tr>
+          <td class="cr">CR ${esc(s.tier)}</td>
+          <td class="num">${s.monstersInTier}</td>
+          <td class="num">${s.monstersWithRecharge}</td>
+          <td class="num">${pct}%</td>
+          <td class="num">${s.actionCount}</td>
+        </tr>`;
+      }).join('');
+      document.getElementById('ana-recharge').innerHTML = `
+        <table class="ana-table">
+          <thead><tr><th>Tier</th><th style="text-align:right">Monsters</th><th style="text-align:right">With recharge</th><th style="text-align:right">% of tier</th><th style="text-align:right">Recharge actions</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    }
+    function renderArchetypes(r){
+      const rows = r.topArchetypes.map(a => `
+        <div class="ana-archetype-row">
+          <div class="desc"><b>${esc(KIND_LABELS[a.kind] || a.kind)}</b> · <span class="ability-chip ${esc(a.ability)}">${esc(a.ability.toUpperCase())}</span> · ${esc(a.damageType)}</div>
+          <div class="n">${a.n}</div>
+        </div>`).join('');
+      document.getElementById('ana-archetypes').innerHTML = `<div class="ana-archetype-list">${rows}</div>`;
     }
 
     /* ── Editor ──
