@@ -130,6 +130,7 @@
     .ed-feat-list{display:flex;flex-direction:column;gap:0.5rem}
     .ed-feat{background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius);padding:0.5rem 0.6rem}
     .ed-feat-top{display:flex;gap:6px;align-items:center;margin-bottom:5px}
+    .ed-feat-tpl{font-size:0.8rem;color:var(--teal-bright);padding:0 4px;cursor:default;line-height:1}
     .ed-feat-top input{flex:1;font-weight:600}
     .ed-feat textarea{font-size:0.88rem;min-height:50px}
     .ed-feat-actions{display:flex;gap:4px}
@@ -1540,6 +1541,10 @@
 
     function syncEditor(){
       // Read every form field into currentEdit, refresh derived bits, re-render preview.
+      // Snapshot stat-relevant state BEFORE the update so we can detect a
+      // change after — drives the auto-recalc of templated actions.
+      const prevStatSig = statSnapshot(currentEdit);
+
       const $ = id => document.getElementById(id);
       const numOrNull = v => { const n = parseInt(v,10); return isFinite(n) ? n : null; };
       const splitCsv = s => (s||'').split(',').map(x => x.trim()).filter(Boolean);
@@ -1618,6 +1623,12 @@
       $('ed-title').textContent = currentEdit.name || 'New monster';
       for (const sec of FEATURE_SECTIONS) $(`ed-${sec}-n`).textContent = String((currentEdit[sec]||[]).length);
 
+      // Auto-recalc templated actions if the stat snapshot changed.
+      // Runs before renderPreview() so the preview reflects the new body.
+      if (statSnapshot(currentEdit) !== prevStatSig){
+        recalcTemplatedActions();
+      }
+
       renderPreview();
     }
 
@@ -1675,6 +1686,7 @@
         <div class="ed-feat">
           <div class="ed-feat-top">
             <input value="${esc(f.name||'')}" placeholder="Feature name" oninput="updateFeature('${section}',${i},'name',this.value)">
+            ${f._template ? `<span class="ed-feat-tpl" title="Linked to ${esc(TEMPLATES[f._template.kind]?.label || f._template.kind)} template — name and body recompute when stats change. Editing the name or body breaks the link.">🔗</span>` : ''}
             <div class="ed-feat-actions">
               <button class="btn ghost sm" onclick="moveFeature('${section}',${i},-1)" ${i===0?'disabled':''}>↑</button>
               <button class="btn ghost sm" onclick="moveFeature('${section}',${i},1)" ${i===items.length-1?'disabled':''}>↓</button>
@@ -1709,6 +1721,13 @@
       const f = currentEdit[section][idx];
       if (!f) return;
       f[field] = val;
+      // Hand-edit severs the template link — the DM has taken ownership of
+      // this feature's prose, so auto-recalc no longer touches it. The 🔗
+      // badge disappears on next render. (We don't re-render here to keep
+      // focus on the textarea they're typing in.)
+      if ((field === 'name' || field === 'body') && f._template){
+        delete f._template;
+      }
       // No re-render of the list (would steal focus); preview-only update.
       renderPreview();
     }
@@ -2355,36 +2374,97 @@
       }
       renderTemplatePreview();
     }
-    function applySectionWrapping(name, body){
+    function applySectionWrapping(name, body, targetSection, trigger, legendaryCost){
       // Wrap the template's compose output per the target section's conventions.
       // Reactions get Trigger:/Response: framing; Legendary names get a
-      // "(Costs N Actions)" suffix when the cost exceeds 1.
-      if (_tpl.targetSection === 'reactions' && _tpl.trigger && _tpl.trigger.trim()){
-        body = `Trigger: ${_tpl.trigger.trim()}\nResponse: ${body}`;
+      // "(Costs N Actions)" suffix when the cost exceeds 1. Pure function so
+      // we can reuse it from auto-recalc (which runs outside modal state).
+      if (targetSection === 'reactions' && trigger && trigger.trim()){
+        body = `Trigger: ${trigger.trim()}\nResponse: ${body}`;
       }
-      if (_tpl.targetSection === 'legendaryActions'){
-        const cost = parseInt(_tpl.legendaryCost, 10) || 1;
+      if (targetSection === 'legendaryActions'){
+        const cost = parseInt(legendaryCost, 10) || 1;
         if (cost > 1) name = `${name} (Costs ${cost} Actions)`;
       }
       return { name, body };
     }
     function renderTemplatePreview(){
       const composed = TEMPLATES[_tpl.kind].compose(_tpl.fields, currentEdit);
-      const { name, body } = applySectionWrapping(composed.name, composed.body);
+      const { name, body } = applySectionWrapping(composed.name, composed.body, _tpl.targetSection, _tpl.trigger, _tpl.legendaryCost);
       document.getElementById('tpl-preview').innerHTML =
         `<div class="name">${esc(name || '—')}</div><div class="body">${esc(body || '').replace(/\n/g, '<br>')}</div>`;
     }
     function composeFromTemplate(){
       readTemplateFields();
       const composed = TEMPLATES[_tpl.kind].compose(_tpl.fields, currentEdit);
-      const { name, body } = applySectionWrapping(composed.name, composed.body);
       const sec = _tpl.targetSection || 'actions';
+      const { name, body } = applySectionWrapping(composed.name, composed.body, sec, _tpl.trigger, _tpl.legendaryCost);
       if (!Array.isArray(currentEdit[sec])) currentEdit[sec] = [];
-      currentEdit[sec].push({ name, body });
+      // Stamp the action with its template lineage so a stat change can
+      // re-derive name + body without losing the parameters. Wrapper fields
+      // (trigger, legendaryCost) are per-feature, not stat-derived, so they
+      // get persisted alongside the template fields.
+      currentEdit[sec].push({
+        name, body,
+        _template: {
+          kind: _tpl.kind,
+          fields: { ..._tpl.fields },
+          targetSection: sec,
+          trigger: _tpl.trigger || null,
+          legendaryCost: _tpl.legendaryCost || null
+        }
+      });
       renderFeatureList(sec);
       syncEditor();
       closeTemplateModal();
       toast(`Added "${name}" to ${SECTION_LABELS[sec] || sec}.`);
+    }
+
+    /* ── Auto-recalc on stat change ──
+     * When the DM changes an ability score, CR/PB, or the monster name,
+     * walk every templated feature and re-derive its name + body from the
+     * stored template fields. Hand-edited features (no _template) are
+     * left alone. The 🔗 badge on a feature signals it's linked; editing
+     * its name or body severs the link (see updateFeature).
+     */
+    function statSnapshot(monster){
+      const a = monster?.abilities || {};
+      return JSON.stringify({
+        cr: monster.cr,
+        pb: monster.pb,
+        name: monster.name,
+        mods: ['str','dex','con','int','wis','cha'].map(k => a[k]?.mod ?? 0)
+      });
+    }
+    function recalcTemplatedActions(){
+      let count = 0;
+      const dirtySections = new Set();
+      for (const sec of FEATURE_SECTIONS){
+        const list = currentEdit[sec];
+        if (!Array.isArray(list)) continue;
+        for (let i = 0; i < list.length; i++){
+          const f = list[i];
+          if (!f._template) continue;
+          const t = f._template;
+          const tmpl = TEMPLATES[t.kind];
+          if (!tmpl) continue;
+          const composed = tmpl.compose(t.fields, currentEdit);
+          const wrapped = applySectionWrapping(composed.name, composed.body, t.targetSection, t.trigger, t.legendaryCost);
+          if (f.name !== wrapped.name || f.body !== wrapped.body){
+            f.name = wrapped.name;
+            f.body = wrapped.body;
+            dirtySections.add(sec);
+            count++;
+          }
+        }
+      }
+      if (count > 0){
+        // Re-render only the affected sections. The user just changed a stat
+        // input (which is the focused element), so re-rendering feature lists
+        // doesn't steal focus from anything they're typing in.
+        for (const sec of dirtySections) renderFeatureList(sec);
+      }
+      return count;
     }
 
     async function saveKey(type, payload){

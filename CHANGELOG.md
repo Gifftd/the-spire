@@ -9,6 +9,82 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: auto-recalculate templated actions when stats change
+
+When the DM changes an ability score, the monster's CR, or the monster's
+name, every action composed from a template now auto-updates its attack
+bonus / save DC / subject so the numbers stay correct. Hand-edited actions
+are skipped — once you edit a templated action's name or body manually, the
+link severs and that action's prose is yours.
+
+#### Behavior summary
+
+Stamping: composing from a template attaches a `_template` field to the
+action: `{ kind, fields, targetSection, trigger, legendaryCost }`. Survives
+Save → KV round-trip (it's part of the saved action object).
+
+Recalc trigger: a small stat snapshot `{ cr, pb, name, mods[] }` is compared
+in `syncEditor()` before and after each form read. If anything changed,
+`recalcTemplatedActions()` walks every section, re-runs `compose()` for each
+`_template`-tagged feature, re-applies section wrapping (Trigger/Cost), and
+updates the name + body in place. Only sections that actually changed get
+re-rendered, so focus on stat inputs is preserved.
+
+Severance: when `updateFeature(section, idx, 'name'|'body', val)` fires from
+a user keystroke, the `_template` is removed from that action. Auto-recalc
+won't touch hand-edited actions again. (Edits via the template modal still
+re-stamp `_template`, so the link can be restored by re-composing.)
+
+Visual cue: a small **🔗** badge sits next to the name input on linked
+features, with hover text identifying the template kind. The badge
+disappears the moment you edit the name or body.
+
+#### What does and doesn't update
+
+- ✅ **Attack bonus** (`mod + PB`) — recomputed from current ability mods + PB.
+- ✅ **Save DC** (`8 + PB + mod`) — recomputed from the stored "monster
+  ability driving DC" + current PB + that ability's current mod.
+- ✅ **Multiattack subject** — "The X makes…" reflects the monster's current
+  name.
+- ✅ **"Use Existing Action" body** — same; the `<monster>` token reflows.
+- ❌ **Damage dice** — the explicit `NdM+K` you typed stays as-is. We can't
+  tell whether `+5` was your STR mod or a +5 magic weapon you want
+  preserved. Edit the dice if you want the bonus to track.
+- ❌ **Damage averages** inside the dice expression — derived from the dice
+  text via `avgFromDice`, so they update automatically iff you change the
+  dice text yourself.
+
+#### Added — `bestiary-dm.html`
+- `applySectionWrapping(name, body, targetSection, trigger, legendaryCost)`
+  refactored to take wrapper data as parameters (was reading modal state).
+  Reused by both modal preview and auto-recalc.
+- `statSnapshot(monster)` — stable JSON string of stat-relevant fields.
+- `recalcTemplatedActions()` — walks all FEATURE_SECTIONS, re-derives every
+  templated feature, returns the count changed. Re-renders only the sections
+  that actually changed.
+- `syncEditor()` captures the snapshot before/after the form read; calls
+  recalc when they differ.
+- `updateFeature()` severs `_template` on name/body edits.
+- `composeFromTemplate()` stamps `_template` on every newly added feature.
+- `renderFeatureList()` paints the 🔗 badge with template-label tooltip
+  for linked features.
+
+#### Verified end-to-end
+
+Set up CR 10 monster (STR 20 / CON 18 / PB +4 / name Glass Hydra). Composed
+three templated actions: Bite (melee STR, 2d10+5 Slashing, reach 10), Fire
+Breath (recharge save effect on CON DC), Multiattack.
+
+- Initial bodies: Bite `+9 ... 16 (2d10+5) Slashing`, Fire Breath
+  `DC 16, 6d6 Fire`, Multiattack `The glass hydra makes two Bite attacks`.
+- STR 20 → 18 → Bite recomputed to `+8`; Fire Breath unchanged (CON
+  unchanged); Multiattack unchanged (name unchanged).
+- Name Glass Hydra → Crystal Wyrm → Multiattack updated to
+  `The crystal wyrm makes two Bite attacks`; others unchanged.
+- Hand-edited Bite's body → `_template` removed (linked=false);
+  subsequent STR 18 → 14 left Bite alone (its body intact); Fire Breath
+  and Multiattack still linked and not touched (no stat link triggered).
+
 ### Menagerie: load an existing monster into the editor as a copy
 
 Two new entry points for the "I like this monster, but I want to riff on it"
