@@ -1806,6 +1806,21 @@
       return `${avg} (${dice.replace(/\s+/g,'')}) ${type} damage`;
     }
 
+    // Pull every action with an attack roll out of the monster — used by the
+    // Multiattack template's datalist so the DM can pick from already-defined
+    // attacks. Strips any trailing parenthetical from the name so
+    // "Bite (Recharge 5–6)" becomes just "Bite" for the multiattack body.
+    function getAttackActionNames(monster){
+      const actions = Array.isArray(monster?.actions) ? monster.actions : [];
+      return actions
+        .filter(a => /Attack Roll:/i.test(a.body || ''))
+        .map(a => {
+          const full = (a.name || '').trim();
+          const base = full.replace(/\s*\(.*?\)\s*$/, '').trim() || full;
+          return { full, base };
+        });
+    }
+
     const TEMPLATES = {
       melee_attack: {
         label: 'Melee Weapon Attack',
@@ -1998,21 +2013,37 @@
 
       multiattack: {
         label: 'Multiattack',
-        defaults: (m) => ({
-          count: 2,
-          attackName: '',
-          preamble: '',
-          coda: ''
-        }),
-        renderForm: (f, m) => `
-          <div class="row c2">
-            <div class="fg"><label>Attack count</label><input id="tplf-count" type="number" min="1" max="10" value="${f.count}"></div>
-            <div class="fg"><label>Attack name (must match an action above)</label><input id="tplf-attackName" placeholder="e.g. Tentacle, Bite, Greatsword" value="${esc(f.attackName||'')}"></div>
-          </div>
-          <div class="fg"><label>Preamble (optional)</label><input id="tplf-preamble" placeholder='e.g. "uses Spellcasting, then"' value="${esc(f.preamble||'')}"></div>
-          <div class="fg"><label>Coda (optional)</label><input id="tplf-coda" placeholder='e.g. "and uses Animal Spirit if available"' value="${esc(f.coda||'')}"></div>
-          <div class="tpl-help" style="margin-top:0.3rem">The monster's name is inserted automatically: "The &lt;monster&gt; makes …".</div>
-        `,
+        defaults: (m) => {
+          // Default to the first attack-roll action on the monster, if any —
+          // saves a click in the common path of "I just added Bite, now I want
+          // a multiattack for it".
+          const attacks = getAttackActionNames(m);
+          return {
+            count: 2,
+            attackName: attacks[0]?.base || '',
+            preamble: '',
+            coda: ''
+          };
+        },
+        renderForm: (f, m) => {
+          const attacks = getAttackActionNames(m);
+          const datalist = attacks.length
+            ? `<datalist id="tplf-attackName-list">${attacks.map(a => `<option value="${esc(a.base)}">${esc(a.full)}</option>`).join('')}</datalist>`
+            : '';
+          const helpText = attacks.length
+            ? `Pick from this monster's defined attacks or type a custom name. The recharge marker is stripped automatically (so "Bite (Recharge 5–6)" becomes "Bite").`
+            : `No attack-roll actions defined yet — add one via "+ From template…" first, or type the name freely here.`;
+          return `
+            <div class="row c2">
+              <div class="fg"><label>Attack count</label><input id="tplf-count" type="number" min="1" max="10" value="${f.count}"></div>
+              <div class="fg"><label>Attack to multiply</label><input id="tplf-attackName" list="tplf-attackName-list" placeholder="e.g. Tentacle, Bite, Greatsword" value="${esc(f.attackName||'')}">${datalist}</div>
+            </div>
+            <div class="tpl-help">${helpText}</div>
+            <div class="fg"><label>Preamble (optional)</label><input id="tplf-preamble" placeholder='e.g. "uses Spellcasting, then"' value="${esc(f.preamble||'')}"></div>
+            <div class="fg"><label>Coda (optional)</label><input id="tplf-coda" placeholder='e.g. "and uses Animal Spirit if available"' value="${esc(f.coda||'')}"></div>
+            <div class="tpl-help" style="margin-top:0.3rem">The monster's name is inserted automatically: "The &lt;monster&gt; makes …".</div>
+          `;
+        },
         compose: (f, m) => {
           const cnt = Math.max(1, Math.min(10, parseInt(f.count, 10) || 2));
           const countWord = ({1:'one',2:'two',3:'three',4:'four',5:'five',6:'six',7:'seven',8:'eight',9:'nine',10:'ten'})[cnt] || String(cnt);

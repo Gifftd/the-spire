@@ -9,6 +9,40 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: Multiattack template picks from this monster's defined attacks
+
+Small UX win on top of the Phase 2 composer. The Multiattack template's
+"Attack to multiply" field is now an `<input>` paired with a `<datalist>` —
+typing autocompletes against attack-roll actions already defined on the
+current edit, but the DM can still type a free name for an attack they'll
+add later. The default value pre-fills to the monster's first defined
+attack so the common path ("just added Bite, now I want a multiattack of
+it") is one click + Compose.
+
+Recharge markers on the source attack are stripped automatically — picking
+"Tail Slam (Recharge 5–6)" from the dropdown produces a multiattack body
+of `"…makes three Tail Slam attacks."`, not `"…three Tail Slam (Recharge
+5–6) attacks."`.
+
+#### Added — `bestiary-dm.html`
+- `getAttackActionNames(monster)` returns `[{ full, base }]` for each
+  attack-roll action on the monster (filtered by `Attack Roll:` in the
+  body). `base` strips any trailing parenthetical from the name.
+- Multiattack template's `renderForm` now emits a hybrid `<input
+  list="…">` + `<datalist>`. Help text adapts: lists the picker hint when
+  attacks are defined, prompts the DM to add one first (or type free)
+  when none are.
+- Multiattack `defaults(monster)` seeds `attackName` to the first defined
+  attack's base name.
+
+#### Verified
+- Three attacks defined (Bite, Claw, Tail Slam (Recharge 5–6)) → datalist
+  shows all three with full labels but base values (so the recharge
+  marker on Tail Slam doesn't bleed into the multiattack body).
+- Typing a custom "Spectral Bite" still produces the right body.
+- Switching the picker from Spectral Bite → Claw updates the preview
+  live and composes "The glass hydra makes two Claw attacks." correctly.
+
 ### Menagerie: template-driven action composer in the editor (Phase 2)
 
 Builds on the Phase 1 classifier. The custom-monster editor's Actions section
