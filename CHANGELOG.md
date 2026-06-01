@@ -9,6 +9,133 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: load an existing monster into the editor as a copy
+
+Two new entry points for the "I like this monster, but I want to riff on it"
+workflow. The source monster is never touched — both paths deep-clone the
+monster into the editor's working state with the source `id` stripped, so
+the next Save mints a fresh entry in `bestiary_custom`.
+
+#### Path 1 — Browse → "📋 Edit a copy"
+
+A small button at the top of the Browse-tab stat block view. Click it on
+any monster (imported or custom) and the page switches to the Editor tab
+with the monster pre-loaded as `"<name> (copy)"` and a blank id, ready
+to tweak.
+
+#### Path 2 — Editor → "📋 From existing…"
+
+A new button in the Editor's chip strip next to "+ New monster". Opens a
+small picker modal with a name search and a scrollable list of every
+monster (imported + custom) sorted by CR. Click a row → it loads into the
+editor and the modal closes. The picker caps the rendered list at 200
+entries to keep the DOM small; further results are reachable via the
+search filter.
+
+#### Added — `bestiary-dm.html`
+- `cloneMonsterToEditor(monsterId)` — deep-clones the monster, strips the
+  `_custom` runtime tag, clears the `id`, suffixes the name with `" (copy)"`,
+  sets `source: 'custom'`, swaps `currentEdit` + clears `editingId`,
+  refreshes the form, and switches to the Editor tab.
+- `openClonePicker()` / `closeClonePicker()` / `renderCloneList()` /
+  `pickCloneSource(id)` — the small picker modal and its filter.
+- Modal markup `#clone-modal` reuses the existing `.modal-backdrop` +
+  `.tpl-modal` styles; just three new clone-specific selectors
+  (`.clone-search`, `.clone-list`, `.clone-row`).
+
+#### Verified
+- Browse path: searched "Aboleth", opened stat block, clicked "📋 Edit a
+  copy". Tab switched to Editor, name became "Aboleth (copy)", id empty,
+  source "custom", all 4 actions copied (Multiattack first).
+- Editor path: clicked "📋 From existing…", filtered to "Adult Black
+  Dragon", clicked the row. Modal closed; editor showed
+  "Adult Black Dragon (copy)" with AC 19, HP 195, Multiattack as first
+  action, editingId=null so Save will mint a fresh entry.
+
+### Menagerie: action templates extended to Bonus/Reaction/Legendary sections
+
+The "+ From template…" button — previously Actions-only — now sits on
+**Bonus Actions**, **Reactions**, and **Legendary Actions** section headers
+too. Composed entries land in the right section array; the modal title and
+the primary button label both update to "Add to <Section>" so it's clear
+where the result is going.
+
+Two **section-specific wrappers** layer on top of the existing six
+templates without changing them:
+
+- **Reactions**: a *Trigger* textarea above the template form. When filled,
+  the composed body is reframed as `Trigger: <text>\nResponse: <body>` —
+  matches the 2024 MM reaction phrasing.
+- **Legendary Actions**: a *Cost (actions)* numeric field (1–3, default 1).
+  When > 1, the composed action name gets a `(Costs N Actions)` suffix.
+
+#### New template — `Use Existing Action`
+
+The most common Legendary pattern in the 2024 MM is "The X uses its Y."
+A seventh template captures it: pick an existing action from this monster
+(autocomplete via datalist, same shape as the Multiattack picker), and the
+template emits `name: "<Action>"` + `body: "The <monster> uses its
+<Action>."`. Recharge markers are stripped from the picked name.
+
+The Legendary section defaults to this template when the modal opens —
+the most common case becomes one click + Compose.
+
+#### Added — `bestiary-dm.html`
+- `openTemplateModal(targetSection)` accepts a section name. `_tpl.targetSection`
+  drives the modal title, the primary button label, and where the composed
+  result lands.
+- `renderSectionWrapper()` paints the Trigger / Cost fields conditionally.
+  `applySectionWrapping(name, body)` runs after the template's own compose,
+  so all six existing templates work in any section automatically.
+- `composeFromTemplate()` now pushes to `currentEdit[_tpl.targetSection]`
+  rather than `currentEdit.actions`.
+- Each of the four section headers has matching "+ From template…" + "+ Add
+  blank" buttons.
+
+#### Verified
+- Title + button: "Add to Reactions" / "Add to Legendary Actions" / "Add to
+  Bonus Actions" — all correct per opened section.
+- Reactions get Trigger:/Response: framing applied; bonus actions get no
+  wrapping (`tpl-section-wrap` is empty for them).
+- Legendary cost defaults to 1 (no suffix), bumping to 2 emits
+  `"Bite (Costs 2 Actions)"`.
+- "Use Existing Action" default kind activates when opening Legendary;
+  composes `"The glass hydra uses its Bite."` from a single Bite action.
+
+### Menagerie: Multiattack template picks from this monster's defined attacks
+
+Small UX win on top of the Phase 2 composer. The Multiattack template's
+"Attack to multiply" field is now an `<input>` paired with a `<datalist>` —
+typing autocompletes against attack-roll actions already defined on the
+current edit, but the DM can still type a free name for an attack they'll
+add later. The default value pre-fills to the monster's first defined
+attack so the common path ("just added Bite, now I want a multiattack of
+it") is one click + Compose.
+
+Recharge markers on the source attack are stripped automatically — picking
+"Tail Slam (Recharge 5–6)" from the dropdown produces a multiattack body
+of `"…makes three Tail Slam attacks."`, not `"…three Tail Slam (Recharge
+5–6) attacks."`.
+
+#### Added — `bestiary-dm.html`
+- `getAttackActionNames(monster)` returns `[{ full, base }]` for each
+  attack-roll action on the monster (filtered by `Attack Roll:` in the
+  body). `base` strips any trailing parenthetical from the name.
+- Multiattack template's `renderForm` now emits a hybrid `<input
+  list="…">` + `<datalist>`. Help text adapts: lists the picker hint when
+  attacks are defined, prompts the DM to add one first (or type free)
+  when none are.
+- Multiattack `defaults(monster)` seeds `attackName` to the first defined
+  attack's base name.
+
+#### Verified
+- Three attacks defined (Bite, Claw, Tail Slam (Recharge 5–6)) → datalist
+  shows all three with full labels but base values (so the recharge
+  marker on Tail Slam doesn't bleed into the multiattack body).
+- Typing a custom "Spectral Bite" still produces the right body.
+- Switching the picker from Spectral Bite → Claw updates the preview
+  live and composes "The glass hydra makes two Claw attacks." correctly.
+
 ### Menagerie: template-driven action composer in the editor (Phase 2)
 
 Builds on the Phase 1 classifier. The custom-monster editor's Actions section
