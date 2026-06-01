@@ -9,6 +9,60 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: template-driven action composer in the editor (Phase 2)
+
+Builds on the Phase 1 classifier. The custom-monster editor's Actions section
+gets a new **"+ From template…"** button that opens a structured form modal
+covering the six action archetypes the Phase 1 analysis surfaced as covering
+~95% of the corpus:
+
+- **Melee Weapon Attack** — weapon name, ability, reach, damage dice + type, optional rider damage, recharge marker
+- **Ranged Weapon Attack** — short/long range, otherwise same shape
+- **Melee or Ranged (Flex) Attack** — both reach and range
+- **Save Effect** — target's save ability, monster ability driving DC, area-text, damage on fail, "half on save" toggle, extra failure/success clauses, recharge
+- **Multiattack** — attack count, named attack, optional preamble/coda
+- **Spellcasting Block** — spellcasting ability, At-Will / 1·2·3/Day lists
+
+Each template composes into the exact 2024 MM phrasing. A live preview pane
+in the modal shows the body string as you type, and derived chips display the
+attack bonus / save DC / damage averages computed from the monster's mods + PB.
+Math goes through one shared `avgFromDice(dice)` helper (floor of `N·(M+1)/2 + K`,
+which matches the book's rounding).
+
+#### Added — `bestiary-dm.html`
+- New action-template modal (`#tpl-modal`) with template selector at top,
+  dynamic structured form in the middle, live preview pane at the bottom,
+  Cancel / Add Action buttons in the footer.
+- New `TEMPLATES` registry mapping each kind to `{ label, defaults(monster),
+  renderForm(fields, monster), compose(fields, monster) }`. Easy to add more
+  templates later — passive trait templates, lair-action templates, etc.
+- Form re-renders on every input so the derived chips and preview update
+  live. Focus + caret position preserved across re-renders so typing
+  doesn't jump.
+- "+ From template…" button placed next to the existing "+ Add blank"
+  button on the Actions section. Other sections (Traits, Bonus, Reactions,
+  Legendary, Lair) still get the blank "+ Add" only — most templates fit
+  Actions; Phase 3 can expand if needed.
+
+#### Composition examples (CR 10 monster: STR 20, CON 18, CHA 16, PB +4)
+
+**Melee Weapon Attack** — "Bite", 2d10+5 Slashing + 2d6 Fire rider, reach 10:
+> Melee Attack Roll: **+9**, reach 10 ft. Hit: **16** (2d10+5) Slashing damage plus **7** (2d6) Fire damage.
+
+**Save Effect** — "Fire Breath", recharge 5–6, DEX save, CON DC, 6d6 Fire, half on save:
+> Dexterity Saving Throw: **DC 16**, each creature in a 30-foot Cone. Failure: **21** (6d6) Fire damage. Success: Half damage only.
+
+**Multiattack** — 3 Bite attacks:
+> The glass hydra makes three Bite attacks.
+
+**Spellcasting** — CHA, at-will Mage Hand · Message, 1/Day Lightning Bolt:
+> The glass hydra casts one of the following spells, requiring no Material components and using Charisma as the spellcasting ability (spell save DC **15**):  
+> At Will: Mage Hand, Message  
+> 1/Day Each: Lightning Bolt
+
+All four verified end-to-end in preview: bonuses match `mod + PB`, save DCs
+match `8 + PB + mod`, damage averages match the book's rounding.
+
 ### Menagerie: action classifier + action-breakdown analysis (Phase 1)
 
 First half of the template-driven editor work. A regex classifier walks every
