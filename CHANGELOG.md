@@ -9,6 +9,48 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: role + terrain visible in Browse, editable in Editor
+
+Phase 2 of the random monster generator. The role and terrain tags
+produced by `tag_bestiary.py` now flow into the Menagerie UI as
+read-only chips on the Browse list and editable controls in the Editor.
+A DM-edited tag flips a `roleManual` / `terrainManual` flag on the
+record so the next `tag_bestiary.py` run won't clobber it.
+
+#### Added — `bestiary-dm.html`
+
+- **Browse list rows** now render a teal `role` chip next to the
+  monster name and up to two `terrain` chips beneath it (with a
+  `+N` overflow indicator carrying the rest in a tooltip).
+- **Browse toolbar** gains a `Role` and `Terrain` filter dropdown
+  alongside the existing Type / Size / CR filters. `clearFilters()`
+  resets them too.
+- **Editor → new "Tags" section** below Identity: a role dropdown
+  (defaulting to "(auto)" so the DM can re-enable inference) and a
+  12-entry terrain chip-checkbox grid. The header shows a "manual:
+  role + terrain — won't be overwritten by re-tagger" indicator
+  whenever the DM has overridden either.
+- **Manual-override semantics**: changing the role dropdown or any
+  terrain checkbox sets `roleManual: true` / `terrainManual: true` on
+  the record; clearing the role back to "(auto)" removes the flag and
+  lets the Python tagger re-classify on its next run.
+
+#### Wiring
+
+- `syncEditor()` reads both controls into `currentEdit.role` and
+  `currentEdit.terrain[]`, and only flips the manual flag when the
+  DM's value differs from what was loaded (so opening a monster and
+  closing without edits doesn't accidentally mark every record
+  manual).
+- `loadFormFromEdit()` paints the dropdown + checkbox grid from the
+  record. The "manual" indicator reads `m.roleManual` and
+  `m.terrainManual` directly.
+- `renderList()` filter chain honors the new role and terrain
+  dropdowns. The chip rendering tolerates monsters without tags
+  (older imports) by treating absent fields as empty arrays.
+
+---
+
 ### Menagerie: auto-tag bestiary with role + terrain (random-generator prep)
 
 Phase 1 of the random monster generator. Every monster in the bestiary now
