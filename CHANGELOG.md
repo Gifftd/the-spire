@@ -7,6 +7,80 @@ Dates are YYYY-MM-DD.
 
 ---
 
+## [Unreleased] — 2026-06-02
+
+### Sessions: standalone DM tool with vault round-trip
+
+Adds `sessions-dm.html`, a full-screen DM workspace for managing
+sessions — replacing the cramped Timeline tab inside the Atlas
+Workshop for session-kind entries. Other timeline kinds (events,
+milestones, planned) still live in the map-dm Timeline tab; the
+two tools share the same `timeline` KV key.
+
+#### Why
+
+Editing a session inside the 320px-wide Timeline pane on map-dm.html
+was painful — long bodies and prep notes were unreadable, and there
+was no way to bring vault prep into the tool. Most prep happens in
+an Obsidian vault outside the browser, so the tool now imports and
+exports `.md` files matching the existing Session template.
+
+#### Layout
+
+Three panes:
+- **Left**: session list + search + year filter, with a List ↔
+  Timeline view toggle. Timeline view groups cards under sticky
+  month/year headers with a vertical rail.
+- **Middle**: full-screen editor — title, dates, tags, Summary
+  (player-facing), Prep (raw Markdown, DM-only), attendance,
+  linked locations & NPCs, structured loot, attached combats,
+  visibility, DM log.
+- **Right**: at-a-glance sidebar with attendance badges, counts,
+  and import/export buttons.
+
+#### Vault import/export
+
+- Drag-drop `.md` files (or paste Markdown). Frontmatter `id:`
+  controls update-vs-create; matching by title is the fallback.
+- `## Summary` → `body` (player-facing chronicle).
+- `## Log` → `dmNotes`.
+- Everything between (Housekeeping / Recap / Strong start / Scenes
+  / NPCs / Locations / Secrets and Clues / Loot / …) is preserved
+  verbatim as raw Markdown in a new `prep` field, including its
+  section headings.
+- `[[Wikilink]]` characters and locations are name-matched to the
+  campaign roster; unmatched names are reported on import so the
+  DM can fix them.
+- Frontmatter extras (any keys we don't consume) round-trip as-is.
+- Export: per-session "Download .md" button + bulk "Download all"
+  (sequential downloads). Drop the files into your `Sessions/`
+  folder.
+
+#### Schema additions (backward-compat)
+
+New optional fields on session-kind timeline entries — all pass
+through the existing worker untouched:
+- `prep: string` — raw Markdown prep block.
+- `attendance: [characterId]` — who actually showed up.
+- `tags: [string]` — vault tags.
+- `frontmatterExtras: object` — unknown vault frontmatter keys for
+  faithful round-trip.
+
+Existing entries without these fields keep working in the map-dm
+Timeline tab.
+
+#### Hub
+
+Adds a "The Sessions" card to the Keeper's Wing on `home.html`,
+sitting between Atlas Workshop and War Table.
+
+#### No worker changes
+
+The Cloudflare Worker is untouched — the new fields ride on the
+existing `timeline` POST/GET. No redeploy required.
+
+---
+
 ## [Unreleased] — 2026-05-29
 
 ### Bestiary + War Table: source chip everywhere
