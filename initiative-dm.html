@@ -515,12 +515,13 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
         <input type="number" id="bp-party-size" min="1" max="12" value="4" oninput="onPartyChange()">
         <label>Avg level</label>
         <input type="number" id="bp-party-level" min="1" max="20" value="5" oninput="onPartyChange()">
-        <span id="bp-party-note" style="font-size:0.78rem;color:var(--ink-faint);font-style:italic">2024 DMG XP thresholds, per-character × party size.</span>
+        <span id="bp-party-note" style="font-size:0.78rem;color:var(--ink-faint);font-style:italic">Flee Mortals CR budget — per-character × party size.</span>
       </div>
       <div class="bestiary-budget" id="bp-budget">
-        <div class="total">Total XP: <span id="bp-xp-total">0</span></div>
+        <div class="total">Total CR: <span id="bp-cr-total">0</span> <small id="bp-xp-total-note" style="color:var(--ink-faint);font-weight:normal;margin-left:8px"></small></div>
         <div class="thresholds" id="bp-thresholds"></div>
         <div class="verdict" id="bp-verdict"></div>
+        <div id="bp-fm-extras" style="font-size:0.78rem;color:var(--ink-faint);margin-top:0.4rem;line-height:1.45"></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -900,16 +901,109 @@ const _BP = {
   party: { size: 4, level: 5 },  // overwritten from localStorage on first open
 };
 
-// 2024 DMG XP thresholds, per character. Party total = level threshold × size.
-const XP_THRESHOLDS = {
-  1:{l:50,m:75,h:100},     2:{l:100,m:150,h:200},   3:{l:150,m:225,h:400},
-  4:{l:250,m:375,h:500},   5:{l:500,m:750,h:1100},  6:{l:600,m:1000,h:1400},
-  7:{l:750,m:1300,h:1700}, 8:{l:1000,m:1700,h:2100},9:{l:1300,m:2000,h:2600},
-  10:{l:1600,m:2300,h:3100}, 11:{l:1900,m:2900,h:4100}, 12:{l:2200,m:3700,h:4700},
-  13:{l:2600,m:4200,h:5400}, 14:{l:2900,m:4900,h:6200}, 15:{l:3300,m:5400,h:7800},
-  16:{l:3800,m:6100,h:9800}, 17:{l:4500,m:7200,h:11700},18:{l:5000,m:8700,h:14200},
-  19:{l:5500,m:10700,h:17200},20:{l:6400,m:13200,h:22000}
+// ── Flee Mortals encounter math (replaces 2024 DMG XP thresholds) ──
+// Per-character CR budget by character level + difficulty, plus the
+// max single-monster CR allowed for that level ("CR Cap"). The CRs of
+// the picked monsters are summed; minions contribute a fraction of
+// their CR per the Minion Encounter Building table; solos are scored
+// against the Solo Creatures table because they don't share budget
+// rules. Page-of-record: Flee, Mortals! — Introduction →
+// Encounter Building.
+const FM_CR_BUDGET = {
+  1: {e: 0.125, s: 0.125, h: 0.25,  cap: 1 },
+  2: {e: 0.125, s: 0.25,  h: 0.5,   cap: 3 },
+  3: {e: 0.25,  s: 0.5,   h: 0.75,  cap: 4 },
+  4: {e: 0.5,   s: 0.75,  h: 1,     cap: 6 },
+  5: {e: 1,     s: 1.5,   h: 2.5,   cap: 8 },
+  6: {e: 1.5,   s: 2,     h: 3,     cap: 9 },
+  7: {e: 2,     s: 2.5,   h: 3.5,   cap: 10},
+  8: {e: 2.5,   s: 3,     h: 4,     cap: 12},
+  9: {e: 3,     s: 3.5,   h: 4.5,   cap: 13},
+  10:{e: 3.5,   s: 4,     h: 5,     cap: 15},
+  11:{e: 4,     s: 4.5,   h: 5.5,   cap: 16},
+  12:{e: 4.5,   s: 5,     h: 6,     cap: 17},
+  13:{e: 5,     s: 5.5,   h: 6.5,   cap: 19},
+  14:{e: 5.5,   s: 6,     h: 7,     cap: 20},
+  15:{e: 6,     s: 6.5,   h: 7.5,   cap: 22},
+  16:{e: 6.5,   s: 7,     h: 8,     cap: 24},
+  17:{e: 7,     s: 7.5,   h: 8.5,   cap: 25},
+  18:{e: 7.5,   s: 8,     h: 9,     cap: 26},
+  19:{e: 8,     s: 8.5,   h: 9.5,   cap: 28},
+  20:{e: 8.5,   s: 9,     h: 10,    cap: 30}
 };
+
+// Minions per Standard — table lookup. How many minions of a given CR
+// are encounter-equivalent to one standard creature of that CR. Lower
+// CRs need fewer minions to total one standard; epic tiers need ten.
+const FM_MINIONS_PER_STD = {
+  0:5, 0.125:5, 0.25:5, 0.5:5, 1:5, 2:5, 3:5, 4:5,
+  5:8, 6:8, 7:8, 8:8,
+  9:10, 10:10, 11:10, 12:10, 13:10, 14:10, 15:10, 16:10, 17:10, 18:10,
+  19:10, 20:10, 21:10, 22:10, 23:10, 24:10, 25:10, 26:10, 27:10, 28:10,
+  29:10, 30:10
+};
+function minionsPerStd(cr){
+  const c = +cr || 0;
+  if (FM_MINIONS_PER_STD[c] != null) return FM_MINIONS_PER_STD[c];
+  // Closest defined CR bucket
+  const keys = Object.keys(FM_MINIONS_PER_STD).map(Number).sort((a,b)=>a-b);
+  let best = keys[0];
+  for (const k of keys){
+    if (Math.abs(k - c) < Math.abs(best - c)) best = k;
+  }
+  return FM_MINIONS_PER_STD[best];
+}
+
+// Format CR (decimal → fraction-friendly display).
+function fmCR(v){
+  if (v == null) return '—';
+  if (v === 0.125) return '⅛';
+  if (v === 0.25)  return '¼';
+  if (v === 0.5)   return '½';
+  if (v === 0.75)  return '¾';
+  if (v === 1.5)   return '1½';
+  // Generic: 2.5 → "2½", 0.875 → "0.88"
+  if (v % 1 === 0) return String(v);
+  if (Math.abs(v - Math.floor(v) - 0.5) < 0.001) return `${Math.floor(v)}½`;
+  return v.toFixed(2);
+}
+
+// FM difficulty resolver against budgets. The 10% slop on each band
+// matches FM's "if you're building a hard encounter, don't go over
+// your budget" guidance — small overruns still feel hard rather than
+// instantly tipping into extreme.
+function fmDifficultyBand(totalCR, budget){
+  if (totalCR <= 0) return 'none';
+  if (totalCR < budget.easy * 0.9)      return 'trivial';
+  if (totalCR <= budget.easy * 1.1)     return 'easy';
+  if (totalCR <= budget.standard * 1.1) return 'standard';
+  if (totalCR <= budget.hard * 1.1)     return 'hard';
+  return 'extreme';
+}
+
+// Solo creatures use a totally different table (FM treats a single
+// big boss differently from a pile of monsters). Maps (CR cap minus
+// solo CR) to a band based on party size.
+function fmSoloBand(soloCr, level, size){
+  const row = FM_CR_BUDGET[Math.max(1, Math.min(20, level))];
+  const diff = row.cap - (+soloCr || 0);
+  if (size <= 5){
+    if (diff >= 7) return 'trivial';
+    if (diff >= 5) return 'easy';
+    if (diff >= 3) return 'standard';
+    if (diff >= 0) return 'hard';
+    return 'extreme';
+  }
+  if (diff >= 6) return 'trivial';
+  if (diff >= 4) return 'easy';
+  if (diff >= 2) return 'standard';
+  if (diff >= 0) return 'hard';
+  return 'extreme';
+}
+
+// Daily encounter points (FM's adventuring-day budget). Trivial = 0,
+// Easy = 1, Standard = 2, Hard = 4, Extreme = 8.
+const FM_DAILY_POINTS = { trivial: 0, easy: 1, standard: 2, hard: 4, extreme: 8 };
 const BP_CR_OPTIONS = [
   ['0','0'], ['0.125','1/8'], ['0.25','1/4'], ['0.5','1/2'],
   ['1','1'], ['2','2'], ['3','3'], ['4','4'], ['5','5'],
@@ -1305,36 +1399,117 @@ function onPartyChange(){
 }
 
 function renderBudget(){
-  const xp = totalPickedXP();
-  document.getElementById('bp-xp-total').textContent = xp.toLocaleString();
-  const lvl  = _BP.party.level;
+  const lvlRaw = _BP.party.level;
   const size = _BP.party.size;
-  const t = XP_THRESHOLDS[lvl];
+  const lvl = Math.max(1, Math.min(20, lvlRaw));
+  const row = FM_CR_BUDGET[lvl];
+  const xp = totalPickedXP();
+
+  // Walk picks and tally weighted CR, separating solos and minions.
+  let totalCR = 0;
+  let nonMinionCount = 0;
+  let minionCount = 0;
+  let soloPicks = [];
+  let capExceeded = [];
+  for (const p of _BP.picks){
+    const m = _BP.monsters.find(x => x.id === p.id);
+    if (!m) continue;
+    const cr = +m.cr || 0;
+    const q = p.qty || 1;
+    if (m.isSolo){ soloPicks.push({ m, q }); continue; }
+    if (m.isMinion){
+      totalCR += (cr / minionsPerStd(cr)) * q;
+      minionCount += q;
+    } else {
+      totalCR += cr * q;
+      nonMinionCount += q;
+    }
+    if (row && cr > row.cap) capExceeded.push(m);
+  }
+
+  // Round display to nearest quarter — keeps "2.5" and "3.75" readable.
+  const displayCR = Math.round(totalCR * 4) / 4;
+  document.getElementById('bp-cr-total').textContent = fmCR(displayCR);
+  document.getElementById('bp-xp-total-note').textContent =
+    xp ? `(${xp.toLocaleString()} XP via 2014 tables)` : '';
+
   const thr = document.getElementById('bp-thresholds');
   const verdict = document.getElementById('bp-verdict');
-  if (!t){
+  const extras = document.getElementById('bp-fm-extras');
+  if (!row){
     thr.innerHTML = '';
     verdict.textContent = '';
+    extras.innerHTML = '';
     return;
   }
-  const low  = t.l * size;
-  const mod  = t.m * size;
-  const high = t.h * size;
-  // Difficulty band: ≤ low = Low, ≤ mod = Moderate, ≤ high = High, > high = Over
-  const band = xp <= low ? 'low' : xp <= mod ? 'moderate' : xp <= high ? 'high' : 'over';
+
+  const budget = {
+    easy: row.e * size,
+    standard: row.s * size,
+    hard: row.h * size
+  };
+
+  // Non-solo budget band
+  let band = fmDifficultyBand(totalCR, budget);
+
+  // Solo creatures override the budget calculation — use the Solo
+  // Creatures Encounters table instead. If multiple solos are picked,
+  // that's unusual but we'll take the highest-CR one as canonical.
+  let soloBand = null;
+  if (soloPicks.length){
+    soloPicks.sort((a, b) => (b.m.cr || 0) - (a.m.cr || 0));
+    soloBand = fmSoloBand(soloPicks[0].m.cr, lvl, size);
+    band = soloBand;
+  }
+
   const hit = b => band === b ? ' hit' : '';
   thr.innerHTML = `
-    <span class="${hit('low')}">Low ${low.toLocaleString()}</span>
-    <span class="${hit('moderate')}">Moderate ${mod.toLocaleString()}</span>
-    <span class="${hit('high')}">High ${high.toLocaleString()}</span>
+    <span class="${hit('easy')}">Easy CR ${fmCR(budget.easy)}</span>
+    <span class="${hit('standard')}">Standard CR ${fmCR(budget.standard)}</span>
+    <span class="${hit('hard')}">Hard CR ${fmCR(budget.hard)}</span>
   `;
-  verdict.className = 'verdict ' + band;
-  verdict.textContent = ({
-    low:      `Low difficulty — short on threat for a party of ${size} at level ${lvl}.`,
-    moderate: `Moderate difficulty — a meaningful resource drain.`,
-    high:     `High difficulty — risk of PC deaths without smart play.`,
-    over:     `Over the High threshold by ${(xp - high).toLocaleString()} XP — potential party wipe territory.`
-  })[band];
+
+  // Map FM band → existing verdict CSS classes for the colored chip.
+  // (`low`/`moderate`/`high`/`over` are the CSS classes; FM bands map
+  // onto them by severity.)
+  const bandToCss = {
+    none: 'low', trivial: 'low', easy: 'low',
+    standard: 'moderate', hard: 'high', extreme: 'over'
+  };
+  verdict.className = 'verdict ' + (bandToCss[band] || 'low');
+  const points = FM_DAILY_POINTS[band] ?? 0;
+  const pluralPoints = points === 1 ? '' : 's';
+  const verdictText = ({
+    none:     `No monsters picked yet.`,
+    trivial:  `Trivial — barely a speed bump. 0 daily encounter points.`,
+    easy:     `Easy — minimal resource drain. ${points} daily encounter point${pluralPoints}.`,
+    standard: `Standard — meaningful resource drain. ${points} daily encounter points.`,
+    hard:     `Hard — risk of PC deaths without smart play. ${points} daily encounter points.`,
+    extreme:  `Extreme — party survival not guaranteed. ${points} daily encounter points.`
+  })[band] || '';
+  verdict.textContent = verdictText;
+
+  // FM-specific extras / warnings
+  const bits = [];
+  bits.push(`CR cap for level ${lvl}: <b>${row.cap}</b>`);
+  if (capExceeded.length){
+    const names = capExceeded.map(m => `${m.name} (CR ${m.crText || m.cr})`).join(', ');
+    bits.push(`<span style="color:var(--rust)">⚠ Above CR cap: ${bpEsc(names)} — FM advises swapping these out at this level.</span>`);
+  }
+  const nonMinionLimit = 3 * size;
+  if (nonMinionCount > nonMinionLimit){
+    bits.push(`<span style="color:var(--rust)">⚠ ${nonMinionCount} non-minion creatures exceeds FM's recommended cap of ${nonMinionLimit} (3 × party size) — action economy may overwhelm the party.</span>`);
+  } else if (nonMinionCount){
+    bits.push(`Non-minion creatures: ${nonMinionCount} / ${nonMinionLimit} max`);
+  }
+  if (minionCount){
+    bits.push(`Minions: ${minionCount} (count fractionally per FM Minion Encounter Building table)`);
+  }
+  if (soloPicks.length){
+    const sName = soloPicks[0].m.name;
+    bits.push(`Solo encounter — difficulty scored against the FM Solo Creatures table using <b>${bpEsc(sName)}</b> (CR ${soloPicks[0].m.crText || soloPicks[0].m.cr}). Mixing other monsters with a solo is non-standard.`);
+  }
+  extras.innerHTML = bits.join('<br>');
 }
 
 // ───── Combatant stat-block view ─────
