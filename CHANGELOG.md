@@ -9,6 +9,70 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: Flee Mortals scrape — 305 monsters captured (FM v1 live)
+
+Production run of the FM scrape pipeline against the live DDB book.
+Replaces the speculative template `scripts/scrape_fm_ddb.js` from the
+prior commit with the verified-working version tuned to the actual
+DOM (`.mcdm-statblock` wrapper, `.mon-data` header block,
+`<p class="monster--action-header">` section dividers).
+
+#### Captured
+
+| Category | Count |
+|----------|-------|
+| Standard monsters (CR + role) | 221 |
+| Villain-party NPCs | 35 |
+| Player companions (PB-scaled) | 26 |
+| Retainers (PB-scaled) | 23 |
+| **Total** | **305** |
+
+Concatenated into `bestiary.json` alongside MM 2024 (503) and ToB
+v1 (316) for a unified bestiary of **1,124 monsters**.
+
+#### Role distribution across the merged bestiary
+
+After running `tag_bestiary.py` (which preserved the 194 FM-supplied
+roles via the `roleManual:true` flag): Brute 378, Soldier 244,
+Skirmisher 187, Controller 148, Ambusher 50, Artillery 49, Support
+41, Leader 27, Defender 0.
+
+#### Workflow that worked
+
+1. Visit each of 5 stat-block pages on DDB
+   (`/sources/fm/creatures-{ad,ek,ls,tz}` + `/sources/fm/villain-parties`)
+2. Paste the scrape script into devtools console on each page —
+   results accumulate in `localStorage.fm_scrape`
+3. On the last page, call `window.__fmDownload()` → `fm.json`
+   downloads to `~/Downloads`
+4. Move to project root, run `python3 scripts/normalize_bestiary.py`
+   — auto-detects `fm.json` alongside `tob.json`
+5. Run `python3 scripts/tag_bestiary.py` — preserves the
+   FM-supplied roles, fills in terrain affinities
+6. Menagerie Import tab → Merge mode → library auto-rebuilds with
+   the new FM features included
+
+#### Script changes (`scripts/scrape_fm_ddb.js`)
+
+Production version (replaces speculation template):
+- Selector locked to `.mcdm-statblock` (FM-specific class).
+- `.mon-data` lines parsed for size+type, "CR X Role" line with
+  optional Minion/Solo suffix, XP line. Standalone "Retainer" line
+  detected via post-process pass.
+- `<p>` walker stops at `<p class="monster--action-header">` to
+  switch sections (Actions / Bonus Actions / Reactions / Legendary
+  Actions / Villain Actions / Lair Actions).
+- 2014→2024 prose modernizer included inline. "Melee Weapon Attack:
+  +X to hit" → "Melee Attack Roll: +X", strip ", one target.",
+  capitalize damage types.
+- Multi-page accumulation via `localStorage.fm_scrape` so each page
+  visit appends; final page calls `window.__fmDownload()` to build
+  the envelope and trigger Blob download.
+- Companion / retainer / villain-party / minion / solo all routed
+  to `fmCategory` for downstream filtering.
+
+---
+
 ### Menagerie: Flee Mortals (MCDM) scrape pipeline
 
 Adds support for scraping the Flee Mortals book from D&D Beyond and
