@@ -1,0 +1,1348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Spire — Sessions (DM)</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0806;--surface:#13100a;--surface2:#1c1810;--surface3:#242018;
+  --border:#2e2510;--border-light:#3e3418;
+  --gold:#b8860b;--gold-light:#d4a820;--gold-faint:#6b4f08;--gold-dim:#4a3606;
+  --ink:#e8dfc0;--ink-dim:#a09070;--ink-faint:#6a5a40;
+  --red:#8b2020;--red-bg:#2a0f0d;--green:#2d6a3f;--green-bg:#0d1f12;--green-light:#4a9a60;
+  --purple:#5a3e9b;--purple-bg:#18102a;--amber:#c87800;
+  --session:#4a80c0;--session-light:#8fbceb;
+  --radius:4px;--topbar:48px;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,serif;display:flex;flex-direction:column}
+
+/* ── Topbar ── */
+.topbar{height:var(--topbar);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1rem;gap:0.6rem;flex-shrink:0;z-index:50;flex-wrap:wrap}
+.topbar h1{font-family:'Cinzel',serif;font-size:0.95rem;letter-spacing:0.1em;color:var(--gold);flex:1;min-width:80px}
+.btn{font-family:'Cinzel',serif;font-size:0.68rem;letter-spacing:0.08em;border:1px solid;border-radius:var(--radius);padding:4px 10px;cursor:pointer;transition:all 0.15s;white-space:nowrap;background:transparent;text-decoration:none;display:inline-block}
+.btn-gold{background:var(--gold-dim);border-color:var(--gold);color:var(--gold-light)}.btn-gold:hover{background:var(--gold);color:var(--bg)}
+.btn-green{background:var(--green-bg);border-color:var(--green);color:#8e8}.btn-green:hover{background:var(--green);color:white}
+.btn-red{background:var(--red-bg);border-color:var(--red);color:#e88}.btn-red:hover{background:var(--red);color:white}
+.btn-purple{background:var(--purple-bg);border-color:var(--purple);color:#c0a0f0}.btn-purple:hover{background:var(--purple);color:white}
+.btn-ghost{border-color:var(--border-light);color:var(--ink-dim)}.btn-ghost:hover{border-color:var(--ink-dim);color:var(--ink)}
+.btn-sm{font-size:0.6rem;padding:3px 7px}
+.sync-status{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.08em;color:var(--ink-faint)}
+.sync-status.ok{color:var(--green-light)}.sync-status.fail{color:var(--red)}.sync-status.ing{color:var(--amber)}
+
+/* ── 3-pane layout ── */
+.layout{flex:1;display:grid;grid-template-columns:340px 1fr 280px;overflow:hidden;min-height:0}
+.pane-list{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.pane-editor{background:var(--bg);overflow-y:auto;padding:0 1.25rem 1.25rem;min-height:0}
+.pane-sidebar{background:var(--surface);border-left:1px solid var(--border);overflow-y:auto;padding:0.9rem 0.9rem;min-height:0}
+@media(max-width:1100px){
+  .layout{grid-template-columns:300px 1fr}
+  .pane-sidebar{display:none}
+}
+
+/* ── List pane ── */
+.list-toolbar{padding:0.6rem 0.7rem;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px;flex-shrink:0;background:var(--surface)}
+.list-toolbar-row{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.list-toolbar input[type=text]{flex:1;min-width:0;background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:5px 8px;font-family:'Crimson Text',serif;font-size:0.84rem;outline:none}
+.list-toolbar input[type=text]:focus{border-color:var(--gold)}
+.list-toolbar select{background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:4px 7px;font-size:0.78rem;font-family:'Crimson Text',serif;cursor:pointer}
+.view-toggle{display:flex;gap:0;border:1px solid var(--border-light);border-radius:2px;overflow:hidden}
+.view-toggle button{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.08em;padding:4px 10px;border:none;background:transparent;color:var(--ink-faint);cursor:pointer;transition:all 0.15s}
+.view-toggle button.on{background:var(--gold-dim);color:var(--gold-light)}
+.list-content{flex:1;overflow-y:auto;padding:0.6rem 0.5rem;min-height:0}
+.list-empty{padding:1.2rem 0.6rem;color:var(--ink-faint);font-style:italic;font-size:0.86rem;text-align:center}
+
+.session-card{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--session);border-radius:var(--radius);padding:7px 10px;margin-bottom:6px;cursor:pointer;transition:border-color 0.15s}
+.session-card:hover{border-color:var(--border-light);border-left-color:var(--session-light)}
+.session-card.selected{border-color:var(--gold);border-left-color:var(--gold)}
+.session-card-row{display:flex;align-items:baseline;gap:6px}
+.session-card-num{font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.1em;color:var(--session-light);background:rgba(74,128,192,0.12);border:1px solid var(--session);padding:1px 7px;border-radius:8px;flex-shrink:0}
+.session-card-title{font-family:'Cinzel',serif;font-size:0.84rem;color:var(--ink);flex:1;line-height:1.25;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.session-card-meta{display:flex;gap:8px;margin-top:4px;font-size:0.7rem;color:var(--ink-faint);font-family:'Cinzel',serif;letter-spacing:0.04em}
+.session-card-meta .att{color:var(--ink-dim)}
+
+/* Timeline (calendar) view */
+.tl-month{position:sticky;top:0;background:var(--surface);font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.16em;color:var(--gold-faint);padding:6px 4px 4px;border-bottom:1px solid var(--border);margin:6px 0 6px;z-index:1}
+.tl-rail{position:relative;padding-left:14px;border-left:1px solid var(--border-light);margin-left:6px}
+.tl-rail .session-card{position:relative}
+.tl-rail .session-card::before{content:"";position:absolute;left:-19px;top:13px;width:9px;height:9px;border-radius:50%;background:var(--session);border:2px solid var(--surface)}
+.tl-rail .session-card.selected::before{background:var(--gold-light)}
+
+/* ── Editor pane ── */
+.editor-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--ink-faint);font-style:italic;text-align:center;padding:2rem;min-height:60vh}
+.editor-empty h2{font-family:'Cinzel',serif;font-size:1.1rem;letter-spacing:0.08em;color:var(--ink-dim);margin-bottom:0.6rem;font-style:normal}
+.editor-empty p{max-width:32rem;line-height:1.5;font-size:0.92rem}
+
+.editor-header{position:sticky;top:0;background:var(--bg);padding:0.9rem 0 0.6rem;z-index:5;border-bottom:1px solid var(--border);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.editor-header .title-stack{flex:1;min-width:200px}
+.editor-header h2{font-family:'Cinzel',serif;font-size:1rem;letter-spacing:0.06em;color:var(--gold-light);line-height:1.25;margin-bottom:2px}
+.editor-header .sub{font-size:0.78rem;color:var(--ink-faint);font-family:'Cinzel',serif;letter-spacing:0.06em}
+
+.field{margin-bottom:0.7rem}
+.field label{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;color:var(--ink-faint);display:block;margin-bottom:3px}
+.field input,.field textarea,.field select{width:100%;background:var(--surface);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.94rem;padding:6px 9px;outline:none;transition:border-color 0.15s;line-height:1.45}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--gold)}
+.field textarea{resize:vertical;min-height:80px}
+.field textarea.body{min-height:180px}
+.field textarea.prep{min-height:340px;font-family:'Crimson Text',serif;line-height:1.55}
+.field textarea.mono{font-family:ui-monospace,'Menlo','Consolas',monospace;font-size:0.85rem}
+.field select{cursor:pointer}
+.field-row{display:flex;gap:8px;flex-wrap:wrap}.field-row .field{flex:1;min-width:160px}
+.section-header{font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.14em;color:var(--gold-faint);margin:1.2rem 0 0.4rem;padding-bottom:4px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.section-header .hint{font-family:'Crimson Text',serif;font-size:0.75rem;letter-spacing:0;color:var(--ink-faint);font-style:italic;text-transform:none}
+
+.chip-grid{display:flex;flex-wrap:wrap;gap:5px;padding:6px 2px}
+.chip{font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.05em;padding:3px 10px;border-radius:10px;border:1px solid var(--border-light);color:var(--ink-faint);background:var(--surface2);cursor:pointer;transition:all 0.12s;user-select:none}
+.chip:hover{border-color:var(--ink-dim);color:var(--ink-dim)}
+.chip.on{border-color:var(--gold);color:var(--gold);background:var(--gold-dim)}
+.chip.attend.on{border-color:var(--session-light);background:rgba(74,128,192,0.22);color:var(--session-light)}
+.chip-empty{font-size:0.78rem;color:var(--ink-faint);font-style:italic;padding:4px 0}
+.chip-hint{font-size:0.74rem;color:var(--ink-faint);font-style:italic;margin-top:2px}
+
+.dm-note-area{background:#12102a;border:1px solid #3a2a6a;border-radius:var(--radius);padding:8px 10px;margin-top:0.4rem}
+.dm-note-label{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;color:#8870e0;margin-bottom:4px}
+.dm-note-area textarea{width:100%;background:transparent;border:none;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.92rem;outline:none;resize:vertical;line-height:1.5}
+
+/* Loot rows */
+.loot-row{display:flex;gap:5px;align-items:center;margin-bottom:5px}
+.loot-row input{background:var(--surface);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.88rem;padding:5px 8px;outline:none}
+.loot-row input:focus{border-color:var(--gold)}
+.loot-row .loot-item{flex:1;min-width:0}
+.loot-row .loot-qty{width:60px;flex-shrink:0}
+.loot-row .loot-who{width:130px;flex-shrink:0}
+.loot-row .loot-del{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:0.9rem;padding:0 4px;flex-shrink:0}
+.loot-row .loot-del:hover{color:var(--red)}
+
+/* Combat items */
+.combat-item{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--session);border-radius:var(--radius);padding:6px 10px;margin-bottom:5px;font-size:0.86rem}
+.combat-item .name{flex:1;font-family:'Cinzel',serif;color:var(--ink);font-size:0.82rem}
+.combat-item .sub{color:var(--ink-faint);font-size:0.75rem}
+.combat-item .del{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:0.9rem;padding:0 4px}
+.combat-item .del:hover{color:var(--red)}
+
+.action-row{display:flex;gap:6px;margin-top:1rem;flex-wrap:wrap;padding-top:0.8rem;border-top:1px solid var(--border)}
+.action-row .grow{flex:1}
+
+/* ── Sidebar ── */
+.side-section{margin-bottom:1.1rem}
+.side-h{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.16em;color:var(--gold-faint);margin-bottom:6px;padding-bottom:3px;border-bottom:1px solid var(--border)}
+.side-stat{display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:0.86rem;color:var(--ink-dim)}
+.side-stat .val{color:var(--ink);font-family:'Cinzel',serif;font-size:0.84rem}
+.side-attend{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.side-attend .badge{font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.04em;padding:2px 8px;border-radius:9px;background:rgba(74,128,192,0.18);color:var(--session-light);border:1px solid var(--session)}
+.side-attend .absent{background:rgba(106,90,64,0.15);color:var(--ink-faint);border-color:var(--border-light);text-decoration:line-through}
+.side-export{display:flex;flex-direction:column;gap:5px}
+.side-export .btn{justify-content:center;text-align:center;width:100%}
+.side-export .hint{font-size:0.74rem;color:var(--ink-faint);font-style:italic;line-height:1.35;margin-top:2px}
+
+/* ── Import overlay ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:200;padding:1rem}
+.overlay.visible{display:flex}
+.modal{background:var(--surface);border:1px solid var(--gold-faint);border-radius:var(--radius);padding:1.2rem 1.4rem;max-width:640px;width:100%;max-height:88vh;overflow-y:auto}
+.modal h2{font-family:'Cinzel',serif;font-size:1rem;letter-spacing:0.08em;color:var(--gold-light);margin-bottom:0.7rem}
+.modal .drop-zone{border:2px dashed var(--border-light);border-radius:var(--radius);padding:1.3rem;text-align:center;color:var(--ink-faint);transition:all 0.15s;cursor:pointer;font-size:0.92rem;font-family:'Crimson Text',serif}
+.modal .drop-zone.dragover{border-color:var(--gold);color:var(--gold-light);background:rgba(184,134,11,0.07)}
+.modal .modal-actions{display:flex;gap:6px;margin-top:0.9rem;justify-content:flex-end}
+.import-results{margin-top:0.8rem;font-size:0.86rem}
+.import-results .imp-row{display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px dashed var(--border)}
+.import-results .imp-status{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.08em;padding:2px 7px;border-radius:9px;flex-shrink:0}
+.import-results .imp-new{background:var(--green-bg);color:#8e8;border:1px solid var(--green)}
+.import-results .imp-upd{background:rgba(184,134,11,0.18);color:var(--gold-light);border:1px solid var(--gold-faint)}
+.import-results .imp-err{background:var(--red-bg);color:#e88;border:1px solid var(--red)}
+.import-results .imp-meta{flex:1;font-size:0.84rem;color:var(--ink-dim);line-height:1.4}
+.import-results .imp-name{color:var(--ink);font-family:'Cinzel',serif;font-size:0.82rem}
+
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-light);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--ink-faint)}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <h1>THE SESSIONS</h1>
+  <span class="sync-status" id="sync-status">—</span>
+  <button class="btn btn-gold btn-sm" onclick="newSession()">+ NEW SESSION</button>
+  <button class="btn btn-ghost btn-sm" onclick="openImport()">IMPORT .MD</button>
+  <a class="btn btn-ghost btn-sm" href="home.html">← HUB</a>
+</header>
+
+<main class="layout">
+  <!-- LIST PANE -->
+  <aside class="pane-list">
+    <div class="list-toolbar">
+      <div class="list-toolbar-row">
+        <input type="text" id="search" placeholder="Search title or body…" oninput="renderList()">
+        <div class="view-toggle">
+          <button id="vt-list" class="on" onclick="setView('list')">LIST</button>
+          <button id="vt-cal" onclick="setView('cal')">TIMELINE</button>
+        </div>
+      </div>
+      <div class="list-toolbar-row">
+        <select id="year-filter" onchange="renderList()" style="flex:1"><option value="">All years</option></select>
+        <span class="sync-status" id="list-count">0</span>
+      </div>
+    </div>
+    <div class="list-content" id="list-content"></div>
+  </aside>
+
+  <!-- EDITOR PANE -->
+  <section class="pane-editor" id="pane-editor">
+    <div class="editor-empty" id="editor-empty">
+      <h2>No session selected</h2>
+      <p>Pick a session from the list, or start a new one. Sessions you import from your vault land here, and you can push edits back to your vault as Markdown.</p>
+    </div>
+    <div id="editor" style="display:none">
+      <div class="editor-header">
+        <div class="title-stack">
+          <h2 id="hdr-title">Untitled session</h2>
+          <div class="sub" id="hdr-sub">—</div>
+        </div>
+        <button class="btn btn-gold btn-sm" onclick="saveSession()">SAVE</button>
+        <button class="btn btn-ghost btn-sm" onclick="cancelEdit()">CANCEL</button>
+        <button class="btn btn-red btn-sm" onclick="deleteSession()">DELETE</button>
+      </div>
+
+      <div class="field" style="margin-top:0.6rem"><label>TITLE</label>
+        <input type="text" id="f-title" placeholder="Session 3: The Pit Beneath the Quarry" oninput="syncHeader()">
+      </div>
+      <div class="field-row">
+        <div class="field"><label>REAL-WORLD DATE</label><input type="date" id="f-dateReal" oninput="syncHeader()"></div>
+        <div class="field"><label>IN-GAME DATE (free text)</label><input type="text" id="f-dateInGame" placeholder="12 Mirtul, 1492 DR"></div>
+        <div class="field"><label>SORT KEY (ISO, optional)</label><input type="date" id="f-dateSort"></div>
+      </div>
+      <div class="field"><label>TAGS (comma-separated)</label>
+        <input type="text" id="f-tags" placeholder="session-three, warrant, quarry">
+      </div>
+
+      <div class="section-header">SUMMARY <span class="hint">— what players see in the Chronicle (becomes <code>## Summary</code> on export)</span></div>
+      <div class="field"><textarea id="f-body" class="body" placeholder="A short, read-aloud-ready recap…"></textarea></div>
+
+      <div class="section-header">PREP <span class="hint">— DM-only. Raw Markdown. Section headings (<code>## Scenes</code>, <code>## NPCs</code>, …) round-trip as-is.</span></div>
+      <div class="field"><textarea id="f-prep" class="prep mono" placeholder="## Strong start&#10;&#10;>&#10;&#10;## Scenes&#10;- [ ] &#10;- [ ] &#10;&#10;## NPCs&#10;- &#10;&#10;## Locations&#10;- &#10;&#10;## Secrets and Clues&#10;- [ ] &#10;&#10;## Loot&#10;- [ ] "></textarea></div>
+
+      <div class="section-header">ATTENDANCE <span class="hint">— who showed up</span></div>
+      <div class="chip-grid" id="f-attend-chips"></div>
+
+      <div class="section-header">LINKED LOCATIONS</div>
+      <div class="chip-grid" id="f-loc-chips"></div>
+
+      <div class="section-header">LINKED NPCs</div>
+      <div class="chip-grid" id="f-npc-chips"></div>
+
+      <div class="section-header">STRUCTURED LOOT <span class="hint">— for initiative exports &amp; per-recipient tracking. Markdown lists in the Prep block stay too.</span></div>
+      <div id="f-loot-rows"></div>
+      <button class="btn btn-ghost btn-sm" type="button" onclick="addLootRow()" style="margin-top:4px">+ Add loot row</button>
+      <datalist id="loot-recipients"></datalist>
+
+      <div class="section-header">ATTACHED COMBATS <span class="hint">— pushed in from the War Table</span></div>
+      <div id="f-combats"></div>
+
+      <div class="section-header">VISIBLE TO <span class="hint">— leave empty for all players</span></div>
+      <div class="chip-grid" id="f-visible-chips"></div>
+      <div class="chip-hint">Empty = visible to every player who can read the Chronicle.</div>
+
+      <div class="section-header">DM LOG <span class="hint">— post-session notes, becomes <code>## Log</code> on export</span></div>
+      <div class="dm-note-area">
+        <div class="dm-note-label">🔒 DM ONLY</div>
+        <textarea id="f-dmNotes" rows="5" placeholder="What actually happened. Threads opened, threads closed, who said what."></textarea>
+      </div>
+
+      <div class="action-row">
+        <button class="btn btn-gold" onclick="saveSession()">SAVE</button>
+        <button class="btn btn-ghost" onclick="cancelEdit()">CANCEL</button>
+        <span class="grow"></span>
+        <button class="btn btn-red" onclick="deleteSession()">DELETE</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- SIDEBAR -->
+  <aside class="pane-sidebar" id="pane-sidebar">
+    <div class="side-section">
+      <div class="side-h">AT A GLANCE</div>
+      <div class="side-stat"><span>Sessions total</span><span class="val" id="g-total">0</span></div>
+      <div class="side-stat"><span>This entry</span><span class="val" id="g-which">—</span></div>
+      <div class="side-stat"><span>Attendance</span><span class="val" id="g-att">—</span></div>
+      <div class="side-stat"><span>Loot rows</span><span class="val" id="g-loot">—</span></div>
+      <div class="side-stat"><span>Combats</span><span class="val" id="g-combats">—</span></div>
+      <div class="side-attend" id="g-att-badges"></div>
+    </div>
+
+    <div class="side-section">
+      <div class="side-h">EXPORT TO VAULT</div>
+      <div class="side-export">
+        <button class="btn btn-gold btn-sm" id="ex-one" onclick="exportCurrent()" disabled>↓ DOWNLOAD .MD</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportAll()">↓ DOWNLOAD ALL</button>
+        <button class="btn btn-ghost btn-sm" onclick="openImport()">↑ IMPORT .MD</button>
+        <div class="hint">Drop the downloaded file into your <code>Sessions/</code> folder. Re-importing with the same <code>id:</code> in frontmatter updates the entry in place.</div>
+      </div>
+    </div>
+
+    <div class="side-section">
+      <div class="side-h">RECENT IMPORTS</div>
+      <div id="recent-imports" style="font-size:0.82rem;color:var(--ink-faint);font-style:italic">No imports this session.</div>
+    </div>
+  </aside>
+</main>
+
+<!-- IMPORT OVERLAY -->
+<div class="overlay" id="import-overlay" onclick="if(event.target===this)closeImport()">
+  <div class="modal">
+    <h2>Import sessions from vault</h2>
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <div style="font-family:'Cinzel',serif;font-size:0.78rem;letter-spacing:0.1em;color:var(--ink-dim);margin-bottom:8px">DROP .MD FILES HERE</div>
+      <div>or click to choose files</div>
+      <div style="margin-top:6px;font-size:0.78rem;color:var(--ink-faint)">Drag-drop multiple at once. Files with an <code>id:</code> in frontmatter update; new files create.</div>
+    </div>
+    <input type="file" id="file-input" accept=".md,text/markdown" multiple style="display:none" onchange="handleFiles(this.files)">
+
+    <div style="margin-top:0.9rem">
+      <div class="side-h" style="margin-bottom:5px">…or paste Markdown</div>
+      <textarea id="paste-md" class="mono" rows="6" style="width:100%;background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:6px 9px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:0.82rem;outline:none" placeholder="---&#10;type: session&#10;name: ...&#10;---&#10;## Summary&#10;..."></textarea>
+      <div style="display:flex;justify-content:flex-end;margin-top:5px">
+        <button class="btn btn-gold btn-sm" onclick="importPasted()">PARSE PASTED</button>
+      </div>
+    </div>
+
+    <div class="import-results" id="import-results"></div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" onclick="closeImport()">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<script src="auth.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  Sessions DM tool — sessions-dm.html
+//  Reads/writes the same `timeline` KV key as map-dm.html, but
+//  scoped to entries where kind === 'session'. Other kinds stay
+//  editable in the map-dm Timeline tab.
+// ═══════════════════════════════════════════════════════════════
+
+const WORKER_URL = 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+
+// DM gate
+if (!window.Auth || !Auth.requireRole('dm', { redirect: 'home.html?notice=' + encodeURIComponent('Sign in as DM to manage sessions.') })) {
+  // requireRole redirected — stop executing
+  throw new Error('DM required');
+}
+
+// ─── State ───
+let timeline   = [];     // full timeline (all kinds)
+let characters = [];
+let npcs       = [];
+let worldData  = { locations: [] };  // for location matching
+let editingId  = null;   // session id, or '__new__'
+let view       = 'list'; // 'list' | 'cal'
+let recentImports = [];  // for the sidebar
+
+// Editor working state
+let work = blankWork();
+
+function blankWork() {
+  return {
+    title:'', body:'', prep:'', dmNotes:'',
+    dateReal:'', dateInGame:'', dateSort:'',
+    attendance:[], locationIds:[], npcIds:[], visibleTo:[],
+    tags:[], loot:[], combats:[], frontmatterExtras:{},
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PERSISTENCE
+// ═══════════════════════════════════════════════════════════════
+function setStatus(msg, cls) {
+  const el = document.getElementById('sync-status');
+  el.textContent = msg;
+  el.className = 'sync-status' + (cls ? ' ' + cls : '');
+}
+
+async function dmGet(type) {
+  try {
+    const res = await fetch(WORKER_URL + '?type=' + encodeURIComponent(type), {
+      cache: 'no-store',
+      headers: Auth.dmHeaders()
+    });
+    if (res.status === 401) {
+      Auth.logout();
+      window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.'));
+      return null;
+    }
+    if (!res.ok) return null;
+    return await res.json();
+  } catch { return null; }
+}
+
+async function dmPost(type, payload) {
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: Auth.dmHeaders(),
+      body: JSON.stringify({ type, payload })
+    });
+    if (res.status === 401) {
+      Auth.logout();
+      window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.'));
+      return false;
+    }
+    return res.ok;
+  } catch { return false; }
+}
+
+async function loadAll() {
+  setStatus('Loading…', 'ing');
+  // Local cache first (instant render)
+  try {
+    const tl = JSON.parse(localStorage.getItem('dm_timeline') || 'null');
+    if (Array.isArray(tl)) timeline = tl;
+    const ch = JSON.parse(localStorage.getItem('dm_characters') || 'null');
+    if (Array.isArray(ch)) characters = ch;
+    const np = JSON.parse(localStorage.getItem('dm_npcs') || 'null');
+    if (Array.isArray(np)) npcs = np;
+    const md = JSON.parse(localStorage.getItem('dm_map_data') || 'null');
+    if (md && md.locations) worldData = md;
+  } catch {}
+  renderList(); renderEditor(); renderSidebar();
+
+  const [tl, ch, np, md] = await Promise.all([
+    dmGet('timeline_dm'),
+    dmGet('characters'),
+    dmGet('npcs'),
+    dmGet('map_data_dm'),
+  ]);
+  if (Array.isArray(tl)) { timeline = tl; localStorage.setItem('dm_timeline', JSON.stringify(tl)); }
+  if (Array.isArray(ch)) { characters = ch; localStorage.setItem('dm_characters', JSON.stringify(ch)); }
+  if (Array.isArray(np)) { npcs = np; localStorage.setItem('dm_npcs', JSON.stringify(np)); }
+  if (md && md.locations) { worldData = md; localStorage.setItem('dm_map_data', JSON.stringify(md)); }
+
+  renderList(); renderEditor(); renderSidebar();
+  setStatus('Saved', 'ok');
+}
+
+async function persistTimeline() {
+  localStorage.setItem('dm_timeline', JSON.stringify(timeline));
+  setStatus('Saving…', 'ing');
+  const ok = await dmPost('timeline', timeline);
+  setStatus(ok ? 'Saved' : 'Save failed', ok ? 'ok' : 'fail');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════════
+function escapeHtml(s) {
+  return (s == null ? '' : String(s))
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function uid() { return 'tle_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function lootUid() { return 'lt_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+function sessionsAll() { return timeline.filter(t => (t.kind || 'event') === 'session'); }
+
+function sortKey(s) { return (s.dateSort || s.dateReal || '') + '|' + (s.title || ''); }
+
+function flattenLocations() {
+  const out = [];
+  (worldData.locations || []).forEach(l => {
+    out.push({ id: l.id, name: l.name, parent: '' });
+    const sub = l.subMap?.locations || [];
+    sub.forEach(sl => out.push({ id: sl.id, name: sl.name, parent: l.name }));
+  });
+  return out;
+}
+
+function nameToCharacterId(name) {
+  if (!name) return null;
+  const norm = String(name).trim().toLowerCase();
+  let c = characters.find(c => (c.name || '').toLowerCase() === norm);
+  if (c) return c.id;
+  // First name match
+  c = characters.find(c => (c.name || '').toLowerCase().split(' ')[0] === norm.split(' ')[0] && norm.split(' ').length === 1);
+  return c ? c.id : null;
+}
+function nameToLocationId(name) {
+  if (!name) return null;
+  const all = flattenLocations();
+  const norm = String(name).trim().toLowerCase();
+  const m = all.find(l => (l.name || '').toLowerCase() === norm);
+  return m ? m.id : null;
+}
+function nameToNpcId(name) {
+  if (!name) return null;
+  const norm = String(name).trim().toLowerCase();
+  const m = npcs.find(n => (n.name || '').toLowerCase() === norm);
+  return m ? m.id : null;
+}
+
+function characterName(id) { return characters.find(c => c.id === id)?.name || ''; }
+function locationName(id) {
+  const all = flattenLocations();
+  return all.find(l => l.id === id)?.name || '';
+}
+function npcName(id) { return npcs.find(n => n.id === id)?.name || ''; }
+
+// ═══════════════════════════════════════════════════════════════
+//  MARKDOWN PARSING / EMITTING
+// ═══════════════════════════════════════════════════════════════
+function stripWikilink(s) {
+  return String(s).replace(/\[\[([^|\]]+)(?:\|([^\]]+))?\]\]/g, (_, target, alias) => (alias || target));
+}
+function extractWikilinkTargets(s) {
+  if (!s) return [];
+  const out = [];
+  const re = /\[\[([^|\]]+)(?:\|([^\]]+))?\]\]/g;
+  let m;
+  while ((m = re.exec(s))) out.push(m[1].trim());
+  return out;
+}
+
+function parseFrontmatter(text) {
+  const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  if (!m) return { meta: {}, rest: text };
+  const meta = {};
+  const lines = m[1].split(/\r?\n/);
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (!line.trim() || /^\s*#/.test(line)) { i++; continue; }
+    const kv = line.match(/^([\w-]+):\s*(.*)$/);
+    if (!kv) { i++; continue; }
+    const key = kv[1];
+    let val = kv[2];
+
+    if (val === '') {
+      // collect indented list items, if any
+      const items = [];
+      let j = i + 1;
+      while (j < lines.length && /^\s+-\s+/.test(lines[j])) {
+        let v = lines[j].replace(/^\s+-\s+/, '').trim();
+        v = v.replace(/^["'](.*)["']$/, '$1');
+        items.push(v);
+        j++;
+      }
+      if (items.length) { meta[key] = items; i = j; continue; }
+      meta[key] = '';
+      i++; continue;
+    }
+
+    // inline array
+    const arr = val.trim().match(/^\[(.*)\]$/);
+    if (arr) {
+      meta[key] = arr[1].split(',').map(s => s.trim().replace(/^["'](.*)["']$/, '$1')).filter(Boolean);
+      i++; continue;
+    }
+
+    val = val.trim().replace(/^["'](.*)["']$/, '$1');
+    meta[key] = val;
+    i++;
+  }
+  return { meta, rest: text.slice(m[0].length) };
+}
+
+function splitSections(markdown) {
+  // Returns array of {name, content}. Content excludes the heading line.
+  const lines = markdown.split(/\r?\n/);
+  const sections = [];
+  let current = null;
+  let buf = [];
+  for (const line of lines) {
+    const h = line.match(/^##\s+(.+?)\s*$/);
+    if (h) {
+      if (current !== null) sections.push({ name: current, raw: buf.join('\n'), heading: currentHeadingLine });
+      else if (buf.length) sections.push({ name: '__preamble__', raw: buf.join('\n'), heading: '' });
+      current = stripWikilink(h[1]).replace(/:\s*$/, '').trim();
+      var currentHeadingLine = line;
+      buf = [];
+    } else {
+      buf.push(line);
+    }
+  }
+  if (current !== null) sections.push({ name: current, raw: buf.join('\n'), heading: currentHeadingLine });
+  else if (buf.length) sections.push({ name: '__preamble__', raw: buf.join('\n'), heading: '' });
+  return sections;
+}
+
+function findSection(sections, candidates) {
+  // case-insensitive match against any name in `candidates`
+  const wants = candidates.map(c => c.toLowerCase());
+  return sections.find(s => wants.includes(s.name.toLowerCase()));
+}
+
+function parseSessionMarkdown(text, fileName) {
+  const { meta, rest } = parseFrontmatter(text);
+  const sections = splitSections(rest);
+
+  // body = ## Summary content (minus ^summary anchor & trailing ---)
+  const summarySec = findSection(sections, ['Summary', 'Session Summary']);
+  let body = '';
+  if (summarySec) {
+    body = summarySec.raw
+      .replace(/^\s*\^summary\s*$/gm, '')
+      .replace(/^\s*---\s*$/gm, '')
+      .trim();
+  }
+
+  // dmNotes = ## Log content
+  const logSec = findSection(sections, ['Log']);
+  const dmNotes = logSec ? logSec.raw.trim() : '';
+
+  // prep = everything between Summary and Log (preserving headings)
+  const ignore = new Set();
+  if (summarySec) ignore.add(summarySec);
+  if (logSec) ignore.add(logSec);
+  const preamble = sections.find(s => s.name === '__preamble__');
+  if (preamble) ignore.add(preamble);
+
+  // Determine ordering: only include sections that come AFTER Summary and BEFORE Log
+  let inMid = !summarySec; // if no summary, everything before log is prep
+  const prepParts = [];
+  for (const s of sections) {
+    if (s === summarySec) { inMid = true; continue; }
+    if (s === logSec) { inMid = false; break; }
+    if (ignore.has(s)) continue;
+    if (!inMid) continue;
+    prepParts.push(s.heading + '\n' + s.raw.replace(/^\s*---\s*$/gm, '').replace(/^\n+|\n+$/g, '') + '\n');
+  }
+  const prep = prepParts.join('\n').trim();
+
+  // Title — name from frontmatter, or filename stem
+  let title = (meta.name || '').trim();
+  if (!title && fileName) title = fileName.replace(/\.md$/i, '');
+  if (!title) title = 'Untitled session';
+
+  // Dates
+  const dateReal = (meta.date || '').trim();
+  const dateInGame = (meta.game_date || '').trim();
+  const dateSort = dateReal && /^\d{4}-\d{2}-\d{2}$/.test(dateReal) ? dateReal : '';
+
+  // Tags
+  let tags = [];
+  if (Array.isArray(meta.tags)) tags = meta.tags.slice();
+  else if (typeof meta.tags === 'string' && meta.tags) tags = meta.tags.split(',').map(s => s.trim()).filter(Boolean);
+
+  // Attendance / characters — extract wikilink targets from `characters` frontmatter (string OR array)
+  const charsField = meta.characters;
+  let charNames = [];
+  if (Array.isArray(charsField)) {
+    charNames = charsField.flatMap(v => extractWikilinkTargets(v).length ? extractWikilinkTargets(v) : [stripWikilink(v)]);
+  } else if (typeof charsField === 'string' && charsField.trim()) {
+    charNames = extractWikilinkTargets(charsField);
+    if (!charNames.length) {
+      // Fallback: comma-split
+      charNames = charsField.split(',').map(s => stripWikilink(s.trim())).filter(Boolean);
+    }
+  }
+  const attendance = [];
+  const unresolvedChars = [];
+  charNames.forEach(n => {
+    const id = nameToCharacterId(n);
+    if (id) { if (!attendance.includes(id)) attendance.push(id); }
+    else unresolvedChars.push(n);
+  });
+
+  // Locations
+  let locNames = [];
+  const locField = meta.location;
+  if (Array.isArray(locField)) {
+    locNames = locField.flatMap(v => extractWikilinkTargets(v).length ? extractWikilinkTargets(v) : [stripWikilink(v)]);
+  } else if (typeof locField === 'string' && locField.trim()) {
+    locNames = extractWikilinkTargets(locField);
+    if (!locNames.length) locNames = [stripWikilink(locField.trim())];
+  }
+  const locationIds = [];
+  const unresolvedLocs = [];
+  locNames.forEach(n => {
+    const id = nameToLocationId(n);
+    if (id) { if (!locationIds.includes(id)) locationIds.push(id); }
+    else unresolvedLocs.push(n);
+  });
+
+  // Stash frontmatter extras we didn't consume so they round-trip on export
+  const consumed = new Set(['type','name','world','campaign','date','game_date','location','characters','tags','id','attendance']);
+  const frontmatterExtras = {};
+  for (const k of Object.keys(meta)) if (!consumed.has(k)) frontmatterExtras[k] = meta[k];
+
+  const id = (meta.id && String(meta.id).trim()) || null;
+
+  return {
+    id, title, body, prep, dmNotes,
+    dateReal, dateInGame, dateSort,
+    tags, attendance, locationIds, npcIds: [], visibleTo: [],
+    loot: [], combats: [],
+    frontmatterExtras,
+    unresolvedChars, unresolvedLocs,
+    raw: { meta, world: meta.world || '', campaign: meta.campaign || '' },
+  };
+}
+
+function emitFrontmatter(s) {
+  const lines = ['---'];
+  lines.push('type: session');
+  if (s.id) lines.push('id: ' + s.id);
+  if (s.title) lines.push('name: ' + yamlQuote(s.title));
+  const world = s.frontmatterExtras?.world || s.raw?.world || '';
+  if (world) lines.push('world: ' + yamlQuote(world));
+  const campaign = s.frontmatterExtras?.campaign || s.raw?.campaign || '';
+  if (campaign) lines.push('campaign: ' + yamlQuote(campaign));
+  lines.push('date: ' + yamlQuote(s.dateReal || ''));
+  lines.push('game_date: ' + (s.dateInGame ? yamlQuote(s.dateInGame) : ''));
+
+  // location: emit as first linked location wikilink, or as a list of wikilinks if multiple
+  const locs = (s.locationIds || []).map(id => locationName(id)).filter(Boolean);
+  if (locs.length === 1) lines.push('location: ' + yamlQuote(`[[${locs[0]}]]`));
+  else if (locs.length > 1) lines.push('location: ' + yamlQuote(locs.map(n => `[[${n}]]`).join(', ')));
+  else lines.push('location: ');
+
+  // characters: emit as wikilinks
+  const chars = (s.attendance || []).map(id => characterName(id)).filter(Boolean);
+  if (chars.length) lines.push('characters: ' + yamlQuote(chars.map(n => `[[${n}]]`).join(', ')));
+  else lines.push('characters: ');
+
+  // tags as inline array
+  if (s.tags && s.tags.length) lines.push('tags: [' + s.tags.map(t => t.replace(/[\[\],]/g, '')).join(', ') + ']');
+  else lines.push('tags: []');
+
+  // Frontmatter extras (anything we didn't consume on import) — re-emit unchanged
+  if (s.frontmatterExtras) {
+    for (const [k, v] of Object.entries(s.frontmatterExtras)) {
+      if (['world','campaign'].includes(k)) continue; // already emitted
+      if (Array.isArray(v)) lines.push(`${k}: [${v.map(x => yamlInlineItem(x)).join(', ')}]`);
+      else lines.push(`${k}: ` + (v === '' ? '' : yamlQuote(v)));
+    }
+  }
+
+  lines.push('---');
+  return lines.join('\n');
+}
+
+function yamlQuote(v) {
+  if (v == null) return '';
+  const s = String(v);
+  // Quote if contains : { } [ ] , & * # ? | < > = ! % @ ` " ' or starts with - or starts with #
+  if (/[:{}\[\],&*#?|<>=!%@`"']/g.test(s) || /^[-\s]/.test(s) || /^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    return '"' + s.replace(/"/g, '\\"') + '"';
+  }
+  return s;
+}
+function yamlInlineItem(v) {
+  const s = String(v);
+  if (/[,\[\]"']/g.test(s)) return '"' + s.replace(/"/g, '\\"') + '"';
+  return s;
+}
+
+function emitSessionMarkdown(s) {
+  const fm = emitFrontmatter(s);
+  const parts = [fm, ''];
+
+  // ## Summary
+  parts.push('## Summary', '');
+  if (s.body && s.body.trim()) parts.push(s.body.trim(), '');
+  parts.push('^summary', '');
+
+  // Prep block — already contains its own ## headings
+  if (s.prep && s.prep.trim()) {
+    parts.push('---', '');
+    parts.push(s.prep.trim(), '');
+  }
+
+  // Structured loot — emit as a sub-section IF user has structured loot rows
+  if (s.loot && s.loot.length) {
+    parts.push('## Recorded Loot', '');
+    s.loot.forEach(l => {
+      const item = (l.item || '').trim();
+      if (!item) return;
+      const qty = (l.qty || '1').toString().trim() || '1';
+      const who = (l.recipient || 'Party').trim();
+      parts.push(`- ${item}${qty !== '1' ? ` ×${qty}` : ''} — ${who}`);
+    });
+    parts.push('');
+  }
+
+  // Attached combats — DM-only summary
+  if (s.combats && s.combats.length) {
+    parts.push('## Combats', '');
+    s.combats.forEach(c => {
+      parts.push(`- **${c.title || 'Combat'}** — ${c.outcome || ''}${c.rounds ? ` (${c.rounds} rds)` : ''}`);
+    });
+    parts.push('');
+  }
+
+  // ## Log
+  parts.push('---', '', '## Log', '');
+  if (s.dmNotes && s.dmNotes.trim()) parts.push(s.dmNotes.trim(), '');
+
+  return parts.join('\n').replace(/\n{3,}/g, '\n\n');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  LIST PANE
+// ═══════════════════════════════════════════════════════════════
+function setView(v) {
+  view = v;
+  document.getElementById('vt-list').classList.toggle('on', v === 'list');
+  document.getElementById('vt-cal').classList.toggle('on', v === 'cal');
+  renderList();
+}
+
+function refreshYearFilter() {
+  const sel = document.getElementById('year-filter');
+  const prev = sel.value;
+  const years = new Set();
+  sessionsAll().forEach(s => {
+    const y = (s.dateSort || s.dateReal || '').slice(0, 4);
+    if (/^\d{4}$/.test(y)) years.add(y);
+  });
+  const sorted = [...years].sort((a, b) => b.localeCompare(a));
+  sel.innerHTML = '<option value="">All years</option>' + sorted.map(y => `<option value="${y}">${y}</option>`).join('');
+  if (sorted.includes(prev)) sel.value = prev;
+}
+
+function renderList() {
+  refreshYearFilter();
+  const q = (document.getElementById('search').value || '').toLowerCase();
+  const yr = document.getElementById('year-filter').value;
+  const all = sessionsAll()
+    .slice()
+    .sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
+
+  const filtered = all.filter(s => {
+    if (yr && (s.dateSort || s.dateReal || '').slice(0, 4) !== yr) return false;
+    if (q && !(`${s.title || ''} ${s.body || ''} ${(s.tags || []).join(' ')}`.toLowerCase().includes(q))) return false;
+    return true;
+  });
+
+  document.getElementById('list-count').textContent =
+    filtered.length === all.length ? `${all.length}` : `${filtered.length}/${all.length}`;
+
+  const container = document.getElementById('list-content');
+  if (!filtered.length) {
+    container.innerHTML = `<div class="list-empty">${all.length === 0 ? 'No sessions yet. Click <b>+ NEW SESSION</b> or import .md files from your vault.' : 'No sessions match your filter.'}</div>`;
+    return;
+  }
+
+  const cardHtml = s => {
+    const sel = s.id === editingId ? 'selected' : '';
+    const num = sessionNumber(s);
+    const attN = (s.attendance || []).length;
+    const date = (s.dateReal || s.dateSort || '').slice(0, 10);
+    return `<div class="session-card ${sel}" onclick="selectSession('${s.id}')">
+      <div class="session-card-row">
+        ${num ? `<span class="session-card-num">${escapeHtml(num)}</span>` : ''}
+        <div class="session-card-title">${escapeHtml(s.title || 'Untitled')}</div>
+      </div>
+      <div class="session-card-meta">
+        ${date ? `<span>${escapeHtml(date)}</span>` : ''}
+        ${attN ? `<span class="att">${attN} attended</span>` : ''}
+        ${s.combats?.length ? `<span>⚔ ${s.combats.length}</span>` : ''}
+        ${s.loot?.length ? `<span>◆ ${s.loot.length} loot</span>` : ''}
+      </div>
+    </div>`;
+  };
+
+  if (view === 'list') {
+    container.innerHTML = filtered.map(cardHtml).join('');
+    return;
+  }
+
+  // Timeline / calendar view: group by Year-Month, sticky headers
+  const groups = new Map();
+  filtered.forEach(s => {
+    const ym = (s.dateSort || s.dateReal || '').slice(0, 7) || '—';
+    if (!groups.has(ym)) groups.set(ym, []);
+    groups.get(ym).push(s);
+  });
+  const monthName = ym => {
+    if (ym === '—') return 'Undated';
+    const [y, m] = ym.split('-');
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${months[parseInt(m, 10) - 1] || ''} ${y}`;
+  };
+  container.innerHTML = [...groups.entries()].map(([ym, list]) =>
+    `<div class="tl-month">${escapeHtml(monthName(ym))}</div>
+     <div class="tl-rail">${list.map(cardHtml).join('')}</div>`
+  ).join('');
+}
+
+function sessionNumber(s) {
+  // Try to extract "Session N" from the title; otherwise just return ''
+  const m = (s.title || '').match(/session\s+(\d+[A-Z]?)/i);
+  return m ? `#${m[1]}` : '';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  EDITOR
+// ═══════════════════════════════════════════════════════════════
+function selectSession(id) {
+  const s = timeline.find(t => t.id === id);
+  if (!s) return;
+  editingId = id;
+  loadIntoWork(s);
+  renderList();
+  renderEditor();
+  renderSidebar();
+  document.getElementById('pane-editor').scrollTop = 0;
+}
+
+function loadIntoWork(s) {
+  work = {
+    title: s.title || '',
+    body: s.body || '',
+    prep: s.prep || '',
+    dmNotes: s.dmNotes || '',
+    dateReal: s.dateReal || '',
+    dateInGame: s.dateInGame || '',
+    dateSort: s.dateSort || '',
+    attendance: (s.attendance || []).slice(),
+    locationIds: (s.locationIds || []).slice(),
+    npcIds: (s.npcIds || []).slice(),
+    visibleTo: (s.visibleTo || []).slice(),
+    tags: (s.tags || []).slice(),
+    loot: (s.loot || []).slice(),
+    combats: (s.combats || []).slice(),
+    frontmatterExtras: { ...(s.frontmatterExtras || {}) },
+  };
+}
+
+function newSession() {
+  editingId = '__new__';
+  work = blankWork();
+  work.dateReal = new Date().toISOString().slice(0, 10);
+  work.dateSort = work.dateReal;
+  renderList();
+  renderEditor();
+  renderSidebar();
+  setTimeout(() => document.getElementById('f-title')?.focus(), 30);
+}
+
+function cancelEdit() {
+  editingId = null;
+  work = blankWork();
+  renderList();
+  renderEditor();
+  renderSidebar();
+}
+
+function renderEditor() {
+  const empty = document.getElementById('editor-empty');
+  const ed = document.getElementById('editor');
+  if (!editingId) {
+    empty.style.display = '';
+    ed.style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+  ed.style.display = '';
+
+  document.getElementById('f-title').value = work.title;
+  document.getElementById('f-dateReal').value = work.dateReal;
+  document.getElementById('f-dateInGame').value = work.dateInGame;
+  document.getElementById('f-dateSort').value = work.dateSort;
+  document.getElementById('f-tags').value = (work.tags || []).join(', ');
+  document.getElementById('f-body').value = work.body;
+  document.getElementById('f-prep').value = work.prep;
+  document.getElementById('f-dmNotes').value = work.dmNotes;
+  syncHeader();
+  renderChips();
+  renderLoot();
+  renderCombats();
+}
+
+function syncHeader() {
+  const t = document.getElementById('f-title').value || 'Untitled session';
+  const d = document.getElementById('f-dateReal').value || '';
+  document.getElementById('hdr-title').textContent = t;
+  document.getElementById('hdr-sub').textContent = d ? `Real-world: ${d}` : '—';
+  // Keep work in sync so the sidebar updates live
+  work.title = document.getElementById('f-title').value;
+  work.dateReal = d;
+  renderSidebar();
+}
+
+function renderChips() {
+  // Attendance + visibleTo: characters
+  const attEl = document.getElementById('f-attend-chips');
+  const visEl = document.getElementById('f-visible-chips');
+  if (!characters.length) {
+    attEl.innerHTML = '<div class="chip-empty">No characters yet. Add some in the Atlas Workshop → Players tab.</div>';
+    visEl.innerHTML = '<div class="chip-empty">No characters to grant visibility to.</div>';
+  } else {
+    const sortChars = characters.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    attEl.innerHTML = sortChars.map(c =>
+      `<span class="chip attend ${work.attendance.includes(c.id) ? 'on' : ''}" onclick="toggleChip('attendance','${c.id}')">${escapeHtml(c.name || '')}${c.player ? ` <span style="opacity:0.6">· ${escapeHtml(c.player)}</span>` : ''}</span>`
+    ).join('');
+    visEl.innerHTML = sortChars.map(c =>
+      `<span class="chip ${work.visibleTo.includes(c.id) ? 'on' : ''}" onclick="toggleChip('visibleTo','${c.id}')">${escapeHtml(c.name || '')}</span>`
+    ).join('');
+  }
+  // Locations
+  const locEl = document.getElementById('f-loc-chips');
+  const locs = flattenLocations().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  if (!locs.length) locEl.innerHTML = '<div class="chip-empty">No locations yet.</div>';
+  else locEl.innerHTML = locs.map(l =>
+    `<span class="chip ${work.locationIds.includes(l.id) ? 'on' : ''}" onclick="toggleChip('locationIds','${l.id}')">${escapeHtml(l.name)}${l.parent ? ` <span style="opacity:0.6">· ${escapeHtml(l.parent)}</span>` : ''}</span>`
+  ).join('');
+  // NPCs
+  const npcEl = document.getElementById('f-npc-chips');
+  if (!npcs.length) npcEl.innerHTML = '<div class="chip-empty">No NPCs yet.</div>';
+  else {
+    const sortNpcs = npcs.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    npcEl.innerHTML = sortNpcs.map(n =>
+      `<span class="chip ${work.npcIds.includes(n.id) ? 'on' : ''}" onclick="toggleChip('npcIds','${n.id}')">${escapeHtml(n.name || '')}</span>`
+    ).join('');
+  }
+}
+
+function toggleChip(which, id) {
+  const arr = work[which];
+  if (!Array.isArray(arr)) return;
+  const i = arr.indexOf(id);
+  if (i >= 0) arr.splice(i, 1); else arr.push(id);
+  renderChips();
+  renderSidebar();
+}
+
+function renderLoot() {
+  const wrap = document.getElementById('f-loot-rows');
+  const dl = document.getElementById('loot-recipients');
+  dl.innerHTML = ['Party', ...characters.map(c => c.name)].map(n => `<option value="${escapeHtml(n)}">`).join('');
+  if (!work.loot.length) {
+    wrap.innerHTML = '<div class="chip-empty">No structured loot rows yet. Use these for per-recipient tracking; freeform Markdown loot lists in the Prep block work too.</div>';
+    return;
+  }
+  wrap.innerHTML = work.loot.map((l, i) => `
+    <div class="loot-row">
+      <input class="loot-item" type="text" placeholder="Item" value="${escapeHtml(l.item || '')}" oninput="work.loot[${i}].item=this.value">
+      <input class="loot-qty"  type="text" placeholder="Qty"  value="${escapeHtml(String(l.qty || '1'))}" oninput="work.loot[${i}].qty=this.value">
+      <input class="loot-who"  type="text" placeholder="Who"  list="loot-recipients" value="${escapeHtml(l.recipient || '')}" oninput="work.loot[${i}].recipient=this.value">
+      <button class="loot-del" type="button" onclick="removeLootRow(${i})" title="Remove">✕</button>
+    </div>
+  `).join('');
+}
+function addLootRow() {
+  work.loot.push({ id: lootUid(), item: '', qty: '1', recipient: '' });
+  renderLoot();
+  setTimeout(() => {
+    const rows = document.querySelectorAll('#f-loot-rows .loot-row .loot-item');
+    if (rows.length) rows[rows.length - 1].focus();
+  }, 20);
+}
+function removeLootRow(i) {
+  work.loot.splice(i, 1);
+  renderLoot();
+  renderSidebar();
+}
+
+function renderCombats() {
+  const box = document.getElementById('f-combats');
+  if (!work.combats.length) {
+    box.innerHTML = '<div class="chip-empty">No combats attached. Push from the War Table → Export.</div>';
+    return;
+  }
+  box.innerHTML = work.combats.map((c, i) =>
+    `<div class="combat-item">
+      <span class="name">⚔ ${escapeHtml(c.title || 'Combat')}</span>
+      <span class="sub">${escapeHtml(c.outcome || '')}${c.rounds ? ` · ${escapeHtml(String(c.rounds))} rds` : ''}</span>
+      <button class="del" type="button" onclick="removeCombat(${i})" title="Detach">✕</button>
+    </div>`
+  ).join('');
+}
+function removeCombat(i) {
+  const c = work.combats[i];
+  if (!confirm(`Detach combat "${c?.title || 'Combat'}" from this session? Its log and summary are removed from the Chronicle.`)) return;
+  work.combats.splice(i, 1);
+  renderCombats();
+  renderSidebar();
+}
+
+function collectFromForm() {
+  work.title = document.getElementById('f-title').value.trim();
+  work.body = document.getElementById('f-body').value;
+  work.prep = document.getElementById('f-prep').value;
+  work.dmNotes = document.getElementById('f-dmNotes').value;
+  work.dateReal = document.getElementById('f-dateReal').value;
+  work.dateInGame = document.getElementById('f-dateInGame').value.trim();
+  work.dateSort = document.getElementById('f-dateSort').value || work.dateReal || '';
+  work.tags = (document.getElementById('f-tags').value || '')
+    .split(',').map(s => s.trim()).filter(Boolean);
+  // Drop blank loot rows
+  work.loot = work.loot.filter(l => (l.item || '').trim()).map(l => ({
+    id: l.id || lootUid(),
+    item: (l.item || '').trim(),
+    qty: (l.qty || '1').toString().trim() || '1',
+    recipient: (l.recipient || 'Party').trim() || 'Party',
+  }));
+}
+
+async function saveSession() {
+  collectFromForm();
+  if (!work.title) { alert('Session needs a title.'); return; }
+
+  const payload = {
+    kind: 'session',
+    title: work.title,
+    body: work.body.trim(),
+    prep: work.prep,
+    dmNotes: work.dmNotes,
+    dateReal: work.dateReal || new Date().toISOString().slice(0, 10),
+    dateInGame: work.dateInGame,
+    dateSort: work.dateSort || work.dateReal || '',
+    attendance: work.attendance.slice(),
+    locationIds: work.locationIds.slice(),
+    characterIds: work.attendance.slice(),  // mirror attendance into characterIds for chronicle linking
+    npcIds: work.npcIds.slice(),
+    visibleTo: work.visibleTo.slice(),
+    tags: work.tags.slice(),
+    loot: work.loot.slice(),
+    combats: work.combats.slice(),
+    frontmatterExtras: work.frontmatterExtras || {},
+  };
+
+  if (editingId === '__new__') {
+    const id = uid();
+    timeline.push({ id, ...payload });
+    editingId = id;
+  } else {
+    const idx = timeline.findIndex(t => t.id === editingId);
+    if (idx < 0) { alert('Session not found.'); return; }
+    timeline[idx] = { ...timeline[idx], ...payload };
+  }
+  await persistTimeline();
+  renderList();
+  renderEditor();
+  renderSidebar();
+}
+
+async function deleteSession() {
+  if (!editingId || editingId === '__new__') { cancelEdit(); return; }
+  const s = timeline.find(t => t.id === editingId);
+  if (!s) return;
+  if (!confirm(`Delete "${s.title || 'this session'}"? This cannot be undone.`)) return;
+  timeline = timeline.filter(t => t.id !== editingId);
+  editingId = null;
+  await persistTimeline();
+  renderList();
+  renderEditor();
+  renderSidebar();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SIDEBAR
+// ═══════════════════════════════════════════════════════════════
+function renderSidebar() {
+  document.getElementById('g-total').textContent = sessionsAll().length;
+  const current = editingId ? (timeline.find(t => t.id === editingId) || work) : null;
+  const editingNew = editingId === '__new__';
+
+  document.getElementById('g-which').textContent = editingId ? (work.title || 'Untitled') : '—';
+  document.getElementById('g-att').textContent = editingId ? (work.attendance.length || 0) : '—';
+  document.getElementById('g-loot').textContent = editingId ? (work.loot.length || 0) : '—';
+  document.getElementById('g-combats').textContent = editingId ? (work.combats.length || 0) : '—';
+
+  const badges = document.getElementById('g-att-badges');
+  if (editingId && characters.length) {
+    badges.innerHTML = characters
+      .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+      .map(c => `<span class="badge ${work.attendance.includes(c.id) ? '' : 'absent'}">${escapeHtml(c.name || '')}</span>`)
+      .join('');
+  } else {
+    badges.innerHTML = '';
+  }
+
+  const ex1 = document.getElementById('ex-one');
+  ex1.disabled = !editingId || editingNew;
+
+  const recent = document.getElementById('recent-imports');
+  if (!recentImports.length) {
+    recent.innerHTML = 'No imports this session.';
+  } else {
+    recent.innerHTML = recentImports.slice(-6).reverse().map(r => `
+      <div style="padding:3px 0;border-bottom:1px dashed var(--border);font-size:0.82rem">
+        <span style="color:${r.kind === 'new' ? '#8e8' : '#d4a820'}">${r.kind === 'new' ? '+ new' : '↻ updated'}</span>
+        <span style="color:var(--ink)">${escapeHtml(r.title || r.file)}</span>
+      </div>
+    `).join('');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  IMPORT
+// ═══════════════════════════════════════════════════════════════
+function openImport() {
+  document.getElementById('import-overlay').classList.add('visible');
+  document.getElementById('import-results').innerHTML = '';
+  document.getElementById('paste-md').value = '';
+}
+function closeImport() {
+  document.getElementById('import-overlay').classList.remove('visible');
+}
+
+// Drag-drop wiring
+function wireDrop() {
+  const dz = document.getElementById('drop-zone');
+  ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); dz.classList.add('dragover');
+  }));
+  ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); dz.classList.remove('dragover');
+  }));
+  dz.addEventListener('drop', e => {
+    const files = e.dataTransfer?.files;
+    if (files && files.length) handleFiles(files);
+  });
+}
+
+async function handleFiles(fileList) {
+  const files = Array.from(fileList).filter(f => f.name.toLowerCase().endsWith('.md') || f.type === 'text/markdown' || f.type === '');
+  if (!files.length) {
+    showImportResult({ kind: 'err', name: 'No .md files', detail: 'Drop or pick at least one Markdown file.' });
+    return;
+  }
+  for (const f of files) {
+    try {
+      const text = await f.text();
+      const parsed = parseSessionMarkdown(text, f.name);
+      applyImport(parsed, f.name);
+    } catch (err) {
+      showImportResult({ kind: 'err', name: f.name, detail: 'Failed to parse: ' + (err.message || err) });
+    }
+  }
+  await persistTimeline();
+  renderList();
+  renderEditor();
+  renderSidebar();
+}
+
+function importPasted() {
+  const text = document.getElementById('paste-md').value.trim();
+  if (!text) return;
+  try {
+    const parsed = parseSessionMarkdown(text, 'pasted-' + Date.now() + '.md');
+    applyImport(parsed, 'pasted markdown');
+    persistTimeline().then(() => { renderList(); renderEditor(); renderSidebar(); });
+  } catch (err) {
+    showImportResult({ kind: 'err', name: 'Pasted markdown', detail: 'Failed to parse: ' + (err.message || err) });
+  }
+}
+
+function applyImport(parsed, fileLabel) {
+  // Match by id (frontmatter) or fall back to title match
+  let existing = null;
+  if (parsed.id) existing = timeline.find(t => t.id === parsed.id);
+  if (!existing) existing = timeline.find(t => (t.kind || 'event') === 'session' && (t.title || '').trim() === (parsed.title || '').trim());
+
+  const entry = {
+    kind: 'session',
+    title: parsed.title,
+    body: parsed.body,
+    prep: parsed.prep,
+    dmNotes: parsed.dmNotes,
+    dateReal: parsed.dateReal,
+    dateInGame: parsed.dateInGame,
+    dateSort: parsed.dateSort,
+    tags: parsed.tags,
+    attendance: parsed.attendance,
+    locationIds: parsed.locationIds,
+    characterIds: parsed.attendance.slice(),
+    npcIds: existing?.npcIds || [],
+    visibleTo: existing?.visibleTo || [],
+    loot: existing?.loot || [],
+    combats: existing?.combats || [],
+    frontmatterExtras: parsed.frontmatterExtras || {},
+  };
+
+  let kind = 'new';
+  if (existing) {
+    Object.assign(existing, entry);
+    kind = 'updated';
+  } else {
+    timeline.push({ id: parsed.id || uid(), ...entry });
+  }
+
+  recentImports.push({ kind: kind === 'new' ? 'new' : 'upd', title: parsed.title, file: fileLabel });
+
+  const unresolved = [];
+  if (parsed.unresolvedChars.length) unresolved.push('Characters not matched: ' + parsed.unresolvedChars.join(', '));
+  if (parsed.unresolvedLocs.length) unresolved.push('Locations not matched: ' + parsed.unresolvedLocs.join(', '));
+
+  showImportResult({
+    kind: kind === 'new' ? 'new' : 'upd',
+    name: parsed.title || fileLabel,
+    detail: unresolved.length ? unresolved.join(' · ') : 'OK',
+  });
+}
+
+function showImportResult({ kind, name, detail }) {
+  const wrap = document.getElementById('import-results');
+  const cls = kind === 'new' ? 'imp-new' : kind === 'upd' ? 'imp-upd' : 'imp-err';
+  const label = kind === 'new' ? 'CREATED' : kind === 'upd' ? 'UPDATED' : 'ERROR';
+  wrap.insertAdjacentHTML('beforeend', `
+    <div class="imp-row">
+      <span class="imp-status ${cls}">${label}</span>
+      <div class="imp-meta"><div class="imp-name">${escapeHtml(name)}</div><div>${escapeHtml(detail || '')}</div></div>
+    </div>
+  `);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  EXPORT
+// ═══════════════════════════════════════════════════════════════
+function safeFilename(title) {
+  return (title || 'session').replace(/[\/\\:*?"<>|]/g, '-').replace(/\s+/g, ' ').trim() + '.md';
+}
+
+function downloadMarkdown(filename, content) {
+  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.style.display = 'none';
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 200);
+}
+
+function exportCurrent() {
+  if (!editingId || editingId === '__new__') return;
+  collectFromForm();
+  const s = timeline.find(t => t.id === editingId);
+  if (!s) return;
+  // Refresh on-disk fields from the live work copy before emitting
+  const merged = { ...s, ...work, id: s.id, kind: 'session' };
+  const md = emitSessionMarkdown(merged);
+  downloadMarkdown(safeFilename(s.title), md);
+}
+
+async function exportAll() {
+  const all = sessionsAll().slice().sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
+  if (!all.length) { alert('No sessions to export.'); return; }
+  if (all.length > 20 && !confirm(`Download ${all.length} files? Your browser may prompt you to allow multiple downloads.`)) return;
+  for (let i = 0; i < all.length; i++) {
+    const s = all[i];
+    const md = emitSessionMarkdown(s);
+    downloadMarkdown(safeFilename(s.title), md);
+    // Small delay so the browser doesn't drop later downloads
+    await new Promise(r => setTimeout(r, 120));
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BOOTSTRAP
+// ═══════════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  wireDrop();
+  loadAll();
+  // Keep work in sync as the user types — light-touch (debounced not needed for low traffic)
+  ['f-title','f-dateReal','f-dateInGame','f-dateSort','f-tags','f-body','f-prep','f-dmNotes']
+    .forEach(id => document.getElementById(id)?.addEventListener('input', () => {
+      collectFromForm();
+      renderSidebar();
+    }));
+});
+</script>
+</body>
+</html>
