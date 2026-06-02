@@ -142,6 +142,9 @@
     .ed-toolbar .title{font-family:'Cinzel',serif;font-size:0.78rem;letter-spacing:0.06em;color:var(--brass-bright)}
     .ed-derived{font-family:'Cinzel',serif;font-size:0.7rem;color:var(--ink-light);padding:4px 6px;background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius)}
     .custom-chip{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--brass);color:var(--brass);background:rgba(184,138,90,0.10);margin-left:6px}
+    .fm-badge{font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;padding:2px 7px;border-radius:8px;margin-left:8px;vertical-align:middle}
+    .fm-badge.solo{border:1px solid var(--rust);color:#e3a08e;background:rgba(154,90,90,0.15)}
+    .fm-badge.minion{border:1px solid var(--ink-faint);color:var(--ink-faint);background:rgba(255,255,255,0.04)}
     .role-chip{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.08em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--teal);color:var(--teal-bright);background:rgba(60,153,150,0.08);margin-left:6px;white-space:nowrap}
     .terrain-chip{font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:0.08em;text-transform:uppercase;padding:1px 5px;border-radius:8px;border:1px solid var(--border-light);color:var(--ink-faint);background:rgba(255,255,255,0.02);margin-left:4px;white-space:nowrap}
     .terrain-strip{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
@@ -864,8 +867,27 @@
     function isCustomId(id){
       return typeof id === 'string' && id.startsWith('custom-');
     }
-    function findMonster(id){
-      return allMonsters().find(m => m.id === id);
+    // Browse-disambiguating key. Schema v7+ monsters have a unique
+    // `slug`; older KV entries fall back to a derived `source-name`
+    // pair so two creatures named the same from different books still
+    // get distinct keys in the list (otherwise clicking selects both).
+    function browseKey(m){
+      if (m && m.slug) return m.slug;
+      const src = ((m && m.source) || 'unknown').toLowerCase();
+      const kebab = ((m && m.name) || '').toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      return `${src}-${kebab || 'unnamed'}`;
+    }
+    function findMonster(idOrKey){
+      const all = allMonsters();
+      // Try slug / id direct match first (fast path, also the schema-v7
+      // path where every monster has a unique slug AND id == slug).
+      const direct = all.find(m => m.id === idOrKey || m.slug === idOrKey);
+      if (direct) return direct;
+      // Fall back to browseKey match — catches the case where the KV
+      // still holds pre-v7 colliding ids; the Browse list passed the
+      // derived `<source>-<kebab>` key instead.
+      return all.find(m => browseKey(m) === idOrKey);
     }
 
     async function bootstrap(){
@@ -1001,9 +1023,17 @@
           ? `<span class="terrain-chip" title="${esc((m.terrain||[]).slice(2).join(', '))}">+${(m.terrain||[]).length-2}</span>`
           : '';
         const roleChip = m.role ? `<span class="role-chip" title="${m.roleManual?'Manually set — survives re-tagger':'Auto-tagged'}">${esc(m.role)}</span>` : '';
+        // Use browseKey (slug || derived) so two monsters with the same
+        // legacy id from different books are still individually
+        // selectable. The source chip surfaces which book each row
+        // comes from when names collide.
+        const key = browseKey(m);
+        const srcChip = m.source && !m._custom
+          ? `<span class="custom-chip" title="Source book" style="border-color:var(--ink-faint);color:var(--ink-faint);background:transparent">${esc(m.source)}</span>`
+          : '';
         return `
-        <div class="row${m.id===activeId?' active':''}" onclick="selectMonster('${esc(m.id)}')">
-          <div class="nm">${esc(m.name)}${m._custom?'<span class="custom-chip">Custom</span>':''}${roleChip}<small>${esc(m.size||'')} ${esc(m.type||'')}</small>
+        <div class="row${key===activeId?' active':''}" onclick="selectMonster('${esc(key)}')">
+          <div class="nm">${esc(m.name)}${m._custom?'<span class="custom-chip">Custom</span>':''}${srcChip}${roleChip}<small>${esc(m.size||'')} ${esc(m.type||'')}</small>
             <div class="terrain-strip">${terrChips}${more}</div>
           </div>
           <span class="cr-chip ${crTier(m.cr)}">CR ${esc(m.crText || m.cr || '?')}</span>
@@ -1116,9 +1146,16 @@
           `</div>`;
       };
 
+      // Flee Mortals category badges — sit beside the name in the
+      // header so a Minion / Solo monster is identifiable at a glance.
+      const fmBadges = [
+        m.isSolo  ? '<span class="fm-badge solo">Solo</span>'    : '',
+        m.isMinion ? '<span class="fm-badge minion">Minion</span>' : ''
+      ].filter(Boolean).join('');
+
       return `
         <div class="statblock">
-          <h2>${esc(m.name)}</h2>
+          <h2>${esc(m.name)}${fmBadges}</h2>
           <div class="sub-line">${esc(subline)}</div>
           <div class="divider"></div>
           <div class="sb-kv">
@@ -1146,6 +1183,7 @@
           ${featureBlock('Bonus Actions', m.bonusActions)}
           ${featureBlock('Reactions', m.reactions)}
           ${featureBlock('Legendary Actions', m.legendaryActions)}
+          ${featureBlock('Villain Actions', m.villainActions)}
           ${featureBlock('Lair Actions', m.lairActions)}
           ${featureBlock('Lair Effects', m.lairEffects)}
           ${m.description ? `<div class="desc">${esc(m.description)}</div>` : ''}
@@ -1160,14 +1198,25 @@
     }
 
     function computeMergeDelta(existingMonsters, newMonsters){
-      // Match on canonical `id` field. Both my MM scrape and ToB extractor
-      // mint IDs from the monster name, so cross-source collisions would
-      // genuinely mean the same creature. If you want both, do Replace.
-      const existingIds = new Set((existingMonsters || []).map(m => m.id));
+      // Match on the canonical `slug` (since schema v7, slug = source +
+      // kebab-name, guaranteed unique across books). Falls back to id +
+      // _legacyId for back-compat: KV may hold pre-v7 entries whose id
+      // is "AboletStatBlock"; the new import has slug "mm-2024-aboleth"
+      // + _legacyId "AboletStatBlock" — they should still dedup as the
+      // same creature. Use Replace mode if you want a clean reset.
+      const keys = new Set();
+      for (const m of (existingMonsters || [])){
+        if (m.slug) keys.add(m.slug);
+        if (m.id)   keys.add(m.id);
+        if (m._legacyId) keys.add(m._legacyId);
+      }
       const toAdd = [];
       const skipped = [];
       for (const m of newMonsters){
-        if (m.id && existingIds.has(m.id)) skipped.push(m);
+        const collide = (m.slug && keys.has(m.slug))
+                     || (m.id && keys.has(m.id))
+                     || (m._legacyId && keys.has(m._legacyId));
+        if (collide) skipped.push(m);
         else toAdd.push(m);
       }
       return { toAdd, skipped };
@@ -2021,7 +2070,7 @@
         vulnerabilitiesText: '', vulnerabilities: [],
         gear: [],
         traits: [], actions: [], bonusActions: [], reactions: [],
-        legendaryActions: [], lairActions: [], lairEffects: [],
+        legendaryActions: [], lairActions: [], lairEffects: [], villainActions: [],
         crText: '1', cr: 1, xp: XP_BY_CR[1], pb: pbForCR(1),
         description: '',
         source: 'custom'
@@ -3271,7 +3320,8 @@
       trait: 5,
       bonus_action: 6,
       reaction: 6,
-      legendary: 9
+      legendary: 9,
+      villain_action: 11        // Flee Mortals 1/round powers — costly
     };
 
     // Slot ranges by CR tier, calibrated against the 2024 MM canon:
@@ -3438,6 +3488,7 @@
       if (kind === 'bonus_action') return 'bonusActions';
       if (kind === 'reaction') return 'reactions';
       if (kind === 'legendary') return 'legendaryActions';
+      if (kind === 'villain_action') return 'villainActions';
       return 'actions';   // melee/ranged/flex/save/spellcasting/utility
     }
 
@@ -3781,7 +3832,7 @@
         vulnerabilitiesText: '', vulnerabilities: [],
         gear: [],
         traits: [], actions: [], bonusActions: [], reactions: [],
-        legendaryActions: [], lairActions: [], lairEffects: [],
+        legendaryActions: [], lairActions: [], lairEffects: [], villainActions: [],
         crText: '1', cr: 1, xp: 0, pb: 2,
         description: '',
         source: 'custom',
@@ -4068,7 +4119,7 @@
     function renderStatblockWithDonors(m){
       // Inject `_donorPrefix` into the name during the render, then
       // remove it after. Cheaper than duplicating renderStatblock.
-      const sections = ['traits','actions','bonusActions','reactions','legendaryActions'];
+      const sections = ['traits','actions','bonusActions','reactions','legendaryActions','villainActions'];
       const stash = [];
       for (const sec of sections){
         const list = m[sec];
@@ -4158,7 +4209,8 @@
       actions:           null,           // classify by body
       bonusActions:     'bonus_action',
       reactions:        'reaction',
-      legendaryActions: 'legendary'
+      legendaryActions: 'legendary',
+      villainActions:   'villain_action'  // Flee Mortals — 1/round boss powers
     };
     const NUM_WORDS_JS = { one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10 };
     const ABIL_LONG_TO_SHORT_JS = {

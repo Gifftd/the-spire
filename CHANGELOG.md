@@ -9,6 +9,200 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: unique slug per monster (schema v7) — fixes FM ↔ MM collisions
+
+Every monster now gets a `slug` field of the form
+`<source>-<kebab-name>` (e.g. `mm-2024-aboleth`, `fm-v1-aboleth`,
+`tob-v1-kraken`). The slug is also assigned to `id` so existing
+id-keyed code paths inherit the uniqueness without changes.
+
+#### Why
+
+Pre-v7 ids were minted from the name alone (`AbolethStatBlock`).
+That collided when the same canonical creature appears in multiple
+books — Flee Mortals shares 33 names with the 2024 Monster Manual
+(Aboleth, Basilisk, Chimera, Crawling Claw, Ghoul, Goblin Warrior,
+Green Hag, Griffon, Harpy, Kraken, etc.). The Import-tab Merge
+dedup keys on `id`, so the FM versions were silently dropped on
+import — a 33-monster data loss the DM only noticed by counting.
+
+#### Schema additions
+
+- `slug` — canonical unique key. Format: `<source-tag>-<kebab(name)>`.
+- `id` is now aliased to `slug` for new normalizations. Old id values
+  (`<PascalCase>StatBlock`) are preserved under `_legacyId` so
+  Merge-mode dedup can match old-KV entries against newly-normalized
+  entries without losing edits.
+
+#### Updated paths
+
+- `scripts/normalize_bestiary.py` mints slug + sets id = slug for
+  every monster. SCHEMA_VERSION bumped to 7. New helper
+  `make_slug(source, name)`.
+- `bestiary-dm.html` `computeMergeDelta` now builds the existing-key
+  set from `slug | id | _legacyId` and the incoming check matches
+  on any of those. A KV holding the pre-v7 "AbolethStatBlock"
+  entry will still merge correctly with the v7 "mm-2024-aboleth"
+  import via the `_legacyId` fallback.
+
+#### Migration steps for the DM
+
+1. `python3 scripts/normalize_bestiary.py` — already done; bestiary.json
+   now has slugs.
+2. Menagerie → Import tab → re-import the regenerated `bestiary.json`.
+   Use **Replace mode** for a clean slate, or **Merge mode** to keep
+   any in-KV edits (the `_legacyId` fallback handles back-compat).
+3. Library auto-rebuild runs in the same operation — donor IDs
+   re-point to the new slugs.
+
+#### Verification
+
+Re-ran the normalizer + the tagger over the merged 1124-monster
+bestiary: 1124 unique slugs (zero collisions), 1124 unique ids
+(was 1091 with 33 collisions), 1124 `_legacyId` stamps preserved.
+
+---
+
+### Menagerie: Flee Mortals scrape — 305 monsters captured (FM v1 live)
+
+Production run of the FM scrape pipeline against the live DDB book.
+Replaces the speculative template `scripts/scrape_fm_ddb.js` from the
+prior commit with the verified-working version tuned to the actual
+DOM (`.mcdm-statblock` wrapper, `.mon-data` header block,
+`<p class="monster--action-header">` section dividers).
+
+#### Captured
+
+| Category | Count |
+|----------|-------|
+| Standard monsters (CR + role) | 221 |
+| Villain-party NPCs | 35 |
+| Player companions (PB-scaled) | 26 |
+| Retainers (PB-scaled) | 23 |
+| **Total** | **305** |
+
+Concatenated into `bestiary.json` alongside MM 2024 (503) and ToB
+v1 (316) for a unified bestiary of **1,124 monsters**.
+
+#### Role distribution across the merged bestiary
+
+After running `tag_bestiary.py` (which preserved the 194 FM-supplied
+roles via the `roleManual:true` flag): Brute 378, Soldier 244,
+Skirmisher 187, Controller 148, Ambusher 50, Artillery 49, Support
+41, Leader 27, Defender 0.
+
+#### Workflow that worked
+
+1. Visit each of 5 stat-block pages on DDB
+   (`/sources/fm/creatures-{ad,ek,ls,tz}` + `/sources/fm/villain-parties`)
+2. Paste the scrape script into devtools console on each page —
+   results accumulate in `localStorage.fm_scrape`
+3. On the last page, call `window.__fmDownload()` → `fm.json`
+   downloads to `~/Downloads`
+4. Move to project root, run `python3 scripts/normalize_bestiary.py`
+   — auto-detects `fm.json` alongside `tob.json`
+5. Run `python3 scripts/tag_bestiary.py` — preserves the
+   FM-supplied roles, fills in terrain affinities
+6. Menagerie Import tab → Merge mode → library auto-rebuilds with
+   the new FM features included
+
+#### Script changes (`scripts/scrape_fm_ddb.js`)
+
+Production version (replaces speculation template):
+- Selector locked to `.mcdm-statblock` (FM-specific class).
+- `.mon-data` lines parsed for size+type, "CR X Role" line with
+  optional Minion/Solo suffix, XP line. Standalone "Retainer" line
+  detected via post-process pass.
+- `<p>` walker stops at `<p class="monster--action-header">` to
+  switch sections (Actions / Bonus Actions / Reactions / Legendary
+  Actions / Villain Actions / Lair Actions).
+- 2014→2024 prose modernizer included inline. "Melee Weapon Attack:
+  +X to hit" → "Melee Attack Roll: +X", strip ", one target.",
+  capitalize damage types.
+- Multi-page accumulation via `localStorage.fm_scrape` so each page
+  visit appends; final page calls `window.__fmDownload()` to build
+  the envelope and trigger Blob download.
+- Companion / retainer / villain-party / minion / solo all routed
+  to `fmCategory` for downstream filtering.
+
+---
+
+### Menagerie: Flee Mortals (MCDM) scrape pipeline
+
+Adds support for scraping the Flee Mortals book from D&D Beyond and
+ingesting its MCDM-specific stat block shapes — Villain Actions,
+Minion / Solo flags, and pre-tagged Flee Mortals roles (which match
+the taxonomy we already use, so they slot directly into `role` with
+`roleManual:true` set so the auto-tagger never overrides them).
+
+#### Added — `scripts/scrape_fm_ddb.js`
+
+Chrome devtools paste-and-run script. Walks the Flee Mortals source
+page on DDB, extracts per-monster stat blocks, and triggers a Blob
+download of `fm.json` to ~/Downloads. Output shape matches the
+existing MM 2024 scrape envelope (same `source / scrapedAt / count /
+monsters` keys) plus the FM extensions on each monster. Selectors
+are annotated `// VERIFY` so the DM can spot-check against DDB's
+actual DOM if extraction looks wrong.
+
+Documented workflow:
+1. Sit on the Flee Mortals source page on DDB
+2. Paste the contents of `scrape_fm_ddb.js` into the devtools console
+3. `fm.json` downloads automatically
+4. Move it to the project root
+5. `python3 scripts/normalize_bestiary.py` picks it up alongside
+   `tob.json` (both auto-detected; multi-source extras concatenated)
+6. Menagerie → Import tab → select normalized `bestiary.json` →
+   Merge mode → done. The library auto-rebuild includes the FM
+   monsters' actions/traits.
+
+#### Schema additions (v6)
+
+`scripts/normalize_bestiary.py` now passes through:
+- `villainActions: [{name, body}]` — FM's 1/round boss powers,
+  rendered as its own section between Legendary Actions and Lair
+  Actions
+- `isMinion: bool` — minion-tier monsters (the FM concept of a
+  group-blob with shared HP)
+- `isSolo: bool` — solo monsters (boss-tier, expected to fight a
+  full party alone)
+- `fmRole: string` — original FM role text, preserved as
+  back-reference
+- `fmCategory: string` — derived: "minion" / "solo" / "" — useful
+  for filtering / encounter-building
+
+If `fmRole` is present, the normalizer copies it to `role` and
+flips `roleManual:true` — the auto-tagger won't override MCDM's
+intent on a re-run. SCHEMA_VERSION bumped to 6.
+
+#### Renderer updates
+
+`bestiary-dm.html` `renderStatblock` now displays:
+- A teal **Solo** or muted **Minion** chip beside the monster's name
+  in the header
+- A **Villain Actions** section (same renderer as Legendary
+  Actions), positioned between Legendary Actions and Lair Actions
+
+`renderStatblockWithDonors` walks the new `villainActions` array
+too, so a chimera that slotted villain actions shows them with
+proper `⟨from …⟩` donor labels.
+
+#### Library extractor updates
+
+Both `scripts/extract_features.py` and the JS port in
+`bestiary-dm.html` gain `villainActions` → `villain_action` kind.
+`KIND_COST_MULT.villain_action = 11` (between save_effect and
+spellcasting — pricey because these are 1/round boss powers, not
+at-will). `sectionForKind` maps `villain_action` →
+`villainActions`. `blankChimera` now includes an empty
+`villainActions: []` so the generator's slot allocator can extend
+to support villain actions later.
+
+`.gitignore` patterns for `fm.json` / `fm-*.json` follow the same
+gitignored-book-content rule the rest of the bestiary data uses.
+
+---
+
 ### Menagerie: bestiary import auto-rebuilds the feature library
 
 When the DM imports a new bestiary (Merge or Replace), the page now
