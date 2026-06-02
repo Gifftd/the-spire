@@ -2967,27 +2967,26 @@
     }
 
     /* ──────────────────────────────────────────────────────────────────
-     * Generator (Phase 3) — hybrid algorithm.
+     * Generator (Phase 3, chimera edition).
      *
-     * Pick a real bestiary monster matching the (role, terrain, type)
-     * criteria as the action-template basis, then retune its numerical
-     * fields (HP, AC, PB, XP, CR-text) to the target CR using both:
-     *   (a) Analysis-tab CR median bands (real data)
-     *   (b) Role-flavored modifiers (Brute +HP / Defender +AC / etc.)
+     * Builds a brand-new monster by slotting features and actions pulled
+     * from MULTIPLE real bestiary monsters — a dragon's breath weapon,
+     * a roper's tentacles, a mage's spellcasting block, etc. Every
+     * feature has a point cost derived from its source CR + its kind;
+     * each generation has a CR-scaled point budget so the chimera stays
+     * roughly CR-appropriate even when it pulls from wildly different
+     * tiers.
      *
-     * Action bodies are cloned verbatim — the DM refines damage numbers
-     * in the Editor where templated actions auto-recalc against the new
-     * CR/PB. Non-templated actions get a tooltip note so the DM knows to
-     * audit them.
+     * Attack-shaped actions are reverse-engineered into the Editor's
+     * template format (`_template` fields) so they auto-recompute
+     * against the chimera's stats when opened for refinement.
      * ────────────────────────────────────────────────────────────────── */
 
     let _generated = null;          // latest generated monster (preview)
-    let _genCandidates = [];        // candidate list from last roll
+    let _genDonors = [];            // donor monsters that contributed parts
     let _genCriteria = null;        // last criteria snapshot (for re-roll)
 
-    // Role-flavored stat adjustments. These nudge HP and AC away from the
-    // CR-median band so a Brute really does feel heavier than an Artillery
-    // at the same CR.
+    // Numerical role bias (same as before — used for HP/AC retune).
     const ROLE_HP_BIAS = {
       Brute: 1.18, Defender: 1.10, Soldier: 1.00, Skirmisher: 0.92,
       Ambusher: 0.82, Artillery: 0.82, Controller: 0.95,
@@ -2999,10 +2998,54 @@
       Leader: 0, Support: -2
     };
 
-    // Terrain adjective pools — drives the name generator. Five per
-    // terrain gives 60 distinct prefixes; combined with the base
-    // monster's last 1-2 words that's wide variation without obvious
-    // repetition in a single session.
+    // Ability-score templates by role. Picked when building the chimera
+    // so a Brute is STR/CON heavy and a Controller is INT/WIS heavy,
+    // regardless of which monsters donated its actions.
+    const ROLE_ABILITY_TEMPLATE = {
+      Brute:      { str:17, dex:11, con:17, int: 8, wis:10, cha: 9 },
+      Defender:   { str:16, dex:11, con:17, int:10, wis:13, cha:10 },
+      Soldier:    { str:15, dex:13, con:14, int:10, wis:12, cha:10 },
+      Skirmisher: { str:12, dex:17, con:13, int:11, wis:13, cha:11 },
+      Ambusher:   { str:12, dex:18, con:12, int:11, wis:14, cha:13 },
+      Artillery:  { str:10, dex:15, con:12, int:16, wis:13, cha:12 },
+      Controller: { str:10, dex:13, con:13, int:16, wis:16, cha:13 },
+      Leader:     { str:14, dex:12, con:14, int:12, wis:14, cha:16 },
+      Support:    { str:10, dex:12, con:13, int:12, wis:16, cha:15 }
+    };
+
+    // Per-feature-kind point multiplier. The cost of a feature is
+    // `max(1, source.cr) * kindMultiplier` — so a CR 10 multiattack
+    // (80 pts) is "expensive" relative to a CR 1 trait (2 pts).
+    const KIND_COST_MULT = {
+      multiattack: 8,
+      melee_attack: 4, ranged_attack: 4, flex_attack: 4,
+      save_effect: 6, recharge_save: 6, recharge_attack: 5,
+      spellcasting: 7,
+      utility: 3,
+      trait: 2,
+      bonus_action: 3,
+      reaction: 3,
+      legendary: 5
+    };
+
+    // Slot budget by section. Each section gets at most this many
+    // entries — keeps the chimera stat block from sprawling.
+    function slotPlanFor(cr){
+      return {
+        actions: { multiattack: 1, attacks: [2, cr >= 5 ? 4 : 3], saves: [0, cr >= 5 ? 2 : 1], spellcasting: cr >= 5 ? 1 : 0, utility: [0, 1] },
+        traits: [1, 3],
+        bonusActions: [0, 1],
+        reactions: [0, cr >= 5 ? 2 : 1],
+        legendary: cr >= 11 ? [1, 3] : [0, 0]
+      };
+    }
+
+    function pointBudgetFor(cr){
+      // CR 1 → 60, CR 5 → 180, CR 10 → 330, CR 20 → 630, CR 30 → 930
+      return Math.max(50, Math.round(cr * 30 + 30));
+    }
+
+    // Terrain adjective pools — drives the name generator.
     const TERRAIN_ADJECTIVES = {
       arctic:     ['Arctic','Frostbound','Glacial','Frozen','Permafrost','Polar'],
       coastal:    ['Coastal','Tidal','Brinebound','Seaborne','Harborfast','Saltworn'],
@@ -3019,6 +3062,7 @@
     };
 
     function rand(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
+    function rint(lo, hi){ return lo + Math.floor(Math.random() * (hi - lo + 1)); }
     function clamp(n, lo, hi){ return Math.max(lo, Math.min(hi, n)); }
 
     function initGenerate(){
@@ -3047,132 +3091,484 @@
     function generateMonster(){
       const crit = readGenCriteria();
       _genCriteria = crit;
+      _genDonors = [];
 
-      // Filter the bestiary by criteria. Role/type/terrain match if set;
-      // empty filters allow anything.
-      const pool = allMonsters().filter(m => {
+      const all = allMonsters();
+      // Soft-filter pool: prefer monsters matching all criteria, with
+      // a fallback to the full bestiary so 20% of slot draws can still
+      // be wild (the "dragon with mage spellcasting" case).
+      const matchPool = all.filter(m => {
         if (crit.role && m.role !== crit.role) return false;
         if (crit.type && m.type !== crit.type) return false;
         if (crit.terrains.length && !crit.terrains.some(t => (m.terrain||[]).includes(t))) return false;
         return true;
       });
-
-      if (!pool.length){
-        toast('No monsters match those criteria — broaden the filter.', true);
+      if (!matchPool.length){
+        toast('No monsters match the criteria — broaden the filter or pick from the whole bestiary.', true);
         return;
       }
 
-      // Score by CR distance, then random-pick from the top tier (8) so
-      // re-rolling yields variation without abandoning relevance.
-      const scored = pool.map(m => ({
-        m, dist: Math.abs((+m.cr || 0) - crit.cr)
-      })).sort((a,b) => a.dist - b.dist);
+      // Build the feature catalog from BOTH pools. Each entry is
+      // { kind, source, item, section, cost } where item is the raw
+      // action/trait object from the source monster.
+      const matchCatalog = buildFeatureCatalog(matchPool);
+      const wildCatalog = buildFeatureCatalog(all);
 
-      const tierN = Math.min(8, scored.length);
-      const top = scored.slice(0, tierN);
-      _genCandidates = top;
-      const picked = top[Math.floor(Math.random() * tierN)].m;
-
-      _generated = retuneToCR(picked, crit);
-      renderGeneratedPreview(picked);
-      renderGenCandidates(picked.id);
+      _generated = chimerise(crit, matchCatalog, wildCatalog);
+      renderGeneratedPreview();
+      renderDonorList();
 
       document.getElementById('gen-reroll-btn').disabled = false;
       document.getElementById('gen-open-btn').disabled = false;
     }
 
-    function retuneToCR(base, crit){
-      const gen = JSON.parse(JSON.stringify(base));
-
-      // Strip clone-runtime markers
-      delete gen._custom;
-      delete gen._generated;
-      delete gen._generatedFrom;
-
-      // Source-of-truth fields for re-tuning
-      const newCr = crit.cr;
-      const newCrText = (CR_OPTIONS.find(([v]) => parseFloat(v) === newCr) || ['',''])[1] || String(newCr);
-      const newPb = pbForCR(newCr);
-      const newXp = XP_BY_CR[newCr] ?? 0;
-
-      gen.cr = newCr;
-      gen.crText = newCrText;
-      gen.pb = newPb;
-      gen.xp = newXp;
-
-      // Pull CR-typical HP/AC bands from the Analysis cache. Build once
-      // if not already cached (Analysis tab also populates this lazily).
-      if (!window.__anaCache) window.__anaCache = computeAnalysis(allMonsters());
-      const row = window.__anaCache?.crRows?.find(r => r.cr === newCr);
-
-      // HP retune — CR-typical median × role bias × random variance.
-      // Variance keeps each roll feeling distinct without going off-target.
-      const hpBase = row?.hpMed || base.hp || 50;
-      const hpBias = ROLE_HP_BIAS[crit.role || gen.role] || 1.0;
-      const hpJitter = 0.88 + Math.random() * 0.24;       // 0.88 – 1.12
-      gen.hp = Math.max(1, Math.round(hpBase * hpBias * hpJitter));
-      // We're not in structured-HP mode (the formula would need full
-      // re-derivation from CON + die size); turn it off so the Editor
-      // doesn't try to recompute HP from stale dice counts.
-      gen.hpStructured = false;
-      gen.hpFormula = '';
-      delete gen.hitDiceCount;
-      delete gen.hitDieSize;
-      delete gen.hpMagicBonus;
-
-      // AC retune — CR-typical median + role adjustment, clamped to a
-      // sane band so the output doesn't end up AC 8 or AC 25.
-      const acBase = row?.acMed || base.ac || 14;
-      const acAdj = ROLE_AC_ADJ[crit.role || gen.role] || 0;
-      gen.ac = clamp(Math.round(acBase) + acAdj, 10, 22);
-      gen.acText = `AC ${gen.ac}`;
-
-      // Initiative — match Dex mod + PB-tier bonus; reuse if present.
-      const dexMod = gen.abilities?.dex?.mod ?? 0;
-      gen.initiative = dexMod;
-      gen.initiativeScore = 10 + dexMod;
-
-      // Tags — honor explicit user choices; flip the manual flags so the
-      // Python tagger doesn't override them on its next run.
-      if (crit.role){
-        gen.role = crit.role;
-        gen.roleManual = true;
+    function buildFeatureCatalog(monsters){
+      // Flatten every feature/action across the pool into a draw pile.
+      // Each entry is tagged with its source monster + the section it
+      // came from so the chimera loop can place it in the right bucket.
+      const out = [];
+      const sectionMap = [
+        ['traits', 'trait'],
+        ['actions', null],          // null → classify dynamically
+        ['bonusActions', 'bonus_action'],
+        ['reactions', 'reaction'],
+        ['legendaryActions', 'legendary']
+      ];
+      for (const m of monsters){
+        const sourceCr = Math.max(1, +m.cr || 1);
+        for (const [section, defaultKind] of sectionMap){
+          const items = m[section];
+          if (!Array.isArray(items)) continue;
+          for (const item of items){
+            const kind = defaultKind || classifyAction(item, m).kind;
+            const mult = KIND_COST_MULT[kind] ?? 3;
+            const cost = Math.max(1, Math.round(sourceCr * mult));
+            out.push({ kind, source: m, item, section, cost });
+          }
+        }
       }
-      if (crit.terrains.length){
-        gen.terrain = [...crit.terrains];
-        gen.terrainManual = true;
-      }
-
-      // Name — DM override wins; otherwise terrain-themed compose.
-      gen.name = crit.nameOverride || generateName(base, crit);
-
-      // ID — fresh, custom-prefixed so saveCustom() picks it up cleanly.
-      gen.id = makeGeneratedId(gen.name);
-      gen.source = 'custom';
-      gen._generated = true;
-      gen._generatedFrom = base.id;
-      gen._generatedFromName = base.name;
-      gen._generatedFromCR = base.crText || String(base.cr);
-
-      return gen;
+      return out;
     }
 
-    function generateName(base, crit){
-      // Pick a terrain to flavor the name. Prefer the criteria's first
-      // checked terrain; fall back to one of the base's terrains; finally
-      // a generic descriptor.
-      const terr = crit.terrains[0]
-        || (base.terrain || [])[0]
-        || 'planar';
-      const adjPool = TERRAIN_ADJECTIVES[terr] || ['Strange'];
-      const adj = rand(adjPool);
+    // ── Chimera ─────────────────────────────────────────────────────
+    // Slot-driven picker. Budget is allocated across required and
+    // optional sections; each slot draws from the soft-filtered match
+    // pool 80% of the time, the wild pool 20%, then deep-clones the
+    // pulled feature (with attribution metadata) into the new monster.
+    function chimerise(crit, matchCat, wildCat){
+      const targetCr = crit.cr;
+      const plan = slotPlanFor(targetCr);
+      let budget = pointBudgetFor(targetCr);
 
-      // Take the last 1-2 words of the base name as the noun. "Goblin
-      // Warrior" → "Goblin Warrior"; "Ogre" → "Ogre"; "Adult Red Dragon"
-      // → "Red Dragon"; this avoids the wordy book full-name and keeps
-      // generation pithy.
-      const parts = (base.name || 'Creature').split(/\s+/).filter(Boolean);
-      const noun = parts.slice(-2).join(' ');
+      const newMon = blankChimera(crit);
+      const donorIds = new Set();
+      const trackDonor = (feat) => {
+        if (!feat) return;
+        donorIds.add(feat.source.id);
+      };
+
+      function draw(predicate){
+        // Try the match catalog first, then wild. Filter by predicate
+        // + budget. Random pick from up to 30 candidates so re-rolls
+        // diverge nicely.
+        const fromMatch = matchCat.filter(predicate).filter(f => f.cost <= budget);
+        const useWild = (Math.random() < 0.20) || !fromMatch.length;
+        let pool = useWild ? wildCat.filter(predicate).filter(f => f.cost <= budget) : fromMatch;
+        if (!pool.length) return null;
+        // Top-30 shuffle for variety
+        const sample = pool.slice().sort(() => Math.random() - 0.5).slice(0, 30);
+        const pick = rand(sample);
+        budget -= pick.cost;
+        return pick;
+      }
+
+      // 1) Required: one Multiattack
+      const mAttack = draw(f => f.kind === 'multiattack');
+      if (mAttack){
+        newMon.actions.push(slotFeature(mAttack));
+        trackDonor(mAttack);
+      }
+
+      // 2) 2–4 single attacks. Multiattack's recompose target is at
+      //    least one of these names (the existing template engine fills
+      //    that in when the DM opens the result in the Editor).
+      const attackTarget = rint(...plan.actions.attacks);
+      for (let i = 0; i < attackTarget; i++){
+        const pick = draw(f => /_attack$/.test(f.kind) && f.kind !== 'recharge_attack');
+        if (!pick) break;
+        newMon.actions.push(slotFeature(pick));
+        trackDonor(pick);
+      }
+
+      // 3) 0–2 save effects (the breath-weapon slot)
+      const saveTarget = rint(...plan.actions.saves);
+      for (let i = 0; i < saveTarget; i++){
+        const pick = draw(f => f.kind === 'save_effect' || f.kind === 'recharge_save' || f.kind === 'recharge_attack');
+        if (!pick) break;
+        newMon.actions.push(slotFeature(pick));
+        trackDonor(pick);
+      }
+
+      // 4) 0–1 spellcasting blocks
+      if (plan.actions.spellcasting){
+        const pick = draw(f => f.kind === 'spellcasting');
+        if (pick){
+          newMon.actions.push(slotFeature(pick));
+          trackDonor(pick);
+        }
+      }
+
+      // 5) 0–1 utility action (the "weird signature thing" slot)
+      const utilN = rint(...plan.actions.utility);
+      for (let i = 0; i < utilN; i++){
+        const pick = draw(f => f.kind === 'utility' && f.section === 'actions');
+        if (!pick) break;
+        newMon.actions.push(slotFeature(pick));
+        trackDonor(pick);
+      }
+
+      // 6) 1–3 traits
+      const traitN = rint(...plan.traits);
+      const seenTraitNames = new Set();
+      for (let i = 0; i < traitN; i++){
+        const pick = draw(f => f.kind === 'trait' && !seenTraitNames.has((f.item.name || '').toLowerCase()));
+        if (!pick) break;
+        seenTraitNames.add((pick.item.name || '').toLowerCase());
+        newMon.traits.push(slotFeature(pick));
+        trackDonor(pick);
+      }
+
+      // 7) 0–1 bonus actions
+      const bonusN = rint(...plan.bonusActions);
+      for (let i = 0; i < bonusN; i++){
+        const pick = draw(f => f.section === 'bonusActions');
+        if (!pick) break;
+        newMon.bonusActions.push(slotFeature(pick));
+        trackDonor(pick);
+      }
+
+      // 8) 0–2 reactions
+      const reactN = rint(...plan.reactions);
+      for (let i = 0; i < reactN; i++){
+        const pick = draw(f => f.section === 'reactions');
+        if (!pick) break;
+        newMon.reactions.push(slotFeature(pick));
+        trackDonor(pick);
+      }
+
+      // 9) 0–3 legendary actions (only at CR 11+)
+      const legN = rint(...plan.legendary);
+      for (let i = 0; i < legN; i++){
+        const pick = draw(f => f.section === 'legendaryActions');
+        if (!pick) break;
+        newMon.legendaryActions.push(slotFeature(pick));
+        trackDonor(pick);
+      }
+
+      // Numerical retune from CR target + role, after action selection
+      // so the abilityScores driving template re-compose are in place.
+      retuneChimeraStats(newMon, crit);
+
+      // Convert templatable actions into Editor templates so they
+      // auto-recompute when the DM opens the result in the Editor.
+      for (const sec of ['actions','bonusActions','reactions','legendaryActions']){
+        for (const a of newMon[sec]){
+          if (a._template) continue;          // already a custom-source template
+          const tpl = parseToTemplate(a, sec);
+          if (tpl) a._template = tpl;
+        }
+      }
+
+      // Stamp identity and lineage
+      newMon.name = crit.nameOverride || chimeraName(newMon, crit, [...donorIds]);
+      newMon.id = makeGeneratedId(newMon.name);
+      newMon._generated = true;
+      newMon._chimera = true;
+      newMon._donorIds = [...donorIds];
+
+      // Cache the donor monsters by id for the preview UI
+      const allById = Object.fromEntries(allMonsters().map(m => [m.id, m]));
+      _genDonors = [...donorIds].map(id => allById[id]).filter(Boolean);
+
+      return newMon;
+    }
+
+    function blankChimera(crit){
+      // A minimum scaffold to populate during chimerise. We don't use
+      // blankMonster() because that defaults structured-HP, hit dice
+      // count etc. — the chimera flows through retuneChimeraStats for
+      // those.
+      return {
+        id: '', name: '', size: 'Medium', type: '', subtype: '', alignment: 'Unaligned',
+        ac: null, acText: '',
+        hp: null, hpFormula: '',
+        hpStructured: false,
+        initiative: 0, initiativeScore: 10,
+        speed: { walk: 30 }, speedText: '',
+        abilities: Object.fromEntries(ABIL_KEYS.map(k => [k, { score: 10, mod: 0, save: 0 }])),
+        skills: {}, sensesText: '', senses: {},
+        languagesText: '', languages: [],
+        resistancesText: '', resistances: [],
+        immunitiesText: '', damageImmunities: [], conditionImmunities: [],
+        vulnerabilitiesText: '', vulnerabilities: [],
+        gear: [],
+        traits: [], actions: [], bonusActions: [], reactions: [],
+        legendaryActions: [], lairActions: [], lairEffects: [],
+        crText: '1', cr: 1, xp: 0, pb: 2,
+        description: '',
+        source: 'custom',
+        role: crit.role || null,
+        terrain: crit.terrains.length ? [...crit.terrains] : []
+      };
+    }
+
+    function slotFeature(feat){
+      // Deep-clone the source feature item, stamp it with donor
+      // attribution. Keeps the original action/trait body untouched in
+      // the source bestiary.
+      const f = JSON.parse(JSON.stringify(feat.item));
+      f._donorName = feat.source.name;
+      f._donorCR = feat.source.crText || String(feat.source.cr);
+      f._donorId = feat.source.id;
+      return f;
+    }
+
+    function retuneChimeraStats(mon, crit){
+      const cr = crit.cr;
+      const role = crit.role || mon.role || 'Soldier';
+      mon.cr = cr;
+      mon.crText = (CR_OPTIONS.find(([v]) => parseFloat(v) === cr) || ['', String(cr)])[1];
+      mon.pb = pbForCR(cr);
+      mon.xp = XP_BY_CR[cr] ?? 0;
+
+      // HP / AC from the Analysis cache, biased by role.
+      if (!window.__anaCache) window.__anaCache = computeAnalysis(allMonsters());
+      const row = window.__anaCache?.crRows?.find(r => r.cr === cr);
+      const hpBase = row?.hpMed || 50;
+      const acBase = row?.acMed || 14;
+      const hpBias = ROLE_HP_BIAS[role] || 1.0;
+      const acAdj = ROLE_AC_ADJ[role] || 0;
+      const hpJitter = 0.90 + Math.random() * 0.20;
+      mon.hp = Math.max(1, Math.round(hpBase * hpBias * hpJitter));
+      mon.hpFormula = '';
+      mon.ac = clamp(Math.round(acBase) + acAdj, 10, 22);
+      mon.acText = `AC ${mon.ac}`;
+
+      // Ability scores from role template, scaled +1 per tier above CR 5.
+      const tier = cr <= 4 ? 0 : cr <= 10 ? 1 : cr <= 16 ? 2 : cr <= 20 ? 3 : 4;
+      const tpl = ROLE_ABILITY_TEMPLATE[role] || ROLE_ABILITY_TEMPLATE.Soldier;
+      const primaryAbilities = pickPrimaryAbilities(tpl);
+      for (const k of ABIL_KEYS){
+        const base = tpl[k] || 10;
+        const bonus = primaryAbilities.includes(k) ? tier : Math.max(0, tier - 1);
+        const score = clamp(base + bonus, 1, 30);
+        const mod = Math.floor((score - 10) / 2);
+        mon.abilities[k] = { score, mod, save: mod };
+      }
+
+      // Initiative from new Dex mod
+      mon.initiative = mon.abilities.dex.mod;
+      mon.initiativeScore = 10 + mon.abilities.dex.mod;
+
+      // Speed — inherit walk 30; bump fly if any donor flew.
+      // (We could look at donor speeds, but a deterministic walk 30 is
+      // safer; DM tweaks in Editor.)
+      mon.speed = { walk: 30 };
+      mon.speedText = '30 ft.';
+
+      // Tags
+      if (crit.role){
+        mon.role = crit.role;
+        mon.roleManual = true;
+      }
+      if (crit.terrains.length){
+        mon.terrain = [...crit.terrains];
+        mon.terrainManual = true;
+      }
+
+      // Description
+      const donorList = (mon._donorIds || []).slice(0, 4).join(', ');
+      mon.description = `Procedurally generated chimera at CR ${mon.crText}. Pulled features from ${(mon._donorIds || []).length} donor monsters.`;
+    }
+
+    function pickPrimaryAbilities(tpl){
+      // Return the two highest-scoring abilities in the role template —
+      // these get the bonus-per-tier bump above.
+      const sorted = Object.entries(tpl).sort((a, b) => b[1] - a[1]);
+      return [sorted[0][0], sorted[1][0]];
+    }
+
+    // ── Attack → template parser ────────────────────────────────────
+    // Reverse-engineer an action body into the structured `_template`
+    // shape used by the Editor. When the chimera opens in the Editor,
+    // the template engine recomputes the attack body against the new
+    // monster's stats — fixing damage and to-hit drift automatically.
+    function parseToTemplate(action, section){
+      const body = (action.body || '').trim();
+      const name = (action.name || '').replace(/\s*\([^)]+\)\s*$/, '').trim();
+      const rechargeMatch = (action.name || '').match(/\((Recharge\s+[0-9–\-]+|\d+\/Day)\)/i);
+      const recharge = rechargeMatch
+        ? rechargeMatch[1].replace(/^Recharge\s+/i, '').replace(/–/g, '-')
+        : '';
+
+      // Multiattack
+      if (/^multiattack\b/i.test(action.name || '')){
+        const countMatch = body.match(/\bmakes\s+(one|two|three|four|five|six|seven|eight|nine|ten)\b/i);
+        const NUM = { one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10 };
+        const attackMatch = body.match(/\b(?:makes\s+)?(?:one|two|three|four|five|six|seven|eight|nine|ten)\s+(\w+(?:\s+\w+)?)\s+attacks?\b/i);
+        return {
+          kind: 'multiattack',
+          fields: {
+            count: countMatch ? NUM[countMatch[1].toLowerCase()] : 2,
+            attackName: attackMatch ? attackMatch[1] : '',
+            preamble: '', coda: ''
+          },
+          targetSection: section || 'actions',
+          trigger: null, legendaryCost: null
+        };
+      }
+
+      // Melee / Ranged / Flex attack
+      const mFlex = body.match(/Melee or Ranged Attack Roll:\s*([+\-]\d+)/);
+      const mMelee = !mFlex && body.match(/Melee Attack Roll:\s*([+\-]\d+)/);
+      const mRanged = !mFlex && !mMelee && body.match(/Ranged Attack Roll:\s*([+\-]\d+)/);
+      const atkMatch = mFlex || mMelee || mRanged;
+      if (atkMatch){
+        const attackBonus = parseInt(atkMatch[1], 10);
+        const reach = (body.match(/reach (\d+) ft\./) || [])[1];
+        const rng = body.match(/range (\d+)\/(\d+) ft\./);
+        const r1 = !rng && body.match(/range (\d+) ft\./);
+        const dmgs = parseDamageClauses(body);
+        const primary = dmgs[0] || { dice: '1d6', type: 'Bludgeoning' };
+        const rider = dmgs[1] || null;
+
+        // Re-derive the ability that originally drove this attack so
+        // the template's attackBonusFor() will compose to the same
+        // logical value against the new monster's mods.
+        const sourceMonster = { abilities: action._sourceAbilities || null, pb: action._sourcePb || 2 };
+        // We don't have direct access to source abilities, but the
+        // attack-ability inference uses pb+mod=attackBonus. For the
+        // chimera, default melee→str, ranged→dex, flex→str (covers ~all
+        // 2024-style attacks). DM can flip the dropdown in Editor.
+        const ability = mFlex ? 'str' : (mMelee ? 'str' : 'dex');
+
+        // Strip the bonus from "NdM + K" — we want pure dice; the
+        // template adds (abilityMod + magicBonus) at compose time.
+        const dicePure = (primary.dice || '1d6').replace(/\s*[+\-]\s*\d+/, '');
+        const bonusInBody = (primary.dice || '').match(/[+\-]\s*(\d+)/);
+        const bonusN = bonusInBody ? parseInt(bonusInBody[0].replace(/\s+/g,''), 10) : 0;
+
+        if (mFlex){
+          return {
+            kind: 'flex_attack',
+            fields: {
+              weaponName: name,
+              ability,
+              reach: reach ? parseInt(reach, 10) : 5,
+              rangeShort: rng ? parseInt(rng[1], 10) : (r1 ? parseInt(r1[1], 10) : 20),
+              rangeLong: rng ? parseInt(rng[2], 10) : (r1 ? parseInt(r1[1], 10) : 60),
+              damageDice: dicePure,
+              damageBonus: 0,
+              useAbilityMod: bonusN !== 0,
+              damageType: primary.type || 'Slashing',
+              riderDice: rider ? rider.dice : '',
+              riderType: rider ? rider.type : '',
+              recharge
+            },
+            targetSection: section || 'actions',
+            trigger: null, legendaryCost: null
+          };
+        }
+        if (mMelee){
+          return {
+            kind: 'melee_attack',
+            fields: {
+              weaponName: name,
+              ability,
+              reach: reach ? parseInt(reach, 10) : 5,
+              damageDice: dicePure,
+              damageBonus: 0,
+              useAbilityMod: bonusN !== 0,
+              damageType: primary.type || 'Slashing',
+              riderDice: rider ? rider.dice : '',
+              riderType: rider ? rider.type : '',
+              recharge
+            },
+            targetSection: section || 'actions',
+            trigger: null, legendaryCost: null
+          };
+        }
+        // Ranged
+        return {
+          kind: 'ranged_attack',
+          fields: {
+            weaponName: name,
+            ability,
+            rangeShort: rng ? parseInt(rng[1], 10) : (r1 ? parseInt(r1[1], 10) : 30),
+            rangeLong: rng ? parseInt(rng[2], 10) : (r1 ? parseInt(r1[1], 10) : 120),
+            damageDice: dicePure,
+            damageBonus: 0,
+            useAbilityMod: bonusN !== 0,
+            damageType: primary.type || 'Piercing',
+            riderDice: rider ? rider.dice : '',
+            riderType: rider ? rider.type : '',
+            recharge
+          },
+          targetSection: section || 'actions',
+          trigger: null, legendaryCost: null
+        };
+      }
+
+      // Save effect
+      const sv = body.match(/(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) Saving Throw:\s*DC\s*(\d+)(?:,\s*([^.]+?)\.)?/);
+      if (sv){
+        const ABIL_KEY = { Strength:'str', Dexterity:'dex', Constitution:'con', Intelligence:'int', Wisdom:'wis', Charisma:'cha' };
+        const dmgs = parseDamageClauses(body);
+        const targetClause = (sv[3] || 'each creature in a 30-foot Cone').trim();
+        const failureMatch = body.match(/Failure:\s*([^.]*?)\./);
+        const successMatch = body.match(/Success:\s*Half damage(?: only)?\./i);
+        return {
+          kind: 'save_effect',
+          fields: {
+            actionName: name,
+            targetSave: ABIL_KEY[sv[1]] || 'dex',
+            dcAbility: 'con',         // default; template recomputes DC vs new monster
+            target: targetClause,
+            damageDice: dmgs[0]?.dice ? dmgs[0].dice.replace(/\s*[+\-]\s*\d+/, '') : '6d6',
+            damageType: dmgs[0]?.type || 'Fire',
+            failureSuffix: '',
+            successHalf: !!successMatch,
+            successSuffix: '',
+            recharge
+          },
+          targetSection: section || 'actions',
+          trigger: null, legendaryCost: null
+        };
+      }
+
+      // Not templatable (utility / spellcasting / lore text) — leave as-is
+      return null;
+    }
+
+    function chimeraName(mon, crit, donorIds){
+      const allById = Object.fromEntries(allMonsters().map(m => [m.id, m]));
+      const donors = donorIds.map(id => allById[id]).filter(Boolean);
+      const terr = crit.terrains[0] || (donors[0]?.terrain || [])[0] || 'planar';
+      const adj = rand(TERRAIN_ADJECTIVES[terr] || ['Strange']);
+
+      // Pull the noun from the highest-CR donor's name, last word.
+      // If we have two donors, hyphenate the second one's last word too
+      // for the chimera feel ("Frostbound Lich-Owlbear").
+      const donorsByImportance = donors.slice().sort((a, b) => (+b.cr || 0) - (+a.cr || 0));
+      const nameOf = (m) => {
+        const parts = (m?.name || '').split(/\s+/).filter(Boolean);
+        return parts[parts.length - 1] || 'Creature';
+      };
+      const primary = nameOf(donorsByImportance[0]);
+      const secondary = donorsByImportance[1] && donorsByImportance[1].id !== donorsByImportance[0].id
+        ? nameOf(donorsByImportance[1])
+        : null;
+      const noun = secondary && secondary !== primary ? `${primary}-${secondary}` : primary;
       return `${adj} ${noun}`;
     }
 
@@ -3186,63 +3582,77 @@
       return `custom-${pascal}Gen${stamp}`;
     }
 
-    function deltaChip(label, baseVal, newVal){
-      const cls = (newVal > baseVal) ? 'up' : (newVal < baseVal) ? 'down' : '';
-      const arrow = (newVal > baseVal) ? '▲' : (newVal < baseVal) ? '▼' : '·';
-      return `<span class="gen-delta ${cls}">${esc(label)}: ${esc(String(baseVal ?? '—'))} ${arrow} ${esc(String(newVal ?? '—'))}</span>`;
-    }
-
-    function renderGeneratedPreview(base){
+    function renderGeneratedPreview(){
       if (!_generated){
         document.getElementById('gen-preview-body').innerHTML =
           '<div class="empty-note">Click Generate to roll a new monster.</div>';
         return;
       }
       const g = _generated;
-      // A small delta strip above the stat block so the DM can see how
-      // far the retune moved from the base.
-      const deltas = [
-        deltaChip('CR', base.crText || base.cr, g.crText),
-        deltaChip('HP', base.hp, g.hp),
-        deltaChip('AC', base.ac, g.ac),
-        deltaChip('PB', '+' + (base.pb||0), '+' + g.pb)
-      ].join('');
-      const source = `Based on ${esc(base.name)} (CR ${esc(base.crText || base.cr)} ${esc(base.type || '')}${base.source ? ' · ' + esc(base.source) : ''})`;
-      // Warn about action drift — non-templated actions still carry the
-      // base monster's literal damage numbers. Templated actions will
-      // auto-recompute against the new CR/PB on open-in-editor.
-      const hasTemplated = (g.actions || []).some(a => a._template);
-      const drift = hasTemplated
-        ? `<div class="empty-note" style="font-size:0.75rem;margin-top:0.4rem">Templated actions will auto-recompute when opened in the Editor. Plain-text actions retain the base monster's numbers — refine in the Editor.</div>`
-        : `<div class="empty-note" style="font-size:0.75rem;margin-top:0.4rem">Action bodies carry the base monster's literal damage numbers — open in the Editor and refine to the new CR.</div>`;
+      // Build a per-section stat block with donor attribution labels
+      // overlaid on each feature. This is the same output as
+      // renderStatblock, but each trait/action is preceded by a small
+      // "from <donor> CR X" pill so the DM can see where each piece
+      // came from.
+      const donorN = (g._donorIds || []).length;
+      const budget = pointBudgetFor(g.cr);
+      const summary =
+        `<div class="gen-source-line">Chimera · ${donorN} donor${donorN===1?'':'s'} · point budget ${budget}${g.role ? ' · ' + esc(g.role) : ''}${(g.terrain||[]).length ? ' · ' + esc((g.terrain||[]).join(', ')) : ''}</div>`;
+      const drift =
+        `<div class="empty-note" style="font-size:0.75rem;margin-top:0.4rem">Attack actions are linked to Editor templates (🔗) — opening in Editor recomputes their numbers against the new stats. Lore text and spellcasting bodies retain their donor wording; refine as needed.</div>`;
       document.getElementById('gen-preview-body').innerHTML =
-        `<div class="gen-source-line">${source}</div>` +
-        `<div class="gen-deltas">${deltas}</div>` +
-        renderStatblock(g) +
+        summary +
+        renderStatblockWithDonors(g) +
         drift;
     }
 
-    function renderGenCandidates(pickedId){
+    // Render the stat block with a small donor label on each feature so
+    // the chimera's seams are visible at a glance.
+    function renderStatblockWithDonors(m){
+      // Inject `_donorPrefix` into the name during the render, then
+      // remove it after. Cheaper than duplicating renderStatblock.
+      const sections = ['traits','actions','bonusActions','reactions','legendaryActions'];
+      const stash = [];
+      for (const sec of sections){
+        const list = m[sec];
+        if (!Array.isArray(list)) continue;
+        for (const f of list){
+          stash.push({ f, originalName: f.name });
+          if (f._donorName){
+            f.name = `${f.name} ⟨from ${f._donorName} · CR ${f._donorCR}⟩`;
+          }
+        }
+      }
+      try {
+        return renderStatblock(m);
+      } finally {
+        for (const { f, originalName } of stash){
+          f.name = originalName;
+        }
+      }
+    }
+
+    function renderDonorList(){
       const list = document.getElementById('gen-candidates');
-      document.getElementById('gen-cand-n').textContent = _genCandidates.length;
-      if (!_genCandidates.length){
-        list.innerHTML = '<div class="empty-note" style="font-size:0.8rem">No candidates yet.</div>';
+      document.getElementById('gen-cand-n').textContent = _genDonors.length;
+      if (!_genDonors.length){
+        list.innerHTML = '<div class="empty-note" style="font-size:0.8rem">Donors will appear here after Generate.</div>';
         return;
       }
-      list.innerHTML = _genCandidates.map(({ m, dist }) => `
-        <div class="gen-cand${m.id === pickedId ? ' active' : ''}" onclick="rebaseOnCandidate('${esc(m.id)}')">
+      // Sort donors by CR descending so the biggest contributors lead.
+      const sorted = _genDonors.slice().sort((a, b) => (+b.cr || 0) - (+a.cr || 0));
+      list.innerHTML = sorted.map(m => `
+        <div class="gen-cand" onclick="selectMonsterFromDonor('${esc(m.id)}')" title="Click to view this donor's full stat block on the Browse tab">
           <div class="gen-cand-nm">${esc(m.name)}${m.role ? ` <span class="role-chip">${esc(m.role)}</span>` : ''}</div>
-          <div class="gen-cand-meta">CR ${esc(m.crText || m.cr || '?')} · Δ${dist}</div>
+          <div class="gen-cand-meta">CR ${esc(m.crText || m.cr || '?')} · ${esc(m.type || '')}</div>
         </div>
       `).join('');
     }
 
-    function rebaseOnCandidate(monsterId){
-      const cand = _genCandidates.find(c => c.m.id === monsterId);
-      if (!cand || !_genCriteria) return;
-      _generated = retuneToCR(cand.m, _genCriteria);
-      renderGeneratedPreview(cand.m);
-      renderGenCandidates(cand.m.id);
+    function selectMonsterFromDonor(monsterId){
+      // Quick way for the DM to inspect a donor's full stat block.
+      window.switchTab('browse');
+      selectMonster(monsterId);
     }
 
     function openGeneratedInEditor(){

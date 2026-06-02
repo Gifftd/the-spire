@@ -9,6 +9,67 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: Generate tab — chimera edition (compositional rewrite)
+
+Replaces the retune-from-similar-monster algorithm with a true
+compositional generator. The chimera version pulls individual
+features and actions from **multiple** bestiary monsters and slots
+them into one new stat block, governed by a per-CR points budget so
+the output stays roughly balanced even when it mixes wildly
+different tiers (a dragon's breath weapon + a roper's tentacles + a
+mage's spellcasting block).
+
+#### Algorithm
+
+1. **Feature catalog** — every action, trait, bonus action, reaction,
+   and legendary action in `allMonsters()` becomes a draw-pile entry
+   tagged with its source monster, kind, and a point cost.
+2. **Cost** = `max(1, source.cr) × kind_multiplier`. Multipliers:
+   multiattack 8, single attack 4, save effect 6, spellcasting 7,
+   utility 3, trait 2, bonus action 3, reaction 3, legendary action 5.
+3. **Budget per CR** = `max(50, cr × 30 + 30)` — CR 1 → 60, CR 5 →
+   180, CR 10 → 330, CR 20 → 630, CR 30 → 930.
+4. **Slot plan** — one Multiattack (required), 2–4 attacks, 0–2 save
+   effects, 0–1 spellcasting block, 0–1 utility, 1–3 traits, 0–1
+   bonus action, 0–2 reactions, 0–3 legendary actions (CR 11+).
+5. **Soft filter** — each draw checks the criteria-matching catalog
+   first; 20% of the time it draws from the full bestiary instead,
+   so the chimera has occasional wild flavor.
+6. **Attack-body parser** — every melee/ranged/flex/save action gets
+   reverse-engineered into the Editor's `_template` shape so opening
+   the result in the Editor recomputes its numbers against the new
+   stats. Lore text and spellcasting bodies are cloned verbatim.
+7. **Numerical retune** — CR / PB / XP from the canonical tables;
+   HP / AC from the Analysis-tab CR median × role bias; ability
+   scores from a per-role template (Brute = STR/CON heavy, Controller
+   = INT/WIS heavy) plus +1 per tier above CR 5 on the two primary
+   scores.
+8. **Name** — terrain-themed adjective + hyphenated last words of the
+   two highest-CR donors ("Frostbound Lich-Owlbear" / "Bogborn
+   Hag-Owlbear").
+
+#### Added — `bestiary-dm.html`
+
+- **Donors panel** replaces the candidates panel. Lists the monsters
+  that contributed parts, sorted by CR descending; clicking a row
+  jumps to the Browse tab and selects that monster so the DM can
+  inspect what got pulled.
+- **Per-feature attribution** — the preview stat block prefixes each
+  trait/action with a `⟨from <donor> · CR X⟩` label so the chimera's
+  seams are visible at a glance. Labels are stripped before the
+  feature is saved through the Editor.
+- **Budget summary** — preview header shows the chimera's role,
+  terrain, donor count, and the point budget that governed the roll.
+
+#### Removed
+
+- Old `retuneToCR`, `generateName`, `rebaseOnCandidate`,
+  `renderGenCandidates`, `_genCandidates` — superseded by
+  `chimerise`, `buildFeatureCatalog`, `parseToTemplate`, and
+  `chimeraName`.
+
+---
+
 ### Menagerie: Generate tab — procedural monster generator
 
 Phase 3 of the random monster generator. Adds a new **Generate** tab on
