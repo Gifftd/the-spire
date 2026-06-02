@@ -3059,8 +3059,10 @@
         };
       }
       if (cr < 6){
+        // Utility opens here — Will-o'-Wisp's Consume Life, Doppelganger's
+        // Read Thoughts, Specter's Steal Body all appear at CR 2-3.
         return {
-          actions: { multiattack: 1, attacks: [1, 1], saves: [0, 1], spellcasting: 0, utility: [0, 0] },
+          actions: { multiattack: 1, attacks: [1, 1], saves: [0, 1], spellcasting: 0, utility: [0, 1] },
           traits: [0, 1],
           bonusActions: [0, 1],
           reactions: [0, 1],
@@ -3068,10 +3070,10 @@
         };
       }
       if (cr < 11){
-        // No utility action slot at this tier — too easy to over-stuff
-        // a Mind Flayer-sized stat block. Spellcasting only at CR 9+.
+        // Spellcasting only at CR 9+ to avoid Mage-block proliferation
+        // on mid-tier mooks; utility stays available throughout.
         return {
-          actions: { multiattack: 1, attacks: [1, 1], saves: [0, 1], spellcasting: cr >= 9 ? 1 : 0, utility: [0, 0] },
+          actions: { multiattack: 1, attacks: [1, 1], saves: [0, 1], spellcasting: cr >= 9 ? 1 : 0, utility: [0, 1] },
           traits: [1, 2],
           bonusActions: [0, 1],
           reactions: [0, 1],
@@ -3080,7 +3082,7 @@
       }
       if (cr < 17){
         return {
-          actions: { multiattack: 1, attacks: [1, 2], saves: [0, 1], spellcasting: 1, utility: [0, 0] },
+          actions: { multiattack: 1, attacks: [1, 2], saves: [0, 1], spellcasting: 1, utility: [0, 1] },
           traits: [1, 2],
           bonusActions: [0, 1],
           reactions: [0, 1],
