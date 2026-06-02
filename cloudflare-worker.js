@@ -493,6 +493,17 @@ export default {
         return json(await kvGet(env, 'encounters', []));
       }
 
+      // DM-only: normalized feature library used by the Menagerie's
+      // monster generator. Produced by `scripts/extract_features.py` —
+      // a flat, tier-stratified, donor-agnostic catalog of every
+      // trait/action/bonus/reaction/legendary action extracted from the
+      // imported bestiary. Schema is `{schemaVersion, features: [...]}`.
+      if (type === 'feature_library') {
+        const auth = await verifyDMAuth(request, env);
+        if (!auth.ok) return json({ error: 'DM auth required' }, 401);
+        return json(await kvGet(env, 'feature_library', { schemaVersion: 0, features: [] }));
+      }
+
       // DM-only: everything the apothecary editor needs in one shot.
       if (type === 'potion_data_dm') {
         const auth = await verifyDMAuth(request, env);
@@ -660,7 +671,7 @@ export default {
     }
 
     // ── DM-only writes ────────────────────────────────────────
-    const DM_WRITE_TYPES = ['initiative_state','map_data','map_data_dm','characters','journals','npcs','timeline','potion_ingredients','potions','negative_potions','potion_inventories','potion_recipes','potion_library','bestiary','bestiary_custom','encounters'];
+    const DM_WRITE_TYPES = ['initiative_state','map_data','map_data_dm','characters','journals','npcs','timeline','potion_ingredients','potions','negative_potions','potion_inventories','potion_recipes','potion_library','bestiary','bestiary_custom','encounters','feature_library'];
     if (DM_WRITE_TYPES.includes(body?.type)) {
       const auth = await verifyDMAuth(request, env);
       if (!auth.ok) return json({ error: 'DM auth required' }, 401);

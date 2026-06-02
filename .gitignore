@@ -17,6 +17,8 @@ mm2024-*.json
 mm-*.json
 bestiary.json
 bestiary-*.json
+feature_library.json
+feature_library-*.json
 # Source PDFs of owned third-party bestiaries — kept locally for the
 # scrape pipeline; never committed.
 *.pdf
