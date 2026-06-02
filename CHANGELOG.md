@@ -9,6 +9,74 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: chimera generator rewired to consume the feature library
+
+Replaces the runtime catalog-build path (walk `allMonsters()` every
+generation, classify each feature on the fly) with the pre-extracted
+feature library. The library's templateFields are stat-agnostic and
+get re-composed against the chimera's new stats; bodies with
+`{MONSTER}` placeholders are filled in once the chimera's name is
+stamped. Multiattack is now synthesized from the slotted attacks
+rather than pulled from any donor.
+
+#### Changed — `bestiary-dm.html`
+
+- `generateMonster` drops the matchPool / wildPool construction and
+  the runtime catalog build; it just calls `chimerise(crit)` against
+  the loaded library. Hard-errors with a toast if the library isn't
+  loaded (no silent fallback to runtime catalog).
+- `chimerise` is now ~150 lines: filters the library by adjacent
+  tiers around the target CR, tags each entry with role/terrain/tier
+  match scores, slot-fills via a single `draw(predicate)` closure
+  with soft-filter (80% strict match) and signature bias (70% reroll
+  to common alternatives). Dedupe-by-canonical-name keeps duplicate
+  picks out across all sections.
+- `materializeFromLibrary(libEntry, newMon, allById)` builds a
+  chimera feature from a library entry: templatable kinds get
+  `_template` set + the body composed against `newMon`; prose kinds
+  copy the `bodyTemplate` verbatim with `{MONSTER}` placeholders
+  intact (resolved later).
+- `recomposeTemplatedFeatures(newMon)` re-runs the template engine
+  on every templatable feature after `retuneChimeraStats` changes
+  the abilities + PB. Without this, attack bonus + damage would
+  reflect the materialize-time stats (which match the role template
+  but predate the per-CR tier bump).
+- `synthesizeMultiattack(newMon, cr)` builds the multiattack at the
+  end from the slotted attacks. Removes the previous "patch the
+  donor's multiattack to point at our attacks" hack entirely.
+- `fillMonsterPlaceholders(newMon)` does a final pass replacing
+  `{MONSTER}` with the chimera's lowercased name across every
+  feature's body + name and the monster description.
+- Removed: `buildFeatureCatalog` (the library replaces it). Removed:
+  `slotFeature` (the library entry IS the feature; `materializeFrom-
+  Library` deep-clones and stamps donor metadata directly).
+- `parseToTemplate` renamed to `_parseToTemplate_legacy` and left in
+  the file as reference. Slated for deletion in a follow-up.
+
+#### New helpers
+
+- `tierForCR(cr)` → `'low'|'mid'|'high'|'epic'` — mirrors the
+  Python script's TIER_BANDS so the page resolves to the same labels.
+- `adjacentTiers(tier)` → 1-3 tier names around the target. Lets the
+  generator pull from adjacent bands when the target tier is thin.
+- `sectionForKind(kind)` → which `newMon` array the feature lives in.
+
+#### Behavior changes (vs. runtime-catalog path)
+
+- Signature features (1,202 of 1,980 library entries) are now
+  explicitly rate-limited: a 70% chance to reroll signature picks to
+  common alternatives. Previously they slotted at the same rate as
+  any other feature, which over-flavored chimeras.
+- The dedupe-by-canonical-name now spans all sections — a chimera
+  can't roll two "Bite" entries (one mid, one high) into the same
+  monster. Previously the dedupe was per-section, allowing the same
+  named feature to appear in actions AND bonusActions.
+- Multiattack is always coherent with the chimera's actual attacks
+  because it's synthesized from the slotted attack names instead of
+  pulled from a donor and patched.
+
+---
+
 ### Menagerie: feature library — extracted, normalized, tier-stratified
 
 Builds a flat, donor-agnostic feature catalog that the chimera

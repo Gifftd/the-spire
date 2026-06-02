@@ -3206,28 +3206,16 @@
       _genCriteria = crit;
       _genDonors = [];
 
-      const all = allMonsters();
-      // Soft-filter pool: prefer monsters matching all criteria, with
-      // a fallback to the full bestiary so 20% of slot draws can still
-      // be wild (the "dragon with mage spellcasting" case).
-      const matchPool = all.filter(m => {
-        if (crit.role && m.role !== crit.role) return false;
-        if (crit.type && m.type !== crit.type) return false;
-        if (crit.terrains.length && !crit.terrains.some(t => (m.terrain||[]).includes(t))) return false;
-        return true;
-      });
-      if (!matchPool.length){
-        toast('No monsters match the criteria — broaden the filter or pick from the whole bestiary.', true);
+      // Library must be loaded — extract_features.py output, imported
+      // via the Import tab. We don't fall back to runtime catalog-
+      // building anymore; the library is the source of truth.
+      if (!featureLibrary || !Array.isArray(featureLibrary.features) || !featureLibrary.features.length){
+        toast('Feature library not loaded. Run scripts/extract_features.py and import feature_library.json via the Import tab first.', true);
         return;
       }
 
-      // Build the feature catalog from BOTH pools. Each entry is
-      // { kind, source, item, section, cost } where item is the raw
-      // action/trait object from the source monster.
-      const matchCatalog = buildFeatureCatalog(matchPool);
-      const wildCatalog = buildFeatureCatalog(all);
-
-      _generated = chimerise(crit, matchCatalog, wildCatalog);
+      _generated = chimerise(crit);
+      if (!_generated) return;
       renderGeneratedPreview();
       renderDonorList();
 
@@ -3235,218 +3223,310 @@
       document.getElementById('gen-open-btn').disabled = false;
     }
 
-    function buildFeatureCatalog(monsters){
-      // Flatten every feature/action across the pool into a draw pile.
-      // Each entry is tagged with its source monster + the section it
-      // came from so the chimera loop can place it in the right bucket.
-      const out = [];
-      const sectionMap = [
-        ['traits', 'trait'],
-        ['actions', null],          // null → classify dynamically
-        ['bonusActions', 'bonus_action'],
-        ['reactions', 'reaction'],
-        ['legendaryActions', 'legendary']
-      ];
-      for (const m of monsters){
-        const sourceCr = Math.max(1, +m.cr || 1);
-        for (const [section, defaultKind] of sectionMap){
-          const items = m[section];
-          if (!Array.isArray(items)) continue;
-          for (const item of items){
-            const kind = defaultKind || classifyAction(item, m).kind;
-            const mult = KIND_COST_MULT[kind] ?? 3;
-            const cost = Math.max(1, Math.round(sourceCr * mult));
-            out.push({ kind, source: m, item, section, cost });
-          }
-        }
-      }
-      return out;
+    // ── Library helpers ─────────────────────────────────────────────
+    // tierForCR mirrors the script's TIER_BANDS so a target CR resolves
+    // to the same tier label the library was built against.
+    function tierForCR(cr){
+      if (cr <  5) return 'low';
+      if (cr < 11) return 'mid';
+      if (cr < 17) return 'high';
+      return 'epic';
+    }
+    function adjacentTiers(tier){
+      // Pulling from the target tier ± one band when the target tier
+      // is thin (no Brute Bite at "epic" → fall back to "high"). The
+      // budget still gates power even when pulling across.
+      const order = ['low','mid','high','epic'];
+      const i = order.indexOf(tier);
+      return order.slice(Math.max(0, i - 1), Math.min(order.length, i + 2));
+    }
+    function sectionForKind(kind){
+      if (kind === 'trait') return 'traits';
+      if (kind === 'bonus_action') return 'bonusActions';
+      if (kind === 'reaction') return 'reactions';
+      if (kind === 'legendary') return 'legendaryActions';
+      return 'actions';   // melee/ranged/flex/save/spellcasting/utility
     }
 
-    // ── Chimera ─────────────────────────────────────────────────────
-    // Slot-driven picker. Budget is allocated across required and
-    // optional sections; each slot draws from the soft-filtered match
-    // pool 80% of the time, the wild pool 20%, then deep-clones the
-    // pulled feature (with attribution metadata) into the new monster.
-    function chimerise(crit, matchCat, wildCat){
+    // ── Chimera (library edition) ───────────────────────────────────
+    // Pulls features from `featureLibrary.features` (extracted by
+    // scripts/extract_features.py). Each library entry is donor-
+    // agnostic, tier-stratified, and has either pre-extracted
+    // templateFields (for attacks + saves) or a {MONSTER}-templated
+    // bodyTemplate (for traits, spellcasting, etc.).
+    //
+    // Slot order is the same as the runtime-catalog version. The
+    // Multiattack is synthesized at the end against the actual slotted
+    // attacks, not pulled from the library, so its `attackName` always
+    // matches what's actually in the chimera.
+    function chimerise(crit){
       const targetCr = crit.cr;
       const plan = slotPlanFor(targetCr);
       let budget = pointBudgetFor(targetCr);
 
+      const targetTier = tierForCR(targetCr);
+      const tierSet = new Set(adjacentTiers(targetTier));
+
+      // Score each library entry: tag whether it matches the criteria
+      // (role + terrain) so the soft-filter can prefer matching picks.
+      const lib = featureLibrary.features.filter(f => tierSet.has(f.tier));
+      for (const f of lib){
+        f._matchRole = !crit.role || (f.roleAffinity || []).includes(crit.role);
+        f._matchTerr = !crit.terrains.length
+          || (f.terrainAffinity || []).some(t => crit.terrains.includes(t));
+        f._tierMatch = f.tier === targetTier;
+      }
+
       const newMon = blankChimera(crit);
+      const allById = Object.fromEntries(allMonsters().map(m => [m.id, m]));
       const donorIds = new Set();
-      const trackDonor = (feat) => {
-        if (!feat) return;
-        donorIds.add(feat.source.id);
-      };
+      const seenCanonicalNames = new Set();   // dedupe by canonicalName
 
       function draw(predicate){
-        // Try the match catalog first, then wild. Filter by predicate
-        // + budget. Random pick from up to 30 candidates so re-rolls
+        const candidates = lib.filter(f =>
+          predicate(f)
+          && f.cost <= budget
+          && !seenCanonicalNames.has(f.canonicalName)
+        );
+        if (!candidates.length) return null;
+
+        // Soft filter: 80% try strict match (all of role+terrain+tier),
+        // 20% allow any. If the strict pool is empty, fall back to any.
+        const strict = (Math.random() < 0.80)
+          ? candidates.filter(f => f._matchRole && f._matchTerr && f._tierMatch)
+          : [];
+        let pool = strict.length ? strict : candidates;
+
+        // Bias against signature features — they should feel rare. 70%
+        // chance to reroll a signature pick to a common alternative,
+        // unless that's all the pool has.
+        const common = pool.filter(f => !f.isSignature);
+        if (common.length && Math.random() < 0.70) pool = common;
+
+        // Random pick from up to 30 shuffled candidates so re-rolls
         // diverge nicely.
-        const fromMatch = matchCat.filter(predicate).filter(f => f.cost <= budget);
-        const useWild = (Math.random() < 0.20) || !fromMatch.length;
-        let pool = useWild ? wildCat.filter(predicate).filter(f => f.cost <= budget) : fromMatch;
-        if (!pool.length) return null;
-        // Top-30 shuffle for variety
         const sample = pool.slice().sort(() => Math.random() - 0.5).slice(0, 30);
         const pick = rand(sample);
-        budget -= pick.cost;
+        if (pick){
+          budget -= pick.cost;
+          seenCanonicalNames.add(pick.canonicalName);
+        }
         return pick;
       }
 
-      // 1) Optional: one Multiattack (only when the plan allows — low CR
-      //    typically has none in the 2024 MM).
-      if (plan.actions.multiattack > 0){
-        const mAttack = draw(f => f.kind === 'multiattack');
-        if (mAttack){
-          newMon.actions.push(slotFeature(mAttack));
-          trackDonor(mAttack);
-        }
+      function place(libEntry, section){
+        if (!libEntry) return;
+        const feat = materializeFromLibrary(libEntry, newMon, allById);
+        newMon[section].push(feat);
+        if (feat._donorId) donorIds.add(feat._donorId);
       }
 
-      // 2) 1–N single attacks per the tier plan. The multiattack body
-      //    gets patched after these are picked so its `attackName`
-      //    references one we actually slotted (not the donor's).
+      // 1) Multiattack — NOT drawn from the library. Synthesized at the
+      //    end against the actual slotted attacks, so it always
+      //    references a real attack on the chimera.
+      const wantsMultiattack = plan.actions.multiattack > 0;
+
+      // 2) Single attacks
       const attackTarget = rint(...plan.actions.attacks);
       for (let i = 0; i < attackTarget; i++){
-        const pick = draw(f => /_attack$/.test(f.kind) && f.kind !== 'recharge_attack');
-        if (!pick) break;
-        newMon.actions.push(slotFeature(pick));
-        trackDonor(pick);
+        place(draw(f => /_attack$/.test(f.kind)), 'actions');
       }
 
-      // 3) 0–2 save effects (the breath-weapon slot)
+      // 3) Save effects (breath weapons, gazes, etc.)
       const saveTarget = rint(...plan.actions.saves);
       for (let i = 0; i < saveTarget; i++){
-        const pick = draw(f => f.kind === 'save_effect' || f.kind === 'recharge_save' || f.kind === 'recharge_attack');
-        if (!pick) break;
-        newMon.actions.push(slotFeature(pick));
-        trackDonor(pick);
+        place(draw(f => f.kind === 'save_effect' || f.kind === 'recharge_save'), 'actions');
       }
 
-      // 4) 0–1 spellcasting blocks
+      // 4) Spellcasting (one block, when planned)
       if (plan.actions.spellcasting){
-        const pick = draw(f => f.kind === 'spellcasting');
-        if (pick){
-          newMon.actions.push(slotFeature(pick));
-          trackDonor(pick);
-        }
+        place(draw(f => f.kind === 'spellcasting'), 'actions');
       }
 
-      // 5) 0–1 utility action (the "weird signature thing" slot)
+      // 5) Utility action(s)
       const utilN = rint(...plan.actions.utility);
       for (let i = 0; i < utilN; i++){
-        const pick = draw(f => f.kind === 'utility' && f.section === 'actions');
-        if (!pick) break;
-        newMon.actions.push(slotFeature(pick));
-        trackDonor(pick);
+        place(draw(f => f.kind === 'utility'), 'actions');
       }
 
-      // 6) 1–3 traits
+      // 6) Traits
       const traitN = rint(...plan.traits);
-      const seenTraitNames = new Set();
       for (let i = 0; i < traitN; i++){
-        const pick = draw(f => f.kind === 'trait' && !seenTraitNames.has((f.item.name || '').toLowerCase()));
-        if (!pick) break;
-        seenTraitNames.add((pick.item.name || '').toLowerCase());
-        newMon.traits.push(slotFeature(pick));
-        trackDonor(pick);
+        place(draw(f => f.kind === 'trait'), 'traits');
       }
 
-      // 7) 0–1 bonus actions
+      // 7) Bonus actions
       const bonusN = rint(...plan.bonusActions);
       for (let i = 0; i < bonusN; i++){
-        const pick = draw(f => f.section === 'bonusActions');
-        if (!pick) break;
-        newMon.bonusActions.push(slotFeature(pick));
-        trackDonor(pick);
+        place(draw(f => f.kind === 'bonus_action'), 'bonusActions');
       }
 
-      // 8) 0–2 reactions
+      // 8) Reactions
       const reactN = rint(...plan.reactions);
       for (let i = 0; i < reactN; i++){
-        const pick = draw(f => f.section === 'reactions');
-        if (!pick) break;
-        newMon.reactions.push(slotFeature(pick));
-        trackDonor(pick);
+        place(draw(f => f.kind === 'reaction'), 'reactions');
       }
 
-      // 9) 0–3 legendary actions (only at CR 11+)
+      // 9) Legendary actions (CR 11+)
       const legN = rint(...plan.legendary);
       for (let i = 0; i < legN; i++){
-        const pick = draw(f => f.section === 'legendaryActions');
-        if (!pick) break;
-        newMon.legendaryActions.push(slotFeature(pick));
-        trackDonor(pick);
+        place(draw(f => f.kind === 'legendary'), 'legendaryActions');
       }
 
-      // Numerical retune from CR target + role, after action selection
-      // so the abilityScores driving template re-compose are in place.
+      // Numerical retune — abilities/HP/AC/PB/XP must be set before
+      // synthesizeMultiattack composes its body (the multiattack
+      // template needs the new monster's stats).
       retuneChimeraStats(newMon, crit);
 
-      // Convert templatable actions into Editor templates so they
-      // auto-recompute when the DM opens the result in the Editor.
-      for (const sec of ['actions','bonusActions','reactions','legendaryActions']){
-        for (const a of newMon[sec]){
-          if (a._template) continue;          // already a custom-source template
-          const tpl = parseToTemplate(a, sec);
-          if (tpl) a._template = tpl;
-        }
+      // Re-compose every templatable action against the new stats. The
+      // library's templateFields are stat-agnostic; compose() runs
+      // attackBonusFor() and saveDCFor() against `newMon` so e.g. the
+      // Bite's "+8 to hit, 12 (2d8 + 5) Piercing" reflects the chimera's
+      // STR + PB, not the donor's.
+      recomposeTemplatedFeatures(newMon);
+
+      // 10) Multiattack synthesis — uses the first slotted attack as
+      //     its `attackName` so the body always reads cleanly.
+      if (wantsMultiattack){
+        synthesizeMultiattack(newMon, targetCr);
       }
 
-      // ── Repoint Multiattack at an attack we actually slotted ──
-      // Without this, a Multiattack pulled from a Beholder would still
-      // read "uses Eye Rays three times" even when the chimera has Bite
-      // and Claws as its attacks. We rebuild the multiattack body to
-      // reference the first slotted attack (preferring one from the
-      // same donor as the multiattack), and let the existing template
-      // engine recompose against the chimera's stats.
-      const multi = newMon.actions.find(a => a._template?.kind === 'multiattack');
-      if (multi){
-        const slottedAttacks = newMon.actions.filter(a =>
-          a._template?.kind && /_attack$/.test(a._template.kind)
-        );
-        if (slottedAttacks.length){
-          // Prefer same-donor for narrative coherence, otherwise first.
-          const sameDonor = slottedAttacks.find(a => a._donorId === multi._donorId);
-          const chosen = sameDonor || slottedAttacks[0];
-          const chosenName = chosen._template?.fields?.weaponName || chosen.name || 'Attack';
-          // Clamp the count to something sensible — donors with "makes
-          // four attacks" multiattacks dropped into a CR 3 chimera read
-          // weird. 2 attacks is the sweet spot under CR 11.
-          const sensibleCount = targetCr < 11
-            ? Math.min(multi._template.fields.count || 2, 2)
-            : Math.min(multi._template.fields.count || 3, 3);
-          multi._template.fields = {
-            ...multi._template.fields,
-            attackName: chosenName,
-            count: sensibleCount
-          };
-          const composed = TEMPLATES.multiattack.compose(multi._template.fields, newMon);
-          const wrapped = applySectionWrapping(composed.name, composed.body, 'actions', null, null);
-          multi.name = wrapped.name;
-          multi.body = wrapped.body;
-        } else {
-          // No attacks slotted but Multiattack was — drop it. A solo
-          // Multiattack referencing nothing is just noise.
-          const idx = newMon.actions.indexOf(multi);
-          if (idx >= 0) newMon.actions.splice(idx, 1);
-        }
-      }
-
-      // Stamp identity and lineage
+      // Stamp identity + lineage
       newMon.name = crit.nameOverride || chimeraName(newMon, crit, [...donorIds]);
       newMon.id = makeGeneratedId(newMon.name);
       newMon._generated = true;
       newMon._chimera = true;
       newMon._donorIds = [...donorIds];
 
-      // Cache the donor monsters by id for the preview UI
-      const allById = Object.fromEntries(allMonsters().map(m => [m.id, m]));
+      // Final pass: substitute {MONSTER} placeholders now that the
+      // chimera's name is known. Traits + spellcasting + utility bodies
+      // got their placeholders from `make_body_template()` in the
+      // extractor; this is where they finally fill in.
+      fillMonsterPlaceholders(newMon);
+
+      // Cache donors for the preview panel
       _genDonors = [...donorIds].map(id => allById[id]).filter(Boolean);
 
       return newMon;
+    }
+
+    // ── Materialize a library entry into a chimera feature ──────────
+    // For templatable kinds (attacks + saves), set _template and compose
+    // the body against the new monster. For prose kinds (traits etc.),
+    // copy the bodyTemplate verbatim — {MONSTER} placeholders get
+    // resolved later, once the chimera has a name.
+    function materializeFromLibrary(libEntry, newMon, allById){
+      const donor = (libEntry.donorIds || [])
+        .map(id => allById[id])
+        .find(Boolean);
+      const f = {
+        _libraryId: libEntry.id,
+        _donorName: donor?.name || '(library)',
+        _donorCR: donor ? (donor.crText || String(donor.cr)) : libEntry.tier,
+        _donorId: donor?.id || null,
+        _isSignature: !!libEntry.isSignature,
+        _libraryKind: libEntry.kind,
+        name: libEntry.name || libEntry.canonicalName || 'Feature',
+        body: ''
+      };
+
+      const TEMPLATABLE = new Set([
+        'melee_attack', 'ranged_attack', 'flex_attack', 'save_effect'
+      ]);
+      if (TEMPLATABLE.has(libEntry.kind) && libEntry.templateFields
+          && Object.keys(libEntry.templateFields).length){
+        f._template = {
+          kind: libEntry.kind,
+          fields: JSON.parse(JSON.stringify(libEntry.templateFields)),
+          targetSection: sectionForKind(libEntry.kind),
+          trigger: null,
+          legendaryCost: null
+        };
+        const composed = TEMPLATES[libEntry.kind].compose(f._template.fields, newMon);
+        const wrapped = applySectionWrapping(composed.name, composed.body, f._template.targetSection, null, null);
+        f.name = wrapped.name;
+        f.body = wrapped.body;
+      } else {
+        // Prose: keep verbatim. Recharge marker comes from the original
+        // (it lived in the action's display name, preserved in
+        // libEntry.name) — already in `f.name`.
+        f.body = libEntry.bodyTemplate || '';
+      }
+      return f;
+    }
+
+    function recomposeTemplatedFeatures(newMon){
+      // Walk every templatable feature and recompose its body against
+      // the chimera's stats. Needed because retuneChimeraStats changes
+      // abilities + PB after materializeFromLibrary's initial compose.
+      const sections = ['actions','bonusActions','reactions','legendaryActions'];
+      for (const sec of sections){
+        for (const f of newMon[sec]){
+          if (!f._template) continue;
+          const tmpl = TEMPLATES[f._template.kind];
+          if (!tmpl) continue;
+          const composed = tmpl.compose(f._template.fields, newMon);
+          const wrapped = applySectionWrapping(composed.name, composed.body, f._template.targetSection, f._template.trigger, f._template.legendaryCost);
+          f.name = wrapped.name;
+          f.body = wrapped.body;
+        }
+      }
+    }
+
+    function synthesizeMultiattack(newMon, cr){
+      const slottedAttacks = newMon.actions.filter(a =>
+        a._template?.kind && /_attack$/.test(a._template.kind)
+      );
+      if (!slottedAttacks.length) return;
+
+      const chosen = slottedAttacks[0];
+      const attackName = chosen._template?.fields?.weaponName || chosen.name || 'Attack';
+      const count = cr < 11 ? 2 : 3;
+
+      const multi = {
+        name: 'Multiattack',
+        body: '',
+        _template: {
+          kind: 'multiattack',
+          fields: { count, attackName, preamble: '', coda: '' },
+          targetSection: 'actions',
+          trigger: null,
+          legendaryCost: null
+        },
+        _synthesized: true,
+        _donorName: 'synthesized',
+        _donorCR: '—',
+        _donorId: null,
+        _isSignature: false
+      };
+      const composed = TEMPLATES.multiattack.compose(multi._template.fields, newMon);
+      const wrapped = applySectionWrapping(composed.name, composed.body, 'actions', null, null);
+      multi.name = wrapped.name;
+      multi.body = wrapped.body;
+      newMon.actions.unshift(multi);
+    }
+
+    function fillMonsterPlaceholders(newMon){
+      // Replace {MONSTER} tokens with the chimera's name (lowercased so
+      // the resulting prose reads naturally: "the frostbound owlbear
+      // has advantage on...").
+      const name = (newMon.name || 'creature').toLowerCase();
+      const sections = ['traits','actions','bonusActions','reactions','legendaryActions','description'];
+      for (const sec of sections){
+        const v = newMon[sec];
+        if (Array.isArray(v)){
+          for (const f of v){
+            if (f.body && f.body.includes('{MONSTER}')){
+              f.body = f.body.replace(/\{MONSTER\}/g, name);
+            }
+            if (f.name && f.name.includes('{MONSTER}')){
+              f.name = f.name.replace(/\{MONSTER\}/g, name);
+            }
+          }
+        } else if (typeof v === 'string' && v.includes('{MONSTER}')){
+          newMon[sec] = v.replace(/\{MONSTER\}/g, name);
+        }
+      }
     }
 
     function blankChimera(crit){
@@ -3476,17 +3556,6 @@
         role: crit.role || null,
         terrain: crit.terrains.length ? [...crit.terrains] : []
       };
-    }
-
-    function slotFeature(feat){
-      // Deep-clone the source feature item, stamp it with donor
-      // attribution. Keeps the original action/trait body untouched in
-      // the source bestiary.
-      const f = JSON.parse(JSON.stringify(feat.item));
-      f._donorName = feat.source.name;
-      f._donorCR = feat.source.crText || String(feat.source.cr);
-      f._donorId = feat.source.id;
-      return f;
     }
 
     function retuneChimeraStats(mon, crit){
@@ -3554,12 +3623,12 @@
       return [sorted[0][0], sorted[1][0]];
     }
 
-    // ── Attack → template parser ────────────────────────────────────
-    // Reverse-engineer an action body into the structured `_template`
-    // shape used by the Editor. When the chimera opens in the Editor,
-    // the template engine recomputes the attack body against the new
-    // monster's stats — fixing damage and to-hit drift automatically.
-    function parseToTemplate(action, section){
+    // ── Attack → template parser (DEPRECATED) ───────────────────────
+    // Kept temporarily as `_parseToTemplate_legacy` for reference; the
+    // chimera generator no longer calls it (the library now ships
+    // pre-extracted templateFields from `scripts/extract_features.py`).
+    // Will be deleted in a follow-up cleanup pass.
+    function _parseToTemplate_legacy(action, section){
       const body = (action.body || '').trim();
       const name = (action.name || '').replace(/\s*\([^)]+\)\s*$/, '').trim();
       const rechargeMatch = (action.name || '').match(/\((Recharge\s+[0-9–\-]+|\d+\/Day)\)/i);
