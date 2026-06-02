@@ -231,7 +231,10 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
       <div class="section-header">LINKED LOCATIONS</div>
       <div class="chip-grid" id="f-loc-chips"></div>
 
-      <div class="section-header">LINKED NPCs</div>
+      <div class="section-header">LINKED NPCs
+        <button class="btn btn-gold btn-sm" type="button" onclick="openAddNpc()" style="margin-left:auto">+ ADD NPC</button>
+        <button class="btn btn-ghost btn-sm" type="button" onclick="openScanPrep()" title="Find [[Wikilinks]] in your prep that aren't NPCs yet">↑ SCAN PREP</button>
+      </div>
       <div class="chip-grid" id="f-npc-chips"></div>
 
       <div class="section-header">STRUCTURED LOOT <span class="hint">— for initiative exports &amp; per-recipient tracking. Markdown lists in the Prep block stay too.</span></div>
@@ -289,6 +292,54 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
     </div>
   </aside>
 </main>
+
+<!-- ADD NPC OVERLAY -->
+<div class="overlay" id="npc-overlay" onclick="if(event.target===this)closeAddNpc()">
+  <div class="modal">
+    <h2 id="npc-modal-title">Quick-add NPC</h2>
+    <div class="field"><label>NAME</label><input type="text" id="npc-f-name" placeholder="Mistress Halen" autocomplete="off"></div>
+    <div class="field-row">
+      <div class="field"><label>ROLE</label><input type="text" id="npc-f-role" placeholder="Healer · Apothecary"></div>
+      <div class="field"><label>STATUS</label>
+        <select id="npc-f-status">
+          <option value="alive">Alive</option>
+          <option value="dead">Dead</option>
+          <option value="missing">Missing</option>
+          <option value="unknown">Unknown</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>CURRENT LOCATION</label>
+      <select id="npc-f-location"><option value="">— unknown / off-map —</option></select>
+    </div>
+    <div class="field"><label>CURRENT ACTIVITY</label><input type="text" id="npc-f-activity" placeholder="Running the healing house off the east market"></div>
+    <div class="field"><label>PUBLIC DESCRIPTION (visible to players who know them)</label><textarea id="npc-f-description" rows="3"></textarea></div>
+    <div class="dm-note-area">
+      <div class="dm-note-label">🔒 DM ONLY</div>
+      <textarea id="npc-f-dmNotes" rows="3" placeholder="True motives, stat block, plot hooks…"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" onclick="closeAddNpc()">CANCEL</button>
+      <button class="btn btn-gold btn-sm" onclick="saveNewNpc()">CREATE &amp; LINK</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCAN PREP OVERLAY -->
+<div class="overlay" id="scan-overlay" onclick="if(event.target===this)closeScanPrep()">
+  <div class="modal">
+    <h2>NPCs referenced in your prep</h2>
+    <div style="font-size:0.86rem;color:var(--ink-dim);margin-bottom:0.6rem;line-height:1.45">
+      Pulled from <code>[[Wikilinks]]</code> in your prep block and bare names under <code>## NPCs</code>.
+      Names matching existing NPCs, locations, or your characters are filtered out.
+    </div>
+    <div id="scan-list" style="margin:0.4rem 0"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" onclick="closeScanPrep()">CANCEL</button>
+      <button class="btn btn-gold btn-sm" id="scan-create-btn" onclick="createScannedNpcs()">CREATE SELECTED &amp; LINK</button>
+    </div>
+  </div>
+</div>
 
 <!-- IMPORT OVERLAY -->
 <div class="overlay" id="import-overlay" onclick="if(event.target===this)closeImport()">
@@ -1328,6 +1379,216 @@ async function exportAll() {
     // Small delay so the browser doesn't drop later downloads
     await new Promise(r => setTimeout(r, 120));
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  NPC QUICK-ADD + PREP SCAN
+// ═══════════════════════════════════════════════════════════════
+function slugify(s) {
+  return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+function uniqueNpcId(name, extraUsed) {
+  const used = new Set([...npcs.map(n => n.id), ...(extraUsed || [])]);
+  let base = slugify(name) || 'npc';
+  let id = base, n = 1;
+  while (used.has(id)) id = `${base}-${++n}`;
+  return id;
+}
+
+async function saveNPCsKV() {
+  localStorage.setItem('dm_npcs', JSON.stringify(npcs));
+  setStatus('Saving NPCs…', 'ing');
+  const ok = await dmPost('npcs', npcs);
+  setStatus(ok ? 'Saved' : 'Save failed', ok ? 'ok' : 'fail');
+  return ok;
+}
+
+let _scanCandidates = [];
+
+function refreshAddNpcLocationOptions() {
+  const sel = document.getElementById('npc-f-location');
+  if (!sel) return;
+  const locs = flattenLocations().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  sel.innerHTML = '<option value="">— unknown / off-map —</option>' +
+    locs.map(l => `<option value="${escapeHtml(l.id)}">${escapeHtml(l.name)}${l.parent ? ` · ${escapeHtml(l.parent)}` : ''}</option>`).join('');
+}
+
+function openAddNpc(prefill) {
+  refreshAddNpcLocationOptions();
+  document.getElementById('npc-modal-title').textContent = 'Quick-add NPC';
+  document.getElementById('npc-f-name').value = (prefill && prefill.name) || '';
+  document.getElementById('npc-f-role').value = (prefill && prefill.role) || '';
+  document.getElementById('npc-f-status').value = 'alive';
+  // Default to the session's first linked location if any
+  let defaultLoc = '';
+  if (work && work.locationIds && work.locationIds.length) defaultLoc = work.locationIds[0];
+  document.getElementById('npc-f-location').value = defaultLoc;
+  document.getElementById('npc-f-activity').value = '';
+  document.getElementById('npc-f-description').value = '';
+  document.getElementById('npc-f-dmNotes').value = '';
+  document.getElementById('npc-overlay').classList.add('visible');
+  setTimeout(() => document.getElementById('npc-f-name').focus(), 30);
+}
+function closeAddNpc() {
+  document.getElementById('npc-overlay').classList.remove('visible');
+}
+
+async function saveNewNpc() {
+  const name = document.getElementById('npc-f-name').value.trim();
+  if (!name) { alert('NPC needs a name.'); return; }
+  // Reject duplicate names (case-insensitive) so the chip grid stays clean.
+  if (npcs.some(n => (n.name || '').toLowerCase() === name.toLowerCase())) {
+    if (!confirm(`An NPC named "${name}" already exists. Create a duplicate anyway?`)) return;
+  }
+  const npc = {
+    id: uniqueNpcId(name),
+    name,
+    role: document.getElementById('npc-f-role').value.trim(),
+    status: document.getElementById('npc-f-status').value,
+    currentLocationId: document.getElementById('npc-f-location').value || null,
+    currentActivity: document.getElementById('npc-f-activity').value.trim(),
+    description: document.getElementById('npc-f-description').value.trim(),
+    notes: '',
+    dmNotes: document.getElementById('npc-f-dmNotes').value.trim(),
+    knownTo: [],
+    history: [],
+    tags: [],
+  };
+  npcs.push(npc);
+  const ok = await saveNPCsKV();
+  if (!ok) {
+    // Roll back if the worker rejected; otherwise the local roster drifts from KV.
+    npcs.pop();
+    alert('Failed to save NPC — check your DM session and try again.');
+    return;
+  }
+  // Auto-link to the current session if one is being edited
+  if (editingId) {
+    if (!work.npcIds.includes(npc.id)) work.npcIds.push(npc.id);
+  }
+  closeAddNpc();
+  renderChips();
+  renderSidebar();
+}
+
+// ── Scan prep for unresolved NPC references ──
+function findCandidateNpcsInPrep(prepText) {
+  if (!prepText) return [];
+  const names = new Set();
+
+  // 1. Every [[Wikilink]] anywhere in prep
+  const re = /\[\[([^|\]]+)(?:\|[^\]]+)?\]\]/g;
+  let m;
+  while ((m = re.exec(prepText))) names.add(m[1].trim());
+
+  // 2. Bare list items under any ## NPCs / ## NPC heading
+  const lines = prepText.split(/\r?\n/);
+  let inNpcSection = false;
+  for (const line of lines) {
+    const h = line.match(/^##\s+(.+?)\s*$/);
+    if (h) {
+      const heading = stripWikilink(h[1]).replace(/:\s*$/, '').trim().toLowerCase();
+      inNpcSection = (heading === 'npcs' || heading === 'npc');
+      continue;
+    }
+    if (!inNpcSection) continue;
+    const li = line.match(/^\s*-\s+(?:\[[ xX]?\]\s+)?(.+)$/);
+    if (!li) continue;
+    // If the line has its own [[Wikilink]], the earlier full-prep scan already
+    // captured it — don't double-add the surrounding "Senior Examiner Naila Vass".
+    if (/\[\[/.test(li[1])) continue;
+    // Drop trailing "— description" and parentheticals so just the name remains
+    let n = li[1].trim();
+    n = n.split(/\s+[—–-]\s+/)[0].trim();   // trim em-dash separator
+    n = n.replace(/\*\*/g, '').trim();         // strip bold markers
+    n = n.replace(/\s*\(.*?\)\s*$/, '').trim();
+    if (n) names.add(n);
+  }
+
+  // 3. Filter out characters, locations, and existing NPCs (case-insensitive)
+  const charNames = new Set(characters.map(c => (c.name || '').toLowerCase()));
+  const locNames = new Set(flattenLocations().map(l => (l.name || '').toLowerCase()));
+  const npcNames = new Set(npcs.map(n => (n.name || '').toLowerCase()));
+
+  return [...names].filter(n => {
+    const lc = n.toLowerCase();
+    if (!lc) return false;
+    if (charNames.has(lc)) return false;
+    if (locNames.has(lc)) return false;
+    if (npcNames.has(lc)) return false;
+    return true;
+  }).sort((a, b) => a.localeCompare(b));
+}
+
+function openScanPrep() {
+  if (!editingId) { alert('Select or create a session first.'); return; }
+  collectFromForm();
+  _scanCandidates = findCandidateNpcsInPrep(work.prep || '');
+  const wrap = document.getElementById('scan-list');
+  if (!_scanCandidates.length) {
+    wrap.innerHTML = '<div class="chip-empty" style="padding:0.6rem 0">Nothing to add. Every NPC referenced in your prep is already in the roster (or matches a location/character).</div>';
+    document.getElementById('scan-create-btn').disabled = true;
+  } else {
+    document.getElementById('scan-create-btn').disabled = false;
+    wrap.innerHTML = _scanCandidates.map((name, i) => `
+      <div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px dashed var(--border)">
+        <input type="checkbox" id="scan-cb-${i}" checked style="accent-color:var(--gold);width:14px;height:14px;cursor:pointer">
+        <label for="scan-cb-${i}" style="font-family:'Cinzel',serif;font-size:0.86rem;color:var(--ink);min-width:180px;cursor:pointer">${escapeHtml(name)}</label>
+        <input type="text" id="scan-role-${i}" placeholder="role (optional)" style="flex:1;background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:4px 7px;font-family:'Crimson Text',serif;font-size:0.84rem;outline:none">
+      </div>
+    `).join('');
+  }
+  document.getElementById('scan-overlay').classList.add('visible');
+}
+function closeScanPrep() {
+  document.getElementById('scan-overlay').classList.remove('visible');
+}
+
+async function createScannedNpcs() {
+  const picks = _scanCandidates
+    .map((name, i) => ({ name, role: document.getElementById('scan-role-' + i)?.value.trim() || '', checked: document.getElementById('scan-cb-' + i)?.checked }))
+    .filter(p => p.checked);
+  if (!picks.length) { closeScanPrep(); return; }
+  const defaultLoc = (work.locationIds && work.locationIds[0]) || null;
+  const created = [];
+  const usedIds = [];
+  for (const p of picks) {
+    const id = uniqueNpcId(p.name, usedIds);
+    usedIds.push(id);
+    const npc = {
+      id,
+      name: p.name,
+      role: p.role,
+      status: 'alive',
+      currentLocationId: defaultLoc,
+      currentActivity: '',
+      description: '',
+      notes: '',
+      dmNotes: '',
+      knownTo: [],
+      history: [],
+      tags: [],
+    };
+    npcs.push(npc);
+    created.push(npc.id);
+  }
+  const ok = await saveNPCsKV();
+  if (!ok) {
+    // Roll back additions if the worker rejected the save
+    for (const id of created) {
+      const idx = npcs.findIndex(n => n.id === id);
+      if (idx >= 0) npcs.splice(idx, 1);
+    }
+    alert('Failed to save NPCs — check your DM session and try again.');
+    return;
+  }
+  // Auto-link all newly created NPCs to the current session
+  for (const id of created) {
+    if (!work.npcIds.includes(id)) work.npcIds.push(id);
+  }
+  closeScanPrep();
+  renderChips();
+  renderSidebar();
 }
 
 // ═══════════════════════════════════════════════════════════════
