@@ -9,6 +9,71 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: feature library — extracted, normalized, tier-stratified
+
+Builds a flat, donor-agnostic feature catalog that the chimera
+generator will pull from instead of walking the raw bestiary every
+roll. The library lives in a new `feature_library` KV key, imported
+the same way the bestiary is. The generator rewire to consume it
+lands in a follow-up commit; this one ships the extraction pipeline
+and the KV plumbing.
+
+#### Added — `scripts/extract_features.py`
+
+- Reads `bestiary.json` (already normalized + tagged by the prior
+  scripts) and walks every monster's traits, actions, bonus actions,
+  reactions, and legendary actions.
+- For each feature: classifies its kind (`melee_attack`,
+  `ranged_attack`, `flex_attack`, `save_effect`, `multiattack`,
+  `spellcasting`, `utility`, `trait`, `bonus_action`, `reaction`,
+  `legendary`), reverse-engineers the template fields for the
+  templatable kinds, and normalizes the body with a `{MONSTER}`
+  placeholder so the same trait reads clean on any future chimera.
+- Tier-stratifies by source CR (low CR 1–4, mid CR 5–10, high CR
+  11–16, epic CR 17+). Each tier gets its own library entry with the
+  representative donor's dice and reach/range so a CR 5 chimera's
+  Bite pulls 4d8 not 4d12.
+- Aggregates role + terrain affinity across donors — `Bite` appears
+  with affinity for Brute/Skirmisher/Soldier (its donor roles) so the
+  generator's role filter can match on the feature itself, not the
+  donor's identity.
+- Flags `isSignature: true` for canonical names that appear on only
+  one donor across the entire bestiary (Mind Blast, Eye Rays, Wail).
+  The generator can ration these so distinctive features don't
+  sprinkle onto every monster.
+- Output schema: `{schemaVersion, monsterCount, featureCount,
+  features: [...]}`. First run extracted **1,980 features** from
+  819 monsters (692 traits, 354 utility, 303 melee attacks, 168 save
+  effects, 125 legendary, 97 bonus, 93 ranged attacks, 69 reactions,
+  59 flex attacks, 20 spellcasting blocks). Tier split: low 691, mid
+  673, high 386, epic 230. Signature: 1,202 of 1,980.
+
+#### Added — `cloudflare-worker.js`
+
+- New GET endpoint `?type=feature_library` returns the KV-stored
+  library (empty envelope by default). DM-gated.
+- `feature_library` added to `DM_WRITE_TYPES` so POST works.
+
+#### Added — `bestiary-dm.html`
+
+- New page-level `featureLibrary` state; bootstrap fetches it
+  alongside the bestiary and bestiary_custom on load. Tolerant of a
+  missing route (older worker deploys won't break the page).
+- Import tab detects feature-library shape (`{features: [...]}`)
+  at file-load time, sets a `seedKind` flag, and routes to a single
+  replace-only KV write (the library is regenerated as a whole from
+  the Python script, so merge mode doesn't apply).
+- Import preview adapts wording: "Replace the feature library with N
+  features" vs. the bestiary's merge-by-id flow.
+
+#### Required worker redeploy
+
+The new `feature_library` GET endpoint + `DM_WRITE_TYPES` entry need
+a manual paste into the Cloudflare dashboard before the page can
+fetch or save the library.
+
+---
+
 ### Menagerie: chimera slot tightening + multiattack repointing
 
 Tightens the chimera generator's slot caps so output matches 2024 MM

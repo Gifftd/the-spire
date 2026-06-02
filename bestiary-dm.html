@@ -741,7 +741,13 @@
     // under a separate KV key so re-imports of the source book never touch it.
     let customMonsters = [];
     let seedData = null;
+    let seedKind = 'bestiary';  // 'bestiary' or 'feature_library'
     let activeId = null;
+    // feature_library: pre-extracted, tier-stratified, donor-agnostic catalog
+    // of every action/trait/etc. Populated from the `feature_library` KV key
+    // (which the DM imports via the Import tab using
+    // `scripts/extract_features.py` output). Used by the chimera generator.
+    let featureLibrary = { schemaVersion: 0, features: [] };
 
     // CR sort table: 1/8 < 1/4 < 1/2 < 1 < 2 ...
     const CR_OPTIONS = [
@@ -782,11 +788,12 @@
       if (!Auth.requireRole('dm', { reason:'The Menagerie is for the DM only.' })) return;
       const stateEl = document.getElementById('state');
       try {
-        const [r, rc] = await Promise.all([
-          fetch(WORKER_URL + '?type=bestiary',        { cache:'no-store', headers: Auth.dmHeaders() }),
-          fetch(WORKER_URL + '?type=bestiary_custom', { cache:'no-store', headers: Auth.dmHeaders() })
+        const [r, rc, rl] = await Promise.all([
+          fetch(WORKER_URL + '?type=bestiary',         { cache:'no-store', headers: Auth.dmHeaders() }),
+          fetch(WORKER_URL + '?type=bestiary_custom',  { cache:'no-store', headers: Auth.dmHeaders() }),
+          fetch(WORKER_URL + '?type=feature_library',  { cache:'no-store', headers: Auth.dmHeaders() })
         ]);
-        if (r.status === 401 || rc.status === 401){ stateEl.textContent='Your DM session expired — sign in again on the home page.'; stateEl.classList.add('error'); return; }
+        if (r.status === 401 || rc.status === 401 || rl.status === 401){ stateEl.textContent='Your DM session expired — sign in again on the home page.'; stateEl.classList.add('error'); return; }
         if (!r.ok) throw new Error('HTTP '+r.status);
         const d = await r.json();
         bestiary = (d && typeof d === 'object') ? d : { monsters: [] };
@@ -796,6 +803,13 @@
         if (rc.ok){
           const dc = await rc.json();
           customMonsters = Array.isArray(dc) ? dc : (Array.isArray(dc?.monsters) ? dc.monsters : []);
+        }
+        // feature_library endpoint is newer still — tolerate a missing route
+        // (the chimera generator falls back to building the catalog from the
+        // bestiary at runtime when the library is empty).
+        if (rl.ok){
+          const dl = await rl.json();
+          if (dl && Array.isArray(dl.features)) featureLibrary = dl;
         }
       } catch(e){
         stateEl.textContent = 'Could not reach the worker. (If you just added the bestiary endpoint, redeploy the worker first.)';
@@ -1047,6 +1061,16 @@
       const prev = document.getElementById('import-preview');
       const btn = document.getElementById('import-btn');
       if (!seedData){ prev.textContent = ''; btn.disabled = true; return; }
+      // Feature library path — single envelope, replace-only (the library
+      // is regenerated as a whole from the Python script).
+      if (seedKind === 'feature_library'){
+        const n = (seedData.features || []).length;
+        const existing = (featureLibrary.features || []).length;
+        prev.innerHTML = `<b>Replace</b> the feature library with this file's <b>${n}</b> features (schema v${esc(String(seedData.schemaVersion || 1))}). Current library: ${existing} features.`;
+        btn.textContent = `Replace feature library (${n} entries)`;
+        btn.disabled = false;
+        return;
+      }
       const newMonsters = asMonsters(seedData);
       const mode = getImportMode();
       const sourceTag = seedData.source ? ` from <b>${esc(seedData.source)}</b>` : '';
@@ -1074,14 +1098,24 @@
 
     function loadSeed(ev){
       const file = ev.target.files && ev.target.files[0];
-      if (!file){ seedData = null; refreshImportPreview(); return; }
+      if (!file){ seedData = null; seedKind = 'bestiary'; refreshImportPreview(); return; }
       const reader = new FileReader();
       reader.onload = () => {
         try {
           const d = JSON.parse(reader.result);
+          // Feature library detection — top-level `features` array means
+          // this is a `scripts/extract_features.py` output, not a bestiary.
+          if (d && !Array.isArray(d) && Array.isArray(d.features)){
+            if (!d.features.length) throw new Error('Feature library file has no features.');
+            seedKind = 'feature_library';
+            seedData = d;
+            refreshImportPreview();
+            return;
+          }
           const ms = asMonsters(d);
-          if (!ms.length) throw new Error('No monsters found in that file.');
+          if (!ms.length) throw new Error('No monsters or features found in that file.');
           // Preserve the envelope if it has one; otherwise wrap.
+          seedKind = 'bestiary';
           seedData = (d && !Array.isArray(d) && Array.isArray(d.monsters))
             ? d
             : { schemaVersion: 1, monsters: ms, count: ms.length, importedAt: new Date().toISOString() };
@@ -1100,6 +1134,24 @@
       if (!seedData) return;
       const btn = document.getElementById('import-btn');
       const originalLabel = btn.textContent;
+
+      // Feature library import — single KV write, replace-only path.
+      if (seedKind === 'feature_library'){
+        btn.disabled = true; btn.textContent = 'Replacing library…';
+        const ok = await saveKey('feature_library', seedData);
+        if (ok){
+          featureLibrary = seedData;
+          document.getElementById('import-preview').innerHTML =
+            `<b style="color:var(--teal-bright)">Done.</b> Feature library is now ${(seedData.features||[]).length} entries.`;
+          toast('Feature library imported.');
+          btn.textContent = originalLabel;
+        } else {
+          btn.textContent = originalLabel;
+          btn.disabled = false;
+        }
+        return;
+      }
+
       const mode = getImportMode();
       btn.disabled = true; btn.textContent = mode === 'replace' ? 'Replacing…' : 'Merging…';
 
