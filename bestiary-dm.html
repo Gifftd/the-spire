@@ -1320,8 +1320,37 @@
         populateFilters();
         renderList();
         renderSource();
-        document.getElementById('import-preview').innerHTML = summaryHTML;
-        toast(mode === 'replace' ? 'Bestiary replaced.' : 'New monsters added.');
+
+        // ── Auto-rebuild the feature library against the new bestiary ──
+        // Mirrors what `scripts/extract_features.py` does, in-browser, so
+        // the DM doesn't have to drop to the command line just because
+        // they added monsters. Preserves library entries flagged
+        // _custom or _manualEdit so handwritten + DM-tweaked entries
+        // survive the rebuild.
+        btn.textContent = 'Rebuilding library…';
+        let libSummary = '';
+        try {
+          const before = (featureLibrary.features || []).length;
+          const monsters = asMonsters(payload);
+          // Light yield to the event loop so the spinner can paint.
+          await new Promise(r => setTimeout(r, 0));
+          const rebuilt = rebuildLibraryFromBestiary(featureLibrary, monsters);
+          const libOk = await saveKey('feature_library', rebuilt);
+          if (libOk){
+            featureLibrary = rebuilt;
+            const after = rebuilt.features.length;
+            const delta = after - before;
+            libSummary = `<br><span style="color:var(--ink-faint);font-size:0.85em">Feature library auto-rebuilt: ${after} entries (${delta >= 0 ? '+' : ''}${delta} from previous).</span>`;
+          } else {
+            libSummary = `<br><span style="color:var(--rust);font-size:0.85em">Feature library rebuild failed — re-run scripts/extract_features.py and re-import via the library path.</span>`;
+          }
+        } catch(e){
+          console.error('Library rebuild failed:', e);
+          libSummary = `<br><span style="color:var(--rust);font-size:0.85em">Feature library rebuild errored: ${esc(e.message)}. Bestiary save succeeded; rebuild manually with scripts/extract_features.py.</span>`;
+        }
+
+        document.getElementById('import-preview').innerHTML = summaryHTML + libSummary;
+        toast(mode === 'replace' ? 'Bestiary replaced + library rebuilt.' : 'New monsters added + library updated.');
         btn.textContent = originalLabel;
         // After a successful import, the file's still selected. Recompute
         // so the next click would be a no-op.
@@ -4105,6 +4134,336 @@
     }
 
     /* ──────────────────────────────────────────────────────────────────
+     * Feature library — in-browser extractor.
+     *
+     * This is the JS port of `scripts/extract_features.py` so the page
+     * can rebuild the library automatically after every bestiary
+     * import (Merge or Replace). The Python script is still useful for
+     * cold-start / one-off generation; this path covers the common
+     * "DM imports a new book and wants the library to update too" flow.
+     *
+     * Same outputs as the Python pipeline: each library entry is a
+     * `{canonicalName, kind, tier}` bucket with aggregated
+     * templateFields, body template with `{MONSTER}` / `{SPELL_DC}` /
+     * `{SPELL_ATK}` placeholders, role + terrain affinities unioned
+     * across donors, signature flag, cost.
+     *
+     * Manual edits made via the Library tab survive the rebuild — any
+     * entry with `_custom: true` (no donor lineage) or `_manualEdit:
+     * true` (DM-edited) is preserved verbatim.
+     * ────────────────────────────────────────────────────────────────── */
+
+    const SECTION_KIND_DEFAULTS = {
+      traits:           'trait',
+      actions:           null,           // classify by body
+      bonusActions:     'bonus_action',
+      reactions:        'reaction',
+      legendaryActions: 'legendary'
+    };
+    const NUM_WORDS_JS = { one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10 };
+    const ABIL_LONG_TO_SHORT_JS = {
+      Strength:'str', Dexterity:'dex', Constitution:'con',
+      Intelligence:'int', Wisdom:'wis', Charisma:'cha'
+    };
+    const TIER_BANDS_JS = {
+      low:  [1, 4], mid: [5, 10], high: [11, 16], epic: [17, 30]
+    };
+
+    // Strip recharge markers + form qualifiers from raw action names so
+    // the canonical bucket name is donor-agnostic. Mirrors the Python
+    // RECHARGE_RX + FORM_QUALIFIER_RX.
+    function libCanonicalName(raw){
+      if (!raw) return '';
+      let n = raw.replace(/\s*\((Recharge\s+[0-9–\-/]+|\d+\s*\/\s*Day)\)\s*/gi, '');
+      n = n.replace(/\s*\([^)]{0,80}(only|form)[^)]{0,80}\)\s*/gi, '');
+      return n.trim();
+    }
+
+    // Replace donor-specific references with `{MONSTER}` placeholders.
+    // Mirrors Python make_body_template — full name first, then word
+    // tokens ≥4 chars. The chimera-fill pass resolves these at slot
+    // time.
+    function libMakeBodyTemplate(body, donorName){
+      if (!body || !donorName) return body || '';
+      let out = body;
+      const parts = [donorName].concat(donorName.split(/\s+/).filter(p => p.length >= 4));
+      const seen = new Set();
+      for (const cand of parts){
+        const k = cand.toLowerCase();
+        if (seen.has(k)) continue;
+        seen.add(k);
+        const rx = new RegExp(`\\b${cand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+        out = out.replace(rx, '{MONSTER}');
+      }
+      return out;
+    }
+
+    // Strip donor-specific spell DC + spell-attack bonus to
+    // placeholders, matching the Python normalize_spellcasting_body.
+    function libNormalizeSpellcastingBody(body){
+      if (!body) return body;
+      return body
+        .replace(/spell save DC\s*\d+/gi, 'spell save DC {SPELL_DC}')
+        .replace(/\+\s*\d+\s*to hit with spell attacks/gi, '+{SPELL_ATK} to hit with spell attacks');
+    }
+
+    // Parse a feature into template fields (for templatable kinds) +
+    // canonical name. Mirrors Python's parse_attack/save/multiattack/
+    // spellcasting_to_template, returning the same field shapes the
+    // chimera's compose() expects.
+    function libParseFeatureFields(item, monster, kind){
+      const body = (item.body || '').trim();
+      const rawName = item.name || '';
+      const cname = libCanonicalName(rawName);
+      const rechargeMatch = rawName.match(/\((Recharge\s+[0-9–\-]+|\d+\s*\/\s*Day)\)/i);
+      const recharge = rechargeMatch
+        ? rechargeMatch[1].replace(/^Recharge\s+/i, '').replace(/–/g, '-')
+        : '';
+
+      // Multiattack — not stored in library (synthesized at slot time)
+      // but we still return a name + empty fields so the caller can
+      // skip cleanly.
+      if (/^multiattack\b/i.test(rawName)){
+        return { kind: 'multiattack', canonicalName: 'Multiattack', fields: {}, isAttackOrSave: false };
+      }
+
+      // Attack
+      const mFlex = body.match(/Melee or Ranged Attack Roll:\s*([+\-]\d+)/);
+      const mMelee = !mFlex && body.match(/Melee Attack Roll:\s*([+\-]\d+)/);
+      const mRanged = !mFlex && !mMelee && body.match(/Ranged Attack Roll:\s*([+\-]\d+)/);
+      const atkMatch = mFlex || mMelee || mRanged;
+      if (atkMatch){
+        const attackBonus = parseInt(atkMatch[1], 10);
+        const ability = mRanged ? 'dex' : 'str';     // default; close enough for aggregation
+        const reach = (body.match(/reach (\d+) ft\./) || [])[1];
+        const rngFull = body.match(/range (\d+)\/(\d+) ft\./);
+        const rngSingle = !rngFull && body.match(/range (\d+) ft\./);
+        const dmgs = parseDamageClauses(body);
+        const primary = dmgs[0] || { dice: '1d6', type: 'Bludgeoning' };
+        const rider = dmgs[1] || null;
+        const dicePure = (primary.dice || '1d6').replace(/\s*[+\-]\s*\d+/, '');
+        const bonusInBody = (primary.dice || '').match(/[+\-]\s*\d+/);
+
+        const detectedKind = mFlex ? 'flex_attack' : (mMelee ? 'melee_attack' : 'ranged_attack');
+        const fields = {
+          weaponName: cname || 'Attack',
+          ability,
+          damageDice: dicePure,
+          damageBonus: 0,
+          useAbilityMod: !!bonusInBody,
+          damageType: primary.type || (mMelee ? 'Slashing' : 'Piercing'),
+          riderDice: rider ? rider.dice : '',
+          riderType: rider ? rider.type : '',
+          recharge
+        };
+        if (detectedKind !== 'ranged_attack'){
+          fields.reach = reach ? parseInt(reach, 10) : 5;
+        }
+        if (detectedKind !== 'melee_attack'){
+          if (rngFull){ fields.rangeShort = parseInt(rngFull[1], 10); fields.rangeLong = parseInt(rngFull[2], 10); }
+          else if (rngSingle){ fields.rangeShort = parseInt(rngSingle[1], 10); fields.rangeLong = parseInt(rngSingle[1], 10); }
+          else { fields.rangeShort = 30; fields.rangeLong = 120; }
+        }
+        return { kind: detectedKind, canonicalName: cname, fields, isAttackOrSave: true };
+      }
+
+      // Save effect
+      const sv = body.match(/(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma) Saving Throw:\s*DC\s*(\d+)(?:,\s*([^.]+?)\.)?/);
+      if (sv){
+        const dmgs = parseDamageClauses(body);
+        const successHalf = /Success:\s*Half damage(?: only)?\./i.test(body);
+        const fields = {
+          actionName: cname || 'Effect',
+          targetSave: ABIL_LONG_TO_SHORT_JS[sv[1]] || 'dex',
+          dcAbility: 'con',
+          target: (sv[3] || 'each creature in a 30-foot Cone').trim(),
+          damageDice: (dmgs[0]?.dice || '6d6').replace(/\s*[+\-]\s*\d+/, ''),
+          damageType: dmgs[0]?.type || 'Fire',
+          failureSuffix: '',
+          successHalf,
+          successSuffix: '',
+          recharge
+        };
+        return { kind: 'save_effect', canonicalName: cname, fields, isAttackOrSave: true };
+      }
+
+      // Spellcasting
+      if (/^spellcasting$/i.test(rawName) || /\bspellcasting ability\b/i.test(body)){
+        const ab = body.match(/using\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)/);
+        return {
+          kind: 'spellcasting',
+          canonicalName: cname || 'Spellcasting',
+          fields: { spellAbility: ABIL_LONG_TO_SHORT_JS[ab?.[1]] || 'cha' },
+          isAttackOrSave: false
+        };
+      }
+
+      return { kind: null, canonicalName: cname, fields: {}, isAttackOrSave: false };
+    }
+
+    // Walk a monster's sections and yield one record per feature.
+    function* libExtractMonsterFeatures(monster){
+      for (const section of Object.keys(SECTION_KIND_DEFAULTS)){
+        const items = monster[section];
+        if (!Array.isArray(items)) continue;
+        for (const item of items){
+          const defaultKind = SECTION_KIND_DEFAULTS[section];
+          const parsed = libParseFeatureFields(item, monster, defaultKind);
+          const kind = parsed.kind || defaultKind || 'utility';
+          if (kind === 'multiattack') continue;     // synthesized at slot time
+          const body = item.body || '';
+          let bodyTemplate = libMakeBodyTemplate(body, monster.name || '');
+          if (kind === 'spellcasting') bodyTemplate = libNormalizeSpellcastingBody(bodyTemplate);
+          yield {
+            kind,
+            canonicalName: parsed.canonicalName || libCanonicalName(item.name || ''),
+            bodyTemplate,
+            templateFields: parsed.fields,
+            section,
+            donor: monster
+          };
+        }
+      }
+    }
+
+    // Aggregate templateFields across donors in a (canonicalName, kind,
+    // tier) bucket. Per-component:
+    //   - NdM strings: median count + median size
+    //   - numeric: median
+    //   - boolean: majority
+    //   - string: mode (most common)
+    function libAggregateTemplateFields(donors){
+      const fieldValues = {};
+      for (const f of donors){
+        const tf = f.templateFields || {};
+        for (const k of Object.keys(tf)){
+          (fieldValues[k] ||= []).push(tf[k]);
+        }
+      }
+      const out = {};
+      const diceRx = /^\s*(\d+)d(\d+)\s*$/;
+      function median(arr){ const s = arr.slice().sort((a,b)=>a-b); return s[Math.floor(s.length/2)]; }
+      function mode(arr){
+        const counts = new Map();
+        for (const v of arr) counts.set(v, (counts.get(v) || 0) + 1);
+        let best = null, bestN = -1;
+        for (const [v, n] of counts){ if (n > bestN){ best = v; bestN = n; } }
+        return best;
+      }
+      for (const k of Object.keys(fieldValues)){
+        const vs = fieldValues[k].filter(v => v !== undefined && v !== null);
+        if (!vs.length) continue;
+        const sample = vs[0];
+        if (typeof sample === 'string' && diceRx.test(sample)){
+          const counts = [], sizes = [];
+          for (const v of vs){
+            const m = String(v).match(diceRx);
+            if (m){ counts.push(parseInt(m[1], 10)); sizes.push(parseInt(m[2], 10)); }
+          }
+          out[k] = counts.length ? `${median(counts)}d${median(sizes)}` : (mode(vs) || sample);
+        } else if (typeof sample === 'number'){
+          const nums = vs.filter(v => typeof v === 'number');
+          out[k] = nums.length ? median(nums) : sample;
+        } else if (typeof sample === 'boolean'){
+          let t = 0, f = 0;
+          for (const v of vs) (v ? t++ : f++);
+          out[k] = t > f;
+        } else {
+          out[k] = mode(vs);
+        }
+      }
+      return out;
+    }
+
+    // Rebuild the feature library from a (potentially merged) bestiary.
+    // Preserves library entries with `_custom: true` (manually added)
+    // or `_manualEdit: true` (DM-tweaked) — those survive verbatim.
+    function rebuildLibraryFromBestiary(currentLibrary, allMonsters){
+      const buckets = new Map();        // key → array of donor records
+      const nameDonors = new Map();     // canonicalName → Set<monsterId>
+      function libTier(cr){
+        if (cr <  5) return 'low';
+        if (cr < 11) return 'mid';
+        if (cr < 17) return 'high';
+        return 'epic';
+      }
+
+      for (const m of allMonsters){
+        if (m.cr == null) continue;
+        const tier = libTier(+m.cr || 1);
+        for (const f of libExtractMonsterFeatures(m)){
+          const key = `${f.canonicalName}|${f.kind}|${tier}`;
+          if (!buckets.has(key)) buckets.set(key, []);
+          buckets.get(key).push(f);
+          if (!nameDonors.has(f.canonicalName)) nameDonors.set(f.canonicalName, new Set());
+          nameDonors.get(f.canonicalName).add(m.id);
+        }
+      }
+
+      const preserved = (currentLibrary.features || []).filter(e =>
+        e._custom || e._manualEdit
+      );
+      const preservedKeys = new Set(preserved.map(e => `${e.canonicalName}|${e.kind}|${e.tier}`));
+
+      const built = [];
+      for (const [key, donors] of buckets){
+        const [cname, kind, tier] = key.split('|');
+        // Skip if preserved entry already exists at this key
+        if (preservedKeys.has(key)) continue;
+        const tierBand = TIER_BANDS_JS[tier] || [1, 4];
+        const tierMid = (tierBand[0] + tierBand[1]) / 2;
+        const cost = Math.max(1, Math.round(tierMid * (KIND_COST_MULT[kind] || 3)));
+        const aggregated = libAggregateTemplateFields(donors);
+
+        // Pick rep body from donor closest to tier midpoint
+        let rep = donors[0];
+        let repDist = Infinity;
+        for (const d of donors){
+          const c = +(d.donor.cr) || 0;
+          const dist = Math.abs(c - tierMid);
+          if (dist < repDist){ rep = d; repDist = dist; }
+        }
+
+        const roleSet = new Set(), terrainSet = new Set();
+        const donorIds = [];
+        for (const d of donors){
+          if (d.donor.role) roleSet.add(d.donor.role);
+          for (const t of (d.donor.terrain || [])) terrainSet.add(t);
+          donorIds.push(d.donor.id);
+        }
+        const uniqueDonors = Array.from(new Set(donorIds));
+        const isSignature = (nameDonors.get(cname) || new Set()).size === 1;
+
+        built.push({
+          id: `${cname}-${kind}-${tier}`.replace(/\s+/g, '_'),
+          canonicalName: cname,
+          name: cname,
+          kind,
+          tier,
+          tierBand,
+          cost,
+          isSignature,
+          templateFields: aggregated,
+          bodyTemplate: rep.bodyTemplate,
+          roleAffinity: Array.from(roleSet).sort(),
+          terrainAffinity: Array.from(terrainSet).sort(),
+          donorIds: uniqueDonors.sort(),
+          donorCount: uniqueDonors.length
+        });
+      }
+
+      const allFeatures = preserved.concat(built);
+      return {
+        schemaVersion: 2,
+        extractedFrom: (currentLibrary.extractedFrom || 'bestiary') + ' · in-browser rebuild',
+        monsterCount: allMonsters.length,
+        featureCount: allFeatures.length,
+        features: allFeatures,
+        _rebuiltAt: new Date().toISOString()
+      };
+    }
+
+    /* ──────────────────────────────────────────────────────────────────
      * Library tab — browse, add, edit, delete library entries.
      *
      * The library is a single envelope `{schemaVersion, features: [...]}` —
@@ -4360,8 +4719,15 @@
       const features = featureLibrary.features || [];
       const idx = features.findIndex(x => x.id === selectedLibraryId);
       if (idx < 0){ toast('Library entry not found.', true); return; }
-      // Merge updates into the existing entry (preserve donorIds/donorCount).
-      features[idx] = { ...features[idx], ...updates };
+      // Merge updates into the existing entry (preserve donorIds /
+      // donorCount). Flip `_manualEdit` so the auto-rebuild on the
+      // next bestiary import won't overwrite this DM tweak.
+      features[idx] = {
+        ...features[idx],
+        ...updates,
+        _manualEdit: true,
+        _manualEditedAt: new Date().toISOString()
+      };
       const ok = await persistLibrary();
       if (ok){
         toast(`Saved "${features[idx].canonicalName}".`);
