@@ -9,6 +9,67 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: bestiary import auto-rebuilds the feature library
+
+When the DM imports a new bestiary (Merge or Replace), the page now
+re-runs the feature-extraction logic in-browser and rebuilds the
+feature library against the resulting bestiary — so newly-imported
+monsters' actions/traits become library entries automatically with
+proper role + terrain affinity, tier, cost, and `{MONSTER}` /
+`{SPELL_DC}` / `{SPELL_ATK}` placeholders.
+
+#### Added — `bestiary-dm.html`
+
+- **JS port of `scripts/extract_features.py`**, living alongside the
+  chimera generator helpers. Functions:
+  - `libCanonicalName(raw)` — strip recharge markers + form qualifiers
+  - `libMakeBodyTemplate(body, donorName)` — `{MONSTER}` substitution
+  - `libNormalizeSpellcastingBody(body)` — strip DC / spell-attack
+    bonus into `{SPELL_DC}` / `{SPELL_ATK}` placeholders
+  - `libParseFeatureFields(item, monster, kind)` — extract template
+    fields for attack/save/multiattack/spellcasting kinds
+  - `libExtractMonsterFeatures(monster)` — generator over a monster's
+    traits/actions/bonus/reactions/legendary
+  - `libAggregateTemplateFields(donors)` — median dice + die size,
+    median numerics, mode strings, majority booleans (mirrors the
+    Python aggregator from the v2 extractor)
+  - `rebuildLibraryFromBestiary(currentLibrary, allMonsters)` — the
+    driver. Buckets by `(canonicalName, kind, tier)`, builds entries
+    with aggregated fields + affinity unions, **preserves entries
+    flagged `_custom: true` or `_manualEdit: true`** so handwritten +
+    DM-tweaked library content survives the rebuild.
+
+#### Changed — Import workflow
+
+- `doImport`'s bestiary path (both Merge and Replace) now triggers a
+  library auto-rebuild after the bestiary save succeeds. A
+  `setTimeout(0)` yield lets the spinner paint before the rebuild
+  starts. Result lands in the `feature_library` KV via the existing
+  save path, and the in-memory `featureLibrary` updates so the
+  generator picks up new features without a page reload.
+- Import preview gets a second line: "Feature library auto-rebuilt:
+  N entries (+M from previous)." If the rebuild fails for any
+  reason, the bestiary save still succeeds and the error message
+  surfaces in the preview, with a fallback note pointing the DM at
+  `scripts/extract_features.py`.
+
+#### Changed — Library tab Save
+
+- Saving an entry via the Library tab now stamps `_manualEdit: true`
+  + `_manualEditedAt: <ISO>` on the modified record. The next
+  auto-rebuild on bestiary import will skip rebuilding that bucket
+  and preserve the DM's edit verbatim.
+
+#### Workflow this unlocks
+
+- DM imports a new book (e.g. a homebrew bestiary, Volo's etc.) →
+  the library updates in the same operation, no command-line step.
+- Stand-alone Python pipeline (`scripts/extract_features.py` +
+  Import library file) still works — useful for cold-start or for
+  DMs who want to inspect the extracted JSON before importing.
+
+---
+
 ### Menagerie: Library tab + in-place monster edit
 
 Two related editing affordances that close out the chimera-architecture
