@@ -9,6 +9,64 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### War Table: Flee Mortals encounter math replaces 2024 DMG XP thresholds
+
+The bestiary picker's encounter difficulty was using 2014 DMG XP-band
+math (Low / Moderate / High). Switches over to the Flee Mortals system
+which fits the MCDM monsters we just imported (and matches how DMs run
+the FM-shaped combat encounters).
+
+#### What's different about FM encounter building
+
+- Encounters are sized by **CR budget**, not XP. Per-character CR
+  budget by level + difficulty, then × party size for the total.
+- Five difficulty bands: **Trivial / Easy / Standard / Hard / Extreme**
+  — replacing the old four (Low / Moderate / High / Over).
+- Each non-trivial encounter is worth **daily encounter points**
+  (Easy 1, Standard 2, Hard 4, Extreme 8). Typical adventuring day
+  budget is 6–8 points.
+- **CR cap** per level: a single monster's CR can't exceed this even
+  if the budget has room (the FM table caps level 1 at CR 1, level
+  10 at CR 15, level 20 at CR 30).
+- **Minions** count fractionally — the Minion Encounter Building
+  table lists how many of a given CR equal one standard creature
+  (5 for CR 0–4, 8 for CR 5–8, 10 for CR 9+).
+- **Solo creatures** are sized against a different table entirely
+  — the difficulty is (CR cap − solo CR) bucketed by party size.
+  Mixing other monsters with a solo is non-standard.
+- Action-economy cap: no more than **3 non-minion creatures per
+  character** (party of 4 → max 12 non-minion monsters).
+
+#### Changed — `initiative-dm.html`
+
+- New `FM_CR_BUDGET` table (level → easy/standard/hard CR per char +
+  CR cap), `FM_MINIONS_PER_STD` lookup, `fmCR` formatter (½, ¼, etc.),
+  `fmDifficultyBand`, `fmSoloBand`, `FM_DAILY_POINTS`.
+- `renderBudget()` rewritten end-to-end:
+  - Sums monsters' CRs (weighted: minion CR ÷ minions-per-standard,
+    solos handled separately, non-minions count full).
+  - Displays Easy / Standard / Hard CR thresholds with the active
+    band highlighted.
+  - Shows daily encounter points for the resolved difficulty.
+  - Surfaces warnings when a monster's CR exceeds the level cap or
+    the non-minion count exceeds the action-economy cap.
+  - Special-cases solo creatures via the FM Solo Creatures table.
+- UI label updated: "2024 DMG XP thresholds…" → "Flee Mortals CR
+  budget — per-character × party size."
+- "Total XP" → "Total CR"; XP total kept as a small parenthetical
+  footnote for backward reference.
+- `XP_THRESHOLDS` constant removed — no callers remain.
+
+#### Acceptance walkthrough (FM book example)
+
+"Hard encounter for four 5th-level characters" → budget table says
+2.5 CR/char × 4 = **10 CR total**, CR cap **8**. The renderer now
+flags an Owlbear (CR 3) + Bugbear Predator (CR 3) + Lizardfolk
+Terrorsaur (CR 4) = **10 CR**, band Hard, 4 daily encounter points,
+no warnings — matching the example in the FM rulebook.
+
+---
+
 ### Menagerie: unique slug per monster (schema v7) — fixes FM ↔ MM collisions
 
 Every monster now gets a `slug` field of the form
