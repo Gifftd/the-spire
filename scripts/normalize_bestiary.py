@@ -19,7 +19,7 @@ import re
 import sys
 from pathlib import Path
 
-SCHEMA_VERSION = 6  # +Flee Mortals (fm-v1) shape: villainActions, isMinion, isSolo, fmRole
+SCHEMA_VERSION = 7  # +slug field — every monster gets <source>-<kebab-name> as a unique key
 
 # Optional patch input: when present at the project root (default
 # `mm2024-lair-patch.json`), the file contributes lair-effects sections the
@@ -225,8 +225,30 @@ def apply_lair_patch(monsters: list[dict], patch: dict) -> tuple[int, list[str]]
     return n_applied, unmatched
 
 
+def make_slug(source: str, name: str) -> str:
+    """Build a unique key: `<source>-<kebab-name>`. Two monsters named
+    'Aboleth' from mm-2024 and fm-v1 get distinct slugs without
+    colliding. Used as the canonical `id` going forward so the Import
+    tab's Merge dedup can keep them both.
+    """
+    base = re.sub(r"[^a-zA-Z0-9]+", "-", (name or "").strip().lower())
+    base = re.sub(r"-+", "-", base).strip("-")
+    src = (source or "unknown").strip().lower()
+    return f"{src}-{base}" if base else f"{src}-unnamed"
+
+
 def normalize_monster(m: dict) -> dict:
     out = dict(m)  # preserve every original field
+
+    # Mint slug from (source, name). Preserve the original id under
+    # `_legacyId` so any existing references (encounters, library
+    # donorIds) can be migrated by ID-fallback lookups.
+    src = m.get("source") or m.get("_source") or "unknown"
+    new_slug = make_slug(src, m.get("name", ""))
+    if out.get("id") and out["id"] != new_slug:
+        out["_legacyId"] = out["id"]
+    out["slug"] = new_slug
+    out["id"] = new_slug   # id := slug so id-keyed code paths inherit uniqueness
 
     size, sizes, typ, types = normalize_size_and_type(m)
     out["size"] = size

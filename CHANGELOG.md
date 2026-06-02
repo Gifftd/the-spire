@@ -9,6 +9,60 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: unique slug per monster (schema v7) — fixes FM ↔ MM collisions
+
+Every monster now gets a `slug` field of the form
+`<source>-<kebab-name>` (e.g. `mm-2024-aboleth`, `fm-v1-aboleth`,
+`tob-v1-kraken`). The slug is also assigned to `id` so existing
+id-keyed code paths inherit the uniqueness without changes.
+
+#### Why
+
+Pre-v7 ids were minted from the name alone (`AbolethStatBlock`).
+That collided when the same canonical creature appears in multiple
+books — Flee Mortals shares 33 names with the 2024 Monster Manual
+(Aboleth, Basilisk, Chimera, Crawling Claw, Ghoul, Goblin Warrior,
+Green Hag, Griffon, Harpy, Kraken, etc.). The Import-tab Merge
+dedup keys on `id`, so the FM versions were silently dropped on
+import — a 33-monster data loss the DM only noticed by counting.
+
+#### Schema additions
+
+- `slug` — canonical unique key. Format: `<source-tag>-<kebab(name)>`.
+- `id` is now aliased to `slug` for new normalizations. Old id values
+  (`<PascalCase>StatBlock`) are preserved under `_legacyId` so
+  Merge-mode dedup can match old-KV entries against newly-normalized
+  entries without losing edits.
+
+#### Updated paths
+
+- `scripts/normalize_bestiary.py` mints slug + sets id = slug for
+  every monster. SCHEMA_VERSION bumped to 7. New helper
+  `make_slug(source, name)`.
+- `bestiary-dm.html` `computeMergeDelta` now builds the existing-key
+  set from `slug | id | _legacyId` and the incoming check matches
+  on any of those. A KV holding the pre-v7 "AbolethStatBlock"
+  entry will still merge correctly with the v7 "mm-2024-aboleth"
+  import via the `_legacyId` fallback.
+
+#### Migration steps for the DM
+
+1. `python3 scripts/normalize_bestiary.py` — already done; bestiary.json
+   now has slugs.
+2. Menagerie → Import tab → re-import the regenerated `bestiary.json`.
+   Use **Replace mode** for a clean slate, or **Merge mode** to keep
+   any in-KV edits (the `_legacyId` fallback handles back-compat).
+3. Library auto-rebuild runs in the same operation — donor IDs
+   re-point to the new slugs.
+
+#### Verification
+
+Re-ran the normalizer + the tagger over the merged 1124-monster
+bestiary: 1124 unique slugs (zero collisions), 1124 unique ids
+(was 1091 with 33 collisions), 1124 `_legacyId` stamps preserved.
+
+---
+
 ### Menagerie: Flee Mortals scrape — 305 monsters captured (FM v1 live)
 
 Production run of the FM scrape pipeline against the live DDB book.

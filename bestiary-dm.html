@@ -1171,14 +1171,25 @@
     }
 
     function computeMergeDelta(existingMonsters, newMonsters){
-      // Match on canonical `id` field. Both my MM scrape and ToB extractor
-      // mint IDs from the monster name, so cross-source collisions would
-      // genuinely mean the same creature. If you want both, do Replace.
-      const existingIds = new Set((existingMonsters || []).map(m => m.id));
+      // Match on the canonical `slug` (since schema v7, slug = source +
+      // kebab-name, guaranteed unique across books). Falls back to id +
+      // _legacyId for back-compat: KV may hold pre-v7 entries whose id
+      // is "AboletStatBlock"; the new import has slug "mm-2024-aboleth"
+      // + _legacyId "AboletStatBlock" — they should still dedup as the
+      // same creature. Use Replace mode if you want a clean reset.
+      const keys = new Set();
+      for (const m of (existingMonsters || [])){
+        if (m.slug) keys.add(m.slug);
+        if (m.id)   keys.add(m.id);
+        if (m._legacyId) keys.add(m._legacyId);
+      }
       const toAdd = [];
       const skipped = [];
       for (const m of newMonsters){
-        if (m.id && existingIds.has(m.id)) skipped.push(m);
+        const collide = (m.slug && keys.has(m.slug))
+                     || (m.id && keys.has(m.id))
+                     || (m._legacyId && keys.has(m._legacyId));
+        if (collide) skipped.push(m);
         else toAdd.push(m);
       }
       return { toAdd, skipped };
