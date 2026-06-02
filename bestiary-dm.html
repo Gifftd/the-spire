@@ -142,6 +142,9 @@
     .ed-toolbar .title{font-family:'Cinzel',serif;font-size:0.78rem;letter-spacing:0.06em;color:var(--brass-bright)}
     .ed-derived{font-family:'Cinzel',serif;font-size:0.7rem;color:var(--ink-light);padding:4px 6px;background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius)}
     .custom-chip{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--brass);color:var(--brass);background:rgba(184,138,90,0.10);margin-left:6px}
+    .fm-badge{font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;padding:2px 7px;border-radius:8px;margin-left:8px;vertical-align:middle}
+    .fm-badge.solo{border:1px solid var(--rust);color:#e3a08e;background:rgba(154,90,90,0.15)}
+    .fm-badge.minion{border:1px solid var(--ink-faint);color:var(--ink-faint);background:rgba(255,255,255,0.04)}
     .role-chip{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.08em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--teal);color:var(--teal-bright);background:rgba(60,153,150,0.08);margin-left:6px;white-space:nowrap}
     .terrain-chip{font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:0.08em;text-transform:uppercase;padding:1px 5px;border-radius:8px;border:1px solid var(--border-light);color:var(--ink-faint);background:rgba(255,255,255,0.02);margin-left:4px;white-space:nowrap}
     .terrain-strip{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
@@ -1116,9 +1119,16 @@
           `</div>`;
       };
 
+      // Flee Mortals category badges — sit beside the name in the
+      // header so a Minion / Solo monster is identifiable at a glance.
+      const fmBadges = [
+        m.isSolo  ? '<span class="fm-badge solo">Solo</span>'    : '',
+        m.isMinion ? '<span class="fm-badge minion">Minion</span>' : ''
+      ].filter(Boolean).join('');
+
       return `
         <div class="statblock">
-          <h2>${esc(m.name)}</h2>
+          <h2>${esc(m.name)}${fmBadges}</h2>
           <div class="sub-line">${esc(subline)}</div>
           <div class="divider"></div>
           <div class="sb-kv">
@@ -1146,6 +1156,7 @@
           ${featureBlock('Bonus Actions', m.bonusActions)}
           ${featureBlock('Reactions', m.reactions)}
           ${featureBlock('Legendary Actions', m.legendaryActions)}
+          ${featureBlock('Villain Actions', m.villainActions)}
           ${featureBlock('Lair Actions', m.lairActions)}
           ${featureBlock('Lair Effects', m.lairEffects)}
           ${m.description ? `<div class="desc">${esc(m.description)}</div>` : ''}
@@ -2021,7 +2032,7 @@
         vulnerabilitiesText: '', vulnerabilities: [],
         gear: [],
         traits: [], actions: [], bonusActions: [], reactions: [],
-        legendaryActions: [], lairActions: [], lairEffects: [],
+        legendaryActions: [], lairActions: [], lairEffects: [], villainActions: [],
         crText: '1', cr: 1, xp: XP_BY_CR[1], pb: pbForCR(1),
         description: '',
         source: 'custom'
@@ -3271,7 +3282,8 @@
       trait: 5,
       bonus_action: 6,
       reaction: 6,
-      legendary: 9
+      legendary: 9,
+      villain_action: 11        // Flee Mortals 1/round powers — costly
     };
 
     // Slot ranges by CR tier, calibrated against the 2024 MM canon:
@@ -3438,6 +3450,7 @@
       if (kind === 'bonus_action') return 'bonusActions';
       if (kind === 'reaction') return 'reactions';
       if (kind === 'legendary') return 'legendaryActions';
+      if (kind === 'villain_action') return 'villainActions';
       return 'actions';   // melee/ranged/flex/save/spellcasting/utility
     }
 
@@ -3781,7 +3794,7 @@
         vulnerabilitiesText: '', vulnerabilities: [],
         gear: [],
         traits: [], actions: [], bonusActions: [], reactions: [],
-        legendaryActions: [], lairActions: [], lairEffects: [],
+        legendaryActions: [], lairActions: [], lairEffects: [], villainActions: [],
         crText: '1', cr: 1, xp: 0, pb: 2,
         description: '',
         source: 'custom',
@@ -4068,7 +4081,7 @@
     function renderStatblockWithDonors(m){
       // Inject `_donorPrefix` into the name during the render, then
       // remove it after. Cheaper than duplicating renderStatblock.
-      const sections = ['traits','actions','bonusActions','reactions','legendaryActions'];
+      const sections = ['traits','actions','bonusActions','reactions','legendaryActions','villainActions'];
       const stash = [];
       for (const sec of sections){
         const list = m[sec];
@@ -4158,7 +4171,8 @@
       actions:           null,           // classify by body
       bonusActions:     'bonus_action',
       reactions:        'reaction',
-      legendaryActions: 'legendary'
+      legendaryActions: 'legendary',
+      villainActions:   'villain_action'  // Flee Mortals — 1/round boss powers
     };
     const NUM_WORDS_JS = { one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10 };
     const ABIL_LONG_TO_SHORT_JS = {

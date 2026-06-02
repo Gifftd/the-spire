@@ -19,7 +19,7 @@ import re
 import sys
 from pathlib import Path
 
-SCHEMA_VERSION = 4  # +tob-v1 monsters concatenated into the same bestiary envelope
+SCHEMA_VERSION = 6  # +Flee Mortals (fm-v1) shape: villainActions, isMinion, isSolo, fmRole
 
 # Optional patch input: when present at the project root (default
 # `mm2024-lair-patch.json`), the file contributes lair-effects sections the
@@ -35,6 +35,7 @@ PATCH_PATH_DEFAULT = "mm2024-lair-patch.json"
 # preserved so the editor / browse / picker can filter by it later.
 # Produced by `scripts/extract_tob.py` from the Tome of Beasts PDF.
 TOB_PATH_DEFAULT = "tob.json"
+FM_PATH_DEFAULT = "fm.json"
 
 SIZE_WORDS = {"Tiny", "Small", "Medium", "Large", "Huge", "Gargantuan"}
 
@@ -244,6 +245,26 @@ def normalize_monster(m: dict) -> dict:
     # 2024 MM doesn't populate.
     out["lairEffects"] = extract_lair_effects(m.get("description", "") or "")
 
+    # ── Flee Mortals extensions (FM-source monsters only) ─────────────
+    # Villain Actions, Minion / Solo flags, and the MCDM-canonical role
+    # text live alongside the usual sections. Default to empty / false
+    # so non-FM monsters serialize unchanged.
+    out["villainActions"] = list(m.get("villainActions") or [])
+    out["isMinion"] = bool(m.get("isMinion") or False)
+    out["isSolo"] = bool(m.get("isSolo") or False)
+    out["fmRole"] = (m.get("fmRole") or "").strip()
+    out["fmCategory"] = (m.get("fmCategory") or "").strip()
+
+    # If FM-source supplied a role explicitly, treat it as canonical:
+    # set `role` from `fmRole` and mark `roleManual:true` so the
+    # auto-tagger never overrides MCDM's intent. The role taxonomy
+    # already matches Flee Mortals 1:1, so a clean string copy is the
+    # right thing (Ambusher / Artillery / Brute / Controller / Defender
+    # / Leader / Skirmisher / Soldier / Support).
+    if out["fmRole"]:
+        out["role"] = out["fmRole"]
+        out["roleManual"] = True
+
     return out
 
 
@@ -318,13 +339,14 @@ def main() -> int:
     # gets normalized through the same pipeline and concatenated into the
     # output. Sources stay tagged per-monster so the bestiary can filter.
     extras = []
-    tob_path = here / TOB_PATH_DEFAULT
-    if tob_path.exists():
+    for path_default in (TOB_PATH_DEFAULT, FM_PATH_DEFAULT):
+        p = here / path_default
+        if not p.exists(): continue
         try:
-            extras.append(json.loads(tob_path.read_text(encoding="utf-8")))
-            print(f"  including {tob_path.name}")
+            extras.append(json.loads(p.read_text(encoding="utf-8")))
+            print(f"  including {p.name}")
         except json.JSONDecodeError as e:
-            print(f"warning: could not parse {tob_path}: {e}", file=sys.stderr)
+            print(f"warning: could not parse {p}: {e}", file=sys.stderr)
 
     norm = normalize(raw, patch, extras=extras)
     out_path.write_text(

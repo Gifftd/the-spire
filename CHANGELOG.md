@@ -9,6 +9,82 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: Flee Mortals (MCDM) scrape pipeline
+
+Adds support for scraping the Flee Mortals book from D&D Beyond and
+ingesting its MCDM-specific stat block shapes — Villain Actions,
+Minion / Solo flags, and pre-tagged Flee Mortals roles (which match
+the taxonomy we already use, so they slot directly into `role` with
+`roleManual:true` set so the auto-tagger never overrides them).
+
+#### Added — `scripts/scrape_fm_ddb.js`
+
+Chrome devtools paste-and-run script. Walks the Flee Mortals source
+page on DDB, extracts per-monster stat blocks, and triggers a Blob
+download of `fm.json` to ~/Downloads. Output shape matches the
+existing MM 2024 scrape envelope (same `source / scrapedAt / count /
+monsters` keys) plus the FM extensions on each monster. Selectors
+are annotated `// VERIFY` so the DM can spot-check against DDB's
+actual DOM if extraction looks wrong.
+
+Documented workflow:
+1. Sit on the Flee Mortals source page on DDB
+2. Paste the contents of `scrape_fm_ddb.js` into the devtools console
+3. `fm.json` downloads automatically
+4. Move it to the project root
+5. `python3 scripts/normalize_bestiary.py` picks it up alongside
+   `tob.json` (both auto-detected; multi-source extras concatenated)
+6. Menagerie → Import tab → select normalized `bestiary.json` →
+   Merge mode → done. The library auto-rebuild includes the FM
+   monsters' actions/traits.
+
+#### Schema additions (v6)
+
+`scripts/normalize_bestiary.py` now passes through:
+- `villainActions: [{name, body}]` — FM's 1/round boss powers,
+  rendered as its own section between Legendary Actions and Lair
+  Actions
+- `isMinion: bool` — minion-tier monsters (the FM concept of a
+  group-blob with shared HP)
+- `isSolo: bool` — solo monsters (boss-tier, expected to fight a
+  full party alone)
+- `fmRole: string` — original FM role text, preserved as
+  back-reference
+- `fmCategory: string` — derived: "minion" / "solo" / "" — useful
+  for filtering / encounter-building
+
+If `fmRole` is present, the normalizer copies it to `role` and
+flips `roleManual:true` — the auto-tagger won't override MCDM's
+intent on a re-run. SCHEMA_VERSION bumped to 6.
+
+#### Renderer updates
+
+`bestiary-dm.html` `renderStatblock` now displays:
+- A teal **Solo** or muted **Minion** chip beside the monster's name
+  in the header
+- A **Villain Actions** section (same renderer as Legendary
+  Actions), positioned between Legendary Actions and Lair Actions
+
+`renderStatblockWithDonors` walks the new `villainActions` array
+too, so a chimera that slotted villain actions shows them with
+proper `⟨from …⟩` donor labels.
+
+#### Library extractor updates
+
+Both `scripts/extract_features.py` and the JS port in
+`bestiary-dm.html` gain `villainActions` → `villain_action` kind.
+`KIND_COST_MULT.villain_action = 11` (between save_effect and
+spellcasting — pricey because these are 1/round boss powers, not
+at-will). `sectionForKind` maps `villain_action` →
+`villainActions`. `blankChimera` now includes an empty
+`villainActions: []` so the generator's slot allocator can extend
+to support villain actions later.
+
+`.gitignore` patterns for `fm.json` / `fm-*.json` follow the same
+gitignored-book-content rule the rest of the bestiary data uses.
+
+---
+
 ### Menagerie: bestiary import auto-rebuilds the feature library
 
 When the DM imports a new bestiary (Merge or Replace), the page now

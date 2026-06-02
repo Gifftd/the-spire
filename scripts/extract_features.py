@@ -85,6 +85,7 @@ KIND_COST_MULT = {
     'bonus_action':     6,
     'reaction':         6,
     'legendary':        9,
+    'villain_action':  11,    # Flee Mortals 1/round powers — costly
 }
 
 # ─────────────────────────────────────────────────────────────────────
@@ -367,6 +368,7 @@ SECTION_KIND_DEFAULTS = {
     'bonusActions':     'bonus_action',
     'reactions':        'reaction',
     'legendaryActions': 'legendary',
+    'villainActions':   'villain_action',   # Flee Mortals 1/round powers
 }
 
 
