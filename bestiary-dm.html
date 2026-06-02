@@ -175,6 +175,30 @@
     .gen-delta.up{color:#9ad8a6;border-color:#4a7050}
     .gen-delta.down{color:#e8a89a;border-color:#6e4848}
     .gen-source-line{font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.12em;color:var(--ink-faint);margin-bottom:0.4rem}
+    /* Library tab */
+    .lib-edit{display:flex;flex-direction:column;gap:0.7rem}
+    .lib-edit-sec{background:rgba(0,0,0,0.18);border:1px solid var(--border-light);border-radius:6px;padding:0.65rem}
+    .lib-edit-sec h4{font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.14em;color:var(--brass-bright);margin:0 0 0.5rem 0;text-transform:uppercase}
+    .lib-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.5rem}
+    .lib-fg{display:flex;flex-direction:column;gap:3px}
+    .lib-fg label{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;color:var(--ink-light);text-transform:uppercase}
+    .lib-fg input,.lib-fg select,.lib-fg textarea{background:rgba(0,0,0,0.25);border:1px solid var(--border-light);border-radius:4px;padding:5px 7px;color:var(--ink);font-family:inherit;font-size:0.85rem;width:100%;box-sizing:border-box}
+    .lib-fg textarea{font-family:'Crimson Text',Georgia,serif;font-size:0.9rem;min-height:80px;line-height:1.4}
+    .lib-fg input:focus,.lib-fg select:focus,.lib-fg textarea:focus{outline:none;border-color:var(--teal)}
+    .lib-actions{display:flex;flex-wrap:wrap;gap:0.4rem;align-items:center;padding-top:0.4rem;border-top:1px solid var(--border-light)}
+    .lib-row{display:flex;align-items:center;justify-content:space-between;padding:6px 9px;background:rgba(255,255,255,0.02);border:1px solid var(--border-light);border-radius:4px;cursor:pointer;font-size:0.82rem;margin-bottom:3px}
+    .lib-row:hover{border-color:var(--teal);background:rgba(60,153,150,0.08)}
+    .lib-row.active{border-color:var(--brass);background:rgba(184,138,90,0.10)}
+    .lib-row .nm{flex:1;color:var(--ink-light)}
+    .lib-row .meta{font-size:0.62rem;color:var(--ink-faint);letter-spacing:0.05em;text-transform:uppercase}
+    .lib-row .sig-chip{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 5px;border-radius:6px;border:1px solid var(--rust);color:#e3a08e;background:rgba(154,90,90,0.10);margin-left:5px}
+    .lib-tier-chip{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.08em;text-transform:uppercase;padding:1px 5px;border-radius:6px;border:1px solid var(--border-light);color:var(--ink-light);margin-left:5px}
+    .lib-tier-chip.t-low{color:var(--ink-light)}
+    .lib-tier-chip.t-mid{color:var(--teal-bright);border-color:var(--teal)}
+    .lib-tier-chip.t-high{color:var(--brass-bright);border-color:var(--brass)}
+    .lib-tier-chip.t-epic{color:#e3a08e;border-color:var(--rust)}
+    .lib-help{font-size:0.7rem;color:var(--ink-faint);line-height:1.4;margin-top:0.3rem;font-style:italic}
+    .lib-donors{font-size:0.7rem;color:var(--ink-faint);background:rgba(0,0,0,0.20);border:1px solid var(--border-light);border-radius:4px;padding:5px 7px;max-height:80px;overflow-y:auto}
 
     /* Analysis tab */
     .ana-cards{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:1rem}
@@ -295,6 +319,7 @@
         <button class="tab" data-tab="analysis" onclick="switchTab('analysis')">Analysis</button>
         <button class="tab" data-tab="editor" onclick="switchTab('editor')">Editor</button>
         <button class="tab" data-tab="generate" onclick="switchTab('generate')">Generate</button>
+        <button class="tab" data-tab="library" onclick="switchTab('library')">Library</button>
         <button class="tab" data-tab="import" onclick="switchTab('import')">Import</button>
       </div>
 
@@ -647,6 +672,67 @@
         </div>
       </div>
 
+      <!-- LIBRARY -->
+      <div class="tab-panel" id="panel-library" style="display:none">
+        <div class="layout">
+          <div>
+            <div class="col-head">
+              <span>Library features (<span id="lib-count">0</span>)</span>
+              <span id="lib-source" style="font-size:0.55rem;color:var(--ink-faint);letter-spacing:0.12em">—</span>
+            </div>
+            <div class="toolbar">
+              <input type="text" id="lib-search" placeholder="Search name…" oninput="renderLibraryList()">
+              <select id="lib-kind-filter" onchange="renderLibraryList()">
+                <option value="">All kinds</option>
+                <option value="melee_attack">Melee attack</option>
+                <option value="ranged_attack">Ranged attack</option>
+                <option value="flex_attack">Flex attack</option>
+                <option value="save_effect">Save effect</option>
+                <option value="recharge_save">Recharge save</option>
+                <option value="spellcasting">Spellcasting</option>
+                <option value="utility">Utility</option>
+                <option value="trait">Trait</option>
+                <option value="bonus_action">Bonus action</option>
+                <option value="reaction">Reaction</option>
+                <option value="legendary">Legendary</option>
+              </select>
+              <select id="lib-tier-filter" onchange="renderLibraryList()">
+                <option value="">All tiers</option>
+                <option value="low">Low (CR 1–4)</option>
+                <option value="mid">Mid (CR 5–10)</option>
+                <option value="high">High (CR 11–16)</option>
+                <option value="epic">Epic (CR 17+)</option>
+              </select>
+            </div>
+            <div class="toolbar">
+              <select id="lib-role-filter" onchange="renderLibraryList()">
+                <option value="">All roles</option>
+                <option>Ambusher</option><option>Artillery</option><option>Brute</option>
+                <option>Controller</option><option>Defender</option><option>Leader</option>
+                <option>Skirmisher</option><option>Soldier</option><option>Support</option>
+              </select>
+              <select id="lib-signature-filter" onchange="renderLibraryList()">
+                <option value="">All entries</option>
+                <option value="signature">Signature only</option>
+                <option value="common">Common only</option>
+              </select>
+              <button class="btn ghost sm" onclick="clearLibraryFilters()">Clear</button>
+              <button class="btn brass sm" onclick="newLibraryEntry()">+ New</button>
+            </div>
+            <div class="list" id="lib-list"></div>
+          </div>
+          <div>
+            <div class="col-head">
+              <span>Edit feature</span>
+              <span id="lib-edit-id" style="font-size:0.55rem;color:var(--ink-faint);letter-spacing:0.12em"></span>
+            </div>
+            <div id="lib-edit-panel">
+              <div class="empty-note">Pick a feature on the left, or click <b>+ New</b> to create one.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- IMPORT -->
       <div class="tab-panel" id="panel-import" style="display:none">
         <div class="form">
@@ -841,6 +927,7 @@
       document.querySelectorAll('.tab-panel').forEach(p=>p.style.display='none');
       document.getElementById('panel-'+name).style.display='';
       if (name === 'analysis' && !window.__anaCache) runAnalysis();
+      if (name === 'library') renderLibraryList();
     }
 
     function crTier(cr){
@@ -930,8 +1017,10 @@
       const m = findMonster(id);
       if (!m){ document.getElementById('m-statblock').innerHTML = '<div class="empty-note">Not found.</div>'; return; }
       document.getElementById('sb-id').textContent = m.source || '';
+      const isCustom = !!m._custom;
       document.getElementById('m-statblock').innerHTML =
-        `<div style="display:flex;justify-content:flex-end;margin-bottom:0.4rem">
+        `<div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:0.4rem">
+           <button class="btn ghost sm" onclick="editMonsterInPlace('${esc(m.id)}')" title="Open this monster in the Editor and save changes back to ${isCustom ? 'bestiary_custom' : 'the imported bestiary'}">✏️ Edit ${isCustom ? 'this custom' : 'this monster'}</button>
            <button class="btn ghost sm" onclick="cloneMonsterToEditor('${esc(m.id)}')" title="Open this monster in the Editor as a new custom copy">📋 Edit a copy</button>
          </div>` +
         renderStatblock(m);
@@ -953,12 +1042,39 @@
       clone.name = (clone.name || 'Monster') + ' (copy)';
       clone.source = 'custom';
       editingId = null;
+      editingSource = 'custom';
       currentEdit = clone;
       loadFormFromEdit();
       syncEditor();
       renderChips();
       window.switchTab('editor');
       toast(`Loaded "${src.name}" as a copy — edit, then Save to mint a new monster.`);
+    }
+
+    /* ── Edit an existing monster in place ──
+     * Opens any monster — imported or custom — in the Editor with
+     * editingId set to its id. Save writes back to the SAME source KV
+     * (bestiary for imported, bestiary_custom for homebrew), so the
+     * record is updated, not duplicated. Imported monsters get an
+     * `_edited: true` flag stamped on them.
+     */
+    function editMonsterInPlace(monsterId){
+      const src = findMonster(monsterId);
+      if (!src){ toast('Could not find that monster.', true); return; }
+      const isCustom = !!src._custom;
+      const clone = JSON.parse(JSON.stringify(src));
+      delete clone._custom;
+      // Keep the original id so save targets the existing entry.
+      editingId = src.id;
+      editingSource = isCustom ? 'custom' : 'bestiary';
+      currentEdit = clone;
+      loadFormFromEdit();
+      syncEditor();
+      renderChips();
+      window.switchTab('editor');
+      toast(isCustom
+        ? `Editing custom "${src.name}" — Save updates the record.`
+        : `Editing imported "${src.name}" — Save writes back to the bestiary KV.`);
     }
 
     /* ── Stat block ── */
@@ -1821,7 +1937,8 @@
       return 9;
     }
 
-    let editingId = null;          // null = new, or id of an existing custom monster
+    let editingId = null;          // null = new, or id of an existing monster
+    let editingSource = 'custom';  // 'custom' (default) or 'bestiary' (imported)
     let currentEdit = blankMonster();
 
     function genId(){
@@ -2153,7 +2270,10 @@
       $('ed-gear').value = (m.gear||[]).join(', ');
       $('ed-description').value = m.description || '';
       for (const sec of FEATURE_SECTIONS) renderFeatureList(sec);
-      $('ed-del-btn').style.display = editingId ? '' : 'none';
+      // Delete is restricted to custom monsters — imported bestiary
+      // edits don't expose Delete (re-import refreshes them instead).
+      // Duplicate is always offered for editable records.
+      $('ed-del-btn').style.display = (editingId && editingSource === 'custom') ? '' : 'none';
       $('ed-dup-btn').style.display = editingId ? '' : 'none';
     }
 
@@ -2228,6 +2348,7 @@
 
     function newCustom(){
       editingId = null;
+      editingSource = 'custom';
       currentEdit = blankMonster();
       loadFormFromEdit();
       syncEditor();
@@ -2238,6 +2359,7 @@
       const found = customMonsters.find(m => m.id === id);
       if (!found) return;
       editingId = id;
+      editingSource = 'custom';
       // Deep clone so edits don't mutate the saved version until Save.
       currentEdit = JSON.parse(JSON.stringify(found));
       loadFormFromEdit();
@@ -2247,6 +2369,9 @@
 
     async function saveCustom(){
       // Persist currentEdit. New monsters get an id stamped here.
+      // editingSource decides which KV to write back to:
+      //   'custom'   → bestiary_custom (homebrew, default)
+      //   'bestiary' → bestiary        (in-place edit of imported)
       if (!currentEdit.name.trim()){
         toast('Give the monster a name first.', true);
         document.getElementById('ed-name').focus();
@@ -2256,8 +2381,44 @@
       btn.disabled = true;
       const original = btn.textContent;
       btn.textContent = 'Saving…';
-      const next = customMonsters.slice();
       const toSave = JSON.parse(JSON.stringify(currentEdit));
+
+      // Branch on source. The bestiary path mutates the imported
+      // envelope; the custom path is unchanged.
+      if (editingSource === 'bestiary' && editingId){
+        const bestiaryMonsters = asMonsters(bestiary).slice();
+        const i = bestiaryMonsters.findIndex(m => m.id === editingId);
+        if (i < 0){
+          btn.disabled = false; btn.textContent = original;
+          toast('Imported monster not found in bestiary — try Edit a copy instead.', true);
+          return;
+        }
+        toSave.id = editingId;
+        toSave._edited = true;
+        toSave._editedAt = new Date().toISOString();
+        bestiaryMonsters[i] = toSave;
+        const envelope = (bestiary && typeof bestiary === 'object' && !Array.isArray(bestiary))
+          ? { ...bestiary, monsters: bestiaryMonsters, count: bestiaryMonsters.length }
+          : { schemaVersion: 4, monsters: bestiaryMonsters, count: bestiaryMonsters.length };
+        const ok = await saveKey('bestiary', envelope);
+        btn.disabled = false; btn.textContent = original;
+        if (!ok) return;
+        bestiary = envelope;
+        // Invalidate Analysis cache — stats may have changed
+        window.__anaCache = null;
+        editingId = toSave.id;
+        currentEdit = JSON.parse(JSON.stringify(toSave));
+        populateFilters();
+        renderList();
+        renderSource();
+        loadFormFromEdit();
+        syncEditor();
+        toast(`Saved "${toSave.name}" back to the imported bestiary.`);
+        return;
+      }
+
+      // Custom path (the original behavior)
+      const next = customMonsters.slice();
       if (editingId){
         const i = next.findIndex(m => m.id === editingId);
         toSave.id = editingId;
@@ -2272,6 +2433,7 @@
       if (!ok) return;
       customMonsters = next;
       editingId = toSave.id;
+      editingSource = 'custom';
       currentEdit = JSON.parse(JSON.stringify(toSave));
       // Keep filter/source/list in sync with the new custom monster.
       populateFilters();
@@ -3940,6 +4102,308 @@
       renderChips();
       window.switchTab('editor');
       toast(`Loaded "${clone.name}" into the Editor — refine and Save to mint.`);
+    }
+
+    /* ──────────────────────────────────────────────────────────────────
+     * Library tab — browse, add, edit, delete library entries.
+     *
+     * The library is a single envelope `{schemaVersion, features: [...]}` —
+     * every edit / add / delete rewrites the whole envelope to the
+     * feature_library KV. Cheaper to ship than per-entry endpoints, and
+     * matches how the bestiary itself is stored.
+     * ────────────────────────────────────────────────────────────────── */
+
+    let selectedLibraryId = null;
+
+    function renderLibrarySource(){
+      const el = document.getElementById('lib-source');
+      if (!el) return;
+      const n = (featureLibrary.features || []).length;
+      const v = featureLibrary.schemaVersion || 0;
+      el.textContent = n ? `${n} entries · schema v${v}` : 'empty — import via the Import tab';
+    }
+
+    function renderLibraryList(){
+      renderLibrarySource();
+      const list = document.getElementById('lib-list');
+      const features = featureLibrary.features || [];
+      if (!features.length){
+        list.innerHTML = '<div class="empty-note">No library entries — run scripts/extract_features.py and import via the Import tab.</div>';
+        document.getElementById('lib-count').textContent = 0;
+        return;
+      }
+
+      const q = (document.getElementById('lib-search').value || '').trim().toLowerCase();
+      const kindF = document.getElementById('lib-kind-filter').value;
+      const tierF = document.getElementById('lib-tier-filter').value;
+      const roleF = document.getElementById('lib-role-filter').value;
+      const sigF  = document.getElementById('lib-signature-filter').value;
+
+      const filtered = features.filter(f => {
+        if (q && !(f.canonicalName || '').toLowerCase().includes(q)) return false;
+        if (kindF && f.kind !== kindF) return false;
+        if (tierF && f.tier !== tierF) return false;
+        if (roleF && !(f.roleAffinity || []).includes(roleF)) return false;
+        if (sigF === 'signature' && !f.isSignature) return false;
+        if (sigF === 'common' && f.isSignature) return false;
+        return true;
+      });
+
+      // Sort by tier then name for stable browsing
+      const tierOrder = { low: 0, mid: 1, high: 2, epic: 3 };
+      filtered.sort((a, b) => (tierOrder[a.tier] ?? 4) - (tierOrder[b.tier] ?? 4) || (a.canonicalName || '').localeCompare(b.canonicalName || ''));
+
+      document.getElementById('lib-count').textContent = filtered.length;
+      // Cap list for DOM weight; user can narrow with search.
+      const cap = 250;
+      const shown = filtered.slice(0, cap);
+      list.innerHTML = shown.map(f => `
+        <div class="lib-row${f.id === selectedLibraryId ? ' active' : ''}" onclick="selectLibraryEntry('${esc(f.id)}')">
+          <div class="nm">${esc(f.canonicalName)}${f.isSignature ? '<span class="sig-chip">Sig</span>' : ''}<span class="lib-tier-chip t-${esc(f.tier)}">${esc(f.tier)}</span></div>
+          <div class="meta">${esc(f.kind)} · ${f.donorCount}d · ${f.cost}p</div>
+        </div>
+      `).join('') + (filtered.length > cap ? `<div class="empty-note" style="font-size:0.75rem">Showing first ${cap} of ${filtered.length} — narrow with search.</div>` : '');
+    }
+
+    function clearLibraryFilters(){
+      document.getElementById('lib-search').value = '';
+      document.getElementById('lib-kind-filter').value = '';
+      document.getElementById('lib-tier-filter').value = '';
+      document.getElementById('lib-role-filter').value = '';
+      document.getElementById('lib-signature-filter').value = '';
+      renderLibraryList();
+    }
+
+    function selectLibraryEntry(id){
+      selectedLibraryId = id;
+      const f = (featureLibrary.features || []).find(x => x.id === id);
+      if (!f){
+        document.getElementById('lib-edit-panel').innerHTML = '<div class="empty-note">Not found.</div>';
+        renderLibraryList();
+        return;
+      }
+      renderLibraryEditForm(f, false);
+      renderLibraryList();
+    }
+
+    function newLibraryEntry(){
+      // Mint a placeholder entry. Pick kind=trait + tier=mid as the
+      // most-generic starting shape (no template fields required).
+      const stamp = Date.now().toString(36).slice(-5);
+      const entry = {
+        id: `custom-${stamp}`,
+        canonicalName: 'New Feature',
+        name: 'New Feature',
+        kind: 'trait',
+        tier: 'mid',
+        tierBand: [5, 10],
+        cost: 38,
+        isSignature: false,
+        templateFields: {},
+        bodyTemplate: 'The {MONSTER} ',
+        roleAffinity: [],
+        terrainAffinity: [],
+        donorIds: [],
+        donorCount: 0,
+        _custom: true
+      };
+      featureLibrary.features = (featureLibrary.features || []).concat([entry]);
+      selectedLibraryId = entry.id;
+      renderLibraryList();
+      renderLibraryEditForm(entry, true);
+      document.getElementById('lib-search').value = '';
+      document.getElementById('lib-search').focus();
+    }
+
+    function renderLibraryEditForm(f, isNew){
+      const panel = document.getElementById('lib-edit-panel');
+      const idEl = document.getElementById('lib-edit-id');
+      idEl.textContent = f.id + (isNew ? ' · new' : '');
+
+      const KINDS = [
+        ['melee_attack','Melee attack'],['ranged_attack','Ranged attack'],['flex_attack','Flex attack'],
+        ['save_effect','Save effect'],['recharge_save','Recharge save'],['spellcasting','Spellcasting'],
+        ['utility','Utility'],['trait','Trait'],['bonus_action','Bonus action'],['reaction','Reaction'],
+        ['legendary','Legendary']
+      ];
+      const TIERS = [['low','Low (CR 1–4)'],['mid','Mid (CR 5–10)'],['high','High (CR 11–16)'],['epic','Epic (CR 17+)']];
+      const ROLES = ['Ambusher','Artillery','Brute','Controller','Defender','Leader','Skirmisher','Soldier','Support'];
+      const TERRAINS = ['arctic','coastal','desert','forest','grassland','hill','mountain','swamp','underdark','underwater','urban','planar'];
+
+      const roleChecks = ROLES.map(r =>
+        `<label><input type="checkbox" value="${esc(r)}" ${(f.roleAffinity || []).includes(r) ? 'checked' : ''}><span>${esc(r)}</span></label>`
+      ).join('');
+      const terrainChecks = TERRAINS.map(t =>
+        `<label><input type="checkbox" value="${esc(t)}" ${(f.terrainAffinity || []).includes(t) ? 'checked' : ''}><span>${esc(t.charAt(0).toUpperCase()+t.slice(1))}</span></label>`
+      ).join('');
+      const donorList = (f.donorIds || []).slice(0, 30).join(', ') + ((f.donorIds || []).length > 30 ? `, +${f.donorIds.length - 30} more` : '');
+
+      panel.innerHTML = `
+        <div class="lib-edit">
+          <div class="lib-edit-sec">
+            <h4>Identity</h4>
+            <div class="lib-grid">
+              <div class="lib-fg">
+                <label>Canonical name</label>
+                <input id="lef-canonicalName" value="${esc(f.canonicalName || '')}">
+              </div>
+              <div class="lib-fg">
+                <label>Display name</label>
+                <input id="lef-name" value="${esc(f.name || '')}" placeholder="defaults to canonical">
+              </div>
+              <div class="lib-fg">
+                <label>Kind</label>
+                <select id="lef-kind">${KINDS.map(([v,l]) => `<option value="${v}" ${v === f.kind ? 'selected' : ''}>${l}</option>`).join('')}</select>
+              </div>
+              <div class="lib-fg">
+                <label>Tier</label>
+                <select id="lef-tier">${TIERS.map(([v,l]) => `<option value="${v}" ${v === f.tier ? 'selected' : ''}>${l}</option>`).join('')}</select>
+              </div>
+              <div class="lib-fg">
+                <label>Cost (points)</label>
+                <input id="lef-cost" type="number" min="1" value="${f.cost ?? 10}">
+              </div>
+              <div class="lib-fg">
+                <label>Signature</label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:0.84rem;color:var(--ink-light);padding-top:4px">
+                  <input type="checkbox" id="lef-isSignature" ${f.isSignature ? 'checked' : ''}>
+                  Restrict to high-budget chimeras (rerolled 70% otherwise)
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="lib-edit-sec">
+            <h4>Role affinity</h4>
+            <div class="terrain-pick" id="lef-roles">${roleChecks}</div>
+            <div class="lib-help">Which Flee Mortals roles fit this feature thematically? An empty list means "any role".</div>
+          </div>
+
+          <div class="lib-edit-sec">
+            <h4>Terrain affinity</h4>
+            <div class="terrain-pick" id="lef-terrains">${terrainChecks}</div>
+            <div class="lib-help">Terrains this feature suits. An empty list means "any terrain".</div>
+          </div>
+
+          <div class="lib-edit-sec">
+            <h4>Template fields (compose-time inputs)</h4>
+            <div class="lib-fg">
+              <label>JSON</label>
+              <textarea id="lef-templateFields" style="min-height:130px;font-family:'Menlo','Monaco',monospace;font-size:0.78rem">${esc(JSON.stringify(f.templateFields || {}, null, 2))}</textarea>
+            </div>
+            <div class="lib-help">For attack/save kinds the chimera composes the body from these against its own stats. Edit as raw JSON; saved value must parse. Empty object <code>{}</code> means the bodyTemplate below is used verbatim.</div>
+          </div>
+
+          <div class="lib-edit-sec">
+            <h4>Body template</h4>
+            <div class="lib-fg">
+              <label>Prose with placeholders</label>
+              <textarea id="lef-bodyTemplate" rows="6">${esc(f.bodyTemplate || '')}</textarea>
+            </div>
+            <div class="lib-help">Token <code>&#123;MONSTER&#125;</code> = the chimera's name. <code>&#123;SPELL_DC&#125;</code> and <code>&#123;SPELL_ATK&#125;</code> = spellcasting DC + spell attack bonus, resolved against the chimera. For templatable kinds (attacks/saves) this is back-reference only — compose() rebuilds it from templateFields.</div>
+          </div>
+
+          <div class="lib-edit-sec">
+            <h4>Donor lineage (readonly)</h4>
+            <div class="lib-donors">${donorList ? esc(donorList) : '<i>none — manually-added entry</i>'}</div>
+            <div class="lib-help">${(f.donorCount || 0)} unique donor monster${(f.donorCount === 1) ? '' : 's'} contributed to this entry.</div>
+          </div>
+
+          <div class="lib-actions">
+            <button class="btn brass" onclick="saveLibraryEntry()">Save changes</button>
+            <button class="btn ghost sm" onclick="selectLibraryEntry('${esc(f.id)}')">Discard edits</button>
+            ${isNew || (f._custom || (f.donorCount || 0) === 0)
+              ? `<button class="btn danger sm" onclick="deleteLibraryEntry('${esc(f.id)}')">Delete</button>`
+              : `<span class="lib-help" style="margin:0">Imported entries can't be deleted — re-run extract_features.py and re-import to refresh.</span>`}
+          </div>
+        </div>
+      `;
+    }
+
+    function readLibraryEditForm(){
+      const $ = id => document.getElementById(id);
+      // Roles + terrains: collect checked values
+      const roles = Array.from($('lef-roles').querySelectorAll('input[type=checkbox]:checked')).map(cb => cb.value);
+      const terrains = Array.from($('lef-terrains').querySelectorAll('input[type=checkbox]:checked')).map(cb => cb.value);
+
+      let templateFields = {};
+      try {
+        const raw = ($('lef-templateFields').value || '').trim();
+        templateFields = raw ? JSON.parse(raw) : {};
+      } catch(e){
+        toast('Template fields aren\'t valid JSON — fix the syntax before saving.', true);
+        return null;
+      }
+
+      const tier = $('lef-tier').value;
+      const tierBands = { low: [1,4], mid: [5,10], high: [11,16], epic: [17,30] };
+
+      return {
+        canonicalName: $('lef-canonicalName').value.trim() || 'Unnamed',
+        name: $('lef-name').value.trim() || ($('lef-canonicalName').value.trim() || 'Unnamed'),
+        kind: $('lef-kind').value,
+        tier,
+        tierBand: tierBands[tier] || [1, 4],
+        cost: Math.max(1, parseInt($('lef-cost').value, 10) || 10),
+        isSignature: $('lef-isSignature').checked,
+        templateFields,
+        bodyTemplate: $('lef-bodyTemplate').value,
+        roleAffinity: roles,
+        terrainAffinity: terrains
+      };
+    }
+
+    async function saveLibraryEntry(){
+      if (!selectedLibraryId) return;
+      const updates = readLibraryEditForm();
+      if (!updates) return;
+      const features = featureLibrary.features || [];
+      const idx = features.findIndex(x => x.id === selectedLibraryId);
+      if (idx < 0){ toast('Library entry not found.', true); return; }
+      // Merge updates into the existing entry (preserve donorIds/donorCount).
+      features[idx] = { ...features[idx], ...updates };
+      const ok = await persistLibrary();
+      if (ok){
+        toast(`Saved "${features[idx].canonicalName}".`);
+        renderLibraryList();
+        renderLibraryEditForm(features[idx], false);
+      }
+    }
+
+    async function deleteLibraryEntry(id){
+      const features = featureLibrary.features || [];
+      const idx = features.findIndex(x => x.id === id);
+      if (idx < 0) return;
+      const entry = features[idx];
+      // Only allow deleting custom-authored or zero-donor entries
+      if (!(entry._custom || (entry.donorCount || 0) === 0)){
+        toast('Imported entries can\'t be deleted — re-extract instead.', true);
+        return;
+      }
+      if (!confirm(`Delete "${entry.canonicalName}" from the library?`)) return;
+      features.splice(idx, 1);
+      selectedLibraryId = null;
+      const ok = await persistLibrary();
+      if (ok){
+        toast(`Deleted "${entry.canonicalName}".`);
+        document.getElementById('lib-edit-panel').innerHTML =
+          '<div class="empty-note">Pick a feature on the left, or click <b>+ New</b> to create one.</div>';
+        renderLibraryList();
+      }
+    }
+
+    async function persistLibrary(){
+      // Bump featureCount + bestiary monsterCount; preserve schema
+      // version. The whole envelope ships in one POST.
+      featureLibrary.featureCount = (featureLibrary.features || []).length;
+      const ok = await saveKey('feature_library', featureLibrary);
+      if (!ok){
+        // Roll back the in-memory state would require deep cloning
+        // before mutation. For now, a failed save leaves the page in
+        // a slightly inconsistent state — page reload re-syncs.
+        toast('Save failed — reload the page to discard local changes.', true);
+      }
+      return ok;
     }
 
     async function saveKey(type, payload){
