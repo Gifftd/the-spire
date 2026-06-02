@@ -3015,33 +3015,92 @@
 
     // Per-feature-kind point multiplier. The cost of a feature is
     // `max(1, source.cr) * kindMultiplier` — so a CR 10 multiattack
-    // (80 pts) is "expensive" relative to a CR 1 trait (2 pts).
+    // (120 pts) is "expensive" relative to a CR 1 trait (5 pts).
+    // Costs run hot on purpose: the budget should be the hard ceiling,
+    // and CR-mismatched donors (pulling CR 15 features into a CR 5
+    // chimera) should be priced out rather than slipping through.
     const KIND_COST_MULT = {
-      multiattack: 8,
-      melee_attack: 4, ranged_attack: 4, flex_attack: 4,
-      save_effect: 6, recharge_save: 6, recharge_attack: 5,
-      spellcasting: 7,
-      utility: 3,
-      trait: 2,
-      bonus_action: 3,
-      reaction: 3,
-      legendary: 5
+      multiattack: 12,
+      melee_attack: 6, ranged_attack: 6, flex_attack: 6,
+      save_effect: 10, recharge_save: 10, recharge_attack: 8,
+      spellcasting: 14,
+      utility: 6,
+      trait: 5,
+      bonus_action: 6,
+      reaction: 6,
+      legendary: 9
     };
 
-    // Slot budget by section. Each section gets at most this many
-    // entries — keeps the chimera stat block from sprawling.
+    // Slot ranges by CR tier, calibrated against the 2024 MM canon:
+    //   CR 0-2: 1-2 actions, no multiattack, 0-1 trait, 0 reactions.
+    //           (Goblin Warrior = 2 actions, 0 traits, 0 reactions.)
+    //   CR 3-5: + Multiattack, 1 attack, 0-1 save (breath/special).
+    //           (Hill Giant = 1 multi + 2 attacks; Manticore = 1 multi
+    //            + 1 attack-pair; nobody has 4+ actions at this tier.)
+    //   CR 6-10: + 0-1 utility, 0-1 reaction, occasionally spellcasting.
+    //           (Mind Flayer CR 7 = 1 multi + 1 attack + 1 mind blast +
+    //            spellcasting + 2 traits — that's the heavy end.)
+    //   CR 11-16: legendary actions kick in, 0-1 saves more common.
+    //   CR 17+:  more saves, spellcasting expected, 2-3 attacks ok.
     function slotPlanFor(cr){
+      // Tier max-action targets (multi + attacks + saves + spell + util):
+      //   CR 0-2:   1-2 actions, 0 multiattack
+      //   CR 3-5:   2-3 actions, 1 multi
+      //   CR 6-10:  2-3 actions, 1 multi
+      //   CR 11-16: 3-5 actions, 1 multi
+      //   CR 17+:   4-6 actions, 1 multi
+      if (cr < 3){
+        return {
+          actions: { multiattack: 0, attacks: [1, 2], saves: [0, 0], spellcasting: 0, utility: [0, 0] },
+          traits: [0, 1],
+          bonusActions: [0, 1],
+          reactions: [0, 0],
+          legendary: [0, 0]
+        };
+      }
+      if (cr < 6){
+        return {
+          actions: { multiattack: 1, attacks: [1, 1], saves: [0, 1], spellcasting: 0, utility: [0, 0] },
+          traits: [0, 1],
+          bonusActions: [0, 1],
+          reactions: [0, 1],
+          legendary: [0, 0]
+        };
+      }
+      if (cr < 11){
+        // No utility action slot at this tier — too easy to over-stuff
+        // a Mind Flayer-sized stat block. Spellcasting only at CR 9+.
+        return {
+          actions: { multiattack: 1, attacks: [1, 1], saves: [0, 1], spellcasting: cr >= 9 ? 1 : 0, utility: [0, 0] },
+          traits: [1, 2],
+          bonusActions: [0, 1],
+          reactions: [0, 1],
+          legendary: [0, 0]
+        };
+      }
+      if (cr < 17){
+        return {
+          actions: { multiattack: 1, attacks: [1, 2], saves: [0, 1], spellcasting: 1, utility: [0, 0] },
+          traits: [1, 2],
+          bonusActions: [0, 1],
+          reactions: [0, 1],
+          legendary: [1, 3]
+        };
+      }
       return {
-        actions: { multiattack: 1, attacks: [2, cr >= 5 ? 4 : 3], saves: [0, cr >= 5 ? 2 : 1], spellcasting: cr >= 5 ? 1 : 0, utility: [0, 1] },
+        actions: { multiattack: 1, attacks: [1, 2], saves: [1, 2], spellcasting: 1, utility: [0, 1] },
         traits: [1, 3],
         bonusActions: [0, 1],
-        reactions: [0, cr >= 5 ? 2 : 1],
-        legendary: cr >= 11 ? [1, 3] : [0, 0]
+        reactions: [0, 2],
+        legendary: [2, 3]
       };
     }
 
     function pointBudgetFor(cr){
-      // CR 1 → 60, CR 5 → 180, CR 10 → 330, CR 20 → 630, CR 30 → 930
+      // CR 1 → 60, CR 5 → 180, CR 10 → 330, CR 20 → 630, CR 30 → 930.
+      // Combined with the higher kind multipliers above, the budget
+      // should be the binding constraint roughly half the time and the
+      // slot caps the binding constraint the rest.
       return Math.max(50, Math.round(cr * 30 + 30));
     }
 
@@ -3182,16 +3241,19 @@
         return pick;
       }
 
-      // 1) Required: one Multiattack
-      const mAttack = draw(f => f.kind === 'multiattack');
-      if (mAttack){
-        newMon.actions.push(slotFeature(mAttack));
-        trackDonor(mAttack);
+      // 1) Optional: one Multiattack (only when the plan allows — low CR
+      //    typically has none in the 2024 MM).
+      if (plan.actions.multiattack > 0){
+        const mAttack = draw(f => f.kind === 'multiattack');
+        if (mAttack){
+          newMon.actions.push(slotFeature(mAttack));
+          trackDonor(mAttack);
+        }
       }
 
-      // 2) 2–4 single attacks. Multiattack's recompose target is at
-      //    least one of these names (the existing template engine fills
-      //    that in when the DM opens the result in the Editor).
+      // 2) 1–N single attacks per the tier plan. The multiattack body
+      //    gets patched after these are picked so its `attackName`
+      //    references one we actually slotted (not the donor's).
       const attackTarget = rint(...plan.actions.attacks);
       for (let i = 0; i < attackTarget; i++){
         const pick = draw(f => /_attack$/.test(f.kind) && f.kind !== 'recharge_attack');
@@ -3276,6 +3338,46 @@
           if (a._template) continue;          // already a custom-source template
           const tpl = parseToTemplate(a, sec);
           if (tpl) a._template = tpl;
+        }
+      }
+
+      // ── Repoint Multiattack at an attack we actually slotted ──
+      // Without this, a Multiattack pulled from a Beholder would still
+      // read "uses Eye Rays three times" even when the chimera has Bite
+      // and Claws as its attacks. We rebuild the multiattack body to
+      // reference the first slotted attack (preferring one from the
+      // same donor as the multiattack), and let the existing template
+      // engine recompose against the chimera's stats.
+      const multi = newMon.actions.find(a => a._template?.kind === 'multiattack');
+      if (multi){
+        const slottedAttacks = newMon.actions.filter(a =>
+          a._template?.kind && /_attack$/.test(a._template.kind)
+        );
+        if (slottedAttacks.length){
+          // Prefer same-donor for narrative coherence, otherwise first.
+          const sameDonor = slottedAttacks.find(a => a._donorId === multi._donorId);
+          const chosen = sameDonor || slottedAttacks[0];
+          const chosenName = chosen._template?.fields?.weaponName || chosen.name || 'Attack';
+          // Clamp the count to something sensible — donors with "makes
+          // four attacks" multiattacks dropped into a CR 3 chimera read
+          // weird. 2 attacks is the sweet spot under CR 11.
+          const sensibleCount = targetCr < 11
+            ? Math.min(multi._template.fields.count || 2, 2)
+            : Math.min(multi._template.fields.count || 3, 3);
+          multi._template.fields = {
+            ...multi._template.fields,
+            attackName: chosenName,
+            count: sensibleCount
+          };
+          const composed = TEMPLATES.multiattack.compose(multi._template.fields, newMon);
+          const wrapped = applySectionWrapping(composed.name, composed.body, 'actions', null, null);
+          multi.name = wrapped.name;
+          multi.body = wrapped.body;
+        } else {
+          // No attacks slotted but Multiattack was — drop it. A solo
+          // Multiattack referencing nothing is just noise.
+          const idx = newMon.actions.indexOf(multi);
+          if (idx >= 0) newMon.actions.splice(idx, 1);
         }
       }
 

@@ -9,6 +9,47 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: chimera slot tightening + multiattack repointing
+
+Tightens the chimera generator's slot caps so output matches 2024 MM
+canon — most monsters under CR 11 should have 2-3 actions, not 5-7.
+Also repoints the Multiattack to reference an attack we actually
+slotted (previously the body would still read "uses Eye Rays three
+times" even when the chimera had Bite and Claws as its attacks).
+
+#### Slot range changes
+
+| CR    | actions (was → now) | traits |
+|-------|---------------------|--------|
+| 0–2   | 1–2 (unchanged)     | 0–1    |
+| 3–5   | 2–3 (was 2–4)       | 0–1    |
+| 6–10  | 2–3 (was 2–5)       | 1–2    |
+| 11–16 | 3–5 (was 3–7)       | 1–2    |
+| 17+   | 4–7 (was 4–8)       | 1–3    |
+
+Utility action slot dropped for CR < 17; spellcasting block dropped
+for CR < 9. Reaction slot trimmed to 0–1 below CR 17.
+
+#### Cost multiplier increases
+
+Bumped across the board so the budget binds earlier when CR-mismatched
+donors get sampled (multiattack 8 → 12, single attack 4 → 6, save
+effect 6 → 10, spellcasting 7 → 14, trait 2 → 5, bonus/reaction 3 → 6,
+legendary 5 → 9).
+
+#### Multiattack repointing
+
+After all attacks are slotted, the chimera loop now finds the
+Multiattack (if any) and rewrites its `_template.fields.attackName`
+to one of the slotted attack names — preferring the same donor as
+the multiattack for narrative coherence, else the first slotted
+attack. The attack count is clamped to 2 at CR < 11 and 3 at CR ≥
+11 so a Beholder's "uses Eye Rays three times" doesn't survive into
+a CR 3 chimera. If no attacks were slotted at all, the Multiattack
+is dropped (a solo Multiattack with nothing to swing is just noise).
+
+---
+
 ### Menagerie: Generate tab — chimera edition (compositional rewrite)
 
 Replaces the retune-from-similar-monster algorithm with a true
