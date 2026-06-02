@@ -9,6 +9,121 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: Library tab + in-place monster edit
+
+Two related editing affordances that close out the chimera-architecture
+workstream.
+
+#### Library tab — browse, add, edit, delete library features
+
+New tab between Generate and Import on `bestiary-dm.html`. Same
+Browse-style two-column layout: a filterable list on the left
+(search by name, filter by kind / tier / role affinity / signature
+status) and an edit form on the right.
+
+Form fields:
+- Identity: canonical name, display name, kind (11 options), tier
+  (low/mid/high/epic), cost, signature toggle
+- Role affinity chip-checkboxes (the 9 Flee Mortals roles)
+- Terrain affinity chip-checkboxes (12 terrains)
+- Template fields as raw JSON textarea (for attack/save kinds; the
+  chimera composes the body from these at slot time)
+- Body template textarea with `{MONSTER}` / `{SPELL_DC}` /
+  `{SPELL_ATK}` placeholder hints
+- Donor lineage panel (readonly — shows which monsters contributed
+  to this entry; "manually-added entry" for `_custom: true` items)
+
+Actions: Save changes (writes the whole envelope back to
+`feature_library` KV), Discard edits (re-selects from in-memory
+state), Delete (only available for custom-authored or zero-donor
+entries — imported entries can't be deleted to avoid accidental
+mass-loss; re-extract instead).
+
+`+ New` button mints a placeholder entry (trait + mid + cost 38)
+that the DM can fill in. Auto-focus on the search field after add
+so the new entry is easy to find. List caps at 250 entries
+rendered; narrow with the search/filter dropdowns.
+
+#### In-place monster edit on Browse
+
+New **✏️ Edit this monster** button next to the existing **📋 Edit
+a copy** on every monster's stat block in Browse. Loads the monster
+into the Editor with `editingId` set to the source id, so Save
+updates the existing record instead of minting a new one.
+
+Save routing: a new page-level `editingSource` state
+(`'custom' | 'bestiary'`) determines which KV to write back to.
+Custom monsters keep going to `bestiary_custom` as before; imported
+ones write back to `bestiary` (whole envelope, monsters array
+mutated in place) with an `_edited: true` + `_editedAt` ISO timestamp
+stamp on the modified record. Analysis cache is invalidated on
+imported-monster save.
+
+Delete is hidden for imported edits — re-importing the bestiary is
+the canonical "reset" path. Duplicate stays available so a DM can
+edit-as-copy if they realize mid-edit they want to keep the
+original.
+
+#### Behavior changes
+
+- `cloneMonsterToEditor`, `newCustom`, `loadCustom`, `saveCustom`
+  all set/reset `editingSource` consistently.
+- `loadFormFromEdit` now keys the Delete button visibility on
+  `editingSource === 'custom'` not just `editingId`.
+
+---
+
+### Menagerie: median-dice aggregation + spell DC/atk placeholders (lib v2)
+
+Phase 3 of the feature library: closes the two gaps left in v1.
+
+#### Changed — `scripts/extract_features.py`
+
+- **Median-dice aggregation.** Previously each `(canonicalName, kind,
+  tier)` bucket picked one representative donor (highest CR within
+  the band) and copied its templateFields verbatim, so quirks of a
+  single donor shaped the entry — `Bite-high` could land 2d10 (a
+  single donor's atypical bite) when `Bite-mid` was 4d8. New
+  `aggregate_template_fields(bucket)` walks every donor's fields and
+  computes per-component central tendency: median dice count + die
+  size for dice strings, median for numeric (reach / range / count
+  / bonuses), mode for damageType / weaponName / recharge, majority
+  vote for booleans. Re-extracted library shows the expected
+  progression — Bite: low 1d6 → mid 2d8 → high 2d10 → epic 2d10
+  reach 15 (rider grows even when base dice plateau).
+- **Body-template donor pick.** Prose bodies (traits, spellcasting,
+  utility, etc.) still come from a single donor — but the
+  representative is now the donor closest to the tier midpoint, not
+  the highest-CR outlier. Picks central phrasing over edge-case
+  strongest version.
+- **Spell placeholders.** `parse_spellcasting_to_template` +
+  `normalize_spellcasting_body` strip donor-specific DCs ("spell
+  save DC 17" → "spell save DC {SPELL_DC}") and spell-attack
+  bonuses ("+10 to hit with spell attacks" → "+{SPELL_ATK} to
+  hit…") so the chimera resolves them against its own ability + PB.
+- **SCHEMA_VERSION = 2.** The page tolerates v1 entries (no
+  placeholders, single-donor fields) so a DM who hasn't re-imported
+  doesn't break, but re-running the script + re-importing
+  feature_library.json picks up the new aggregation.
+
+#### Changed — `bestiary-dm.html`
+
+- `fillMonsterPlaceholders` gains `resolveSpellTokens(text, feat)`
+  — replaces `{SPELL_DC}` with `8 + pb + mod` and `{SPELL_ATK}`
+  with `pb + mod` against the chimera's spell ability. The ability
+  comes from the feature's `_template.fields.spellAbility` when
+  present (set by the extractor's `parse_spellcasting_to_template`);
+  falls back to the chimera's best INT/WIS/CHA mod.
+
+#### Required re-imports
+
+- Run `python3 scripts/extract_features.py` to regenerate
+  `feature_library.json` with median dice + spell placeholders.
+- Re-import via the Menagerie's Import tab (Replace path —
+  feature-library imports are always replace-mode).
+
+---
+
 ### Menagerie: chimera generator rewired to consume the feature library
 
 Replaces the runtime catalog-build path (walk `allMonsters()` every

@@ -52,7 +52,7 @@ ROOT = Path(__file__).resolve().parent.parent
 BESTIARY = ROOT / 'bestiary.json'
 LIBRARY = ROOT / 'feature_library.json'
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 # ─────────────────────────────────────────────────────────────────────
 # Tiers and cost model
@@ -332,10 +332,29 @@ def parse_spellcasting_to_template(action, monster):
     save_ability = ABIL_LONG_TO_SHORT.get(ab_match.group(1)) if ab_match else 'cha'
     return {
         'spellAbility': save_ability,
-        # Bodies are preserved verbatim (with {MONSTER} substitution)
-        # because the spell list itself doesn't depend on stats. The
-        # spell DC + attack bonus get recomputed at slot-time.
+        # Bodies are preserved verbatim (with {MONSTER} substitution +
+        # {SPELL_DC} / {SPELL_ATK} placeholders applied by
+        # normalize_spellcasting_body). The spell list itself doesn't
+        # depend on stats; the DC + attack bonus get resolved at slot
+        # time against the chimera's new ability mod + PB.
     }, canonical_name(action.get('name') or 'Spellcasting')
+
+
+# Spell DCs + spell-attack bonuses inside a Spellcasting block reflect
+# the donor's stats. For the chimera we strip them to placeholders that
+# the page fills at slot time against the new monster's mod + PB.
+SPELL_DC_RX = re.compile(r'spell save DC\s*\d+', re.IGNORECASE)
+SPELL_ATK_RX = re.compile(r'\+\s*\d+\s*to hit with spell attacks', re.IGNORECASE)
+# Some 2024 stat blocks embed the DC/atk in parens like "(spell save DC
+# 20, +12 to hit with spell attacks)" — the same regexes catch both.
+
+
+def normalize_spellcasting_body(body):
+    if not body: return body
+    out = body
+    out = SPELL_DC_RX.sub('spell save DC {SPELL_DC}', out)
+    out = SPELL_ATK_RX.sub('+{SPELL_ATK} to hit with spell attacks', out)
+    return out
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -388,6 +407,10 @@ def extract_one(monster):
                 fields, parsed_name = parse_spellcasting_to_template(item, monster)
                 template_fields = fields
                 cname = parsed_name
+                # Strip donor-specific DC + spell-attack bonus to
+                # placeholders so the chimera can resolve them against
+                # its own stats.
+                body_tpl = normalize_spellcasting_body(body_tpl)
 
             yield {
                 'kind': kind,
@@ -398,6 +421,69 @@ def extract_one(monster):
                 'section': section,
                 'donor': monster,
             }
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Aggregation across donors in the same (canonicalName, kind, tier)
+# bucket. Computes per-component central tendency so the library entry
+# reflects the bucket as a whole, not whichever single donor happened
+# to win the highest-CR / longest-body tiebreak.
+# ─────────────────────────────────────────────────────────────────────
+
+DICE_RX = re.compile(r'^\s*(\d+)d(\d+)\s*$')
+
+def _median(values):
+    s = sorted(values)
+    return s[len(s) // 2]
+
+def _mode(values):
+    if not values: return None
+    return Counter(values).most_common(1)[0][0]
+
+def aggregate_template_fields(bucket):
+    """Aggregate templateFields across donors in a bucket.
+
+    Per-component rules:
+      - dice strings (NdM):  median dice count + median die size
+      - reach / range / count / bonuses: median
+      - damageType / weaponName / actionName / recharge: mode (most common)
+      - booleans: majority vote
+      - all other strings: first non-empty
+    """
+    field_values = defaultdict(list)
+    for f in bucket:
+        tf = f.get('templateFields') or {}
+        for k, v in tf.items():
+            field_values[k].append(v)
+
+    out = {}
+    for k, vs in field_values.items():
+        if not vs: continue
+        sample = vs[0]
+        # Dice formula: median dice count + median die size
+        if isinstance(sample, str) and DICE_RX.match(sample or ''):
+            counts, sizes = [], []
+            for v in vs:
+                m = DICE_RX.match(v or '')
+                if m:
+                    counts.append(int(m.group(1)))
+                    sizes.append(int(m.group(2)))
+            if counts:
+                out[k] = f'{_median(counts)}d{_median(sizes)}'
+            else:
+                out[k] = _mode([v for v in vs if v]) or sample
+        # Numeric: median
+        elif isinstance(sample, (int, float)) and not isinstance(sample, bool):
+            nums = [v for v in vs if isinstance(v, (int, float)) and not isinstance(v, bool)]
+            out[k] = _median(nums) if nums else sample
+        # Boolean: majority vote
+        elif isinstance(sample, bool):
+            bools = [bool(v) for v in vs]
+            out[k] = bools.count(True) > bools.count(False)
+        # String (recharge, type, name): mode
+        else:
+            out[k] = _mode(vs)
+    return out
 
 
 def build_library(bestiary_data):
@@ -444,13 +530,17 @@ def build_library(bestiary_data):
         # this exact (kind, tier) tuple. Used to gate rare features.
         is_signature = len(name_donors[cname]) == 1
 
-        # Pick the representative bodyTemplate / templateFields from the
-        # donor at the highest CR within this tier (it'll have the
-        # canonical phrasing of the strongest version).
-        rep = max(donors, key=lambda x: (+(x['donor'].get('cr') or 0), len(x.get('bodyTemplate') or '')))
-        # If the kind is templatable, the bodyTemplate isn't needed at
-        # slot time (compose() rebuilds it from fields). We keep it as a
-        # back-reference for the library editor.
+        # templateFields: aggregate per-component across all donors so
+        # the entry reflects central tendency (median dice, mode types,
+        # majority booleans) rather than one donor's quirks.
+        aggregated_fields = aggregate_template_fields(donors)
+
+        # bodyTemplate: prose kinds (traits, spellcasting, utility,
+        # bonus, reaction, legendary) need a representative body. Pick
+        # the donor closest to the tier midpoint so the wording matches
+        # the central case rather than the strongest outlier.
+        tier_mid = (tier_band[0] + tier_band[1]) / 2
+        rep = min(donors, key=lambda x: abs((+(x['donor'].get('cr') or 0)) - tier_mid))
         body_tpl = rep['bodyTemplate']
 
         entries.append({
@@ -462,7 +552,7 @@ def build_library(bestiary_data):
             'tierBand': tier_band,
             'cost': cost,
             'isSignature': is_signature,
-            'templateFields': rep['templateFields'],
+            'templateFields': aggregated_fields,
             'bodyTemplate': body_tpl,
             'roleAffinity': sorted(role_set),
             'terrainAffinity': sorted(terrain_set),
