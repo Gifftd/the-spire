@@ -9,6 +9,29 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### Sessions: inline NPC creation + prep-scan helper
+
+The Sessions tool can now create NPCs without leaving the editor.
+Two entry points sit next to the LINKED NPCs chip grid:
+
+- **+ ADD NPC** opens a quick-add modal (Name, Role, Status,
+  Location, Activity, Public Description, DM Notes). Saves to
+  the global `npcs` KV roster and auto-links the new NPC to the
+  current session. Location dropdown defaults to the session's
+  first linked location.
+- **↑ SCAN PREP** finds NPC candidates referenced in the prep
+  block — every `[[Wikilink]]` plus bare list items under
+  `## NPCs` — then filters out anything that already matches a
+  location, a character, or an existing NPC. Shows the remainder
+  as a checklist with optional inline role fields. One click
+  creates all checked NPCs (status: alive, location: session's
+  first location) and links them to the session.
+
+Both paths POST to the existing `npcs` KV key — no worker
+changes. The created NPCs are first-class records visible in
+the Atlas Workshop NPCs tab for fuller editing later (history,
+known-to-which-characters, public notes).
+
 ### Sessions: standalone DM tool with vault round-trip
 
 Adds `sessions-dm.html`, a full-screen DM workspace for managing
