@@ -3224,9 +3224,11 @@
     }
 
     // ── Library helpers ─────────────────────────────────────────────
-    // tierForCR mirrors the script's TIER_BANDS so a target CR resolves
-    // to the same tier label the library was built against.
-    function tierForCR(cr){
+    // libraryTierForCR mirrors the Python script's TIER_BANDS so a
+    // target CR resolves to the same tier label the library was built
+    // against. (Named distinctly from the Analysis tab's tierForCR,
+    // which returns a CR_TIER_BUCKETS row — different shape.)
+    function libraryTierForCR(cr){
       if (cr <  5) return 'low';
       if (cr < 11) return 'mid';
       if (cr < 17) return 'high';
@@ -3264,7 +3266,7 @@
       const plan = slotPlanFor(targetCr);
       let budget = pointBudgetFor(targetCr);
 
-      const targetTier = tierForCR(targetCr);
+      const targetTier = libraryTierForCR(targetCr);
       const tierSet = new Set(adjacentTiers(targetTier));
 
       // Score each library entry: tag whether it matches the criteria
