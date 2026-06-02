@@ -303,6 +303,11 @@ body { background: var(--bg); color: var(--ink); font-family: 'Crimson Text', Ge
 .bestiary-cr-chip.t-high { color: var(--gold); border-color: rgba(184,138,90,0.5); }
 .bestiary-cr-chip.t-epic { color: #e88; border-color: #844; }
 .bestiary-custom-chip { font-family: 'Cinzel', serif; font-size: 0.5rem; letter-spacing: 0.08em; padding: 1px 6px; border-radius: 8px; border: 1px solid var(--gold); color: var(--gold); background: rgba(184,138,90,0.10); margin-left: 6px; }
+.bestiary-source-chip { font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 1px 6px; border-radius: 8px; border: 1px solid var(--ink-faint); color: var(--ink-faint); background: transparent; margin-left: 6px; vertical-align: middle; }
+.bestiary-source-chip.s-mm-2024 { border-color: #6c8db5; color: #8eb5e8; }
+.bestiary-source-chip.s-tob-v1 { border-color: #a89478; color: #d2bd96; }
+.bestiary-source-chip.s-fm-v1 { border-color: #c29478; color: #e3a08e; }
+.bestiary-source-chip.s-custom { border-color: var(--gold); color: var(--gold); }
 .bestiary-empty-note { padding: 1.5rem 1rem; text-align: center; color: var(--ink-faint); font-style: italic; font-size: 0.9rem; }
 
 /* Saved encounters */
@@ -1014,6 +1019,23 @@ const BP_CR_OPTIONS = [
   ['26','26'], ['27','27'], ['28','28'], ['29','29'], ['30','30']
 ];
 function bpEsc(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// Source-tag chip: makes "Aboleth (mm-2024)" and "Aboleth (fm-v1)"
+// visually distinguishable in the picker + cart + combatant card.
+// Skip when the source string is unknown / 'imported' / 'custom' (the
+// custom chip already says that part), and fall back to a generic
+// ink-faint chip otherwise.
+function sourceChipHTML(src){
+  if (!src) return '';
+  const norm = String(src).trim();
+  if (!norm || norm === 'imported' || norm === 'custom') return '';
+  const cls = 's-' + norm.replace(/[^a-zA-Z0-9-]+/g, '-').toLowerCase();
+  return `<span class="bestiary-source-chip ${cls}" title="Source book">${bpEsc(norm)}</span>`;
+}
+function bestiarySourceChipHTML(m){
+  if (!m || m._custom) return '';
+  return sourceChipHTML(m.source);
+}
 function bpCrTier(cr){
   const c = +cr;
   if (!isFinite(c)) return 't-low';
@@ -1133,7 +1155,7 @@ function bestiaryRowHTML(m){
   return `
     <div class="bestiary-row${inPicks?' in-picks':''}" id="bprow-${bpEsc(m.id)}" onclick="addPick('${bpEsc(m.id)}')">
       <div class="bestiary-row-head">
-        <div class="bestiary-row-nm">${bpEsc(m.name)}${m._custom?'<span class="bestiary-custom-chip">Custom</span>':''}<small>${bpEsc(m.size||'')} ${bpEsc(m.type||'')}${m.alignment?` · ${bpEsc(m.alignment)}`:''}</small></div>
+        <div class="bestiary-row-nm">${bpEsc(m.name)}${m._custom?'<span class="bestiary-custom-chip">Custom</span>':''}${bestiarySourceChipHTML(m)}<small>${bpEsc(m.size||'')} ${bpEsc(m.type||'')}${m.alignment?` · ${bpEsc(m.alignment)}`:''}</small></div>
         <div class="bestiary-row-meta">
           <span>${m.ac ?? '—'}<small>AC</small></span>
           <span>${m.hp ?? '—'}<small>HP</small></span>
@@ -1245,7 +1267,7 @@ function renderPicks(){
       return `
         <div class="pick-row${p.expanded?' expanded':''}">
           <div class="pick-head">
-            <div class="pick-nm">${bpEsc(m.name)}${m._custom?'<span class="bestiary-custom-chip">Custom</span>':''}<small>CR ${bpEsc(m.crText || m.cr || '?')} · ${xpEach.toLocaleString()} XP ea</small></div>
+            <div class="pick-nm">${bpEsc(m.name)}${m._custom?'<span class="bestiary-custom-chip">Custom</span>':''}${bestiarySourceChipHTML(m)}<small>CR ${bpEsc(m.crText || m.cr || '?')} · ${xpEach.toLocaleString()} XP ea</small></div>
             <div class="pick-qty">
               <button onclick="updatePick('${safeId}','qty',${p.qty-1})">−</button>
               <span class="q">${p.qty}</span>
@@ -1801,6 +1823,7 @@ function render() {
             <span class="type-dot ${c.type}"></span>
             ${isActive ? '<span class="active-arrow">▶</span>' : ''}
             ${c.name}
+            ${c.bestiarySource ? sourceChipHTML(c.bestiarySource) : ''}
             ${hiddenBadge}
           </div>
           ${condChips}

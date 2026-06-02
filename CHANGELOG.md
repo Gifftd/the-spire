@@ -9,6 +9,52 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Bestiary + War Table: source chip everywhere
+
+Adds a color-coded source chip (mm-2024 / tob-v1 / fm-v1 / custom)
+next to every monster's name across the tool so DMs can tell at a
+glance which book a creature came from — especially useful now that
+FM imports overlap with MM names (Aboleth, Basilisk, Chimera, etc.).
+
+#### Where the chip appears
+
+- **Menagerie → Browse list**: row name shows the chip beside the
+  monster name + role chip (already added in the dupe-fix commit;
+  now uses the proper color-coded class instead of a one-off style).
+- **Menagerie → Editor title**: while editing a monster, the title
+  shows the source so the DM can tell which copy of a duplicate-name
+  monster they're refining.
+- **War Table → Bestiary picker rows**: every monster in the picker
+  list gets the chip.
+- **War Table → Cart row**: each picked monster line shows the source
+  beside its name.
+- **War Table → Combatant card**: live in initiative, beside the
+  combatant name — uses the `bestiarySource` stamp already on the
+  combatant (set when adding from the picker).
+
+#### Color scheme
+
+| Source | Color |
+|--------|-------|
+| `mm-2024` | Blue (`#8eb5e8`) |
+| `tob-v1` | Tan (`#d2bd96`) |
+| `fm-v1` | Rust (`#e3a08e`) |
+| `custom` | Brass (`var(--brass-bright)`) |
+| anything else | Faint ink (graceful fallback) |
+
+#### Added
+
+- `bestiary-dm.html`: `.source-chip` CSS class with per-source color
+  variants. Wired into the Browse row and Editor title.
+- `initiative-dm.html`: `.bestiary-source-chip` CSS + new
+  `sourceChipHTML(src)` and `bestiarySourceChipHTML(m)` helpers.
+  Wired into the picker row, cart pick row, and combatant card name.
+- Both tools skip the chip when `source` is empty, `'custom'`, or
+  `'imported'` (those cases either already have a different chip or
+  carry no source info worth surfacing).
+
+---
+
 ### War Table: Flee Mortals encounter math replaces 2024 DMG XP thresholds
 
 The bestiary picker's encounter difficulty was using 2014 DMG XP-band

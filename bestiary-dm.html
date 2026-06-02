@@ -146,6 +146,11 @@
     .fm-badge.solo{border:1px solid var(--rust);color:#e3a08e;background:rgba(154,90,90,0.15)}
     .fm-badge.minion{border:1px solid var(--ink-faint);color:var(--ink-faint);background:rgba(255,255,255,0.04)}
     .role-chip{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.08em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--teal);color:var(--teal-bright);background:rgba(60,153,150,0.08);margin-left:6px;white-space:nowrap}
+    .source-chip{font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--ink-faint);color:var(--ink-faint);background:transparent;margin-left:6px;vertical-align:middle;white-space:nowrap}
+    .source-chip.s-mm-2024{border-color:#6c8db5;color:#8eb5e8}
+    .source-chip.s-tob-v1{border-color:#a89478;color:#d2bd96}
+    .source-chip.s-fm-v1{border-color:#c29478;color:#e3a08e}
+    .source-chip.s-custom{border-color:var(--brass);color:var(--brass-bright)}
     .terrain-chip{font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:0.08em;text-transform:uppercase;padding:1px 5px;border-radius:8px;border:1px solid var(--border-light);color:var(--ink-faint);background:rgba(255,255,255,0.02);margin-left:4px;white-space:nowrap}
     .terrain-strip{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
     .terrain-pick{display:flex;flex-wrap:wrap;gap:6px;padding:6px;border:1px solid var(--border-light);border-radius:6px;background:rgba(0,0,0,0.15)}
@@ -1029,7 +1034,7 @@
         // comes from when names collide.
         const key = browseKey(m);
         const srcChip = m.source && !m._custom
-          ? `<span class="custom-chip" title="Source book" style="border-color:var(--ink-faint);color:var(--ink-faint);background:transparent">${esc(m.source)}</span>`
+          ? `<span class="source-chip s-${esc(String(m.source).replace(/[^a-zA-Z0-9-]+/g,'-').toLowerCase())}" title="Source book">${esc(m.source)}</span>`
           : '';
         return `
         <div class="row${key===activeId?' active':''}" onclick="selectMonster('${esc(key)}')">
@@ -2247,7 +2252,14 @@
       $('ed-xp').textContent = 'XP: ' + (currentEdit.xp ? currentEdit.xp.toLocaleString() : '—');
       $('ed-pb').textContent = 'PB: +' + currentEdit.pb;
       $('ed-id').textContent = 'id: ' + (editingId || '(new)');
-      $('ed-title').textContent = currentEdit.name || 'New monster';
+      // Editor title gets a source chip alongside the name so the DM
+      // can tell at a glance which book they're editing — important
+      // now that FM ↔ MM monsters can share names.
+      const titleEl = $('ed-title');
+      const src = currentEdit.source || (editingSource === 'custom' ? 'custom' : '');
+      const showChip = src && src !== 'custom' && src !== 'imported';
+      titleEl.innerHTML = esc(currentEdit.name || 'New monster')
+        + (showChip ? ` <span class="source-chip s-${esc(String(src).replace(/[^a-zA-Z0-9-]+/g,'-').toLowerCase())}" title="Source book" style="vertical-align:middle">${esc(src)}</span>` : '');
       for (const sec of FEATURE_SECTIONS) $(`ed-${sec}-n`).textContent = String((currentEdit[sec]||[]).length);
 
       // Auto-recalc templated actions if the stat snapshot changed.
