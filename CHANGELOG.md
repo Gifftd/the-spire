@@ -9,6 +9,65 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: Generate tab — procedural monster generator
+
+Phase 3 of the random monster generator. Adds a new **Generate** tab on
+`bestiary-dm.html` that procedurally retunes an existing bestiary
+monster into a new variant for a chosen CR + role + terrain. Output
+flows into the Editor for refinement via the same path
+`cloneMonsterToEditor` already uses.
+
+#### Algorithm (hybrid: reference-based + DMG-table retune)
+
+1. **Filter** the bestiary by role, terrain (any match), and optional
+   creature type.
+2. **Score** the pool by CR distance to the target, take the top 8 as
+   candidates, and **random-pick** one as the base for the retune.
+3. **Retune** the numerical fields against the target CR using:
+   - HP from the Analysis tab's CR-median band × a role-flavored bias
+     (Brute 1.18× / Defender 1.10× / Soldier 1.00× / Skirmisher 0.92× /
+     Ambusher 0.82× / Artillery 0.82× / Controller 0.95× / Leader
+     0.95× / Support 0.82×) × ±12% random jitter.
+   - AC from the CR-median band + a role adjustment (Defender +2,
+     Brute −1, Artillery/Controller −1, Support −2, else 0), clamped
+     to AC 10–22.
+   - PB and XP from the canonical tables (`pbForCR`, `XP_BY_CR`).
+   - Initiative from the cloned base's Dex mod + 10.
+4. **Tag** the output with the chosen role / terrain and flip the
+   manual flags so the Python tagger doesn't override them later.
+5. **Name** combines a terrain-themed adjective (12 pools × ~6 each →
+   72 adjectives) with the last 1–2 words of the base monster's name
+   ("Frostbound Goblin Warrior" / "Bogborn Owlbear").
+6. **Stamp** a fresh `custom-{name}Gen{ts}` id; mark `_generated:true`
+   and `_generatedFrom`/`_generatedFromName` so the lineage is visible
+   in saved records.
+
+Actions are cloned **verbatim** from the base. Templated actions
+auto-recompute against the new CR/PB when the DM opens the result in
+the Editor (`statSnapshot` already detects CR/PB changes and triggers
+`recalcTemplatedActions`). Plain-text actions retain the base's
+literal damage numbers — the preview surfaces a drift warning so the
+DM knows to audit them.
+
+#### Added — `bestiary-dm.html`
+
+- New **Generate** tab between Editor and Import. Two-column layout:
+  the left column is a criteria form (CR / role / terrain chip-grid /
+  optional type / optional name override) plus action row (Generate /
+  Generate Another / Open in Editor) and a candidates panel; the
+  right column is the live stat block preview with a Δ-strip (CR /
+  HP / AC / PB before vs. after).
+- **Candidates panel** lists the top 8 monsters considered for the
+  current criteria, sorted by CR distance. Clicking a row re-bases
+  the generation on that monster without re-rolling the criteria —
+  useful when the random pick isn't the flavor you wanted.
+- **"Open in Editor"** mirrors `cloneMonsterToEditor`'s contract:
+  fresh `editingId = null` so Save mints a new `bestiary_custom`
+  record; the templated-action auto-recalc fires on the first
+  `syncEditor` after load.
+
+---
+
 ### Menagerie: role + terrain visible in Browse, editable in Editor
 
 Phase 2 of the random monster generator. The role and terrain tags

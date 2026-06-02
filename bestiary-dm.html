@@ -152,6 +152,29 @@
     .terrain-pick input[type=checkbox]:checked + span{color:var(--teal-bright)}
     .terrain-pick label:has(input:checked){border-color:var(--teal);background:rgba(60,153,150,0.12);color:var(--teal-bright)}
     .tag-manual{font-size:0.5rem;color:var(--ink-faint);letter-spacing:0.05em;margin-left:6px}
+    /* Generate tab */
+    .gen-layout{display:grid;grid-template-columns:minmax(280px, 360px) 1fr;gap:1.25rem;align-items:start}
+    .gen-form{display:flex;flex-direction:column;gap:0.85rem}
+    .gen-sec{background:rgba(0,0,0,0.18);border:1px solid var(--border-light);border-radius:6px;padding:0.75rem}
+    .gen-sec h3{font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.14em;color:var(--brass-bright);margin:0 0 0.6rem 0;text-transform:uppercase}
+    .gen-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.6rem}
+    .gen-fg{display:flex;flex-direction:column;gap:3px}
+    .gen-fg label{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;color:var(--ink-light);text-transform:uppercase}
+    .gen-fg select,.gen-fg input{background:rgba(0,0,0,0.25);border:1px solid var(--border-light);border-radius:4px;padding:5px 7px;color:var(--ink);font-family:inherit;font-size:0.85rem}
+    .gen-fg select:focus,.gen-fg input:focus{outline:none;border-color:var(--teal)}
+    .gen-actions{display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center}
+    .gen-preview{background:rgba(0,0,0,0.18);border:1px solid var(--border-light);border-radius:6px;padding:0.8rem;min-height:300px}
+    .gen-candidates{display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto}
+    .gen-cand{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;background:rgba(255,255,255,0.02);border:1px solid var(--border-light);border-radius:4px;cursor:pointer;font-size:0.8rem}
+    .gen-cand:hover{border-color:var(--teal);background:rgba(60,153,150,0.08)}
+    .gen-cand.active{border-color:var(--brass);background:rgba(184,138,90,0.10)}
+    .gen-cand-nm{flex:1;color:var(--ink-light)}
+    .gen-cand-meta{font-size:0.65rem;color:var(--ink-faint);letter-spacing:0.05em}
+    .gen-deltas{display:flex;flex-wrap:wrap;gap:4px;margin:0.4rem 0 0.6rem 0;font-size:0.7rem}
+    .gen-delta{padding:2px 6px;border-radius:4px;border:1px solid var(--border-light);color:var(--ink-faint)}
+    .gen-delta.up{color:#9ad8a6;border-color:#4a7050}
+    .gen-delta.down{color:#e8a89a;border-color:#6e4848}
+    .gen-source-line{font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.12em;color:var(--ink-faint);margin-bottom:0.4rem}
 
     /* Analysis tab */
     .ana-cards{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:1rem}
@@ -271,6 +294,7 @@
         <button class="tab active" data-tab="browse" onclick="switchTab('browse')">Browse</button>
         <button class="tab" data-tab="analysis" onclick="switchTab('analysis')">Analysis</button>
         <button class="tab" data-tab="editor" onclick="switchTab('editor')">Editor</button>
+        <button class="tab" data-tab="generate" onclick="switchTab('generate')">Generate</button>
         <button class="tab" data-tab="import" onclick="switchTab('import')">Import</button>
       </div>
 
@@ -555,6 +579,74 @@
         </div>
       </div>
 
+      <!-- GENERATE -->
+      <div class="tab-panel" id="panel-generate" style="display:none">
+        <div class="gen-layout">
+          <div class="gen-form">
+            <div class="gen-sec">
+              <h3>Criteria</h3>
+              <div class="gen-grid">
+                <div class="gen-fg">
+                  <label>Target CR</label>
+                  <select id="gen-cr"></select>
+                </div>
+                <div class="gen-fg">
+                  <label>Role</label>
+                  <select id="gen-role">
+                    <option value="">Any role</option>
+                    <option>Ambusher</option><option>Artillery</option><option>Brute</option>
+                    <option>Controller</option><option>Defender</option><option>Leader</option>
+                    <option>Skirmisher</option><option>Soldier</option><option>Support</option>
+                  </select>
+                </div>
+              </div>
+              <div class="gen-fg" style="margin-top:0.6rem">
+                <label>Terrain (any match)</label>
+                <div class="terrain-pick" id="gen-terrain-pick">
+                  <label><input type="checkbox" value="arctic"><span>Arctic</span></label>
+                  <label><input type="checkbox" value="coastal"><span>Coastal</span></label>
+                  <label><input type="checkbox" value="desert"><span>Desert</span></label>
+                  <label><input type="checkbox" value="forest"><span>Forest</span></label>
+                  <label><input type="checkbox" value="grassland"><span>Grassland</span></label>
+                  <label><input type="checkbox" value="hill"><span>Hill</span></label>
+                  <label><input type="checkbox" value="mountain"><span>Mountain</span></label>
+                  <label><input type="checkbox" value="swamp"><span>Swamp</span></label>
+                  <label><input type="checkbox" value="underdark"><span>Underdark</span></label>
+                  <label><input type="checkbox" value="underwater"><span>Underwater</span></label>
+                  <label><input type="checkbox" value="urban"><span>Urban</span></label>
+                  <label><input type="checkbox" value="planar"><span>Planar</span></label>
+                </div>
+              </div>
+              <div class="gen-grid" style="margin-top:0.6rem">
+                <div class="gen-fg">
+                  <label>Creature type (optional)</label>
+                  <select id="gen-type"><option value="">Any type</option></select>
+                </div>
+                <div class="gen-fg">
+                  <label>Name override (optional)</label>
+                  <input id="gen-name-override" placeholder="leave blank to auto-name">
+                </div>
+              </div>
+            </div>
+            <div class="gen-actions">
+              <button class="btn brass" onclick="generateMonster()">🎲 Generate</button>
+              <button class="btn ghost sm" onclick="generateMonster()" id="gen-reroll-btn" disabled title="Re-roll with the same criteria">↻ Generate another</button>
+              <button class="btn brass sm" onclick="openGeneratedInEditor()" id="gen-open-btn" disabled>📋 Open in Editor</button>
+            </div>
+            <div class="gen-sec">
+              <h3>Candidates considered (<span id="gen-cand-n">0</span>)</h3>
+              <div id="gen-candidates" class="gen-candidates"><div class="empty-note" style="font-size:0.8rem">Set criteria and click Generate. Candidates from the pool will appear here — click any row to re-base the generation on that monster.</div></div>
+            </div>
+          </div>
+          <div>
+            <div class="col-head"><span>Generated stat block</span></div>
+            <div class="gen-preview" id="gen-preview-wrap">
+              <div id="gen-preview-body"><div class="empty-note">Set the criteria on the left and click <strong>🎲 Generate</strong>. The output is procedurally retuned from a similar bestiary monster — you can open it in the Editor to refine before saving.</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- IMPORT -->
       <div class="tab-panel" id="panel-import" style="display:none">
         <div class="form">
@@ -716,6 +808,7 @@
       renderList();
       renderSource();
       initEditor();
+      initGenerate();
     }
 
     function renderSource(){
@@ -2871,6 +2964,306 @@
         for (const sec of dirtySections) renderFeatureList(sec);
       }
       return count;
+    }
+
+    /* ──────────────────────────────────────────────────────────────────
+     * Generator (Phase 3) — hybrid algorithm.
+     *
+     * Pick a real bestiary monster matching the (role, terrain, type)
+     * criteria as the action-template basis, then retune its numerical
+     * fields (HP, AC, PB, XP, CR-text) to the target CR using both:
+     *   (a) Analysis-tab CR median bands (real data)
+     *   (b) Role-flavored modifiers (Brute +HP / Defender +AC / etc.)
+     *
+     * Action bodies are cloned verbatim — the DM refines damage numbers
+     * in the Editor where templated actions auto-recalc against the new
+     * CR/PB. Non-templated actions get a tooltip note so the DM knows to
+     * audit them.
+     * ────────────────────────────────────────────────────────────────── */
+
+    let _generated = null;          // latest generated monster (preview)
+    let _genCandidates = [];        // candidate list from last roll
+    let _genCriteria = null;        // last criteria snapshot (for re-roll)
+
+    // Role-flavored stat adjustments. These nudge HP and AC away from the
+    // CR-median band so a Brute really does feel heavier than an Artillery
+    // at the same CR.
+    const ROLE_HP_BIAS = {
+      Brute: 1.18, Defender: 1.10, Soldier: 1.00, Skirmisher: 0.92,
+      Ambusher: 0.82, Artillery: 0.82, Controller: 0.95,
+      Leader: 0.95, Support: 0.82
+    };
+    const ROLE_AC_ADJ = {
+      Brute: -1, Defender: 2, Soldier: 0, Skirmisher: 0,
+      Ambusher: 0, Artillery: -1, Controller: -1,
+      Leader: 0, Support: -2
+    };
+
+    // Terrain adjective pools — drives the name generator. Five per
+    // terrain gives 60 distinct prefixes; combined with the base
+    // monster's last 1-2 words that's wide variation without obvious
+    // repetition in a single session.
+    const TERRAIN_ADJECTIVES = {
+      arctic:     ['Arctic','Frostbound','Glacial','Frozen','Permafrost','Polar'],
+      coastal:    ['Coastal','Tidal','Brinebound','Seaborne','Harborfast','Saltworn'],
+      desert:     ['Desert','Sandborn','Dunestriding','Sunbaked','Arid','Sirocco'],
+      forest:     ['Verdant','Mosswalked','Wildwood','Sylvan','Leafshadow','Bramble'],
+      grassland:  ['Plains','Steppe','Savannah','Meadowstrider','Windswept','Tall-Grass'],
+      hill:       ['Highland','Crag','Hillbound','Bluff','Knoll','Ridgeborn'],
+      mountain:   ['Alpine','Peakborn','Crestbound','Stoneclaw','Summit','Mountainous'],
+      swamp:      ['Swamp','Bogborn','Mire','Marshtouched','Fenwalker','Murkbound'],
+      underdark:  ['Drowtouched','Cavernlord','Deepborn','Shadow','Black-Veined','Lurker'],
+      underwater: ['Abyssal','Drowned','Tidebound','Coral-Crowned','Deep-Caller','Briny'],
+      urban:      ['Streetborn','Cityborn','Cobblewalker','Alley','Guttertouched','Civic'],
+      planar:     ['Astral','Outerborn','Voidtouched','Celestial-Marked','Far-Wandering','Riftborn']
+    };
+
+    function rand(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
+    function clamp(n, lo, hi){ return Math.max(lo, Math.min(hi, n)); }
+
+    function initGenerate(){
+      // CR dropdown — same options as Browse/Editor, default 5 (mid-tier).
+      const cr = document.getElementById('gen-cr');
+      cr.innerHTML = CR_OPTIONS.map(([v,l]) => `<option value="${v}">CR ${l}</option>`).join('');
+      cr.value = '5';
+      // Type dropdown — populated from actual bestiary types.
+      const tSel = document.getElementById('gen-type');
+      const types = Array.from(new Set(allMonsters().map(m => m.type).filter(Boolean))).sort();
+      tSel.innerHTML = '<option value="">Any type</option>' +
+        types.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+    }
+
+    function readGenCriteria(){
+      const cr = parseFloat(document.getElementById('gen-cr').value);
+      const role = document.getElementById('gen-role').value || '';
+      const type = document.getElementById('gen-type').value || '';
+      const terrains = Array.from(
+        document.querySelectorAll('#gen-terrain-pick input[type=checkbox]:checked')
+      ).map(cb => cb.value);
+      const nameOverride = document.getElementById('gen-name-override').value.trim();
+      return { cr, role, type, terrains, nameOverride };
+    }
+
+    function generateMonster(){
+      const crit = readGenCriteria();
+      _genCriteria = crit;
+
+      // Filter the bestiary by criteria. Role/type/terrain match if set;
+      // empty filters allow anything.
+      const pool = allMonsters().filter(m => {
+        if (crit.role && m.role !== crit.role) return false;
+        if (crit.type && m.type !== crit.type) return false;
+        if (crit.terrains.length && !crit.terrains.some(t => (m.terrain||[]).includes(t))) return false;
+        return true;
+      });
+
+      if (!pool.length){
+        toast('No monsters match those criteria — broaden the filter.', true);
+        return;
+      }
+
+      // Score by CR distance, then random-pick from the top tier (8) so
+      // re-rolling yields variation without abandoning relevance.
+      const scored = pool.map(m => ({
+        m, dist: Math.abs((+m.cr || 0) - crit.cr)
+      })).sort((a,b) => a.dist - b.dist);
+
+      const tierN = Math.min(8, scored.length);
+      const top = scored.slice(0, tierN);
+      _genCandidates = top;
+      const picked = top[Math.floor(Math.random() * tierN)].m;
+
+      _generated = retuneToCR(picked, crit);
+      renderGeneratedPreview(picked);
+      renderGenCandidates(picked.id);
+
+      document.getElementById('gen-reroll-btn').disabled = false;
+      document.getElementById('gen-open-btn').disabled = false;
+    }
+
+    function retuneToCR(base, crit){
+      const gen = JSON.parse(JSON.stringify(base));
+
+      // Strip clone-runtime markers
+      delete gen._custom;
+      delete gen._generated;
+      delete gen._generatedFrom;
+
+      // Source-of-truth fields for re-tuning
+      const newCr = crit.cr;
+      const newCrText = (CR_OPTIONS.find(([v]) => parseFloat(v) === newCr) || ['',''])[1] || String(newCr);
+      const newPb = pbForCR(newCr);
+      const newXp = XP_BY_CR[newCr] ?? 0;
+
+      gen.cr = newCr;
+      gen.crText = newCrText;
+      gen.pb = newPb;
+      gen.xp = newXp;
+
+      // Pull CR-typical HP/AC bands from the Analysis cache. Build once
+      // if not already cached (Analysis tab also populates this lazily).
+      if (!window.__anaCache) window.__anaCache = computeAnalysis(allMonsters());
+      const row = window.__anaCache?.crRows?.find(r => r.cr === newCr);
+
+      // HP retune — CR-typical median × role bias × random variance.
+      // Variance keeps each roll feeling distinct without going off-target.
+      const hpBase = row?.hpMed || base.hp || 50;
+      const hpBias = ROLE_HP_BIAS[crit.role || gen.role] || 1.0;
+      const hpJitter = 0.88 + Math.random() * 0.24;       // 0.88 – 1.12
+      gen.hp = Math.max(1, Math.round(hpBase * hpBias * hpJitter));
+      // We're not in structured-HP mode (the formula would need full
+      // re-derivation from CON + die size); turn it off so the Editor
+      // doesn't try to recompute HP from stale dice counts.
+      gen.hpStructured = false;
+      gen.hpFormula = '';
+      delete gen.hitDiceCount;
+      delete gen.hitDieSize;
+      delete gen.hpMagicBonus;
+
+      // AC retune — CR-typical median + role adjustment, clamped to a
+      // sane band so the output doesn't end up AC 8 or AC 25.
+      const acBase = row?.acMed || base.ac || 14;
+      const acAdj = ROLE_AC_ADJ[crit.role || gen.role] || 0;
+      gen.ac = clamp(Math.round(acBase) + acAdj, 10, 22);
+      gen.acText = `AC ${gen.ac}`;
+
+      // Initiative — match Dex mod + PB-tier bonus; reuse if present.
+      const dexMod = gen.abilities?.dex?.mod ?? 0;
+      gen.initiative = dexMod;
+      gen.initiativeScore = 10 + dexMod;
+
+      // Tags — honor explicit user choices; flip the manual flags so the
+      // Python tagger doesn't override them on its next run.
+      if (crit.role){
+        gen.role = crit.role;
+        gen.roleManual = true;
+      }
+      if (crit.terrains.length){
+        gen.terrain = [...crit.terrains];
+        gen.terrainManual = true;
+      }
+
+      // Name — DM override wins; otherwise terrain-themed compose.
+      gen.name = crit.nameOverride || generateName(base, crit);
+
+      // ID — fresh, custom-prefixed so saveCustom() picks it up cleanly.
+      gen.id = makeGeneratedId(gen.name);
+      gen.source = 'custom';
+      gen._generated = true;
+      gen._generatedFrom = base.id;
+      gen._generatedFromName = base.name;
+      gen._generatedFromCR = base.crText || String(base.cr);
+
+      return gen;
+    }
+
+    function generateName(base, crit){
+      // Pick a terrain to flavor the name. Prefer the criteria's first
+      // checked terrain; fall back to one of the base's terrains; finally
+      // a generic descriptor.
+      const terr = crit.terrains[0]
+        || (base.terrain || [])[0]
+        || 'planar';
+      const adjPool = TERRAIN_ADJECTIVES[terr] || ['Strange'];
+      const adj = rand(adjPool);
+
+      // Take the last 1-2 words of the base name as the noun. "Goblin
+      // Warrior" → "Goblin Warrior"; "Ogre" → "Ogre"; "Adult Red Dragon"
+      // → "Red Dragon"; this avoids the wordy book full-name and keeps
+      // generation pithy.
+      const parts = (base.name || 'Creature').split(/\s+/).filter(Boolean);
+      const noun = parts.slice(-2).join(' ');
+      return `${adj} ${noun}`;
+    }
+
+    function makeGeneratedId(name){
+      const pascal = (name || 'Generated')
+        .replace(/[^a-zA-Z0-9 ]/g, '')
+        .split(/\s+/).filter(Boolean)
+        .map(w => w[0].toUpperCase() + w.slice(1))
+        .join('');
+      const stamp = Date.now().toString(36).slice(-5);
+      return `custom-${pascal}Gen${stamp}`;
+    }
+
+    function deltaChip(label, baseVal, newVal){
+      const cls = (newVal > baseVal) ? 'up' : (newVal < baseVal) ? 'down' : '';
+      const arrow = (newVal > baseVal) ? '▲' : (newVal < baseVal) ? '▼' : '·';
+      return `<span class="gen-delta ${cls}">${esc(label)}: ${esc(String(baseVal ?? '—'))} ${arrow} ${esc(String(newVal ?? '—'))}</span>`;
+    }
+
+    function renderGeneratedPreview(base){
+      if (!_generated){
+        document.getElementById('gen-preview-body').innerHTML =
+          '<div class="empty-note">Click Generate to roll a new monster.</div>';
+        return;
+      }
+      const g = _generated;
+      // A small delta strip above the stat block so the DM can see how
+      // far the retune moved from the base.
+      const deltas = [
+        deltaChip('CR', base.crText || base.cr, g.crText),
+        deltaChip('HP', base.hp, g.hp),
+        deltaChip('AC', base.ac, g.ac),
+        deltaChip('PB', '+' + (base.pb||0), '+' + g.pb)
+      ].join('');
+      const source = `Based on ${esc(base.name)} (CR ${esc(base.crText || base.cr)} ${esc(base.type || '')}${base.source ? ' · ' + esc(base.source) : ''})`;
+      // Warn about action drift — non-templated actions still carry the
+      // base monster's literal damage numbers. Templated actions will
+      // auto-recompute against the new CR/PB on open-in-editor.
+      const hasTemplated = (g.actions || []).some(a => a._template);
+      const drift = hasTemplated
+        ? `<div class="empty-note" style="font-size:0.75rem;margin-top:0.4rem">Templated actions will auto-recompute when opened in the Editor. Plain-text actions retain the base monster's numbers — refine in the Editor.</div>`
+        : `<div class="empty-note" style="font-size:0.75rem;margin-top:0.4rem">Action bodies carry the base monster's literal damage numbers — open in the Editor and refine to the new CR.</div>`;
+      document.getElementById('gen-preview-body').innerHTML =
+        `<div class="gen-source-line">${source}</div>` +
+        `<div class="gen-deltas">${deltas}</div>` +
+        renderStatblock(g) +
+        drift;
+    }
+
+    function renderGenCandidates(pickedId){
+      const list = document.getElementById('gen-candidates');
+      document.getElementById('gen-cand-n').textContent = _genCandidates.length;
+      if (!_genCandidates.length){
+        list.innerHTML = '<div class="empty-note" style="font-size:0.8rem">No candidates yet.</div>';
+        return;
+      }
+      list.innerHTML = _genCandidates.map(({ m, dist }) => `
+        <div class="gen-cand${m.id === pickedId ? ' active' : ''}" onclick="rebaseOnCandidate('${esc(m.id)}')">
+          <div class="gen-cand-nm">${esc(m.name)}${m.role ? ` <span class="role-chip">${esc(m.role)}</span>` : ''}</div>
+          <div class="gen-cand-meta">CR ${esc(m.crText || m.cr || '?')} · Δ${dist}</div>
+        </div>
+      `).join('');
+    }
+
+    function rebaseOnCandidate(monsterId){
+      const cand = _genCandidates.find(c => c.m.id === monsterId);
+      if (!cand || !_genCriteria) return;
+      _generated = retuneToCR(cand.m, _genCriteria);
+      renderGeneratedPreview(cand.m);
+      renderGenCandidates(cand.m.id);
+    }
+
+    function openGeneratedInEditor(){
+      if (!_generated){
+        toast('Generate a monster first.', true);
+        return;
+      }
+      // Mirror cloneMonsterToEditor's flow: the generated monster
+      // becomes the new currentEdit, with no editingId so Save mints a
+      // fresh record in bestiary_custom.
+      const clone = JSON.parse(JSON.stringify(_generated));
+      editingId = null;
+      currentEdit = clone;
+      loadFormFromEdit();
+      syncEditor();
+      // After syncEditor runs, any templated actions get their numbers
+      // recomputed against the new CR/PB via recalcTemplatedActions
+      // (statSnapshot's CR/PB hash changes vs the base).
+      renderChips();
+      window.switchTab('editor');
+      toast(`Loaded "${clone.name}" into the Editor — refine and Save to mint.`);
     }
 
     async function saveKey(type, payload){
