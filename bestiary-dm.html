@@ -867,8 +867,27 @@
     function isCustomId(id){
       return typeof id === 'string' && id.startsWith('custom-');
     }
-    function findMonster(id){
-      return allMonsters().find(m => m.id === id);
+    // Browse-disambiguating key. Schema v7+ monsters have a unique
+    // `slug`; older KV entries fall back to a derived `source-name`
+    // pair so two creatures named the same from different books still
+    // get distinct keys in the list (otherwise clicking selects both).
+    function browseKey(m){
+      if (m && m.slug) return m.slug;
+      const src = ((m && m.source) || 'unknown').toLowerCase();
+      const kebab = ((m && m.name) || '').toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      return `${src}-${kebab || 'unnamed'}`;
+    }
+    function findMonster(idOrKey){
+      const all = allMonsters();
+      // Try slug / id direct match first (fast path, also the schema-v7
+      // path where every monster has a unique slug AND id == slug).
+      const direct = all.find(m => m.id === idOrKey || m.slug === idOrKey);
+      if (direct) return direct;
+      // Fall back to browseKey match — catches the case where the KV
+      // still holds pre-v7 colliding ids; the Browse list passed the
+      // derived `<source>-<kebab>` key instead.
+      return all.find(m => browseKey(m) === idOrKey);
     }
 
     async function bootstrap(){
@@ -1004,9 +1023,17 @@
           ? `<span class="terrain-chip" title="${esc((m.terrain||[]).slice(2).join(', '))}">+${(m.terrain||[]).length-2}</span>`
           : '';
         const roleChip = m.role ? `<span class="role-chip" title="${m.roleManual?'Manually set — survives re-tagger':'Auto-tagged'}">${esc(m.role)}</span>` : '';
+        // Use browseKey (slug || derived) so two monsters with the same
+        // legacy id from different books are still individually
+        // selectable. The source chip surfaces which book each row
+        // comes from when names collide.
+        const key = browseKey(m);
+        const srcChip = m.source && !m._custom
+          ? `<span class="custom-chip" title="Source book" style="border-color:var(--ink-faint);color:var(--ink-faint);background:transparent">${esc(m.source)}</span>`
+          : '';
         return `
-        <div class="row${m.id===activeId?' active':''}" onclick="selectMonster('${esc(m.id)}')">
-          <div class="nm">${esc(m.name)}${m._custom?'<span class="custom-chip">Custom</span>':''}${roleChip}<small>${esc(m.size||'')} ${esc(m.type||'')}</small>
+        <div class="row${key===activeId?' active':''}" onclick="selectMonster('${esc(key)}')">
+          <div class="nm">${esc(m.name)}${m._custom?'<span class="custom-chip">Custom</span>':''}${srcChip}${roleChip}<small>${esc(m.size||'')} ${esc(m.type||'')}</small>
             <div class="terrain-strip">${terrChips}${more}</div>
           </div>
           <span class="cr-chip ${crTier(m.cr)}">CR ${esc(m.crText || m.cr || '?')}</span>
