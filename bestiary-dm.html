@@ -3511,22 +3511,61 @@
     function fillMonsterPlaceholders(newMon){
       // Replace {MONSTER} tokens with the chimera's name (lowercased so
       // the resulting prose reads naturally: "the frostbound owlbear
-      // has advantage on...").
+      // has advantage on..."), plus {SPELL_DC} and {SPELL_ATK} tokens
+      // with values computed against the chimera's spell ability + PB.
+      //
+      // SPELL_DC / SPELL_ATK only appear in spellcasting bodies (the
+      // extractor strips donor-specific numbers to placeholders). The
+      // spell ability lives in the feature's _template.fields when
+      // available; otherwise we fall back to the chimera's best
+      // INT/WIS/CHA mod since that's where casters usually anchor.
       const name = (newMon.name || 'creature').toLowerCase();
+
+      function bestCasterMod(){
+        const abilities = newMon.abilities || {};
+        const candidates = ['int','wis','cha'];
+        let best = -99, bestKey = 'cha';
+        for (const k of candidates){
+          const mod = abilities[k]?.mod ?? 0;
+          if (mod > best){ best = mod; bestKey = k; }
+        }
+        return { mod: best, key: bestKey };
+      }
+
+      function resolveSpellTokens(text, feat){
+        if (!text || (!text.includes('{SPELL_DC}') && !text.includes('{SPELL_ATK}'))){
+          return text;
+        }
+        const explicit = feat?._template?.fields?.spellAbility;
+        const ability = explicit || bestCasterMod().key;
+        const mod = (newMon.abilities?.[ability]?.mod ?? bestCasterMod().mod) || 0;
+        const pb = newMon.pb ?? 2;
+        const dc = 8 + pb + mod;
+        const atk = pb + mod;
+        return text
+          .replace(/\{SPELL_DC\}/g, String(dc))
+          .replace(/\{SPELL_ATK\}/g, (atk >= 0 ? '' : '') + String(atk).replace(/^\+?/, ''));
+      }
+
       const sections = ['traits','actions','bonusActions','reactions','legendaryActions','description'];
       for (const sec of sections){
         const v = newMon[sec];
         if (Array.isArray(v)){
           for (const f of v){
-            if (f.body && f.body.includes('{MONSTER}')){
-              f.body = f.body.replace(/\{MONSTER\}/g, name);
+            if (f.body){
+              if (f.body.includes('{MONSTER}')) f.body = f.body.replace(/\{MONSTER\}/g, name);
+              if (f.body.includes('{SPELL_DC}') || f.body.includes('{SPELL_ATK}')){
+                f.body = resolveSpellTokens(f.body, f);
+              }
             }
             if (f.name && f.name.includes('{MONSTER}')){
               f.name = f.name.replace(/\{MONSTER\}/g, name);
             }
           }
-        } else if (typeof v === 'string' && v.includes('{MONSTER}')){
-          newMon[sec] = v.replace(/\{MONSTER\}/g, name);
+        } else if (typeof v === 'string'){
+          if (v.includes('{MONSTER}')){
+            newMon[sec] = v.replace(/\{MONSTER\}/g, name);
+          }
         }
       }
     }

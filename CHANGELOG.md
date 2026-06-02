@@ -9,6 +9,57 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie: median-dice aggregation + spell DC/atk placeholders (lib v2)
+
+Phase 3 of the feature library: closes the two gaps left in v1.
+
+#### Changed — `scripts/extract_features.py`
+
+- **Median-dice aggregation.** Previously each `(canonicalName, kind,
+  tier)` bucket picked one representative donor (highest CR within
+  the band) and copied its templateFields verbatim, so quirks of a
+  single donor shaped the entry — `Bite-high` could land 2d10 (a
+  single donor's atypical bite) when `Bite-mid` was 4d8. New
+  `aggregate_template_fields(bucket)` walks every donor's fields and
+  computes per-component central tendency: median dice count + die
+  size for dice strings, median for numeric (reach / range / count
+  / bonuses), mode for damageType / weaponName / recharge, majority
+  vote for booleans. Re-extracted library shows the expected
+  progression — Bite: low 1d6 → mid 2d8 → high 2d10 → epic 2d10
+  reach 15 (rider grows even when base dice plateau).
+- **Body-template donor pick.** Prose bodies (traits, spellcasting,
+  utility, etc.) still come from a single donor — but the
+  representative is now the donor closest to the tier midpoint, not
+  the highest-CR outlier. Picks central phrasing over edge-case
+  strongest version.
+- **Spell placeholders.** `parse_spellcasting_to_template` +
+  `normalize_spellcasting_body` strip donor-specific DCs ("spell
+  save DC 17" → "spell save DC {SPELL_DC}") and spell-attack
+  bonuses ("+10 to hit with spell attacks" → "+{SPELL_ATK} to
+  hit…") so the chimera resolves them against its own ability + PB.
+- **SCHEMA_VERSION = 2.** The page tolerates v1 entries (no
+  placeholders, single-donor fields) so a DM who hasn't re-imported
+  doesn't break, but re-running the script + re-importing
+  feature_library.json picks up the new aggregation.
+
+#### Changed — `bestiary-dm.html`
+
+- `fillMonsterPlaceholders` gains `resolveSpellTokens(text, feat)`
+  — replaces `{SPELL_DC}` with `8 + pb + mod` and `{SPELL_ATK}`
+  with `pb + mod` against the chimera's spell ability. The ability
+  comes from the feature's `_template.fields.spellAbility` when
+  present (set by the extractor's `parse_spellcasting_to_template`);
+  falls back to the chimera's best INT/WIS/CHA mod.
+
+#### Required re-imports
+
+- Run `python3 scripts/extract_features.py` to regenerate
+  `feature_library.json` with median dice + spell placeholders.
+- Re-import via the Menagerie's Import tab (Replace path —
+  feature-library imports are always replace-mode).
+
+---
+
 ### Menagerie: chimera generator rewired to consume the feature library
 
 Replaces the runtime catalog-build path (walk `allMonsters()` every
