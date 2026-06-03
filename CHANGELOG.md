@@ -9,6 +9,42 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### Menagerie: deeper visual refresh
+
+CSS-only refresh on top of the foundation pass. JS/HTML untouched.
+
+What's improved:
+- **Topbar**: fluid type for the hero (`clamp(1.2rem, 1rem + 1vw,
+  1.55rem)`), subtle brass glow on the title, refined DM chip
+  (pill shape, brighter brass).
+- **Tabs**: active tab gets a subtle brass background tint **in
+  addition** to the underline (matches Chronicle Workshop); hover
+  state separates from unvisited.
+- **Form inputs** (`input,select,textarea`): 3px teal focus ring
+  via `box-shadow`, italic 0.6-opacity placeholders, slightly
+  larger radius (3px).
+- **List rows**: hover slides the row 2px right; active row gets
+  a teal left border + tinted background.
+- **CR chips**: pill shape, bolder weight, semi-transparent
+  background by tier (mid/high/epic).
+- **Buttons** (`.btn`, `.btn.brass`, `.btn.ghost`, `.btn.sm`):
+  modern easing, colored glow on hover, `translateY(1px)` on
+  `:active` for tactile feedback. Primary button now flips to
+  the brand-color background on hover for stronger contrast.
+- **Stat block**: 6px radius, multi-layer shadow with subtle
+  brass rim, brighter title with text-shadow.
+- **Editor chips**: pill shape, active state gets an outer ring
+  in addition to the brass background.
+- **Column heads** (`.col-head`): brighter brass + uppercase +
+  trailing border (consistent with the rest of the design system).
+- **Home link**: subtle background fill in normal state to
+  separate from ghost buttons.
+- **Toast**: refined entrance animation (translateY + opacity),
+  multi-layer teal/rust glow shadow based on type.
+
+No regressions to browse logic, filters, the editor form, the
+generator, or library/import flows.
+
 ### War Table: deeper visual refresh
 
 Same CSS-only pattern as the Atlas Workshop refresh. JS and HTML
