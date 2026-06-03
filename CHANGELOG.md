@@ -9,6 +9,42 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### UI foundation pass: Atlas Workshop, War Table, Apothecary, Menagerie
+
+Path A baseline rolled out to the four remaining DM tools without
+the full per-tool visual rewrites (which would risk destabilising
+~10,000 lines of complex JS in one commit). Each tool now links
+`theme.css` and includes a small CSS aliasing block that maps the
+shared theme token names (`--c-bg`, `--c-brass`, `--c-ink`, etc.)
+to that page's existing local tokens.
+
+Practical effect:
+- **Focus rings**: tab through any DM tool and you get a consistent
+  teal `:focus-visible` ring (was missing or browser-default).
+- **Themed scrollbars**: thin, dark, matching the rest of the
+  site (was browser-default chunky bars).
+- **`prefers-reduced-motion`**: respected — animations disable
+  for users who opt out at the OS level (was ignored).
+- **Color-scheme: dark** + base reset consistency across all
+  tools (no FOUC quirks).
+- **Component-class availability**: any future use of `.btn`,
+  `.btn--brass`, `.chip`, `.field`, `.modal-overlay`, etc. will
+  render with each tool's existing palette automatically — no
+  per-tool color tweak needed when adopting components.
+
+What did NOT change (intentionally):
+- Each tool's existing color palette (Atlas + War Table stay on
+  the deep-gold scheme; Apothecary + Menagerie stay on the
+  slate+teal+brass scheme). No visual regressions to muscle
+  memory.
+- All existing JS behavior, layouts, and feature sets.
+- Local component classes (e.g. each tool's `.btn-gold`,
+  `.btn-red`, etc.) — left untouched and will be migrated to
+  the shared kit in future per-tool passes.
+
+This unblocks future per-tool visual refreshes: they become
+incremental CSS migrations rather than ground-up rewrites.
+
 ### Chronicle Workshop: multi-kind editor + UI refresh (Path A, page 3)
 
 Third page of the Path A rollout. `sessions-dm.html` (renamed in
