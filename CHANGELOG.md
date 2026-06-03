@@ -9,6 +9,53 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### UI refresh: Chronicle (timeline.html) — Path A, page 2
+
+Second page of the Path A rollout. `timeline.html` (the player-
+facing Chronicle) now uses the shared `theme.css` tokens and
+components. Functional behavior — collapse on click, tags, both
+dates, expand-all toggle, planned divider for DMs — is preserved.
+
+Visible upgrades:
+- Hero strip with a tagline ("A Record of the Realm") and a
+  role-aware subtitle (DMs get "Every thread, every page.";
+  players get "What has happened — and what your character
+  has seen of it.").
+- Search input gets a leading magnifying-glass icon (inline
+  SVG mask, no extra requests).
+- Filter bar gains a live results count: `12 of 47` while
+  filtering, `47 entries` when unfiltered.
+- Identity line uses the unified `.chip` system from theme.css
+  (same look as the role pill on `home.html`).
+- Entries stagger in on render (35ms per card, capped by the
+  natural number of visible entries).
+- Expanded entries get a deeper border-color tint matched to
+  their kind (session blue, event orange, milestone teal,
+  planned brass) and a slightly elevated shadow.
+- Combat panels and loot tables refreshed with theme tokens —
+  cleaner row dividers, consistent label typography.
+- DM Notes block now leads with a 🔒 lock-glyph label.
+
+Accessibility:
+- `<main>` landmark with `aria-labelledby`.
+- `aria-expanded` on each entry header (toggles with the
+  collapse state).
+- `aria-controls` ties the header to its body div.
+- `<time datetime>` for ISO real-world dates.
+- `aria-live="polite"` on the results count and loading state.
+- Visible focus ring (from theme.css :focus-visible) on every
+  interactive element.
+
+Layout:
+- Max-width nudged from 780px → 820px for slightly easier reads
+  on wider screens.
+- Narrow-screen (≤560px) polish: titles shrink, dates wrap
+  below the title, results count wraps cleanly.
+
+State icons (empty + no-results) added to the state block —
+small line-art glyphs for visual feedback when there's nothing
+to show.
+
 ### UI refresh: shared theme.css + home.html exemplar
 
 First step of a UI/UX modernization pass. Goal: bring the tools
