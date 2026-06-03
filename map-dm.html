@@ -451,16 +451,16 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
   <div class="sync-status" id="sync-status">—</div>
 </div>
 
-<div class="main">
+<main class="main" id="main">
   <!-- MAP -->
   <div class="map-col">
     <div class="map-container" id="map-container">
       <div class="map-canvas" id="map-canvas"></div>
     </div>
     <div class="map-controls">
-      <button class="map-btn" onclick="mapZoom(1.2)">+</button>
-      <button class="map-btn" onclick="mapZoom(0.8)">−</button>
-      <button class="map-btn" onclick="mapReset()">⌂</button>
+      <button class="map-btn" onclick="mapZoom(1.2)" title="Zoom in" aria-label="Zoom in">+</button>
+      <button class="map-btn" onclick="mapZoom(0.8)" title="Zoom out" aria-label="Zoom out">−</button>
+      <button class="map-btn" onclick="mapReset()" title="Reset view" aria-label="Reset view">⌂</button>
     </div>
     <div class="map-hint" id="map-hint">Click map to place a new location pin</div>
     <div class="map-legend" id="map-legend"></div>
@@ -712,14 +712,14 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
       <div style="margin-top:4px;text-align:center" id="publish-status" class="sync-status">Unpublished changes</div>
     </div>
   </div>
-</div>
+</main>
 
 <!-- IMPORT MODAL -->
 <div class="modal-backdrop hidden" id="import-modal">
   <div class="modal" style="max-width:560px">
     <div class="modal-header">
       <h2>⬇ Import from Obsidian</h2>
-      <button class="modal-close" onclick="closeImport()">✕</button>
+      <button class="modal-close" onclick="closeImport()" aria-label="Close import dialog">✕</button>
     </div>
     <div class="modal-body">
 
@@ -759,7 +759,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
   <div class="modal">
     <div class="modal-header">
       <h2 id="loc-modal-title">Edit Location</h2>
-      <button class="modal-close" onclick="closeLocModal()">✕</button>
+      <button class="modal-close" onclick="closeLocModal()" aria-label="Close location dialog">✕</button>
     </div>
     <div class="modal-body">
       <div class="editor-tabs" style="margin:-0.8rem -1rem 0.8rem;border-radius:0">

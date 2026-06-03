@@ -508,7 +508,7 @@ body {
   <div id="sync-status" class="sync-status">—</div>
 </div>
 
-<div class="main">
+<main class="main" id="main">
   <div class="combatant-col">
     <div class="lobby-banner" id="lobby-banner">
       <span class="lobby-banner-icon">🔒</span>
@@ -577,14 +577,14 @@ body {
 
     <div id="sync-status-side" class="sync-status">—</div>
   </div>
-</div>
+</main>
 
 <!-- BESTIARY PICKER MODAL -->
 <div class="modal-backdrop hidden" id="bestiary-modal" onclick="if(event.target===this)closeBestiaryPicker()">
   <div class="modal bestiary-modal">
     <div class="modal-header">
       <h2>📖 Add from Bestiary</h2>
-      <button class="modal-close" onclick="closeBestiaryPicker()">✕</button>
+      <button class="modal-close" onclick="closeBestiaryPicker()" aria-label="Close bestiary picker">✕</button>
     </div>
     <div class="modal-body">
       <div class="bestiary-filters">
@@ -636,7 +636,7 @@ body {
   <div class="modal">
     <div class="modal-header">
       <h2>⚔ End Combat — Carry Over</h2>
-      <button class="modal-close" onclick="closeCarryover()">✕</button>
+      <button class="modal-close" onclick="closeCarryover()" aria-label="Close carryover dialog">✕</button>
     </div>
     <div class="modal-body">
       <p style="font-size:0.88rem;color:var(--ink-dim);margin-bottom:1rem">
@@ -664,7 +664,7 @@ body {
   <div class="modal">
     <div class="modal-header">
       <h2>📋 Export Combat Log</h2>
-      <button class="modal-close" onclick="closeExport()">✕</button>
+      <button class="modal-close" onclick="closeExport()" aria-label="Close export dialog">✕</button>
     </div>
     <div class="modal-body">
       <div class="modal-row">

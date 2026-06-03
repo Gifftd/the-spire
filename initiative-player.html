@@ -61,9 +61,15 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem;
   margin-bottom: 1rem;
   padding-bottom: 0.8rem;
   border-bottom: 1px solid var(--border);
+}
+@media (max-width: 480px) {
+  .header h1 { font-size: 0.95rem; letter-spacing: 0.12em; }
+  .round-badge { font-size: 0.66rem; padding: 4px 11px; }
 }
 .header h1 { font-family: 'Cinzel', serif; font-size: clamp(1rem,0.9rem + 0.5vw,1.2rem); font-weight: 600; letter-spacing: 0.16em; color: var(--gold-light); text-transform: uppercase; text-shadow: 0 1px 12px rgba(184,134,11,0.10); }
 .round-badge { font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.14em; color: var(--ink-dim); background: var(--surface); border: 1px solid var(--border-light); border-radius: 9999px; padding: 5px 14px; text-transform: uppercase; }
@@ -172,6 +178,7 @@ body {
 </style>
 </head>
 <body>
+<main id="main" aria-label="Live initiative order" style="width:100%;max-width:640px;display:flex;flex-direction:column;align-items:center">
 
 <div class="header">
   <h1>⚔ Initiative Order</h1>
@@ -196,6 +203,8 @@ body {
   <div class="active-banner" id="active-banner"></div>
   <div id="list"></div>
 </div>
+
+</main>
 
 <script src="auth.js"></script>
 <script>
