@@ -315,15 +315,15 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 
 <!-- REGION VIEW -->
 <div class="view active" id="region-view">
-  <div class="map-container" id="map-container">
+  <div class="map-container" id="map-container" role="main" aria-label="World map">
     <div class="map-canvas" id="map-canvas">
       <!-- map image or placeholder injected here -->
     </div>
   </div>
   <div class="map-controls">
-    <button class="map-btn" onclick="mapZoom(1.2)" title="Zoom in">+</button>
-    <button class="map-btn" onclick="mapZoom(0.8)" title="Zoom out">−</button>
-    <button class="map-btn" onclick="mapReset()" title="Reset view">⌂</button>
+    <button class="map-btn" onclick="mapZoom(1.2)" title="Zoom in" aria-label="Zoom in">+</button>
+    <button class="map-btn" onclick="mapZoom(0.8)" title="Zoom out" aria-label="Zoom out">−</button>
+    <button class="map-btn" onclick="mapReset()" title="Reset view" aria-label="Reset view">⌂</button>
   </div>
   <div class="map-legend" id="map-legend"></div>
   <div class="pin-info-panel" id="pin-info-panel">

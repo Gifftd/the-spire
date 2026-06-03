@@ -9,6 +9,36 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### Mobile + a11y audit pass
+
+Audited every page at 375px width and ran an accessibility sweep
+for screen-reader and keyboard-nav gaps. Targeted fixes only —
+no visual regressions.
+
+**Mobile fix:**
+- `initiative-player.html`: header didn't wrap on phones — the
+  title clipped behind the ROUND pill and HOME link wrapped to
+  two lines. Added `flex-wrap: wrap` + tighter type at ≤480px
+  so the title/round/home now stack cleanly on narrow screens.
+
+**Accessibility fixes:**
+- **`<main>` landmarks** added to the 8 pages that were missing
+  them — every page now has exactly one `<main>` (or
+  `role="main"` on a layout-locked container like
+  `.map-container`). Screen readers can now skip directly to
+  the primary content from the page's landmark menu.
+- **`aria-label`s** on every icon-only button I found:
+  - Map zoom controls (`+`, `−`, `⌂`) on `map.html` and
+    `map-dm.html` — were `title="…"` only; now both.
+  - All 5 modal close (`✕`) buttons on `map-dm.html` and
+    `initiative-dm.html`.
+
+**Verified at scale:**
+- All 11 pages have a `<main>` landmark (or `role="main"`).
+- Visual screenshots at 375×812 confirm home, timeline, the
+  Round, and the player pages render cleanly without overflow.
+- Desktop layouts unchanged.
+
 ### Player pages: foundation + visual refresh
 
 Brings the four player-facing pages in line with the design
