@@ -9,6 +9,47 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### Atlas Workshop: pop-out editor for comfortable editing
+
+The 320px right sidebar editor was getting cramped — long
+descriptions, dmNotes textareas, visibleTo chip grids, and the
+NPC / Timeline / Player forms all had to fight for vertical and
+horizontal room. Forms cut off, scrolling within scrolling.
+
+Added a **pop-out editor mode**: the right column slides out to
+900px wide and overlays the map (which gets dimmed behind a
+backdrop-blurred scrim). The same editor, same forms, same JS —
+just dramatically more room to work in.
+
+How it works:
+- Click **⤢ Pop out editor** in the topbar (or press Enter on it).
+- The editor column animates from sidebar (320px) → overlay
+  drawer (900px) sliding in from the right.
+- Map area gets a translucent scrim with `backdrop-filter:
+  blur(4px)` so the workspace stays visible but defocused.
+- Form fields breathe: padding, font size, and textarea heights
+  scale up automatically. Tabs sit more comfortably. Chip grids
+  get more horizontal room.
+- Toggle button flips to **✕ Collapse editor** with a brass
+  background to signal active state.
+
+Three close paths:
+- Click the toggle button again.
+- Click the scrim outside the drawer.
+- Press **Esc** (the existing Esc handler is now priority-aware
+  — modals close first, then the pop-out editor, then the
+  sub-map drill-down).
+
+Why this approach (and not a full modal): keeping the editor in
+its existing DOM means no form-state churn, no breakage of any
+of the dozen-or-so editor flows (locations, sub-maps, zones,
+characters/journals, NPCs, timeline, world). CSS-only width
+expansion + a class toggle.
+
+No JS data flows changed. No HTML structure moved. Only CSS
+adds (~50 lines) + 2 new event handlers + 1 button + 1 scrim
+div.
+
 ### The Ledger: parchment → dark theme conversion
 
 User asked for the parchment look to be retired. The Ledger
