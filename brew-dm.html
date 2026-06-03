@@ -5,8 +5,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>The Spire — The Apothecary (DM)</title>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="theme.css">
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    /* Alias theme.css token names to this page's existing palette so any theme component classes inherit the local look. */
+    :root{
+      --c-bg:var(--bg);
+      --c-bg-elevated:var(--panel-deep,var(--surface,var(--bg)));
+      --c-surface:var(--panel,var(--surface));
+      --c-surface-2:var(--panel-light,var(--surface2));
+      --c-surface-3:var(--panel-light,var(--surface3,var(--surface2)));
+      --c-border:var(--border);
+      --c-border-light:var(--border-light);
+      --c-brass:var(--brass,var(--gold));
+      --c-brass-bright:var(--brass-bright,var(--gold-light));
+      --c-brass-deep:var(--gold-faint,rgba(184,138,90,0.55));
+      --c-teal:var(--teal,#4a9595);
+      --c-teal-bright:var(--teal-bright,#7ec5c5);
+      --c-teal-deep:var(--teal-deep,#2a5454);
+      --c-ink:var(--ink);
+      --c-ink-light:var(--ink-light,var(--ink-dim));
+      --c-ink-faint:var(--ink-faint);
+      --c-ink-dim:var(--ink-faint);
+      --c-error:var(--rust,var(--red,#c4604c));
+      --c-success:var(--green-light,#5fb381);
+      --c-warn:var(--amber,#c89a4a);
+    }
     :root{
       --bg:#080c10;--panel:#131c22;--panel-deep:#0d141a;--panel-light:#1c2730;
       --border:#2c4048;--border-light:#3e5862;
