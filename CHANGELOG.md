@@ -9,6 +9,51 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### UI refresh: shared theme.css + home.html exemplar
+
+First step of a UI/UX modernization pass. Goal: bring the tools
+in line with current web design standards without giving up the
+no-build-step, vanilla-JS architecture.
+
+New shared file `theme.css` introduces:
+- Design tokens (`--c-…` colors, `--text-…` fluid type via
+  `clamp()`, `--space-…` spacing scale, `--radius-…`,
+  `--shadow-…`, `--motion-…` durations + easings).
+- Reusable components: `.btn` (with `--primary`, `--ghost`,
+  `--danger`, `--brass`, `--sm`, `--lg`, `--block` modifiers),
+  `.card` + `.card--interactive` + `.card--dm`, `.chip` (role
+  variants), `.field` (form input wrapper with focus ring),
+  `.modal` + `.modal-overlay`, `.tab` + `.tab-list`, `.banner`
+  (info/warn/error), `.section-heading`, utilities (`.sr-only`,
+  `.stack`, `.cluster`, `.divider-h`).
+- Base reset, focus-visible rings, themed scrollbars,
+  `prefers-reduced-motion` handling, `color-scheme: dark`.
+
+`home.html` is refreshed end-to-end as the exemplar:
+- Links to `theme.css`, page-specific CSS shrinks ~60%.
+- Richer card design: SVG icons sit in a contained tile with
+  hover lift + multi-layer shadow + colored glow (teal for
+  player tools, brass for DM tools).
+- Fluid typography — campaign title scales from 2.2rem on phones
+  to 3.6rem on desktop via `clamp()`.
+- Entrance animations: hub fades up on load, cards stagger in
+  at 50ms intervals.
+- Accessibility: `<main>` landmark, `role="dialog"` +
+  `aria-modal` + `aria-labelledby` on the login modal,
+  `aria-selected` on tabs, focus is restored to the trigger
+  when the modal closes, focus rings on every interactive
+  element, visible `:focus-visible` ring.
+- Anonymous CTA gets explicit Player / DM sign-in buttons
+  instead of a single generic "Sign in".
+- Notice banner uses the new `.banner--warn` style.
+
+This is path A of two paths discussed with the user (CSS-led
+refresh vs framework rewrite). Path A keeps the static-HTML +
+GitHub-Pages deploy unchanged. Future pages can `<link
+rel="stylesheet" href="theme.css">` and adopt the components
+incrementally; no other page needs to change until it's
+refreshed.
+
 ### Sessions: prep section cards can be minimized
 
 Prep section cards in `sessions-dm.html` were each pretty tall —

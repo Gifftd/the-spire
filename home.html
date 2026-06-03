@@ -4,60 +4,44 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>The Spire — Hub</title>
+  <meta name="theme-color" content="#060a0e">
+  <meta name="description" content="The Spire — a hub of maps, lore, sessions, and combat tools for tabletop campaigns.">
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="theme.css">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      /* Slate + teal — "tower of knowledge" */
-      --bg:             #080c10;
-      --panel:          #131c22;
-      --panel-deep:     #0d141a;
-      --panel-light:    #1c2730;
-      --border:         #2c4048;
-      --border-light:   #3e5862;
-      --teal:           #4a9595;
-      --teal-bright:    #7ec5c5;
-      --teal-deep:      #2a5454;
-      --teal-faint:     #1b3838;
-      --ink:            #dde3e5;
-      --ink-light:      #a3adb3;
-      --ink-faint:      #6c787f;
-      --brass:          #b88a5a;       /* DM accent */
-      --brass-deep:     #6b4d2e;
-      --rust:           #a85d4a;       /* notices / errors */
-    }
+    /* ──────────────────────────────────────────────────────────
+       Page-specific styles (home.html).
+       Shared tokens & components live in theme.css.
+       ────────────────────────────────────────────────────────── */
 
     body {
-      background: var(--bg);
-      background-image:
-        radial-gradient(ellipse at 20% 15%, rgba(74,149,149,0.10) 0%, transparent 55%),
-        radial-gradient(ellipse at 80% 90%, rgba(184,138,90,0.06) 0%, transparent 55%),
-        radial-gradient(circle at 50% 0%, rgba(126,197,197,0.06) 0%, transparent 35%);
-      min-height: 100vh;
-      font-family: 'Crimson Text', Georgia, serif;
-      color: var(--ink);
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      padding: 2rem 1rem 4rem;
+      justify-content: flex-start;
+      padding: clamp(1.25rem, 2vw + 0.5rem, 2.5rem) 1rem 4rem;
+      background-image:
+        radial-gradient(ellipse at 20% 10%, rgba(74,149,149,0.13) 0%, transparent 55%),
+        radial-gradient(ellipse at 80% 90%, rgba(184,138,90,0.08) 0%, transparent 55%),
+        radial-gradient(circle  at 50% 0%,  rgba(126,197,197,0.07) 0%, transparent 38%);
     }
 
-    /* ── Panel ── */
+    /* The framed "parchment" container that holds the hub */
     .scroll {
-      background: var(--panel);
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
-      max-width: 860px;
+      background: var(--c-surface);
+      background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      max-width: 920px;
       width: 100%;
-      border-radius: 4px;
-      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--c-border);
       box-shadow:
-        0 0 0 1px rgba(74,149,149,0.18),
-        0 0 30px rgba(74,149,149,0.06),
-        0 12px 48px rgba(0,0,0,0.75),
+        0 0 0 1px rgba(74,149,149,0.16),
+        0 0 40px rgba(74,149,149,0.05),
+        var(--shadow-4),
         inset 0 1px 0 rgba(126,197,197,0.08);
-      padding: 2.4rem 3rem 3rem;
+      padding: clamp(1.5rem, 2.4vw + 0.5rem, 3rem);
+      animation: hero-rise 360ms var(--ease-out) both;
     }
 
     /* ── Identity bar ── */
@@ -65,324 +49,233 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 1rem;
-      padding-bottom: 1rem;
-      margin-bottom: 1.5rem;
-      border-bottom: 1px solid var(--border);
+      gap: var(--space-3);
+      padding-bottom: var(--space-3);
+      margin-bottom: var(--space-5);
+      border-bottom: 1px solid var(--c-border);
       flex-wrap: wrap;
     }
     .identity-text {
-      font-family: 'Cinzel', serif;
-      font-size: 0.72rem;
-      letter-spacing: 0.14em;
-      color: var(--ink-faint);
+      font-family: var(--font-display);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.18em;
+      color: var(--c-ink-faint);
       text-transform: uppercase;
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
     }
-    .identity-name { color: var(--ink); font-weight: 600; }
-    .role-pill {
-      display: inline-block;
-      font-family: 'Cinzel', serif;
-      font-size: 0.58rem;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      padding: 2px 8px;
-      border-radius: 10px;
-      margin-left: 8px;
-      vertical-align: 0.1em;
-    }
-    .role-pill.dm        { background: rgba(184,138,90,0.12);  color: var(--brass);      border: 1px solid rgba(184,138,90,0.45); }
-    .role-pill.player    { background: rgba(74,149,149,0.15);  color: var(--teal-bright);border: 1px solid rgba(74,149,149,0.45); }
-    .role-pill.anonymous { background: rgba(108,120,127,0.15); color: var(--ink-faint);  border: 1px solid var(--border); }
-    .identity-actions { display: flex; gap: 0.5rem; }
-    .id-btn {
-      font-family: 'Cinzel', serif;
-      font-size: 0.66rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      padding: 6px 12px;
-      border: 1px solid var(--border-light);
-      background: var(--panel-light);
-      color: var(--ink-light);
-      border-radius: 3px;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .id-btn:hover { border-color: var(--teal); color: var(--ink); }
-    .id-btn.primary { background: var(--teal-deep); color: var(--teal-bright); border-color: var(--teal); }
-    .id-btn.primary:hover { background: var(--teal); color: var(--bg); border-color: var(--teal-bright); }
+    .identity-name { color: var(--c-ink); font-weight: 600; letter-spacing: 0.14em; }
+    .identity-actions { display: flex; gap: var(--space-2); }
 
-    /* ── Notice banner ── */
-    .notice {
-      display: none;
-      background: rgba(168,93,74,0.10);
-      border: 1px solid rgba(168,93,74,0.45);
-      border-radius: 3px;
-      padding: 0.7rem 0.9rem;
-      margin-bottom: 1.25rem;
-      color: var(--rust);
-      font-size: 0.9rem;
-    }
-    .notice.visible { display: block; }
-
-    /* ── Header ── */
-    .header { text-align: center; margin-bottom: 2.25rem; }
+    /* ── Hero ── */
+    .hero { text-align: center; margin-bottom: var(--space-6); }
     .tower-mark {
-      display: block; margin: 0 auto 0.5rem; width: 42px; height: 56px; color: var(--teal);
-      filter: drop-shadow(0 0 8px rgba(126,197,197,0.25));
+      display: block; margin: 0 auto var(--space-2);
+      width: 52px; height: 68px;
+      color: var(--c-teal-bright);
+      filter: drop-shadow(0 0 12px rgba(126,197,197,0.30));
     }
     .world-label {
-      font-family: 'Cinzel', serif;
-      font-size: 0.7rem;
-      font-weight: 400;
-      letter-spacing: 0.32em;
+      font-family: var(--font-display);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.36em;
       text-transform: uppercase;
-      color: var(--teal);
+      color: var(--c-teal-bright);
       opacity: 0.85;
-      margin-bottom: 0.55rem;
+      margin-bottom: var(--space-2);
     }
     .campaign-title {
-      font-family: 'Cinzel', serif;
-      font-size: 2.3rem;
+      font-family: var(--font-display);
+      font-size: var(--text-3xl);
       font-weight: 700;
-      color: var(--ink);
-      line-height: 1.1;
+      color: var(--c-ink);
+      line-height: 1.05;
       letter-spacing: 0.12em;
-      margin-bottom: 0.75rem;
+      margin-bottom: var(--space-3);
       text-transform: uppercase;
+      text-shadow: 0 1px 24px rgba(126,197,197,0.10);
     }
-    .divider { display: flex; align-items: center; gap: 0.75rem; margin: 0 auto 1.1rem; max-width: 360px; }
-    .divider-line { flex: 1; height: 1px; background: linear-gradient(to right, transparent, var(--teal)); }
-    .divider-line:last-child { background: linear-gradient(to left, transparent, var(--teal)); }
-    .divider-diamond { width: 6px; height: 6px; background: var(--teal); transform: rotate(45deg); flex-shrink: 0; box-shadow: 0 0 6px rgba(126,197,197,0.5); }
-    .subtitle { font-family: 'Crimson Text', Georgia, serif; font-style: italic; font-size: 1.02rem; color: var(--ink-light); }
-
-    /* ── Section heading ── */
-    .section-heading {
-      font-family: 'Cinzel', serif;
-      font-size: 0.7rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--teal);
-      margin: 1.6rem 0 0.9rem;
-      display: flex;
-      align-items: center;
-      gap: 10px;
+    .divider {
+      display: flex; align-items: center; gap: var(--space-3);
+      margin: 0 auto var(--space-3);
+      max-width: 360px;
     }
-    .section-heading::before, .section-heading::after { content: ''; height: 1px; background: var(--border); }
-    .section-heading::before { width: 14px; }
-    .section-heading::after  { flex: 1; }
-    .section-heading:first-of-type { margin-top: 0; }
+    .divider-line { flex: 1; height: 1px; background: linear-gradient(to right, transparent, var(--c-teal)); }
+    .divider-line:last-child { background: linear-gradient(to left, transparent, var(--c-teal)); }
+    .divider-diamond {
+      width: 7px; height: 7px;
+      background: var(--c-teal);
+      transform: rotate(45deg);
+      flex-shrink: 0;
+      box-shadow: 0 0 8px rgba(126,197,197,0.6);
+    }
+    .subtitle {
+      font-family: var(--font-body);
+      font-style: italic;
+      font-size: var(--text-base);
+      color: var(--c-ink-light);
+    }
 
-    /* ── Tool cards grid ── */
+    /* ── Card grid ── */
     .cards {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1rem;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--space-3);
     }
-    @media (max-width: 600px) {
+    @media (max-width: 720px) {
+      .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 480px) {
       .cards { grid-template-columns: 1fr; }
-      .scroll { padding: 1.5rem 1.25rem 2rem; }
-      .campaign-title { font-size: 1.6rem; }
     }
-    .card {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+    /* Stagger card entrance */
+    .cards > .card {
+      animation: card-rise 380ms var(--ease-out) both;
+      animation-delay: calc(var(--card-i, 0) * 50ms);
+    }
+
+    /* ── Anonymous CTA block ── */
+    .anon-cta {
       text-align: center;
-      text-decoration: none;
-      color: var(--ink);
-      background: var(--panel-light);
-      border: 1px solid var(--border);
-      border-radius: 3px;
-      padding: 1.5rem 1rem 1.25rem;
-      transition: background 0.18s, border-color 0.18s, box-shadow 0.18s, transform 0.15s;
-      position: relative;
-      overflow: hidden;
+      padding: var(--space-5) var(--space-4) var(--space-3);
+      color: var(--c-ink-light);
+      font-size: var(--text-base);
+      line-height: 1.55;
     }
-    .card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(165deg, rgba(126,197,197,0.05) 0%, transparent 70%); pointer-events: none; }
-    .card:hover { background: var(--panel-deep); border-color: var(--teal); box-shadow: 0 6px 20px rgba(0,0,0,0.4), 0 0 0 1px var(--teal), 0 0 18px rgba(74,149,149,0.18); transform: translateY(-2px); }
-    .card:active { transform: translateY(0); }
-    .card.dm    { border-color: rgba(184,138,90,0.45); }
-    .card.dm:hover { border-color: var(--brass); box-shadow: 0 6px 20px rgba(0,0,0,0.4), 0 0 0 1px var(--brass), 0 0 18px rgba(184,138,90,0.15); }
-    .card.dm:hover .card-icon { color: var(--brass); }
-    .card-icon { width: 46px; height: 46px; margin-bottom: 0.8rem; color: var(--ink-light); transition: color 0.18s; }
-    .card:hover .card-icon { color: var(--teal-bright); }
-    .card-title { font-family: 'Cinzel', serif; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); margin-bottom: 0.4rem; }
-    .card-desc { font-size: 0.85rem; color: var(--ink-light); line-height: 1.4; }
-    .card-badge {
-      position: absolute; top: 8px; right: 8px;
-      background: var(--teal); color: var(--bg);
-      font-family: 'Cinzel', serif; font-size: 0.58rem; letter-spacing: 0.1em;
-      padding: 2px 7px; border-radius: 10px; font-weight: 600;
-    }
+    .anon-cta p { max-width: 56ch; margin: 0 auto var(--space-4); }
+    .anon-cta-buttons { display: inline-flex; gap: var(--space-2); flex-wrap: wrap; justify-content: center; }
 
-    /* ── Login modal ── */
-    .modal-overlay { position: fixed; inset: 0; background: rgba(5,8,12,0.85); backdrop-filter: blur(4px); z-index: 200; display: none; align-items: center; justify-content: center; padding: 1rem; }
-    .modal-overlay.visible { display: flex; }
-    .modal {
-      background: var(--panel);
-      border: 1px solid var(--teal-deep);
-      border-radius: 4px;
-      box-shadow:
-        0 0 0 1px rgba(74,149,149,0.2),
-        0 0 30px rgba(74,149,149,0.1),
-        0 16px 48px rgba(0,0,0,0.7);
-      padding: 1.8rem 1.8rem 1.6rem;
-      max-width: 440px;
-      width: 100%;
-      position: relative;
+    /* ── Login modal — page-specific flourishes ── */
+    .setup-hint {
+      background: rgba(184,138,90,0.10);
+      border: 1px solid rgba(184,138,90,0.40);
+      padding: var(--space-3) var(--space-3);
+      border-radius: var(--radius-sm);
+      font-size: var(--text-sm);
+      color: var(--c-ink-light);
+      margin-bottom: var(--space-3);
+      line-height: 1.5;
     }
-    .modal-close {
-      position: absolute; top: 8px; right: 12px;
-      background: transparent; border: none; font-size: 1.5rem; cursor: pointer;
-      color: var(--ink-faint); line-height: 1; padding: 4px 8px;
+    .setup-hint code {
+      background: rgba(0,0,0,0.4);
+      padding: 1px 6px;
+      border-radius: 2px;
+      font-family: var(--font-mono);
+      font-size: 0.88em;
+      color: var(--c-brass-bright);
     }
-    .modal-close:hover { color: var(--teal-bright); }
-    .modal-title { font-family: 'Cinzel', serif; font-size: 1.1rem; letter-spacing: 0.16em; color: var(--ink); margin-bottom: 0.3rem; text-transform: uppercase; }
-    .modal-sub { font-size: 0.9rem; color: var(--ink-light); margin-bottom: 1.1rem; line-height: 1.5; }
-
-    .modal-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 1rem; }
-    .modal-tab {
-      flex: 1; padding: 9px;
-      background: transparent; border: none;
-      font-family: 'Cinzel', serif; font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase;
-      color: var(--ink-faint); cursor: pointer; border-bottom: 2px solid transparent;
-      transition: all 0.15s;
-    }
-    .modal-tab.active { color: var(--teal-bright); border-bottom-color: var(--teal); }
-    .modal-tab:hover:not(.active) { color: var(--ink-light); }
-
-    .field { margin-bottom: 0.7rem; }
-    .field label {
-      display: block; font-family: 'Cinzel', serif; font-size: 0.6rem;
-      letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-faint);
-      margin-bottom: 4px;
-    }
-    .field input, .field select {
-      width: 100%;
-      background: var(--panel-deep); border: 1px solid var(--border);
-      border-radius: 2px; color: var(--ink);
-      font-family: 'Crimson Text', serif; font-size: 0.95rem;
-      padding: 7px 10px; outline: none; transition: border-color 0.15s;
-    }
-    .field input.code-input { font-family: 'Cinzel', serif; letter-spacing: 0.2em; text-transform: uppercase; color: var(--teal-bright); }
-    .field input:focus, .field select:focus { border-color: var(--teal); }
-    .field-error { font-size: 0.85rem; color: var(--rust); min-height: 1.2em; margin-bottom: 0.3rem; }
-
-    .pane { display: none; }
-    .pane.active { display: block; }
-
-    .submit-btn {
-      width: 100%;
-      font-family: 'Cinzel', serif; font-size: 0.78rem; letter-spacing: 0.12em;
-      padding: 9px 14px; border-radius: 3px; cursor: pointer; border: 1px solid var(--teal);
-      background: var(--teal-deep); color: var(--teal-bright); transition: all 0.15s;
+    .code-input {
+      font-family: var(--font-display) !important;
+      letter-spacing: 0.28em !important;
       text-transform: uppercase;
+      color: var(--c-teal-bright) !important;
+      font-size: var(--text-lg) !important;
+      text-align: center;
     }
-    .submit-btn:hover:not(:disabled) { background: var(--teal); color: var(--bg); border-color: var(--teal-bright); }
-    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-    .setup-hint { background: rgba(184,138,90,0.10); border: 1px solid rgba(184,138,90,0.35); padding: 0.6rem 0.7rem; border-radius: 3px; font-size: 0.82rem; color: var(--ink-light); margin-bottom: 0.7rem; line-height: 1.45; }
-    .setup-hint code { background: rgba(0,0,0,0.4); padding: 1px 5px; border-radius: 2px; font-size: 0.85em; color: var(--brass); }
 
     /* ── Footer ── */
-    .footer { margin-top: 2rem; text-align: center; }
-    .footer-rule { height: 1px; background: linear-gradient(to right, transparent, var(--border), transparent); margin-bottom: 1rem; }
-    .footer-text { font-family: 'Cinzel', serif; font-size: 0.65rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--ink-faint); }
+    .footer { margin-top: var(--space-6); text-align: center; }
+    .footer .divider-h { margin-bottom: var(--space-3); }
+    .footer-text {
+      font-family: var(--font-display);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      color: var(--c-ink-dim);
+    }
   </style>
 </head>
 <body>
 
-  <div class="scroll">
+  <main class="scroll" role="main" aria-labelledby="campaign-title">
 
     <!-- IDENTITY BAR -->
-    <div class="identity-bar">
+    <div class="identity-bar" aria-label="Identity">
       <div class="identity-text">
-        Signed in as <span class="identity-name" id="id-name">Visitor</span><span id="id-pill"></span>
+        <span aria-hidden="true">Signed in as</span>
+        <span class="identity-name" id="id-name">Visitor</span>
+        <span id="id-pill" role="status" aria-live="polite"></span>
       </div>
       <div class="identity-actions" id="id-actions"></div>
     </div>
 
-    <div class="notice" id="notice"></div>
+    <!-- Redirect notice from gated pages -->
+    <div class="banner banner--warn" id="notice" role="alert" style="display:none;margin-bottom:var(--space-4)"></div>
 
-    <header class="header">
+    <!-- HERO -->
+    <header class="hero">
       <svg class="tower-mark" viewBox="0 0 42 56" fill="none" aria-hidden="true">
-        <!-- Spire body -->
         <path d="M16 14 L26 14 L28 50 L14 50 Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
-        <!-- Crenellations -->
-        <path d="M14 14 V8 H17 V11 H20 V8 H22 V11 H25 V8 H28 V14"
-              stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" fill="none"/>
-        <!-- Window -->
+        <path d="M14 14 V8 H17 V11 H20 V8 H22 V11 H25 V8 H28 V14" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" fill="none"/>
         <rect x="19" y="26" width="4" height="8" rx="2" fill="currentColor" opacity="0.7"/>
-        <!-- Beacon star above -->
         <path d="M21 2 L22 4.5 L24.5 5 L22 6 L21 8.5 L20 6 L17.5 5 L20 4.5 Z" fill="currentColor"/>
-        <!-- Base step -->
         <path d="M12 50 L30 50 L32 55 L10 55 Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
       </svg>
-      <p class="world-label">Archive &middot; Chronicle &middot; War</p>
-      <h1 class="campaign-title">The Spire</h1>
-      <div class="divider">
+      <p class="world-label">Archive · Chronicle · War</p>
+      <h1 class="campaign-title" id="campaign-title">The Spire</h1>
+      <div class="divider" aria-hidden="true">
         <div class="divider-line"></div>
         <div class="divider-diamond"></div>
         <div class="divider-line"></div>
       </div>
-      <p class="subtitle" id="subtitle">A tower of maps, lore, and combat &mdash; for whatever world you keep.</p>
+      <p class="subtitle" id="subtitle">A tower of maps, lore, and combat — for whatever world you keep.</p>
     </header>
 
     <!-- TOOL CARDS — populated by JS based on role -->
-    <div id="card-sections"></div>
+    <div id="card-sections" aria-live="polite"></div>
 
     <footer class="footer">
-      <div class="footer-rule"></div>
+      <div class="divider-h"></div>
       <p class="footer-text">The Spire</p>
     </footer>
-  </div>
+  </main>
 
   <!-- LOGIN MODAL -->
-  <div class="modal-overlay" id="login-overlay" onclick="if(event.target===this)closeLogin()">
+  <div class="modal-overlay" id="login-overlay" onclick="if(event.target===this)closeLogin()" role="dialog" aria-modal="true" aria-labelledby="login-title" aria-hidden="true">
     <div class="modal">
-      <button class="modal-close" type="button" onclick="closeLogin()" aria-label="Close">×</button>
-      <div class="modal-title">Enter the Spire</div>
+      <button class="modal-close" type="button" onclick="closeLogin()" aria-label="Close login">×</button>
+      <div class="modal-title" id="login-title">Enter the Spire</div>
       <div class="modal-sub">DMs use a username and password. Players claim a character with the code their DM gave them.</div>
 
-      <div class="modal-tabs">
-        <button class="modal-tab active" id="tab-player" type="button" onclick="switchPane('player')">Player</button>
-        <button class="modal-tab" id="tab-dm" type="button" onclick="switchPane('dm')">DM</button>
+      <div class="tab-list" role="tablist">
+        <button class="tab is-active" id="tab-player" type="button" role="tab" aria-selected="true"  aria-controls="pane-player" onclick="switchPane('player')">Player</button>
+        <button class="tab"           id="tab-dm"     type="button" role="tab" aria-selected="false" aria-controls="pane-dm"     onclick="switchPane('dm')">DM</button>
       </div>
 
       <!-- PLAYER PANE -->
-      <div class="pane active" id="pane-player">
+      <div class="tab-pane is-active" id="pane-player" role="tabpanel" aria-labelledby="tab-player">
         <div class="field">
-          <label>Character</label>
+          <label for="char-select">Character</label>
           <select id="char-select"><option value="">— loading —</option></select>
         </div>
         <div class="field">
-          <label>Claim code</label>
+          <label for="char-code">Claim code</label>
           <input type="text" id="char-code" class="code-input" maxlength="10" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="XXXXXX">
         </div>
-        <div class="field-error" id="player-error"></div>
-        <button class="submit-btn" type="button" onclick="doPlayerLogin()">Claim character</button>
+        <div class="field-error" id="player-error" aria-live="polite"></div>
+        <button class="btn btn--primary btn--block btn--lg" type="button" onclick="doPlayerLogin()">Claim character</button>
       </div>
 
       <!-- DM PANE -->
-      <div class="pane" id="pane-dm">
+      <div class="tab-pane" id="pane-dm" role="tabpanel" aria-labelledby="tab-dm">
         <div id="dm-setup-hint" class="setup-hint" style="display:none">
           <strong>First-time setup.</strong> No DM account exists yet. Pick a username + password and provide the worker's <code>DM_TOKEN</code> secret to claim it.
         </div>
         <div class="field">
-          <label>Username</label>
+          <label for="dm-username">Username</label>
           <input type="text" id="dm-username" autocomplete="username" spellcheck="false">
         </div>
         <div class="field">
-          <label>Password</label>
+          <label for="dm-password">Password</label>
           <input type="password" id="dm-password" autocomplete="current-password">
         </div>
         <div class="field" id="dm-master-field" style="display:none">
-          <label>DM_TOKEN (one-time setup)</label>
+          <label for="dm-master">DM_TOKEN (one-time setup)</label>
           <input type="password" id="dm-master" autocomplete="off">
         </div>
-        <div class="field-error" id="dm-error"></div>
-        <button class="submit-btn" type="button" id="dm-submit" onclick="doDMSubmit()">Sign in as DM</button>
+        <div class="field-error" id="dm-error" aria-live="polite"></div>
+        <button class="btn btn--brass btn--block btn--lg" type="button" id="dm-submit" onclick="doDMSubmit()">Sign in as DM</button>
       </div>
     </div>
   </div>
@@ -396,8 +289,7 @@
       if (msg) {
         const el = document.getElementById('notice');
         el.textContent = msg;
-        el.classList.add('visible');
-        // Clear the URL param without reloading
+        el.style.display = '';
         history.replaceState(null, '', location.pathname);
       }
     })();
@@ -407,15 +299,15 @@
       const ident = Auth.identity();
       document.getElementById('id-name').textContent = ident.name || 'Visitor';
       const pill = document.getElementById('id-pill');
-      const cls = ident.role === 'dm' ? 'dm' : ident.role === 'player' ? 'player' : 'anonymous';
+      const cls = ident.role === 'dm' ? 'chip--dm' : ident.role === 'player' ? 'chip--player' : 'chip--anon';
       const label = ident.role === 'dm' ? 'DM' : ident.role === 'player' ? 'Player' : 'Visitor';
-      pill.innerHTML = `<span class="role-pill ${cls}">${label}</span>`;
+      pill.innerHTML = `<span class="chip ${cls}">${label}</span>`;
 
       const actions = document.getElementById('id-actions');
       if (ident.role === 'anonymous') {
-        actions.innerHTML = `<button class="id-btn primary" type="button" onclick="openLogin()">Sign in</button>`;
+        actions.innerHTML = `<button class="btn btn--primary btn--sm" type="button" onclick="openLogin()">Sign in</button>`;
       } else {
-        actions.innerHTML = `<button class="id-btn" type="button" onclick="doLogout()">Sign out</button>`;
+        actions.innerHTML = `<button class="btn btn--ghost btn--sm" type="button" onclick="doLogout()">Sign out</button>`;
       }
 
       const subtitle = document.getElementById('subtitle');
@@ -445,51 +337,61 @@
       sessions: `<svg class="card-icon" viewBox="0 0 52 52" fill="none"><rect x="9" y="11" width="34" height="32" rx="2" stroke="currentColor" stroke-width="2"/><line x1="9" y1="19" x2="43" y2="19" stroke="currentColor" stroke-width="2"/><line x1="17" y1="8" x2="17" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="35" y1="8" x2="35" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="17" cy="27" r="1.8" fill="currentColor"/><circle cx="26" cy="27" r="1.8" fill="currentColor"/><circle cx="35" cy="27" r="1.8" fill="currentColor"/><circle cx="17" cy="35" r="1.8" fill="currentColor"/><circle cx="26" cy="35" r="1.8" fill="currentColor"/></svg>`,
     };
 
-    function makeCard({ href, icon, title, desc, dm = false, badge = '' }) {
-      return `<a href="${href}" class="card ${dm?'dm':''}">${badge?`<span class="card-badge">${badge}</span>`:''}${icon}<span class="card-title">${title}</span><span class="card-desc">${desc}</span></a>`;
+    function makeCard({ href, icon, title, desc, dm = false, badge = '', i = 0 }) {
+      const dmCls = dm ? ' card--dm' : '';
+      const badgeHtml = badge ? `<span class="card-badge">${badge}</span>` : '';
+      return `<a href="${href}" class="card card--interactive${dmCls}" style="--card-i:${i}">
+                ${badgeHtml}
+                <span class="card-icon-tile" aria-hidden="true">${icon}</span>
+                <span class="card-title">${title}</span>
+                <span class="card-desc">${desc}</span>
+              </a>`;
     }
 
     function renderCards() {
       const role = Auth.getRole();
       const sections = [];
+      let i = 0;
 
       // Public tools (everyone)
       const publicCards = [
-        makeCard({ href: 'map.html',                icon: ICONS.map,       title: 'The Atlas',     desc: 'Walk the map. See what the world allows you to see.' }),
-        makeCard({ href: 'timeline.html',           icon: ICONS.chronicle, title: 'The Chronicle', desc: 'What has happened, when, and to whom.' }),
-        makeCard({ href: 'initiative-player.html',  icon: ICONS.init,      title: 'The Round',     desc: 'Live turn order during combat.' }),
+        makeCard({ href: 'map.html',                icon: ICONS.map,       title: 'The Atlas',     desc: 'Walk the map. See what the world allows you to see.', i: i++ }),
+        makeCard({ href: 'timeline.html',           icon: ICONS.chronicle, title: 'The Chronicle', desc: 'What has happened, when, and to whom.',                i: i++ }),
+        makeCard({ href: 'initiative-player.html',  icon: ICONS.init,      title: 'The Round',     desc: 'Live turn order during combat.',                       i: i++ }),
       ];
-      sections.push(`<div class="section-heading">Open to All</div><div class="cards">${publicCards.join('')}</div>`);
+      sections.push(`<h2 class="section-heading">Open to All</h2><div class="cards">${publicCards.join('')}</div>`);
 
-      // Player-only (any signed-in user — gates by login, not specifically player vs DM)
+      // Player-only (any signed-in user)
       if (role === 'player' || role === 'dm') {
         const playerCards = [
-          makeCard({ href: 'index.html', icon: ICONS.perks, title: 'The Ledger', desc: 'Your creation bonus and the perks granted to you.' }),
-          makeCard({ href: 'brew.html', icon: ICONS.cauldron, title: 'The Cauldron', desc: 'Combine ingredients and brew a potion — if your roll holds.' }),
+          makeCard({ href: 'index.html', icon: ICONS.perks,    title: 'The Ledger',   desc: 'Your creation bonus and the perks granted to you.',      i: i++ }),
+          makeCard({ href: 'brew.html',  icon: ICONS.cauldron, title: 'The Cauldron', desc: 'Combine ingredients and brew a potion — if your roll holds.', i: i++ }),
         ];
-        sections.push(`<div class="section-heading">For the Sworn</div><div class="cards">${playerCards.join('')}</div>`);
+        sections.push(`<h2 class="section-heading">For the Sworn</h2><div class="cards">${playerCards.join('')}</div>`);
       }
 
       // DM-only
       if (role === 'dm') {
         const dmCards = [
-          makeCard({ href: 'map-dm.html',        icon: ICONS.mapdm,  title: 'Atlas Workshop', desc: 'Place pins, write lore, manage characters and whispers.', dm: true }),
-          makeCard({ href: 'sessions-dm.html',   icon: ICONS.sessions, title: 'The Sessions',  desc: 'Plan, run, and round-trip sessions to your vault as Markdown.', dm: true }),
-          makeCard({ href: 'initiative-dm.html', icon: ICONS.initdm, title: 'War Table',      desc: 'Order, HP, conditions, broadcast to players.',           dm: true }),
-          makeCard({ href: 'brew-dm.html',       icon: ICONS.apothecary, title: 'The Apothecary', desc: 'Stock ingredients & potions, grant inventory, import the book.', dm: true }),
-          makeCard({ href: 'bestiary-dm.html',   icon: ICONS.menagerie,  title: 'The Menagerie',  desc: 'Browse the bestiary, filter by CR or type, import stat blocks.',   dm: true }),
+          makeCard({ href: 'map-dm.html',        icon: ICONS.mapdm,      title: 'Atlas Workshop',  desc: 'Place pins, write lore, manage characters and whispers.',            dm: true, i: i++ }),
+          makeCard({ href: 'sessions-dm.html',   icon: ICONS.sessions,   title: 'The Sessions',    desc: 'Plan, run, and round-trip sessions to your vault as Markdown.',     dm: true, i: i++ }),
+          makeCard({ href: 'initiative-dm.html', icon: ICONS.initdm,     title: 'War Table',       desc: 'Order, HP, conditions, broadcast to players.',                       dm: true, i: i++ }),
+          makeCard({ href: 'brew-dm.html',       icon: ICONS.apothecary, title: 'The Apothecary',  desc: 'Stock ingredients & potions, grant inventory, import the book.',    dm: true, i: i++ }),
+          makeCard({ href: 'bestiary-dm.html',   icon: ICONS.menagerie,  title: 'The Menagerie',   desc: 'Browse the bestiary, filter by CR or type, import stat blocks.',   dm: true, i: i++ }),
         ];
-        sections.push(`<div class="section-heading">Keeper's Wing</div><div class="cards">${dmCards.join('')}</div>`);
+        sections.push(`<h2 class="section-heading section-heading--brass">Keeper's Wing</h2><div class="cards">${dmCards.join('')}</div>`);
       }
 
       // Prompt for anonymous
       if (role === 'anonymous') {
         sections.push(`
-          <div class="section-heading">Sign in for more</div>
-          <div style="text-align:center;padding:0.5rem 0 0.25rem;color:var(--ink-light);font-size:0.95rem;line-height:1.5">
-            Sworn players unlock their ledger and the whispers meant for them.<br>
-            Keepers unlock the workshop and the war table.
-            <div style="margin-top:0.9rem"><button class="id-btn primary" type="button" onclick="openLogin()">Sign in</button></div>
+          <h2 class="section-heading">Sign in for more</h2>
+          <div class="anon-cta">
+            <p>Sworn players unlock their ledger and the whispers meant for them. Keepers unlock the workshop and the war table.</p>
+            <div class="anon-cta-buttons">
+              <button class="btn btn--primary btn--lg" type="button" onclick="openLogin('player')">Player sign-in</button>
+              <button class="btn btn--brass btn--lg"   type="button" onclick="openLogin('dm')">DM sign-in</button>
+            </div>
           </div>
         `);
       }
@@ -499,24 +401,38 @@
 
     // ─── Login modal ───
     let dmIsConfigured = false;
+    let lastFocusedBeforeLogin = null;
 
-    function openLogin() {
-      document.getElementById('login-overlay').classList.add('visible');
-      // Decide default tab — DM is more sensitive, default to player
-      switchPane('player');
+    function openLogin(tab = 'player') {
+      lastFocusedBeforeLogin = document.activeElement;
+      const overlay = document.getElementById('login-overlay');
+      overlay.classList.add('is-visible');
+      overlay.setAttribute('aria-hidden', 'false');
+      switchPane(tab === 'dm' ? 'dm' : 'player');
       populateCharacters();
       refreshDMStatus();
+      // Focus the first input in the active pane
+      setTimeout(() => {
+        const pane = document.getElementById('pane-' + (tab === 'dm' ? 'dm' : 'player'));
+        pane.querySelector('input, select')?.focus();
+      }, 60);
     }
     function closeLogin() {
-      document.getElementById('login-overlay').classList.remove('visible');
+      const overlay = document.getElementById('login-overlay');
+      overlay.classList.remove('is-visible');
+      overlay.setAttribute('aria-hidden', 'true');
       document.getElementById('player-error').textContent = '';
       document.getElementById('dm-error').textContent = '';
+      lastFocusedBeforeLogin?.focus?.();
     }
     function switchPane(name) {
-      document.getElementById('tab-player').classList.toggle('active', name === 'player');
-      document.getElementById('tab-dm').classList.toggle('active', name === 'dm');
-      document.getElementById('pane-player').classList.toggle('active', name === 'player');
-      document.getElementById('pane-dm').classList.toggle('active', name === 'dm');
+      const isPlayer = name === 'player';
+      document.getElementById('tab-player').classList.toggle('is-active', isPlayer);
+      document.getElementById('tab-player').setAttribute('aria-selected', String(isPlayer));
+      document.getElementById('tab-dm').classList.toggle('is-active', !isPlayer);
+      document.getElementById('tab-dm').setAttribute('aria-selected', String(!isPlayer));
+      document.getElementById('pane-player').classList.toggle('is-active', isPlayer);
+      document.getElementById('pane-dm').classList.toggle('is-active', !isPlayer);
     }
 
     async function populateCharacters() {
@@ -575,7 +491,6 @@
         const master = document.getElementById('dm-master').value;
         const setup = await Auth.dmSetup(u, p, master);
         if (!setup.ok) { errEl.textContent = setup.error; return; }
-        // Account created — now log in to populate stored creds
         const login = await Auth.dmLogin(u, p);
         if (!login.ok) { errEl.textContent = 'Account created but login failed: ' + login.error; return; }
       } else {
@@ -587,15 +502,13 @@
       renderCards();
     }
 
-    // Allow Enter to submit the active pane
+    // Keyboard shortcuts: Enter submits, Escape closes modal
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && document.getElementById('login-overlay').classList.contains('visible')) {
-        closeLogin();
-        return;
-      }
-      if (e.key !== 'Enter') return;
-      if (!document.getElementById('login-overlay').classList.contains('visible')) return;
-      if (document.getElementById('pane-player').classList.contains('active')) doPlayerLogin();
+      const overlay = document.getElementById('login-overlay');
+      const open = overlay.classList.contains('is-visible');
+      if (e.key === 'Escape' && open) { closeLogin(); return; }
+      if (e.key !== 'Enter' || !open) return;
+      if (document.getElementById('pane-player').classList.contains('is-active')) doPlayerLogin();
       else doDMSubmit();
     });
 
