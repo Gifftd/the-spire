@@ -154,6 +154,63 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 .map-container.move-mode .zone:active{cursor:grabbing}
 .map-container.move-mode .poly-zone{cursor:grab}
 
+/* ──────────────────────────────────────────────────────────
+   POP-OUT EDITOR
+   Slide-out drawer that overlays the map. Toggled by the
+   "⤢ Pop out editor" button in the topbar. Esc collapses it.
+   ────────────────────────────────────────────────────────── */
+.editor-scrim{
+  position:fixed;
+  top:var(--topbar);left:0;right:0;bottom:0;
+  background:rgba(0,0,0,0.55);
+  backdrop-filter:blur(4px);
+  -webkit-backdrop-filter:blur(4px);
+  z-index:90;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity 240ms cubic-bezier(0.16,1,0.3,1);
+}
+body.editor-expanded .editor-scrim{opacity:1;pointer-events:auto}
+
+body.editor-expanded .editor-col{
+  position:fixed;
+  top:var(--topbar);
+  right:0;
+  bottom:0;
+  width:min(900px,100vw);
+  max-width:100vw;
+  z-index:100;
+  border-left:1px solid var(--gold-faint);
+  box-shadow:0 0 0 1px rgba(184,134,11,0.18),0 0 60px rgba(0,0,0,0.55),-12px 0 40px rgba(184,134,11,0.07);
+  animation:editor-slide-in 280ms cubic-bezier(0.16,1,0.3,1);
+}
+@keyframes editor-slide-in{
+  from{transform:translateX(40px);opacity:0}
+  to{transform:translateX(0);opacity:1}
+}
+
+/* Roomy form treatment inside the pop-out */
+body.editor-expanded .editor-pane{padding:1.4rem 1.8rem}
+body.editor-expanded .field{margin-bottom:1rem}
+body.editor-expanded .field input,
+body.editor-expanded .field textarea,
+body.editor-expanded .field select{font-size:0.98rem;padding:8px 11px;line-height:1.5}
+body.editor-expanded .field textarea{min-height:100px}
+body.editor-expanded .field-row{gap:12px}
+body.editor-expanded .field label{font-size:0.62rem;margin-bottom:5px}
+body.editor-expanded .section-header{font-size:0.68rem;margin:1.4rem 0 0.6rem}
+body.editor-expanded .visibleto-chip,
+body.editor-expanded .ed-chip{font-size:0.78rem;padding:5px 12px}
+body.editor-expanded .editor-tabs .editor-tab{padding:13px 8px 11px;font-size:0.66rem}
+
+/* Two-column layout for chip grids in pop-out, where space allows */
+@media(min-width:720px){
+  body.editor-expanded .visibleto-chips{gap:6px}
+}
+
+/* When expanded, the toggle button shows collapse state */
+body.editor-expanded #expand-editor-btn{background:var(--gold);color:var(--bg)}
+
 /* ── Editor panel ── */
 .editor-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;background:rgba(13,8,4,0.4)}
 .editor-tab{
@@ -447,9 +504,12 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
   <button class="btn btn-purple btn-sm" onclick="openImport()">⬇ Import</button>
   <button class="btn btn-green" onclick="publishData()">▲ Publish to players</button>
   <button class="btn btn-ghost btn-sm" onclick="window.open('map.html','_blank')">Preview ↗</button>
+  <button class="btn btn-gold btn-sm" id="expand-editor-btn" onclick="toggleEditorExpand()" title="Pop out the editor for more room (Esc to collapse)" aria-label="Pop out editor for more room">⤢ Pop out editor</button>
   <a class="btn btn-ghost btn-sm" href="home.html" style="text-decoration:none">⌂ Home</a>
   <div class="sync-status" id="sync-status">—</div>
 </div>
+<!-- Click-outside scrim for the expanded editor -->
+<div class="editor-scrim" id="editor-scrim" onclick="toggleEditorExpand()" aria-hidden="true"></div>
 
 <main class="main" id="main">
   <!-- MAP -->
@@ -1347,14 +1407,32 @@ function resetSubMap() {
   saveAll();
 }
 
-// Esc returns to world (only when no modal is in the way).
+// Esc handler — closes any open layer in priority order.
 document.addEventListener('keydown', e => {
-  if (e.key !== 'Escape' || !inSubMap()) return;
+  if (e.key !== 'Escape') return;
+  // Modals first
   const locModalOpen    = !document.getElementById('loc-modal').classList.contains('hidden');
   const importModalOpen = !document.getElementById('import-modal')?.classList.contains('hidden');
   if (locModalOpen || importModalOpen) return;
-  exitToWorld();
+  // Pop-out editor next
+  if (document.body.classList.contains('editor-expanded')) {
+    toggleEditorExpand();
+    return;
+  }
+  // Sub-map drill-down last
+  if (inSubMap()) exitToWorld();
 });
+
+// ── Pop-out editor toggle ──
+function toggleEditorExpand() {
+  const body = document.body;
+  const btn  = document.getElementById('expand-editor-btn');
+  const on   = body.classList.toggle('editor-expanded');
+  if (btn) {
+    btn.textContent = on ? '✕ Collapse editor' : '⤢ Pop out editor';
+    btn.setAttribute('aria-label', on ? 'Collapse editor' : 'Pop out editor for more room');
+  }
+}
 
 // ══════════════════════════════════════════════════════════════
 //  MAP BUILD & RENDER
