@@ -59,18 +59,57 @@
     .state{text-align:center;padding:3rem 1rem;color:var(--ink-faint);font-style:italic;font-size:1rem}
     .state.error{color:var(--rust)}
 
+    /* Filter bar: expand/collapse-all button */
+    .filters .toggle-all{
+      font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;
+      padding:6px 10px;border:1px solid var(--border);background:var(--panel-deep);
+      color:var(--ink-light);border-radius:2px;cursor:pointer;transition:all 0.15s;white-space:nowrap;
+    }
+    .filters .toggle-all:hover{border-color:var(--teal);color:var(--teal-bright)}
+
     /* Timeline entries */
     .entry{
       background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
       padding:1.1rem 1.25rem;margin-bottom:1rem;border-left:3px solid var(--border-light);
-      box-shadow:0 2px 8px rgba(0,0,0,0.25);
+      box-shadow:0 2px 8px rgba(0,0,0,0.25);transition:border-color 0.15s;
     }
+    .entry:hover{border-color:var(--border-light)}
     .entry.kind-session   {border-left-color:#4a90d4}
     .entry.kind-event     {border-left-color:#c87800}
     .entry.kind-milestone {border-left-color:var(--teal-bright)}
     .entry.kind-planned   {border-left-color:var(--brass);background:linear-gradient(90deg,rgba(184,138,90,0.06),var(--panel))}
 
-    .entry-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:10px;margin-bottom:0.5rem}
+    /* Collapsed by default — body / combats / loot / dmNotes / linked chips hidden */
+    .entry:not(.expanded) .entry-body,
+    .entry:not(.expanded) .entry-combat,
+    .entry:not(.expanded) .entry-loot,
+    .entry:not(.expanded) .entry-dmnotes,
+    .entry:not(.expanded) .entry-meta{display:none}
+    .entry.expanded{padding-bottom:1.25rem}
+
+    .entry-head{
+      display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;
+      cursor:pointer;user-select:none;outline:none;
+    }
+    .entry.expanded .entry-head{margin-bottom:0.55rem}
+    .entry-head:focus-visible{box-shadow:0 0 0 2px var(--teal-deep) inset;border-radius:2px}
+
+    .entry-dates{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-left:auto}
+    .entry-date.real{color:var(--ink-faint);font-size:0.66rem;font-family:'Cinzel',serif;letter-spacing:0.1em}
+    .entry-date.real::before{content:'·\00a0';color:var(--border-light);margin-right:2px}
+    .entry-toggle{
+      font-family:'Cinzel',serif;font-size:0.85rem;color:var(--teal);width:18px;text-align:center;
+      transition:transform 0.18s;flex-shrink:0;
+    }
+    .entry.expanded .entry-toggle{transform:rotate(90deg);color:var(--teal-bright)}
+
+    /* Tag chips — distinct from location/character/NPC chips */
+    .entry-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:0.45rem}
+    .entry-tag{
+      font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.06em;
+      padding:2px 8px;border-radius:10px;
+      background:rgba(184,138,90,0.10);border:1px solid rgba(184,138,90,0.35);color:var(--brass);
+    }
     .entry-kind{
       font-family:'Cinzel',serif;font-size:0.58rem;letter-spacing:0.18em;text-transform:uppercase;
       padding:2px 8px;border-radius:10px;border:1px solid;
@@ -165,6 +204,7 @@
         <option value="desc">Newest first</option>
         <option value="asc">Oldest first</option>
       </select>
+      <button type="button" class="toggle-all" id="toggle-all" onclick="toggleAll()">Expand all</button>
     </div>
 
     <div id="state" class="state">Loading the chronicle…</div>
@@ -179,10 +219,42 @@
   <script>
     const WORKER_URL = (window.Auth && window.Auth.WORKER_URL) || 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
 
-    let entries = [];
-    let isDM    = false;
+    let entries  = [];
+    let isDM     = false;
+    let expanded = new Set();        // entry ids the user has explicitly opened
 
     function esc(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    // Expand / collapse state ─────────────────────────────────────
+    function toggleEntry(id, ev) {
+      if (ev) ev.stopPropagation();
+      if (expanded.has(id)) expanded.delete(id); else expanded.add(id);
+      const el = document.getElementById('entry-' + id);
+      if (el) el.classList.toggle('expanded');
+    }
+    function toggleAll() {
+      const btn = document.getElementById('toggle-all');
+      // If every currently-rendered entry is open, treat as "collapse all"; else "expand all"
+      const ids = currentFilteredIds();
+      const allOpen = ids.length > 0 && ids.every(id => expanded.has(id));
+      if (allOpen) {
+        ids.forEach(id => expanded.delete(id));
+        btn.textContent = 'Expand all';
+      } else {
+        ids.forEach(id => expanded.add(id));
+        btn.textContent = 'Collapse all';
+      }
+      render();
+    }
+    function refreshToggleAllLabel() {
+      const btn = document.getElementById('toggle-all');
+      const ids = currentFilteredIds();
+      const allOpen = ids.length > 0 && ids.every(id => expanded.has(id));
+      btn.textContent = allOpen ? 'Collapse all' : 'Expand all';
+    }
+    function currentFilteredIds() {
+      return [...document.querySelectorAll('#entries .entry')].map(el => el.id.replace(/^entry-/, ''));
+    }
 
     async function bootstrap() {
       const ident = Auth.identity();
@@ -296,22 +368,37 @@
         ? `<div class="planned-divider">Planned</div>${planned.map(renderEntry).join('')}`
         : '';
       list.innerHTML = pastHtml + plannedHtml;
+      refreshToggleAllLabel();
     }
 
     function renderEntry(e) {
-      const kind = e.kind || 'event';
-      const date = e.dateInGame || e.dateSort || '';
+      const kind     = e.kind || 'event';
+      const dateGame = e.dateInGame || '';
+      const dateReal = e.dateReal   || e.dateSort || '';
+      const tags     = Array.isArray(e.tags) ? e.tags.filter(Boolean) : [];
+      const isOpen   = expanded.has(e.id);
+
       const locChips  = (e.locationIds  || []).map(id => `<a class="entry-chip loc"  href="map.html#${esc(id)}">${esc(nameMaps.locations[id]  || id)}</a>`).join('');
       const charChips = (e.characterIds || []).map(id => `<span class="entry-chip char">${esc(nameMaps.characters[id] || id)}</span>`).join('');
       const npcChips  = (e.npcIds       || []).map(id => `<span class="entry-chip npc">${esc(nameMaps.npcs[id]       || id)}</span>`).join('');
-      const allChips = locChips + charChips + npcChips;
+      const allChips  = locChips + charChips + npcChips;
+
+      // Click anywhere on the header expands; the toggle arrow flips on .entry.expanded.
+      // Keyboard: Enter / Space toggles when the header has focus.
       return `
-        <article class="entry kind-${esc(kind)}">
-          <div class="entry-head">
+        <article class="entry kind-${esc(kind)}${isOpen ? ' expanded' : ''}" id="entry-${esc(e.id)}">
+          <div class="entry-head" role="button" tabindex="0"
+               onclick="toggleEntry('${esc(e.id)}', event)"
+               onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleEntry('${esc(e.id)}',event)}">
             <span class="entry-kind ${esc(kind)}">${esc(kind)}</span>
             <span class="entry-title">${esc(e.title||'(Untitled)')}</span>
-            ${date ? `<span class="entry-date">${esc(date)}</span>` : ''}
+            <div class="entry-dates">
+              ${dateGame ? `<span class="entry-date">${esc(dateGame)}</span>` : ''}
+              ${dateReal ? `<span class="entry-date real">${esc(dateReal)}</span>` : ''}
+            </div>
+            <span class="entry-toggle" aria-hidden="true">▸</span>
           </div>
+          ${tags.length ? `<div class="entry-tags">${tags.map(t => `<span class="entry-tag">#${esc(t)}</span>`).join('')}</div>` : ''}
           ${e.body ? `<div class="entry-body">${esc(e.body)}</div>` : ''}
           ${renderCombats(e.combats)}
           ${renderLoot(e.loot)}

@@ -9,6 +9,27 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### Chronicle: collapsible entries, both dates, tag chips
+
+The player-facing Chronicle (`timeline.html`) was rendering every
+entry fully expanded — sessions with long recaps made it hard to
+scan the campaign at a glance. Entries now collapse by default to
+**title + kind chip + tags + both dates (in-game and real-world)**;
+clicking the entry header (or pressing Enter / Space on it)
+expands it to reveal the recap, combats, loot, DM notes, and
+linked location/character/NPC chips.
+
+The filter bar gets an **Expand all** / **Collapse all** toggle
+that operates on the currently-filtered entries. Per-entry
+expand state lives in a Set, so search/sort/filter changes
+preserve which entries you've opened.
+
+Tags (a new field surfaced by the Sessions tool) render as small
+brass `#tag` chips below the title, visible in both collapsed
+and expanded states. Real-world dates render as a smaller
+dim chip beside the in-game date for at-a-glance temporal
+context.
+
 ### Sessions: inline NPC creation + prep-scan helper
 
 The Sessions tool can now create NPCs without leaving the editor.
