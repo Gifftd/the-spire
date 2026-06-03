@@ -5,8 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Initiative — Player View</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* Alias theme.css token names to this page's existing palette so any theme component classes inherit the local look. */
+:root {
+  --c-bg: var(--bg); --c-bg-elevated: var(--surface); --c-surface: var(--surface);
+  --c-surface-2: var(--surface2); --c-surface-3: var(--surface2);
+  --c-border: var(--border); --c-border-light: var(--border-light);
+  --c-brass: var(--gold); --c-brass-bright: var(--gold-light); --c-brass-deep: var(--gold-faint);
+  --c-teal: var(--lobby-accent, #4a9595); --c-teal-bright: #7ec5c5; --c-teal-deep: var(--lobby-bg, #2a5454);
+  --c-ink: var(--ink); --c-ink-light: var(--ink-dim); --c-ink-faint: var(--ink-faint); --c-ink-dim: var(--ink-faint);
+  --c-error: var(--red); --c-success: var(--green-light);
+}
 :root {
   --bg: #0e0c06;
   --surface: #1a1608;
@@ -33,13 +44,14 @@
 
 body {
   background: var(--bg);
+  background-image: radial-gradient(ellipse at 50% 0%, rgba(184,134,11,0.07) 0%, transparent 55%);
   color: var(--ink);
   font-family: 'Crimson Text', Georgia, serif;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1rem;
+  padding: clamp(1rem, 2vw + 0.5rem, 1.5rem);
 }
 
 /* ── Header ── */
@@ -53,9 +65,9 @@ body {
   padding-bottom: 0.8rem;
   border-bottom: 1px solid var(--border);
 }
-.header h1 { font-family: 'Cinzel', serif; font-size: 1.1rem; letter-spacing: 0.1em; color: var(--gold); }
-.round-badge { font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.1em; color: var(--ink-dim); background: var(--surface); border: 1px solid var(--border-light); border-radius: var(--radius); padding: 4px 12px; }
-.round-badge span { color: var(--gold-light); font-size: 1rem; margin-left: 4px; }
+.header h1 { font-family: 'Cinzel', serif; font-size: clamp(1rem,0.9rem + 0.5vw,1.2rem); font-weight: 600; letter-spacing: 0.16em; color: var(--gold-light); text-transform: uppercase; text-shadow: 0 1px 12px rgba(184,134,11,0.10); }
+.round-badge { font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.14em; color: var(--ink-dim); background: var(--surface); border: 1px solid var(--border-light); border-radius: 9999px; padding: 5px 14px; text-transform: uppercase; }
+.round-badge span { color: var(--gold-light); font-size: 1.05rem; font-weight: 600; margin-left: 5px; }
 
 /* ── Connection bar ── */
 .conn-bar { width: 100%; max-width: 640px; font-family: 'Cinzel', serif; font-size: 0.62rem; letter-spacing: 0.1em; text-align: center; margin-bottom: 0.8rem; padding: 4px; border-radius: var(--radius); }
@@ -96,14 +108,41 @@ body {
 .combat-view.show { display: block; }
 
 /* ── Active banner ── */
-.active-banner { width: 100%; background: linear-gradient(90deg,var(--gold-faint),transparent); border: 1px solid var(--gold); border-radius: var(--radius); padding: 8px 16px; margin-bottom: 1rem; font-family: 'Cinzel', serif; font-size: 0.8rem; letter-spacing: 0.08em; color: var(--gold-light); display: none; }
+.active-banner {
+  width: 100%;
+  background: linear-gradient(90deg,rgba(184,134,11,0.22) 0%,transparent 100%);
+  border: 1px solid var(--gold);
+  border-radius: 6px;
+  padding: 10px 18px;
+  margin-bottom: 1rem;
+  font-family: 'Cinzel', serif; font-size: 0.82rem; font-weight: 500; letter-spacing: 0.12em;
+  color: var(--gold-light); display: none;
+  text-transform: uppercase;
+  box-shadow: 0 0 18px rgba(184,134,11,0.12);
+}
 .active-banner.show { display: block; }
 
 /* ── Rows ── */
-.row { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; transition: border-color 0.3s, box-shadow 0.3s; overflow: hidden; }
+.row {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin-bottom: 8px;
+  transition: border-color 200ms cubic-bezier(0.16,1,0.3,1),
+              box-shadow 200ms cubic-bezier(0.16,1,0.3,1),
+              background 200ms cubic-bezier(0.16,1,0.3,1),
+              transform 200ms cubic-bezier(0.16,1,0.3,1),
+              opacity 200ms cubic-bezier(0.16,1,0.3,1);
+  overflow: hidden;
+}
 .row.is-pc    { border-left: 3px solid var(--pc-accent); }
 .row.is-enemy { border-left: 3px solid var(--enemy-accent); }
-.row.is-active { border-color: var(--gold); box-shadow: 0 0 16px var(--active-glow); background: var(--surface2); }
+.row.is-active {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px rgba(184,134,11,0.25), 0 0 18px var(--active-glow), 0 2px 8px rgba(0,0,0,0.30);
+  background: var(--surface2);
+  transform: translateX(2px);
+}
 .row.is-dead  { opacity: 0.38; }
 
 .row-main { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 10px; padding: 10px 14px; }
