@@ -9,6 +9,33 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### Sessions: prep is now structured section cards
+
+The Prep field used to be a single ~340px monospace textarea full
+of raw Markdown — fine for round-trip with the vault but painful
+to edit in the browser. It's been replaced with a stack of
+labeled section cards, one per `##` heading.
+
+Each card has:
+- An editable heading (gold, Cinzel) at the top.
+- A textarea body sized to the content (auto-grows up to 14 rows).
+- ▲ / ▼ / ✕ controls to reorder and delete sections.
+
+Below the stack: a "+ Add" input with a datalist of the user's
+template section names (Housekeeping, Recap, Strong start, Scenes,
+NPCs, Locations, Secrets and Clues, Loot, Open Threads). Typing a
+custom heading and pressing Enter creates a fresh section. New
+sessions seed those nine default sections (empty bodies) so the
+shape matches the vault template from the start.
+
+Under the hood, `prep` is still stored as a single Markdown string
+for byte-clean vault round-trip. The editor parses it into
+`prepSections: [{heading, body}]` on load and serialises back to
+`## Heading\n\nbody` markdown on save. Headings with no body still
+emit (so empty placeholders survive); body without heading emits
+as preamble. Import/export, the player-facing Chronicle, and the
+existing map-dm Timeline tab are all unaffected.
+
 ### Chronicle: collapsible entries, both dates, tag chips
 
 The player-facing Chronicle (`timeline.html`) was rendering every

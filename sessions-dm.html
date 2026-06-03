@@ -106,6 +106,26 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 .dm-note-label{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;color:#8870e0;margin-bottom:4px}
 .dm-note-area textarea{width:100%;background:transparent;border:none;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.92rem;outline:none;resize:vertical;line-height:1.5}
 
+/* Prep section cards (replaces the raw-markdown textarea) */
+.prep-list{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+.prep-section{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color 0.12s}
+.prep-section:focus-within{border-color:var(--gold-faint)}
+.prep-section-head{display:flex;align-items:center;gap:6px;padding:5px 8px 5px 12px;background:var(--surface3);border-bottom:1px solid var(--border)}
+.prep-section-head .prep-heading{flex:1;background:transparent;border:none;color:var(--gold-light);font-family:'Cinzel',serif;font-size:0.82rem;letter-spacing:0.06em;padding:3px 0;outline:none;min-width:0}
+.prep-section-head .prep-heading::placeholder{color:var(--ink-faint);font-style:italic;letter-spacing:0;font-family:'Crimson Text',serif}
+.prep-section-head .prep-heading:focus{color:var(--gold)}
+.prep-controls{display:flex;gap:3px;flex-shrink:0}
+.prep-ctrl{background:transparent;border:1px solid transparent;border-radius:2px;color:var(--ink-faint);cursor:pointer;font-size:0.74rem;padding:2px 7px;line-height:1.2;font-family:inherit;transition:all 0.12s}
+.prep-ctrl:hover:not(:disabled){border-color:var(--border-light);color:var(--ink)}
+.prep-ctrl.del:hover:not(:disabled){border-color:var(--red);color:var(--red)}
+.prep-ctrl:disabled{opacity:0.28;cursor:not-allowed}
+.prep-section textarea{width:100%;background:transparent;border:none;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.94rem;line-height:1.55;padding:10px 12px;outline:none;resize:vertical;min-height:64px;display:block}
+.prep-section textarea:focus{background:var(--bg)}
+.prep-section textarea::placeholder{color:var(--ink-faint);font-style:italic}
+.prep-add{margin-top:8px;display:flex;gap:6px;align-items:center}
+.prep-add input{flex:1;background:var(--surface);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.88rem;padding:6px 9px;outline:none;min-width:0}
+.prep-add input:focus{border-color:var(--gold)}
+
 /* Loot rows */
 .loot-row{display:flex;gap:5px;align-items:center;margin-bottom:5px}
 .loot-row input{background:var(--surface);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.88rem;padding:5px 8px;outline:none}
@@ -222,8 +242,25 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
       <div class="section-header">SUMMARY <span class="hint">— what players see in the Chronicle (becomes <code>## Summary</code> on export)</span></div>
       <div class="field"><textarea id="f-body" class="body" placeholder="A short, read-aloud-ready recap…"></textarea></div>
 
-      <div class="section-header">PREP <span class="hint">— DM-only. Raw Markdown. Section headings (<code>## Scenes</code>, <code>## NPCs</code>, …) round-trip as-is.</span></div>
-      <div class="field"><textarea id="f-prep" class="prep mono" placeholder="## Strong start&#10;&#10;>&#10;&#10;## Scenes&#10;- [ ] &#10;- [ ] &#10;&#10;## NPCs&#10;- &#10;&#10;## Locations&#10;- &#10;&#10;## Secrets and Clues&#10;- [ ] &#10;&#10;## Loot&#10;- [ ] "></textarea></div>
+      <div class="section-header">PREP <span class="hint">— DM-only. Each section round-trips to your vault as <code>## Heading</code> markdown.</span></div>
+      <div id="f-prep-sections"></div>
+      <div class="prep-add">
+        <input type="text" id="prep-new-heading" list="prep-section-presets"
+               placeholder="New section heading (e.g. Strong start, Scenes, NPCs…)"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();addPrepFromInput()}">
+        <datalist id="prep-section-presets">
+          <option value="Housekeeping">
+          <option value="Recap">
+          <option value="Strong start">
+          <option value="Scenes">
+          <option value="NPCs">
+          <option value="Locations">
+          <option value="Secrets and Clues">
+          <option value="Loot">
+          <option value="Open Threads">
+        </datalist>
+        <button class="btn btn-ghost btn-sm" type="button" onclick="addPrepFromInput()">+ ADD</button>
+      </div>
 
       <div class="section-header">ATTENDANCE <span class="hint">— who showed up</span></div>
       <div class="chip-grid" id="f-attend-chips"></div>
@@ -403,8 +440,35 @@ function blankWork() {
     dateReal:'', dateInGame:'', dateSort:'',
     attendance:[], locationIds:[], npcIds:[], visibleTo:[],
     tags:[], loot:[], combats:[], frontmatterExtras:{},
+    prepSections:[],  // [{heading, body}] — UI representation of `prep`; serialised back to `prep` on save
   };
 }
+
+// Seed sections for a brand-new session. Mirrors the user's vault Session Template.
+const DEFAULT_PREP_SECTIONS = [
+  { heading: 'Housekeeping',      body: '' },
+  { heading: 'Recap',             body: '' },
+  { heading: 'Strong start',      body: '' },
+  { heading: 'Scenes',            body: '' },
+  { heading: 'NPCs',              body: '' },
+  { heading: 'Locations',         body: '' },
+  { heading: 'Secrets and Clues', body: '' },
+  { heading: 'Loot',              body: '' },
+];
+
+// Placeholder copy per known section to nudge the DM toward the right shape.
+const PREP_PLACEHOLDERS = {
+  'Housekeeping':      'Player notes, schedule, attendance reminders…',
+  'Recap':             '![[Previous Session#^summary]]',
+  'Strong start':      '> A vivid opening beat to read aloud.',
+  'Scenes':            '- [ ] **Scene 1.** …\n- [ ] **Scene 2.** …',
+  'NPCs':              '- [[NPC Name]] — what they want, where they stand.',
+  'Locations':         '- [[Location]] — what the players will see.',
+  'Secrets and Clues': '- [ ] A secret the players might find.\n- [ ] A clue tied to a thread.',
+  'Loot':              '- [ ] Item — what it does.',
+  'Open Threads':      '- Thread you intend to push.',
+};
+function prepPlaceholder(heading) { return PREP_PLACEHOLDERS[heading] || ''; }
 
 // ═══════════════════════════════════════════════════════════════
 //  PERSISTENCE
@@ -788,6 +852,57 @@ function yamlInlineItem(v) {
   return s;
 }
 
+// ── Prep-section parse/serialize ─────────────────────────────────
+// `prep` is stored as a single Markdown string for round-trip with the vault.
+// The editor splits it into [{heading, body}] cards; saves serialise back.
+function parsePrepSections(md) {
+  if (!md || !md.trim()) return [];
+  const lines = md.split(/\r?\n/);
+  const out = [];
+  let curHeading = null;
+  let buf = [];
+  let preBuf = [];
+  const flush = () => {
+    const body = buf.join('\n').replace(/^\n+|\n+$/g, '');
+    out.push({ heading: curHeading, body });
+    buf = [];
+  };
+  for (const line of lines) {
+    const h = line.match(/^##\s+(.+?)\s*$/);
+    if (h) {
+      if (curHeading === null) {
+        const pre = preBuf.join('\n').replace(/^\n+|\n+$/g, '');
+        if (pre) out.push({ heading: '', body: pre });
+        preBuf = [];
+      } else {
+        flush();
+      }
+      curHeading = stripWikilink(h[1]).trim();
+    } else if (curHeading === null) {
+      preBuf.push(line);
+    } else {
+      buf.push(line);
+    }
+  }
+  if (curHeading !== null) flush();
+  else {
+    const pre = preBuf.join('\n').replace(/^\n+|\n+$/g, '');
+    if (pre) out.push({ heading: '', body: pre });
+  }
+  return out;
+}
+
+function serializePrepSections(secs) {
+  if (!Array.isArray(secs) || !secs.length) return '';
+  return secs.map(s => {
+    const h = (s.heading || '').trim();
+    const b = (s.body || '').replace(/^\n+|\n+$/g, '');
+    if (h && b) return `## ${h}\n\n${b}`;
+    if (h)      return `## ${h}\n`;
+    return b;
+  }).filter(Boolean).join('\n\n').trim();
+}
+
 function emitSessionMarkdown(s) {
   const fm = emitFrontmatter(s);
   const parts = [fm, ''];
@@ -958,6 +1073,7 @@ function loadIntoWork(s) {
     loot: (s.loot || []).slice(),
     combats: (s.combats || []).slice(),
     frontmatterExtras: { ...(s.frontmatterExtras || {}) },
+    prepSections: parsePrepSections(s.prep || ''),
   };
 }
 
@@ -966,6 +1082,9 @@ function newSession() {
   work = blankWork();
   work.dateReal = new Date().toISOString().slice(0, 10);
   work.dateSort = work.dateReal;
+  // Seed the prep sections from the user's vault template so a fresh session
+  // matches the structure they'd see in Obsidian (all bodies empty).
+  work.prepSections = DEFAULT_PREP_SECTIONS.map(s => ({ ...s }));
   renderList();
   renderEditor();
   renderSidebar();
@@ -997,9 +1116,9 @@ function renderEditor() {
   document.getElementById('f-dateSort').value = work.dateSort;
   document.getElementById('f-tags').value = (work.tags || []).join(', ');
   document.getElementById('f-body').value = work.body;
-  document.getElementById('f-prep').value = work.prep;
   document.getElementById('f-dmNotes').value = work.dmNotes;
   syncHeader();
+  renderPrepSections();
   renderChips();
   renderLoot();
   renderCombats();
@@ -1059,6 +1178,88 @@ function toggleChip(which, id) {
   renderSidebar();
 }
 
+// ── Prep sections (card editor) ──────────────────────────────────
+function renderPrepSections() {
+  const wrap = document.getElementById('f-prep-sections');
+  if (!wrap) return;
+  const secs = work.prepSections || [];
+  if (!secs.length) {
+    wrap.innerHTML = `<div class="chip-empty">No prep sections yet. Add one below — typing a name and hitting Enter creates a section.</div>`;
+    return;
+  }
+  const lastIdx = secs.length - 1;
+  wrap.innerHTML = `<div class="prep-list">${secs.map((s, i) => {
+    const rows = Math.max(3, Math.min(14, ((s.body || '').match(/\n/g) || []).length + 2));
+    const placeholder = prepPlaceholder(s.heading || '');
+    return `
+      <div class="prep-section">
+        <div class="prep-section-head">
+          <input class="prep-heading" type="text" placeholder="(no heading)"
+                 value="${escapeHtml(s.heading || '')}"
+                 oninput="updatePrepHeading(${i}, this.value)">
+          <div class="prep-controls">
+            <button class="prep-ctrl" type="button" onclick="movePrepSection(${i}, -1)" ${i === 0 ? 'disabled' : ''} title="Move up">▲</button>
+            <button class="prep-ctrl" type="button" onclick="movePrepSection(${i},  1)" ${i === lastIdx ? 'disabled' : ''} title="Move down">▼</button>
+            <button class="prep-ctrl del" type="button" onclick="removePrepSection(${i})" title="Delete section">✕</button>
+          </div>
+        </div>
+        <textarea rows="${rows}"
+                  placeholder="${escapeHtml(placeholder)}"
+                  oninput="updatePrepBody(${i}, this.value)">${escapeHtml(s.body || '')}</textarea>
+      </div>
+    `;
+  }).join('')}</div>`;
+}
+
+function updatePrepHeading(i, v) {
+  if (!work.prepSections[i]) return;
+  work.prepSections[i].heading = v;
+  // Don't re-render — the input has focus and we'd lose caret position.
+}
+
+function updatePrepBody(i, v) {
+  if (!work.prepSections[i]) return;
+  work.prepSections[i].body = v;
+}
+
+function addPrepSection(headingHint) {
+  const heading = (headingHint || '').trim();
+  work.prepSections.push({ heading, body: '' });
+  renderPrepSections();
+  // Focus the new section: body if we know the heading, otherwise the heading field.
+  setTimeout(() => {
+    const cards = document.querySelectorAll('#f-prep-sections .prep-section');
+    const last = cards[cards.length - 1];
+    if (!last) return;
+    if (heading) last.querySelector('textarea')?.focus();
+    else last.querySelector('.prep-heading')?.focus();
+  }, 20);
+}
+
+function addPrepFromInput() {
+  const el = document.getElementById('prep-new-heading');
+  if (!el) return;
+  addPrepSection(el.value);
+  el.value = '';
+}
+
+function removePrepSection(i) {
+  const s = work.prepSections[i];
+  const label = (s?.heading || '').trim() || '(unnamed section)';
+  if ((s?.body || '').trim() && !confirm(`Delete the "${label}" section? Its contents will be lost.`)) return;
+  work.prepSections.splice(i, 1);
+  renderPrepSections();
+}
+
+function movePrepSection(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= work.prepSections.length) return;
+  const tmp = work.prepSections[i];
+  work.prepSections[i] = work.prepSections[j];
+  work.prepSections[j] = tmp;
+  renderPrepSections();
+}
+
 function renderLoot() {
   const wrap = document.getElementById('f-loot-rows');
   const dl = document.getElementById('loot-recipients');
@@ -1115,7 +1316,8 @@ function removeCombat(i) {
 function collectFromForm() {
   work.title = document.getElementById('f-title').value.trim();
   work.body = document.getElementById('f-body').value;
-  work.prep = document.getElementById('f-prep').value;
+  // prep is the canonical Markdown blob — rebuild it from the section cards.
+  work.prep = serializePrepSections(work.prepSections || []);
   work.dmNotes = document.getElementById('f-dmNotes').value;
   work.dateReal = document.getElementById('f-dateReal').value;
   work.dateInGame = document.getElementById('f-dateInGame').value.trim();
@@ -1598,7 +1800,8 @@ window.addEventListener('DOMContentLoaded', () => {
   wireDrop();
   loadAll();
   // Keep work in sync as the user types — light-touch (debounced not needed for low traffic)
-  ['f-title','f-dateReal','f-dateInGame','f-dateSort','f-tags','f-body','f-prep','f-dmNotes']
+  // Prep textareas have their own per-section oninput handlers; everything else syncs sidebar.
+  ['f-title','f-dateReal','f-dateInGame','f-dateSort','f-tags','f-body','f-dmNotes']
     .forEach(id => document.getElementById(id)?.addEventListener('input', () => {
       collectFromForm();
       renderSidebar();
