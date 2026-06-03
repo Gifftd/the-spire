@@ -108,9 +108,21 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 
 /* Prep section cards (replaces the raw-markdown textarea) */
 .prep-list{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
-.prep-section{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color 0.12s}
+.prep-section{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color 0.12s,opacity 0.12s}
 .prep-section:focus-within{border-color:var(--gold-faint)}
-.prep-section-head{display:flex;align-items:center;gap:6px;padding:5px 8px 5px 12px;background:var(--surface3);border-bottom:1px solid var(--border)}
+.prep-section.collapsed{opacity:0.78}
+.prep-section.collapsed:hover{opacity:1}
+.prep-section.collapsed textarea{display:none}
+.prep-section.collapsed .prep-section-head{border-bottom:none;padding:3px 8px 3px 6px}
+.prep-section.collapsed .prep-heading{color:var(--ink-dim)}
+.prep-toggle{
+  background:transparent;border:none;color:var(--ink-faint);cursor:pointer;
+  font-size:0.85rem;line-height:1;padding:2px 4px;width:20px;text-align:center;
+  transition:transform 0.16s,color 0.12s;flex-shrink:0;font-family:inherit;
+}
+.prep-toggle:hover{color:var(--ink)}
+.prep-section.collapsed .prep-toggle{transform:rotate(-90deg);color:var(--ink-dim)}
+.prep-section-head{display:flex;align-items:center;gap:4px;padding:5px 8px 5px 4px;background:var(--surface3);border-bottom:1px solid var(--border);transition:padding 0.12s}
 .prep-section-head .prep-heading{flex:1;background:transparent;border:none;color:var(--gold-light);font-family:'Cinzel',serif;font-size:0.82rem;letter-spacing:0.06em;padding:3px 0;outline:none;min-width:0}
 .prep-section-head .prep-heading::placeholder{color:var(--ink-faint);font-style:italic;letter-spacing:0;font-family:'Crimson Text',serif}
 .prep-section-head .prep-heading:focus{color:var(--gold)}
@@ -242,7 +254,13 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
       <div class="section-header">SUMMARY <span class="hint">— what players see in the Chronicle (becomes <code>## Summary</code> on export)</span></div>
       <div class="field"><textarea id="f-body" class="body" placeholder="A short, read-aloud-ready recap…"></textarea></div>
 
-      <div class="section-header">PREP <span class="hint">— DM-only. Each section round-trips to your vault as <code>## Heading</code> markdown.</span></div>
+      <div class="section-header">PREP
+        <span class="hint">— DM-only. Each section round-trips to your vault as <code>## Heading</code> markdown.</span>
+        <span style="margin-left:auto;display:flex;gap:5px;flex-shrink:0">
+          <button class="btn btn-ghost btn-sm" type="button" onclick="collapseAllPrep()" title="Minimize every section">MIN ALL</button>
+          <button class="btn btn-ghost btn-sm" type="button" onclick="expandAllPrep()" title="Expand every section">EXPAND ALL</button>
+        </span>
+      </div>
       <div id="f-prep-sections"></div>
       <div class="prep-add">
         <input type="text" id="prep-new-heading" list="prep-section-presets"
@@ -440,9 +458,12 @@ function blankWork() {
     dateReal:'', dateInGame:'', dateSort:'',
     attendance:[], locationIds:[], npcIds:[], visibleTo:[],
     tags:[], loot:[], combats:[], frontmatterExtras:{},
-    prepSections:[],  // [{heading, body}] — UI representation of `prep`; serialised back to `prep` on save
+    prepSections:[],          // [{uid, heading, body}] — UI representation of `prep`; serialised back to `prep` on save
+    prepCollapsed: new Set(), // section uids that are currently minimized
   };
 }
+
+function newPrepUid() { return 'ps_' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3); }
 
 // Seed sections for a brand-new session. Mirrors the user's vault Session Template.
 const DEFAULT_PREP_SECTIONS = [
@@ -889,6 +910,8 @@ function parsePrepSections(md) {
     const pre = preBuf.join('\n').replace(/^\n+|\n+$/g, '');
     if (pre) out.push({ heading: '', body: pre });
   }
+  // Stamp each section with a transient uid so collapse-state survives moves/deletes.
+  out.forEach(s => { s.uid = newPrepUid(); });
   return out;
 }
 
@@ -1074,6 +1097,7 @@ function loadIntoWork(s) {
     combats: (s.combats || []).slice(),
     frontmatterExtras: { ...(s.frontmatterExtras || {}) },
     prepSections: parsePrepSections(s.prep || ''),
+    prepCollapsed: new Set(),  // start fully expanded; per-session minimize state is transient
   };
 }
 
@@ -1084,7 +1108,7 @@ function newSession() {
   work.dateSort = work.dateReal;
   // Seed the prep sections from the user's vault template so a fresh session
   // matches the structure they'd see in Obsidian (all bodies empty).
-  work.prepSections = DEFAULT_PREP_SECTIONS.map(s => ({ ...s }));
+  work.prepSections = DEFAULT_PREP_SECTIONS.map(s => ({ ...s, uid: newPrepUid() }));
   renderList();
   renderEditor();
   renderSidebar();
@@ -1191,9 +1215,11 @@ function renderPrepSections() {
   wrap.innerHTML = `<div class="prep-list">${secs.map((s, i) => {
     const rows = Math.max(3, Math.min(14, ((s.body || '').match(/\n/g) || []).length + 2));
     const placeholder = prepPlaceholder(s.heading || '');
+    const collapsed = work.prepCollapsed.has(s.uid);
     return `
-      <div class="prep-section">
+      <div class="prep-section${collapsed ? ' collapsed' : ''}" data-uid="${escapeHtml(s.uid)}">
         <div class="prep-section-head">
+          <button class="prep-toggle" type="button" onclick="togglePrepCollapse('${escapeHtml(s.uid)}')" title="Minimize / expand">▾</button>
           <input class="prep-heading" type="text" placeholder="(no heading)"
                  value="${escapeHtml(s.heading || '')}"
                  oninput="updatePrepHeading(${i}, this.value)">
@@ -1211,6 +1237,23 @@ function renderPrepSections() {
   }).join('')}</div>`;
 }
 
+// Toggle one section. DOM-only flip — no re-render — so unsaved typing in the textarea is preserved.
+function togglePrepCollapse(uid) {
+  if (!uid) return;
+  if (work.prepCollapsed.has(uid)) work.prepCollapsed.delete(uid);
+  else work.prepCollapsed.add(uid);
+  const el = document.querySelector(`.prep-section[data-uid="${uid.replace(/"/g, '\\"')}"]`);
+  if (el) el.classList.toggle('collapsed');
+}
+function collapseAllPrep() {
+  (work.prepSections || []).forEach(s => { if (s.uid) work.prepCollapsed.add(s.uid); });
+  renderPrepSections();
+}
+function expandAllPrep() {
+  work.prepCollapsed.clear();
+  renderPrepSections();
+}
+
 function updatePrepHeading(i, v) {
   if (!work.prepSections[i]) return;
   work.prepSections[i].heading = v;
@@ -1224,7 +1267,7 @@ function updatePrepBody(i, v) {
 
 function addPrepSection(headingHint) {
   const heading = (headingHint || '').trim();
-  work.prepSections.push({ heading, body: '' });
+  work.prepSections.push({ uid: newPrepUid(), heading, body: '' });
   renderPrepSections();
   // Focus the new section: body if we know the heading, otherwise the heading field.
   setTimeout(() => {

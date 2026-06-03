@@ -9,6 +9,26 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### Sessions: prep section cards can be minimized
+
+Prep section cards in `sessions-dm.html` were each pretty tall —
+once a session had 6+ sections of even modest length, scrolling
+past sections you weren't currently editing got annoying. Each
+card now has a chevron (▾ / ▸) at the start of its heading bar
+that minimizes the card to just the heading line, hiding the
+body textarea. Click the chevron again to expand.
+
+A pair of **MIN ALL** / **EXPAND ALL** buttons in the PREP
+section header bulk-toggles every card. Useful when you want to
+collapse everything and then expand just the one section you're
+editing.
+
+Minimize state is transient (lives in `work.prepCollapsed`, a Set
+of section uids) — it resets when you pick a different session
+or reload. Toggling a single card is a direct DOM `classList`
+flip rather than a re-render, so any in-progress typing in
+other sections' textareas is preserved.
+
 ### Sessions: prep is now structured section cards
 
 The Prep field used to be a single ~340px monospace textarea full
