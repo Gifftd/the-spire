@@ -9,6 +9,55 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### Player pages: foundation + visual refresh
+
+Brings the four player-facing pages in line with the design
+system landed across the rest of the site. JS/HTML untouched
+except for the inline accessibility patch on the Ledger.
+
+#### Three dark-themed pages (map.html, brew.html,
+####                          initiative-player.html)
+
+Each now links `theme.css` + includes an aliasing block mapping
+shared theme tokens (`--c-bg`, `--c-brass`, `--c-ink`, …) to
+the page's existing local palette via fallback chains. Gains
+focus rings, themed scrollbars, prefers-reduced-motion respect,
+and component-class availability — same wins as the DM tools'
+foundation pass.
+
+On top of foundation, each gets a visual refresh:
+
+- **map.html (The Atlas)**: topbar height 48px → 52px, brighter
+  gold uppercase title with subtle shadow, breadcrumb with
+  letter-spacing + uppercase; buttons modernized with easing,
+  uppercase + letter-spacing, tactile `:active`.
+
+- **brew.html (The Cauldron)**: fluid type for the hero (`clamp`),
+  refined PLAYER/DM role chips (pill shape), home link with
+  subtle background fill in normal state; mode tabs gain modern
+  hover state + active outer ring; search input gets a 3px teal
+  focus ring + italic placeholder; ingredient list rows hover
+  slides 2px right.
+
+- **initiative-player.html (The Round)**: fluid type for the
+  header, brighter gold + uppercase + text-shadow; round badge
+  becomes a pill shape; active banner gains a multi-layer glow;
+  combatant rows gain richer transitions, active card translates
+  2px right with multi-layer glow ring (mirrors War Table).
+
+#### Light-themed page (index.html — The Ledger)
+
+The Ledger's parchment palette is intentionally separate from
+the dark design system. Rather than force theme.css adoption
+(which would conflict with the in-character "ledger" feel), it
+gets a small inline accessibility patch:
+- `:focus-visible` ring in amber (palette-appropriate)
+- `prefers-reduced-motion` respect
+
+If a future theming layer adds light/dark/parchment variants,
+the Ledger can adopt the system properly. For now it stays
+visually distinct.
+
 ### Apothecary: deeper visual refresh
 
 Final DM tool refresh in this pass. CSS-only on top of the

@@ -8,6 +8,24 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    /* Accessibility baseline — keyboard focus rings + prefers-reduced-motion.
+       This page keeps its parchment palette and stays out of the shared dark
+       theme.css design system on purpose. */
+    :focus { outline: none; }
+    :focus-visible {
+      outline: 2px solid var(--amber, #b8860b);
+      outline-offset: 3px;
+      border-radius: 3px;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
     :root {
       --parchment: #f5eed8;
       --parchment-dark: #ede3c4;
