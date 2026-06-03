@@ -9,6 +9,69 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### Chronicle Workshop: multi-kind editor + UI refresh (Path A, page 3)
+
+Third page of the Path A rollout. `sessions-dm.html` (renamed in
+the UI to "Chronicle Workshop") now uses the shared `theme.css`
+tokens and components, **and** gains the ability to create + edit
+every timeline kind — not just sessions.
+
+#### Multi-kind support
+
+- New `KIND` select at the top of the editor with options:
+  Session, Event, Milestone, Planned (DM-only).
+- New kind filter in the list toolbar — narrow the list to one
+  kind, or browse all.
+- List cards show a small color-coded kind chip beside the title
+  (blue session / orange event / teal milestone / brass planned)
+  and a matching left-border accent.
+- "+ NEW ENTRY" button creates a session by default, but if you
+  have the list filtered to (say) "Planned", the new entry adopts
+  that kind so you don't have to switch in the editor.
+- Default prep sections only seed for `session` / `planned` kinds
+  (which are essentially "real session" and "future session");
+  `event` and `milestone` entries start with no prep, just title
+  / dates / body.
+- Frontmatter `type:` is now driven by the entry's kind (was
+  hardcoded `type: session`). Vault round-trip works for all
+  four kinds.
+- Import respects frontmatter `type:` and routes the entry to
+  the right kind automatically.
+- Sidebar "At a Glance" adds a Kind row and renames
+  "Sessions total" → "Entries total".
+
+#### UI refresh
+
+- Links to `theme.css`; page-specific CSS shrinks ~30% and uses
+  shared tokens for all colors / spacing / type / radius /
+  shadow / motion.
+- Local `.chip` (toggleable selector chips) renamed to
+  `.pick-chip` to avoid collision with theme.css's `.chip`. The
+  page now uses theme tokens consistently — brass focus rings,
+  fluid type, focus-ring boxes on input focus.
+- Buttons converted to `.btn` + `.btn--brass` / `.btn--ghost` /
+  `.btn--danger` / `.btn--sm` modifiers.
+- Modal styling refreshed — uses theme shadow + brass border +
+  fade/rise entrance animations.
+- Topbar title changed: "THE SESSIONS" → "CHRONICLE WORKSHOP".
+- Editor empty state copy updated to reflect multi-kind scope.
+
+#### Hub card
+
+`home.html` card updated:
+- Title: "The Sessions" → "Chronicle Workshop"
+- Description: "Plan sessions, events, milestones, and planned
+  threads. Round-trip with your vault."
+
+#### Internal renames (no behavior change)
+
+- `sessionsAll()` → `entriesAll()` (no kind filter)
+- New helper `emitEntryMarkdown()` (was `emitSessionMarkdown`)
+- New helper `parseEntryMarkdown()` (was `parseSessionMarkdown`)
+- Function names bound to onclick handlers (`newSession`,
+  `selectSession`, `saveSession`, `deleteSession`) kept for
+  stability; their internal logic now handles any kind.
+
 ### UI refresh: Chronicle (timeline.html) — Path A, page 2
 
 Second page of the Path A rollout. `timeline.html` (the player-

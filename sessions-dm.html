@@ -3,204 +3,716 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>The Spire — Sessions (DM)</title>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<title>The Spire — Chronicle Workshop (DM)</title>
+<meta name="theme-color" content="#060a0e">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
 <style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#0a0806;--surface:#13100a;--surface2:#1c1810;--surface3:#242018;
-  --border:#2e2510;--border-light:#3e3418;
-  --gold:#b8860b;--gold-light:#d4a820;--gold-faint:#6b4f08;--gold-dim:#4a3606;
-  --ink:#e8dfc0;--ink-dim:#a09070;--ink-faint:#6a5a40;
-  --red:#8b2020;--red-bg:#2a0f0d;--green:#2d6a3f;--green-bg:#0d1f12;--green-light:#4a9a60;
-  --purple:#5a3e9b;--purple-bg:#18102a;--amber:#c87800;
-  --session:#4a80c0;--session-light:#8fbceb;
-  --radius:4px;--topbar:48px;
-}
-html,body{height:100%;overflow:hidden}
-body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,serif;display:flex;flex-direction:column}
+/* ──────────────────────────────────────────────────────────
+   Page-specific styles (sessions-dm.html — Chronicle Workshop).
+   Shared tokens & components live in theme.css.
+   ────────────────────────────────────────────────────────── */
+
+html, body { height: 100%; overflow: hidden; }
+body { display: flex; flex-direction: column; }
 
 /* ── Topbar ── */
-.topbar{height:var(--topbar);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1rem;gap:0.6rem;flex-shrink:0;z-index:50;flex-wrap:wrap}
-.topbar h1{font-family:'Cinzel',serif;font-size:0.95rem;letter-spacing:0.1em;color:var(--gold);flex:1;min-width:80px}
-.btn{font-family:'Cinzel',serif;font-size:0.68rem;letter-spacing:0.08em;border:1px solid;border-radius:var(--radius);padding:4px 10px;cursor:pointer;transition:all 0.15s;white-space:nowrap;background:transparent;text-decoration:none;display:inline-block}
-.btn-gold{background:var(--gold-dim);border-color:var(--gold);color:var(--gold-light)}.btn-gold:hover{background:var(--gold);color:var(--bg)}
-.btn-green{background:var(--green-bg);border-color:var(--green);color:#8e8}.btn-green:hover{background:var(--green);color:white}
-.btn-red{background:var(--red-bg);border-color:var(--red);color:#e88}.btn-red:hover{background:var(--red);color:white}
-.btn-purple{background:var(--purple-bg);border-color:var(--purple);color:#c0a0f0}.btn-purple:hover{background:var(--purple);color:white}
-.btn-ghost{border-color:var(--border-light);color:var(--ink-dim)}.btn-ghost:hover{border-color:var(--ink-dim);color:var(--ink)}
-.btn-sm{font-size:0.6rem;padding:3px 7px}
-.sync-status{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.08em;color:var(--ink-faint)}
-.sync-status.ok{color:var(--green-light)}.sync-status.fail{color:var(--red)}.sync-status.ing{color:var(--amber)}
+.topbar {
+  height: 52px;
+  background: var(--c-surface);
+  border-bottom: 1px solid var(--c-border);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-4);
+  gap: var(--space-2);
+  flex-shrink: 0;
+  z-index: var(--z-elevated);
+  flex-wrap: wrap;
+}
+.topbar h1 {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--c-brass-bright);
+  text-transform: uppercase;
+  flex: 1;
+  min-width: 80px;
+}
+.sync-status {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.10em;
+  color: var(--c-ink-faint);
+  text-transform: uppercase;
+}
+.sync-status.ok   { color: var(--c-success); }
+.sync-status.fail { color: var(--c-error); }
+.sync-status.ing  { color: var(--c-warn); }
 
 /* ── 3-pane layout ── */
-.layout{flex:1;display:grid;grid-template-columns:340px 1fr 280px;overflow:hidden;min-height:0}
-.pane-list{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;min-height:0}
-.pane-editor{background:var(--bg);overflow-y:auto;padding:0 1.25rem 1.25rem;min-height:0}
-.pane-sidebar{background:var(--surface);border-left:1px solid var(--border);overflow-y:auto;padding:0.9rem 0.9rem;min-height:0}
-@media(max-width:1100px){
-  .layout{grid-template-columns:300px 1fr}
-  .pane-sidebar{display:none}
+.layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 340px 1fr 280px;
+  overflow: hidden;
+  min-height: 0;
+}
+.pane-list {
+  background: var(--c-surface);
+  border-right: 1px solid var(--c-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+.pane-editor {
+  background: var(--c-bg);
+  overflow-y: auto;
+  padding: 0 var(--space-5) var(--space-5);
+  min-height: 0;
+}
+.pane-sidebar {
+  background: var(--c-surface);
+  border-left: 1px solid var(--c-border);
+  overflow-y: auto;
+  padding: var(--space-4);
+  min-height: 0;
+}
+@media (max-width: 1100px) {
+  .layout { grid-template-columns: 300px 1fr; }
+  .pane-sidebar { display: none; }
 }
 
 /* ── List pane ── */
-.list-toolbar{padding:0.6rem 0.7rem;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px;flex-shrink:0;background:var(--surface)}
-.list-toolbar-row{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
-.list-toolbar input[type=text]{flex:1;min-width:0;background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:5px 8px;font-family:'Crimson Text',serif;font-size:0.84rem;outline:none}
-.list-toolbar input[type=text]:focus{border-color:var(--gold)}
-.list-toolbar select{background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:4px 7px;font-size:0.78rem;font-family:'Crimson Text',serif;cursor:pointer}
-.view-toggle{display:flex;gap:0;border:1px solid var(--border-light);border-radius:2px;overflow:hidden}
-.view-toggle button{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.08em;padding:4px 10px;border:none;background:transparent;color:var(--ink-faint);cursor:pointer;transition:all 0.15s}
-.view-toggle button.on{background:var(--gold-dim);color:var(--gold-light)}
-.list-content{flex:1;overflow-y:auto;padding:0.6rem 0.5rem;min-height:0}
-.list-empty{padding:1.2rem 0.6rem;color:var(--ink-faint);font-style:italic;font-size:0.86rem;text-align:center}
+.list-toolbar {
+  padding: var(--space-3) var(--space-3);
+  border-bottom: 1px solid var(--c-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  background: var(--c-surface);
+}
+.list-toolbar-row { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
+.list-toolbar input[type=text],
+.list-toolbar select {
+  background: var(--c-bg-elevated);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  color: var(--c-ink);
+  padding: 6px 9px;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  outline: none;
+  transition: border-color var(--motion-fast) var(--ease-out);
+}
+.list-toolbar input[type=text] { flex: 1; min-width: 0; }
+.list-toolbar input[type=text]:focus,
+.list-toolbar select:focus { border-color: var(--c-brass); }
 
-.session-card{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--session);border-radius:var(--radius);padding:7px 10px;margin-bottom:6px;cursor:pointer;transition:border-color 0.15s}
-.session-card:hover{border-color:var(--border-light);border-left-color:var(--session-light)}
-.session-card.selected{border-color:var(--gold);border-left-color:var(--gold)}
-.session-card-row{display:flex;align-items:baseline;gap:6px}
-.session-card-num{font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.1em;color:var(--session-light);background:rgba(74,128,192,0.12);border:1px solid var(--session);padding:1px 7px;border-radius:8px;flex-shrink:0}
-.session-card-title{font-family:'Cinzel',serif;font-size:0.84rem;color:var(--ink);flex:1;line-height:1.25;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.session-card-meta{display:flex;gap:8px;margin-top:4px;font-size:0.7rem;color:var(--ink-faint);font-family:'Cinzel',serif;letter-spacing:0.04em}
-.session-card-meta .att{color:var(--ink-dim)}
+.view-toggle {
+  display: flex;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.view-toggle button {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border: none;
+  background: transparent;
+  color: var(--c-ink-faint);
+  cursor: pointer;
+  transition: all var(--motion-fast) var(--ease-out);
+}
+.view-toggle button.on { background: rgba(184,138,90,0.18); color: var(--c-brass-bright); }
+.list-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-2) var(--space-2);
+  min-height: 0;
+}
+.list-empty {
+  padding: var(--space-5) var(--space-3);
+  color: var(--c-ink-faint);
+  font-style: italic;
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+/* Cards in the list pane (multi-kind colored borders) */
+.entry-card {
+  background: var(--c-surface-2);
+  border: 1px solid var(--c-border);
+  border-left: 3px solid var(--c-border-light);
+  border-radius: var(--radius-sm);
+  padding: 7px 11px;
+  margin-bottom: var(--space-2);
+  cursor: pointer;
+  transition: border-color var(--motion-fast) var(--ease-out),
+              background var(--motion-fast) var(--ease-out);
+}
+.entry-card:hover { border-color: var(--c-border-light); background: var(--c-surface-3); }
+.entry-card.selected { border-color: var(--c-brass); background: var(--c-surface-3); }
+.entry-card.kind-session   { border-left-color: #4a90d4; }
+.entry-card.kind-event     { border-left-color: #c87800; }
+.entry-card.kind-milestone { border-left-color: var(--c-teal-bright); }
+.entry-card.kind-planned   { border-left-color: var(--c-brass); background: linear-gradient(90deg, rgba(184,138,90,0.06), var(--c-surface-2)); }
+.entry-card.selected.kind-session   { border-color: #4a90d4; }
+.entry-card.selected.kind-event     { border-color: #c87800; }
+.entry-card.selected.kind-milestone { border-color: var(--c-teal-bright); }
+.entry-card.selected.kind-planned   { border-color: var(--c-brass); }
+
+.entry-card-row { display: flex; align-items: baseline; gap: 6px; }
+.entry-card-kind {
+  font-family: var(--font-display);
+  font-size: 0.55rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  border: 1px solid;
+  flex-shrink: 0;
+}
+.entry-card-kind.kind-session   { color: #8fbceb; border-color: #4a80c0; background: rgba(74,144,212,0.10); }
+.entry-card-kind.kind-event     { color: #f0b076; border-color: #c87800; background: rgba(200,120,0,0.10); }
+.entry-card-kind.kind-milestone { color: var(--c-teal-bright); border-color: var(--c-teal); background: rgba(74,149,149,0.12); }
+.entry-card-kind.kind-planned   { color: var(--c-brass-bright); border-color: rgba(184,138,90,0.55); background: rgba(184,138,90,0.10); }
+.entry-card-num {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.10em;
+  color: #8fbceb;
+  background: rgba(74,144,212,0.12);
+  border: 1px solid #4a80c0;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+.entry-card-title {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  color: var(--c-ink);
+  flex: 1;
+  line-height: 1.25;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.entry-card-meta {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: 4px;
+  font-size: var(--text-2xs);
+  color: var(--c-ink-faint);
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+}
+.entry-card-meta .att { color: var(--c-ink-dim); }
 
 /* Timeline (calendar) view */
-.tl-month{position:sticky;top:0;background:var(--surface);font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.16em;color:var(--gold-faint);padding:6px 4px 4px;border-bottom:1px solid var(--border);margin:6px 0 6px;z-index:1}
-.tl-rail{position:relative;padding-left:14px;border-left:1px solid var(--border-light);margin-left:6px}
-.tl-rail .session-card{position:relative}
-.tl-rail .session-card::before{content:"";position:absolute;left:-19px;top:13px;width:9px;height:9px;border-radius:50%;background:var(--session);border:2px solid var(--surface)}
-.tl-rail .session-card.selected::before{background:var(--gold-light)}
+.tl-month {
+  position: sticky;
+  top: 0;
+  background: var(--c-surface);
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.18em;
+  color: var(--c-brass);
+  padding: 6px 4px 4px;
+  border-bottom: 1px solid var(--c-border);
+  margin: 6px 0;
+  z-index: 1;
+  text-transform: uppercase;
+}
+.tl-rail {
+  position: relative;
+  padding-left: var(--space-3);
+  border-left: 1px solid var(--c-border-light);
+  margin-left: 6px;
+}
+.tl-rail .entry-card { position: relative; }
+.tl-rail .entry-card::before {
+  content: '';
+  position: absolute;
+  left: -19px;
+  top: 13px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #4a90d4;
+  border: 2px solid var(--c-surface);
+}
+.tl-rail .entry-card.kind-event::before     { background: #c87800; }
+.tl-rail .entry-card.kind-milestone::before { background: var(--c-teal-bright); }
+.tl-rail .entry-card.kind-planned::before   { background: var(--c-brass); }
+.tl-rail .entry-card.selected::before { background: var(--c-brass-bright); }
 
 /* ── Editor pane ── */
-.editor-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--ink-faint);font-style:italic;text-align:center;padding:2rem;min-height:60vh}
-.editor-empty h2{font-family:'Cinzel',serif;font-size:1.1rem;letter-spacing:0.08em;color:var(--ink-dim);margin-bottom:0.6rem;font-style:normal}
-.editor-empty p{max-width:32rem;line-height:1.5;font-size:0.92rem}
-
-.editor-header{position:sticky;top:0;background:var(--bg);padding:0.9rem 0 0.6rem;z-index:5;border-bottom:1px solid var(--border);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.editor-header .title-stack{flex:1;min-width:200px}
-.editor-header h2{font-family:'Cinzel',serif;font-size:1rem;letter-spacing:0.06em;color:var(--gold-light);line-height:1.25;margin-bottom:2px}
-.editor-header .sub{font-size:0.78rem;color:var(--ink-faint);font-family:'Cinzel',serif;letter-spacing:0.06em}
-
-.field{margin-bottom:0.7rem}
-.field label{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;color:var(--ink-faint);display:block;margin-bottom:3px}
-.field input,.field textarea,.field select{width:100%;background:var(--surface);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.94rem;padding:6px 9px;outline:none;transition:border-color 0.15s;line-height:1.45}
-.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--gold)}
-.field textarea{resize:vertical;min-height:80px}
-.field textarea.body{min-height:180px}
-.field textarea.prep{min-height:340px;font-family:'Crimson Text',serif;line-height:1.55}
-.field textarea.mono{font-family:ui-monospace,'Menlo','Consolas',monospace;font-size:0.85rem}
-.field select{cursor:pointer}
-.field-row{display:flex;gap:8px;flex-wrap:wrap}.field-row .field{flex:1;min-width:160px}
-.section-header{font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.14em;color:var(--gold-faint);margin:1.2rem 0 0.4rem;padding-bottom:4px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
-.section-header .hint{font-family:'Crimson Text',serif;font-size:0.75rem;letter-spacing:0;color:var(--ink-faint);font-style:italic;text-transform:none}
-
-.chip-grid{display:flex;flex-wrap:wrap;gap:5px;padding:6px 2px}
-.chip{font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.05em;padding:3px 10px;border-radius:10px;border:1px solid var(--border-light);color:var(--ink-faint);background:var(--surface2);cursor:pointer;transition:all 0.12s;user-select:none}
-.chip:hover{border-color:var(--ink-dim);color:var(--ink-dim)}
-.chip.on{border-color:var(--gold);color:var(--gold);background:var(--gold-dim)}
-.chip.attend.on{border-color:var(--session-light);background:rgba(74,128,192,0.22);color:var(--session-light)}
-.chip-empty{font-size:0.78rem;color:var(--ink-faint);font-style:italic;padding:4px 0}
-.chip-hint{font-size:0.74rem;color:var(--ink-faint);font-style:italic;margin-top:2px}
-
-.dm-note-area{background:#12102a;border:1px solid #3a2a6a;border-radius:var(--radius);padding:8px 10px;margin-top:0.4rem}
-.dm-note-label{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;color:#8870e0;margin-bottom:4px}
-.dm-note-area textarea{width:100%;background:transparent;border:none;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.92rem;outline:none;resize:vertical;line-height:1.5}
-
-/* Prep section cards (replaces the raw-markdown textarea) */
-.prep-list{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
-.prep-section{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color 0.12s,opacity 0.12s}
-.prep-section:focus-within{border-color:var(--gold-faint)}
-.prep-section.collapsed{opacity:0.78}
-.prep-section.collapsed:hover{opacity:1}
-.prep-section.collapsed textarea{display:none}
-.prep-section.collapsed .prep-section-head{border-bottom:none;padding:3px 8px 3px 6px}
-.prep-section.collapsed .prep-heading{color:var(--ink-dim)}
-.prep-toggle{
-  background:transparent;border:none;color:var(--ink-faint);cursor:pointer;
-  font-size:0.85rem;line-height:1;padding:2px 4px;width:20px;text-align:center;
-  transition:transform 0.16s,color 0.12s;flex-shrink:0;font-family:inherit;
+.editor-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--c-ink-faint);
+  font-style: italic;
+  text-align: center;
+  padding: var(--space-7);
+  min-height: 60vh;
 }
-.prep-toggle:hover{color:var(--ink)}
-.prep-section.collapsed .prep-toggle{transform:rotate(-90deg);color:var(--ink-dim)}
-.prep-section-head{display:flex;align-items:center;gap:4px;padding:5px 8px 5px 4px;background:var(--surface3);border-bottom:1px solid var(--border);transition:padding 0.12s}
-.prep-section-head .prep-heading{flex:1;background:transparent;border:none;color:var(--gold-light);font-family:'Cinzel',serif;font-size:0.82rem;letter-spacing:0.06em;padding:3px 0;outline:none;min-width:0}
-.prep-section-head .prep-heading::placeholder{color:var(--ink-faint);font-style:italic;letter-spacing:0;font-family:'Crimson Text',serif}
-.prep-section-head .prep-heading:focus{color:var(--gold)}
-.prep-controls{display:flex;gap:3px;flex-shrink:0}
-.prep-ctrl{background:transparent;border:1px solid transparent;border-radius:2px;color:var(--ink-faint);cursor:pointer;font-size:0.74rem;padding:2px 7px;line-height:1.2;font-family:inherit;transition:all 0.12s}
-.prep-ctrl:hover:not(:disabled){border-color:var(--border-light);color:var(--ink)}
-.prep-ctrl.del:hover:not(:disabled){border-color:var(--red);color:var(--red)}
-.prep-ctrl:disabled{opacity:0.28;cursor:not-allowed}
-.prep-section textarea{width:100%;background:transparent;border:none;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.94rem;line-height:1.55;padding:10px 12px;outline:none;resize:vertical;min-height:64px;display:block}
-.prep-section textarea:focus{background:var(--bg)}
-.prep-section textarea::placeholder{color:var(--ink-faint);font-style:italic}
-.prep-add{margin-top:8px;display:flex;gap:6px;align-items:center}
-.prep-add input{flex:1;background:var(--surface);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.88rem;padding:6px 9px;outline:none;min-width:0}
-.prep-add input:focus{border-color:var(--gold)}
+.editor-empty h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  letter-spacing: 0.10em;
+  color: var(--c-ink-dim);
+  margin-bottom: var(--space-2);
+  font-style: normal;
+  text-transform: uppercase;
+}
+.editor-empty p { max-width: 36rem; line-height: 1.55; font-size: var(--text-sm); }
+
+.editor-header {
+  position: sticky;
+  top: 0;
+  background: var(--c-bg);
+  padding: var(--space-4) 0 var(--space-2);
+  z-index: 5;
+  border-bottom: 1px solid var(--c-border);
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.editor-header .title-stack { flex: 1; min-width: 200px; }
+.editor-header h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  letter-spacing: 0.06em;
+  color: var(--c-brass-bright);
+  line-height: 1.25;
+  margin-bottom: 2px;
+}
+.editor-header .sub {
+  font-size: var(--text-2xs);
+  color: var(--c-ink-faint);
+  font-family: var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Fields (page-specific overrides on top of theme .field) */
+.field { margin-bottom: var(--space-3); }
+.field label {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  color: var(--c-ink-faint);
+  display: block;
+  margin-bottom: var(--space-1);
+  text-transform: uppercase;
+}
+.field input, .field textarea, .field select {
+  width: 100%;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  color: var(--c-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  padding: 7px 11px;
+  outline: none;
+  transition: border-color var(--motion-fast) var(--ease-out),
+              box-shadow var(--motion-fast) var(--ease-out);
+  line-height: 1.5;
+}
+.field input:focus, .field textarea:focus, .field select:focus {
+  border-color: var(--c-brass);
+  box-shadow: 0 0 0 3px rgba(184,138,90,0.15);
+}
+.field textarea { resize: vertical; min-height: 80px; }
+.field textarea.body { min-height: 180px; }
+.field select { cursor: pointer; }
+.field-row { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.field-row .field { flex: 1; min-width: 160px; }
+
+.section-header {
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  color: var(--c-brass);
+  margin: var(--space-5) 0 var(--space-2);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--c-border);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-transform: uppercase;
+}
+.section-header .hint {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  letter-spacing: 0;
+  color: var(--c-ink-faint);
+  font-style: italic;
+  text-transform: none;
+}
+
+/* Selector chips (toggleable) — renamed to .pick-chip to avoid collision with theme.css .chip */
+.pick-grid { display: flex; flex-wrap: wrap; gap: 5px; padding: 6px 2px; }
+.pick-chip {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.06em;
+  padding: 3px 11px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--c-border-light);
+  color: var(--c-ink-faint);
+  background: var(--c-surface-2);
+  cursor: pointer;
+  transition: all var(--motion-fast) var(--ease-out);
+  user-select: none;
+}
+.pick-chip:hover { border-color: var(--c-ink-dim); color: var(--c-ink-dim); }
+.pick-chip.on { border-color: var(--c-brass); color: var(--c-brass-bright); background: rgba(184,138,90,0.18); }
+.pick-chip.attend.on {
+  border-color: #4a90d4;
+  background: rgba(74,144,212,0.22);
+  color: #a3cfee;
+}
+.pick-empty { font-size: var(--text-sm); color: var(--c-ink-faint); font-style: italic; padding: 4px 0; }
+.pick-hint { font-size: var(--text-sm); color: var(--c-ink-faint); font-style: italic; margin-top: 2px; }
+
+/* DM-note block */
+.dm-note-area {
+  background: rgba(90,62,155,0.10);
+  border: 1px solid rgba(90,62,155,0.45);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  margin-top: var(--space-2);
+}
+.dm-note-label {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.14em;
+  color: #a890e8;
+  margin-bottom: var(--space-1);
+  text-transform: uppercase;
+}
+.dm-note-area textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--c-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  outline: none;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+/* Prep section cards */
+.prep-list { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-2); }
+.prep-section {
+  background: var(--c-surface-2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  transition: border-color var(--motion-fast) var(--ease-out), opacity var(--motion-fast) var(--ease-out);
+}
+.prep-section:focus-within { border-color: var(--c-brass); }
+.prep-section.collapsed { opacity: 0.78; }
+.prep-section.collapsed:hover { opacity: 1; }
+.prep-section.collapsed textarea { display: none; }
+.prep-section.collapsed .prep-section-head { border-bottom: none; padding: 3px 8px 3px 6px; }
+.prep-section.collapsed .prep-heading { color: var(--c-ink-dim); }
+.prep-toggle {
+  background: transparent;
+  border: none;
+  color: var(--c-ink-faint);
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 2px 4px;
+  width: 20px;
+  text-align: center;
+  transition: transform var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out);
+  flex-shrink: 0;
+  font-family: inherit;
+}
+.prep-toggle:hover { color: var(--c-ink); }
+.prep-section.collapsed .prep-toggle { transform: rotate(-90deg); color: var(--c-ink-dim); }
+.prep-section-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px 5px 4px;
+  background: var(--c-surface-3);
+  border-bottom: 1px solid var(--c-border);
+}
+.prep-section-head .prep-heading {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--c-brass-bright);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: 0.06em;
+  padding: 3px 0;
+  outline: none;
+  min-width: 0;
+}
+.prep-section-head .prep-heading::placeholder {
+  color: var(--c-ink-faint);
+  font-style: italic;
+  letter-spacing: 0;
+  font-family: var(--font-body);
+}
+.prep-section-head .prep-heading:focus { color: var(--c-brass); }
+.prep-controls { display: flex; gap: 3px; flex-shrink: 0; }
+.prep-ctrl {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  color: var(--c-ink-faint);
+  cursor: pointer;
+  font-size: 0.74rem;
+  padding: 2px 7px;
+  line-height: 1.2;
+  font-family: inherit;
+  transition: all var(--motion-fast) var(--ease-out);
+}
+.prep-ctrl:hover:not(:disabled) { border-color: var(--c-border-light); color: var(--c-ink); }
+.prep-ctrl.del:hover:not(:disabled) { border-color: var(--c-error); color: var(--c-error); }
+.prep-ctrl:disabled { opacity: 0.28; cursor: not-allowed; }
+.prep-section textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--c-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: 1.55;
+  padding: 10px 12px;
+  outline: none;
+  resize: vertical;
+  min-height: 64px;
+  display: block;
+}
+.prep-section textarea:focus { background: var(--c-bg); }
+.prep-section textarea::placeholder { color: var(--c-ink-faint); font-style: italic; }
+.prep-add {
+  margin-top: var(--space-2);
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.prep-add input {
+  flex: 1;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  color: var(--c-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  padding: 6px 10px;
+  outline: none;
+  min-width: 0;
+}
+.prep-add input:focus { border-color: var(--c-brass); }
 
 /* Loot rows */
-.loot-row{display:flex;gap:5px;align-items:center;margin-bottom:5px}
-.loot-row input{background:var(--surface);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.88rem;padding:5px 8px;outline:none}
-.loot-row input:focus{border-color:var(--gold)}
-.loot-row .loot-item{flex:1;min-width:0}
-.loot-row .loot-qty{width:60px;flex-shrink:0}
-.loot-row .loot-who{width:130px;flex-shrink:0}
-.loot-row .loot-del{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:0.9rem;padding:0 4px;flex-shrink:0}
-.loot-row .loot-del:hover{color:var(--red)}
+.loot-row { display: flex; gap: 5px; align-items: center; margin-bottom: 5px; }
+.loot-row input {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  color: var(--c-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  padding: 5px 8px;
+  outline: none;
+}
+.loot-row input:focus { border-color: var(--c-brass); }
+.loot-row .loot-item { flex: 1; min-width: 0; }
+.loot-row .loot-qty  { width: 60px; flex-shrink: 0; }
+.loot-row .loot-who  { width: 130px; flex-shrink: 0; }
+.loot-row .loot-del {
+  background: none;
+  border: none;
+  color: var(--c-ink-faint);
+  cursor: pointer;
+  font-size: 0.95rem;
+  padding: 0 5px;
+  flex-shrink: 0;
+}
+.loot-row .loot-del:hover { color: var(--c-error); }
 
 /* Combat items */
-.combat-item{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--session);border-radius:var(--radius);padding:6px 10px;margin-bottom:5px;font-size:0.86rem}
-.combat-item .name{flex:1;font-family:'Cinzel',serif;color:var(--ink);font-size:0.82rem}
-.combat-item .sub{color:var(--ink-faint);font-size:0.75rem}
-.combat-item .del{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:0.9rem;padding:0 4px}
-.combat-item .del:hover{color:var(--red)}
+.combat-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--c-surface-2);
+  border: 1px solid var(--c-border);
+  border-left: 3px solid #4a90d4;
+  border-radius: var(--radius-sm);
+  padding: 6px 11px;
+  margin-bottom: 5px;
+  font-size: var(--text-sm);
+}
+.combat-item .name { flex: 1; font-family: var(--font-display); color: var(--c-ink); font-size: var(--text-sm); }
+.combat-item .sub  { color: var(--c-ink-faint); font-size: var(--text-2xs); font-family: var(--font-display); letter-spacing: 0.06em; }
+.combat-item .del  { background: none; border: none; color: var(--c-ink-faint); cursor: pointer; font-size: 0.95rem; padding: 0 5px; }
+.combat-item .del:hover { color: var(--c-error); }
 
-.action-row{display:flex;gap:6px;margin-top:1rem;flex-wrap:wrap;padding-top:0.8rem;border-top:1px solid var(--border)}
-.action-row .grow{flex:1}
+.action-row {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  flex-wrap: wrap;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--c-border);
+}
+.action-row .grow { flex: 1; }
 
 /* ── Sidebar ── */
-.side-section{margin-bottom:1.1rem}
-.side-h{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.16em;color:var(--gold-faint);margin-bottom:6px;padding-bottom:3px;border-bottom:1px solid var(--border)}
-.side-stat{display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:0.86rem;color:var(--ink-dim)}
-.side-stat .val{color:var(--ink);font-family:'Cinzel',serif;font-size:0.84rem}
-.side-attend{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
-.side-attend .badge{font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.04em;padding:2px 8px;border-radius:9px;background:rgba(74,128,192,0.18);color:var(--session-light);border:1px solid var(--session)}
-.side-attend .absent{background:rgba(106,90,64,0.15);color:var(--ink-faint);border-color:var(--border-light);text-decoration:line-through}
-.side-export{display:flex;flex-direction:column;gap:5px}
-.side-export .btn{justify-content:center;text-align:center;width:100%}
-.side-export .hint{font-size:0.74rem;color:var(--ink-faint);font-style:italic;line-height:1.35;margin-top:2px}
+.side-section { margin-bottom: var(--space-4); }
+.side-h {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.18em;
+  color: var(--c-brass);
+  margin-bottom: 6px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--c-border);
+  text-transform: uppercase;
+}
+.side-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+  font-size: var(--text-sm);
+  color: var(--c-ink-dim);
+}
+.side-stat .val { color: var(--c-ink); font-family: var(--font-display); font-size: var(--text-sm); }
+.side-attend { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.side-attend .badge {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.04em;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  background: rgba(74,144,212,0.20);
+  color: #a3cfee;
+  border: 1px solid #4a80c0;
+}
+.side-attend .absent {
+  background: rgba(106,90,64,0.15);
+  color: var(--c-ink-faint);
+  border-color: var(--c-border);
+  text-decoration: line-through;
+}
+.side-export { display: flex; flex-direction: column; gap: 5px; }
+.side-export .btn { justify-content: center; text-align: center; width: 100%; }
+.side-export .hint {
+  font-size: var(--text-sm);
+  color: var(--c-ink-faint);
+  font-style: italic;
+  line-height: 1.4;
+  margin-top: 2px;
+}
 
-/* ── Import overlay ── */
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:200;padding:1rem}
-.overlay.visible{display:flex}
-.modal{background:var(--surface);border:1px solid var(--gold-faint);border-radius:var(--radius);padding:1.2rem 1.4rem;max-width:640px;width:100%;max-height:88vh;overflow-y:auto}
-.modal h2{font-family:'Cinzel',serif;font-size:1rem;letter-spacing:0.08em;color:var(--gold-light);margin-bottom:0.7rem}
-.modal .drop-zone{border:2px dashed var(--border-light);border-radius:var(--radius);padding:1.3rem;text-align:center;color:var(--ink-faint);transition:all 0.15s;cursor:pointer;font-size:0.92rem;font-family:'Crimson Text',serif}
-.modal .drop-zone.dragover{border-color:var(--gold);color:var(--gold-light);background:rgba(184,134,11,0.07)}
-.modal .modal-actions{display:flex;gap:6px;margin-top:0.9rem;justify-content:flex-end}
-.import-results{margin-top:0.8rem;font-size:0.86rem}
-.import-results .imp-row{display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px dashed var(--border)}
-.import-results .imp-status{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.08em;padding:2px 7px;border-radius:9px;flex-shrink:0}
-.import-results .imp-new{background:var(--green-bg);color:#8e8;border:1px solid var(--green)}
-.import-results .imp-upd{background:rgba(184,134,11,0.18);color:var(--gold-light);border:1px solid var(--gold-faint)}
-.import-results .imp-err{background:var(--red-bg);color:#e88;border:1px solid var(--red)}
-.import-results .imp-meta{flex:1;font-size:0.84rem;color:var(--ink-dim);line-height:1.4}
-.import-results .imp-name{color:var(--ink);font-family:'Cinzel',serif;font-size:0.82rem}
-
-::-webkit-scrollbar{width:8px;height:8px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--border-light);border-radius:4px}
-::-webkit-scrollbar-thumb:hover{background:var(--ink-faint)}
+/* ── Import overlay ── (uses theme .modal-overlay but custom modal styling) */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(5,8,12,0.78);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+  padding: var(--space-4);
+}
+.overlay.visible { display: flex; animation: pane-fade 200ms var(--ease-out); }
+.modal-pane {
+  background: var(--c-surface);
+  border: 1px solid var(--c-brass);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+  max-width: 640px;
+  width: 100%;
+  max-height: 88vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-4);
+  animation: modal-rise 280ms var(--ease-out);
+}
+.modal-pane h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  letter-spacing: 0.10em;
+  color: var(--c-brass-bright);
+  margin-bottom: var(--space-3);
+  text-transform: uppercase;
+}
+.modal-pane .drop-zone {
+  border: 2px dashed var(--c-border-light);
+  border-radius: var(--radius-sm);
+  padding: var(--space-5);
+  text-align: center;
+  color: var(--c-ink-faint);
+  transition: all var(--motion-fast) var(--ease-out);
+  cursor: pointer;
+  font-size: var(--text-base);
+  font-family: var(--font-body);
+}
+.modal-pane .drop-zone.dragover { border-color: var(--c-brass); color: var(--c-brass-bright); background: rgba(184,138,90,0.08); }
+.modal-pane .modal-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  justify-content: flex-end;
+}
+.import-results { margin-top: var(--space-3); font-size: var(--text-sm); }
+.import-results .imp-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  padding: 5px 0;
+  border-bottom: 1px dashed var(--c-border);
+}
+.import-results .imp-status {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.10em;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+.import-results .imp-new { background: rgba(95,179,129,0.15); color: var(--c-success); border: 1px solid rgba(95,179,129,0.45); }
+.import-results .imp-upd { background: rgba(184,138,90,0.18); color: var(--c-brass-bright); border: 1px solid var(--c-brass); }
+.import-results .imp-err { background: rgba(196,96,76,0.18); color: var(--c-error); border: 1px solid var(--c-error); }
+.import-results .imp-meta { flex: 1; font-size: var(--text-sm); color: var(--c-ink-dim); line-height: 1.4; }
+.import-results .imp-name { color: var(--c-ink); font-family: var(--font-display); font-size: var(--text-sm); }
 </style>
 </head>
 <body>
 
 <header class="topbar">
-  <h1>THE SESSIONS</h1>
+  <h1>CHRONICLE WORKSHOP</h1>
   <span class="sync-status" id="sync-status">—</span>
-  <button class="btn btn-gold btn-sm" onclick="newSession()">+ NEW SESSION</button>
-  <button class="btn btn-ghost btn-sm" onclick="openImport()">IMPORT .MD</button>
-  <a class="btn btn-ghost btn-sm" href="home.html">← HUB</a>
+  <button class="btn btn--brass btn--sm" onclick="newEntry()">+ NEW ENTRY</button>
+  <button class="btn btn--ghost btn--sm" onclick="openImport()">IMPORT .MD</button>
+  <a class="btn btn--ghost btn--sm" href="home.html">← HUB</a>
 </header>
 
 <main class="layout">
@@ -215,6 +727,13 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
         </div>
       </div>
       <div class="list-toolbar-row">
+        <select id="kind-filter" onchange="renderList()" style="flex:1">
+          <option value="">All kinds</option>
+          <option value="session">Sessions</option>
+          <option value="event">Events</option>
+          <option value="milestone">Milestones</option>
+          <option value="planned">Planned (DM)</option>
+        </select>
         <select id="year-filter" onchange="renderList()" style="flex:1"><option value="">All years</option></select>
         <span class="sync-status" id="list-count">0</span>
       </div>
@@ -225,22 +744,32 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
   <!-- EDITOR PANE -->
   <section class="pane-editor" id="pane-editor">
     <div class="editor-empty" id="editor-empty">
-      <h2>No session selected</h2>
-      <p>Pick a session from the list, or start a new one. Sessions you import from your vault land here, and you can push edits back to your vault as Markdown.</p>
+      <h2>No entry selected</h2>
+      <p>Pick a chronicle entry from the list, or start a new one. Sessions, events, milestones, and planned threads all live here. Imports from your vault land as sessions; you can change a kind any time in the editor.</p>
     </div>
     <div id="editor" style="display:none">
       <div class="editor-header">
         <div class="title-stack">
-          <h2 id="hdr-title">Untitled session</h2>
+          <h2 id="hdr-title">Untitled entry</h2>
           <div class="sub" id="hdr-sub">—</div>
         </div>
-        <button class="btn btn-gold btn-sm" onclick="saveSession()">SAVE</button>
-        <button class="btn btn-ghost btn-sm" onclick="cancelEdit()">CANCEL</button>
-        <button class="btn btn-red btn-sm" onclick="deleteSession()">DELETE</button>
+        <button class="btn btn--brass btn--sm" onclick="saveSession()">SAVE</button>
+        <button class="btn btn--ghost btn--sm" onclick="cancelEdit()">CANCEL</button>
+        <button class="btn btn--danger btn--sm" onclick="deleteSession()">DELETE</button>
       </div>
 
-      <div class="field" style="margin-top:0.6rem"><label>TITLE</label>
-        <input type="text" id="f-title" placeholder="Session 3: The Pit Beneath the Quarry" oninput="syncHeader()">
+      <div class="field-row" style="margin-top:0.7rem">
+        <div class="field" style="flex:0 0 180px"><label>KIND</label>
+          <select id="f-kind" onchange="onKindChange()">
+            <option value="session">Session</option>
+            <option value="event">Event</option>
+            <option value="milestone">Milestone</option>
+            <option value="planned">Planned (DM-only)</option>
+          </select>
+        </div>
+        <div class="field"><label>TITLE</label>
+          <input type="text" id="f-title" placeholder="Session 3: The Pit Beneath the Quarry" oninput="syncHeader()">
+        </div>
       </div>
       <div class="field-row">
         <div class="field"><label>REAL-WORLD DATE</label><input type="date" id="f-dateReal" oninput="syncHeader()"></div>
@@ -257,8 +786,8 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
       <div class="section-header">PREP
         <span class="hint">— DM-only. Each section round-trips to your vault as <code>## Heading</code> markdown.</span>
         <span style="margin-left:auto;display:flex;gap:5px;flex-shrink:0">
-          <button class="btn btn-ghost btn-sm" type="button" onclick="collapseAllPrep()" title="Minimize every section">MIN ALL</button>
-          <button class="btn btn-ghost btn-sm" type="button" onclick="expandAllPrep()" title="Expand every section">EXPAND ALL</button>
+          <button class="btn btn--ghost btn--sm" type="button" onclick="collapseAllPrep()" title="Minimize every section">MIN ALL</button>
+          <button class="btn btn--ghost btn--sm" type="button" onclick="expandAllPrep()" title="Expand every section">EXPAND ALL</button>
         </span>
       </div>
       <div id="f-prep-sections"></div>
@@ -277,32 +806,32 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
           <option value="Loot">
           <option value="Open Threads">
         </datalist>
-        <button class="btn btn-ghost btn-sm" type="button" onclick="addPrepFromInput()">+ ADD</button>
+        <button class="btn btn--ghost btn--sm" type="button" onclick="addPrepFromInput()">+ ADD</button>
       </div>
 
       <div class="section-header">ATTENDANCE <span class="hint">— who showed up</span></div>
-      <div class="chip-grid" id="f-attend-chips"></div>
+      <div class="pick-grid" id="f-attend-chips"></div>
 
       <div class="section-header">LINKED LOCATIONS</div>
-      <div class="chip-grid" id="f-loc-chips"></div>
+      <div class="pick-grid" id="f-loc-chips"></div>
 
       <div class="section-header">LINKED NPCs
-        <button class="btn btn-gold btn-sm" type="button" onclick="openAddNpc()" style="margin-left:auto">+ ADD NPC</button>
-        <button class="btn btn-ghost btn-sm" type="button" onclick="openScanPrep()" title="Find [[Wikilinks]] in your prep that aren't NPCs yet">↑ SCAN PREP</button>
+        <button class="btn btn--brass btn--sm" type="button" onclick="openAddNpc()" style="margin-left:auto">+ ADD NPC</button>
+        <button class="btn btn--ghost btn--sm" type="button" onclick="openScanPrep()" title="Find [[Wikilinks]] in your prep that aren't NPCs yet">↑ SCAN PREP</button>
       </div>
-      <div class="chip-grid" id="f-npc-chips"></div>
+      <div class="pick-grid" id="f-npc-chips"></div>
 
       <div class="section-header">STRUCTURED LOOT <span class="hint">— for initiative exports &amp; per-recipient tracking. Markdown lists in the Prep block stay too.</span></div>
       <div id="f-loot-rows"></div>
-      <button class="btn btn-ghost btn-sm" type="button" onclick="addLootRow()" style="margin-top:4px">+ Add loot row</button>
+      <button class="btn btn--ghost btn--sm" type="button" onclick="addLootRow()" style="margin-top:4px">+ ADD LOOT ROW</button>
       <datalist id="loot-recipients"></datalist>
 
       <div class="section-header">ATTACHED COMBATS <span class="hint">— pushed in from the War Table</span></div>
       <div id="f-combats"></div>
 
       <div class="section-header">VISIBLE TO <span class="hint">— leave empty for all players</span></div>
-      <div class="chip-grid" id="f-visible-chips"></div>
-      <div class="chip-hint">Empty = visible to every player who can read the Chronicle.</div>
+      <div class="pick-grid" id="f-visible-chips"></div>
+      <div class="pick-hint">Empty = visible to every player who can read the Chronicle. Planned entries are DM-only regardless.</div>
 
       <div class="section-header">DM LOG <span class="hint">— post-session notes, becomes <code>## Log</code> on export</span></div>
       <div class="dm-note-area">
@@ -311,10 +840,10 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
       </div>
 
       <div class="action-row">
-        <button class="btn btn-gold" onclick="saveSession()">SAVE</button>
-        <button class="btn btn-ghost" onclick="cancelEdit()">CANCEL</button>
+        <button class="btn btn--brass" onclick="saveSession()">SAVE</button>
+        <button class="btn btn--ghost" onclick="cancelEdit()">CANCEL</button>
         <span class="grow"></span>
-        <button class="btn btn-red" onclick="deleteSession()">DELETE</button>
+        <button class="btn btn--danger" onclick="deleteSession()">DELETE</button>
       </div>
     </div>
   </section>
@@ -323,8 +852,9 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
   <aside class="pane-sidebar" id="pane-sidebar">
     <div class="side-section">
       <div class="side-h">AT A GLANCE</div>
-      <div class="side-stat"><span>Sessions total</span><span class="val" id="g-total">0</span></div>
+      <div class="side-stat"><span>Entries total</span><span class="val" id="g-total">0</span></div>
       <div class="side-stat"><span>This entry</span><span class="val" id="g-which">—</span></div>
+      <div class="side-stat"><span>Kind</span><span class="val" id="g-kind">—</span></div>
       <div class="side-stat"><span>Attendance</span><span class="val" id="g-att">—</span></div>
       <div class="side-stat"><span>Loot rows</span><span class="val" id="g-loot">—</span></div>
       <div class="side-stat"><span>Combats</span><span class="val" id="g-combats">—</span></div>
@@ -334,23 +864,23 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
     <div class="side-section">
       <div class="side-h">EXPORT TO VAULT</div>
       <div class="side-export">
-        <button class="btn btn-gold btn-sm" id="ex-one" onclick="exportCurrent()" disabled>↓ DOWNLOAD .MD</button>
-        <button class="btn btn-ghost btn-sm" onclick="exportAll()">↓ DOWNLOAD ALL</button>
-        <button class="btn btn-ghost btn-sm" onclick="openImport()">↑ IMPORT .MD</button>
-        <div class="hint">Drop the downloaded file into your <code>Sessions/</code> folder. Re-importing with the same <code>id:</code> in frontmatter updates the entry in place.</div>
+        <button class="btn btn--brass btn--sm" id="ex-one" onclick="exportCurrent()" disabled>↓ DOWNLOAD .MD</button>
+        <button class="btn btn--ghost btn--sm" onclick="exportAll()">↓ DOWNLOAD ALL</button>
+        <button class="btn btn--ghost btn--sm" onclick="openImport()">↑ IMPORT .MD</button>
+        <div class="hint">Drop downloaded files into your vault. Re-importing with the same <code>id:</code> in frontmatter updates the entry in place.</div>
       </div>
     </div>
 
     <div class="side-section">
       <div class="side-h">RECENT IMPORTS</div>
-      <div id="recent-imports" style="font-size:0.82rem;color:var(--ink-faint);font-style:italic">No imports this session.</div>
+      <div id="recent-imports" style="font-size:var(--text-sm);color:var(--c-ink-faint);font-style:italic">No imports this session.</div>
     </div>
   </aside>
 </main>
 
 <!-- ADD NPC OVERLAY -->
 <div class="overlay" id="npc-overlay" onclick="if(event.target===this)closeAddNpc()">
-  <div class="modal">
+  <div class="modal-pane">
     <h2 id="npc-modal-title">Quick-add NPC</h2>
     <div class="field"><label>NAME</label><input type="text" id="npc-f-name" placeholder="Mistress Halen" autocomplete="off"></div>
     <div class="field-row">
@@ -374,51 +904,51 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
       <textarea id="npc-f-dmNotes" rows="3" placeholder="True motives, stat block, plot hooks…"></textarea>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-ghost btn-sm" onclick="closeAddNpc()">CANCEL</button>
-      <button class="btn btn-gold btn-sm" onclick="saveNewNpc()">CREATE &amp; LINK</button>
+      <button class="btn btn--ghost btn--sm" onclick="closeAddNpc()">CANCEL</button>
+      <button class="btn btn--brass btn--sm" onclick="saveNewNpc()">CREATE &amp; LINK</button>
     </div>
   </div>
 </div>
 
 <!-- SCAN PREP OVERLAY -->
 <div class="overlay" id="scan-overlay" onclick="if(event.target===this)closeScanPrep()">
-  <div class="modal">
+  <div class="modal-pane">
     <h2>NPCs referenced in your prep</h2>
-    <div style="font-size:0.86rem;color:var(--ink-dim);margin-bottom:0.6rem;line-height:1.45">
+    <div style="font-size:var(--text-sm);color:var(--c-ink-dim);margin-bottom:0.6rem;line-height:1.45">
       Pulled from <code>[[Wikilinks]]</code> in your prep block and bare names under <code>## NPCs</code>.
       Names matching existing NPCs, locations, or your characters are filtered out.
     </div>
     <div id="scan-list" style="margin:0.4rem 0"></div>
     <div class="modal-actions">
-      <button class="btn btn-ghost btn-sm" onclick="closeScanPrep()">CANCEL</button>
-      <button class="btn btn-gold btn-sm" id="scan-create-btn" onclick="createScannedNpcs()">CREATE SELECTED &amp; LINK</button>
+      <button class="btn btn--ghost btn--sm" onclick="closeScanPrep()">CANCEL</button>
+      <button class="btn btn--brass btn--sm" id="scan-create-btn" onclick="createScannedNpcs()">CREATE SELECTED &amp; LINK</button>
     </div>
   </div>
 </div>
 
 <!-- IMPORT OVERLAY -->
 <div class="overlay" id="import-overlay" onclick="if(event.target===this)closeImport()">
-  <div class="modal">
-    <h2>Import sessions from vault</h2>
+  <div class="modal-pane">
+    <h2>Import entries from vault</h2>
     <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
-      <div style="font-family:'Cinzel',serif;font-size:0.78rem;letter-spacing:0.1em;color:var(--ink-dim);margin-bottom:8px">DROP .MD FILES HERE</div>
+      <div style="font-family:var(--font-display);font-size:var(--text-xs);letter-spacing:0.14em;color:var(--c-ink-dim);margin-bottom:8px;text-transform:uppercase">Drop .md files here</div>
       <div>or click to choose files</div>
-      <div style="margin-top:6px;font-size:0.78rem;color:var(--ink-faint)">Drag-drop multiple at once. Files with an <code>id:</code> in frontmatter update; new files create.</div>
+      <div style="margin-top:6px;font-size:var(--text-sm);color:var(--c-ink-faint)">Drag-drop multiple at once. Files with an <code>id:</code> in frontmatter update; new files create. <code>type:</code> in frontmatter sets the kind.</div>
     </div>
     <input type="file" id="file-input" accept=".md,text/markdown" multiple style="display:none" onchange="handleFiles(this.files)">
 
     <div style="margin-top:0.9rem">
       <div class="side-h" style="margin-bottom:5px">…or paste Markdown</div>
-      <textarea id="paste-md" class="mono" rows="6" style="width:100%;background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:6px 9px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:0.82rem;outline:none" placeholder="---&#10;type: session&#10;name: ...&#10;---&#10;## Summary&#10;..."></textarea>
+      <textarea id="paste-md" rows="6" style="width:100%;background:var(--c-bg);border:1px solid var(--c-border);border-radius:var(--radius-sm);color:var(--c-ink);padding:8px 11px;font-family:var(--font-mono);font-size:var(--text-sm);outline:none" placeholder="---&#10;type: session&#10;name: ...&#10;---&#10;## Summary&#10;..."></textarea>
       <div style="display:flex;justify-content:flex-end;margin-top:5px">
-        <button class="btn btn-gold btn-sm" onclick="importPasted()">PARSE PASTED</button>
+        <button class="btn btn--brass btn--sm" onclick="importPasted()">PARSE PASTED</button>
       </div>
     </div>
 
     <div class="import-results" id="import-results"></div>
 
     <div class="modal-actions">
-      <button class="btn btn-ghost btn-sm" onclick="closeImport()">CLOSE</button>
+      <button class="btn btn--ghost btn--sm" onclick="closeImport()">CLOSE</button>
     </div>
   </div>
 </div>
@@ -426,46 +956,45 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 <script src="auth.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════════
-//  Sessions DM tool — sessions-dm.html
-//  Reads/writes the same `timeline` KV key as map-dm.html, but
-//  scoped to entries where kind === 'session'. Other kinds stay
-//  editable in the map-dm Timeline tab.
+//  Chronicle Workshop — sessions-dm.html
+//  Reads/writes the same `timeline` KV key as map-dm.html.
+//  Manages ALL chronicle kinds: session / event / milestone / planned.
 // ═══════════════════════════════════════════════════════════════
 
 const WORKER_URL = 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+const VALID_KINDS = ['session', 'event', 'milestone', 'planned'];
 
 // DM gate
-if (!window.Auth || !Auth.requireRole('dm', { redirect: 'home.html?notice=' + encodeURIComponent('Sign in as DM to manage sessions.') })) {
-  // requireRole redirected — stop executing
+if (!window.Auth || !Auth.requireRole('dm', { redirect: 'home.html?notice=' + encodeURIComponent('Sign in as DM to manage the chronicle.') })) {
   throw new Error('DM required');
 }
 
 // ─── State ───
-let timeline   = [];     // full timeline (all kinds)
+let timeline   = [];
 let characters = [];
 let npcs       = [];
-let worldData  = { locations: [] };  // for location matching
-let editingId  = null;   // session id, or '__new__'
-let view       = 'list'; // 'list' | 'cal'
-let recentImports = [];  // for the sidebar
+let worldData  = { locations: [] };
+let editingId  = null;
+let view       = 'list';
+let recentImports = [];
 
-// Editor working state
 let work = blankWork();
 
 function blankWork() {
   return {
+    kind: 'session',
     title:'', body:'', prep:'', dmNotes:'',
     dateReal:'', dateInGame:'', dateSort:'',
     attendance:[], locationIds:[], npcIds:[], visibleTo:[],
     tags:[], loot:[], combats:[], frontmatterExtras:{},
-    prepSections:[],          // [{uid, heading, body}] — UI representation of `prep`; serialised back to `prep` on save
-    prepCollapsed: new Set(), // section uids that are currently minimized
+    prepSections:[],
+    prepCollapsed: new Set(),
   };
 }
 
 function newPrepUid() { return 'ps_' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3); }
 
-// Seed sections for a brand-new session. Mirrors the user's vault Session Template.
+// Vault template prep sections — only seeded for session/planned kinds on new entries.
 const DEFAULT_PREP_SECTIONS = [
   { heading: 'Housekeeping',      body: '' },
   { heading: 'Recap',             body: '' },
@@ -477,7 +1006,6 @@ const DEFAULT_PREP_SECTIONS = [
   { heading: 'Loot',              body: '' },
 ];
 
-// Placeholder copy per known section to nudge the DM toward the right shape.
 const PREP_PLACEHOLDERS = {
   'Housekeeping':      'Player notes, schedule, attendance reminders…',
   'Recap':             '![[Previous Session#^summary]]',
@@ -502,15 +1030,8 @@ function setStatus(msg, cls) {
 
 async function dmGet(type) {
   try {
-    const res = await fetch(WORKER_URL + '?type=' + encodeURIComponent(type), {
-      cache: 'no-store',
-      headers: Auth.dmHeaders()
-    });
-    if (res.status === 401) {
-      Auth.logout();
-      window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.'));
-      return null;
-    }
+    const res = await fetch(WORKER_URL + '?type=' + encodeURIComponent(type), { cache: 'no-store', headers: Auth.dmHeaders() });
+    if (res.status === 401) { Auth.logout(); window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.')); return null; }
     if (!res.ok) return null;
     return await res.json();
   } catch { return null; }
@@ -518,46 +1039,27 @@ async function dmGet(type) {
 
 async function dmPost(type, payload) {
   try {
-    const res = await fetch(WORKER_URL, {
-      method: 'POST',
-      headers: Auth.dmHeaders(),
-      body: JSON.stringify({ type, payload })
-    });
-    if (res.status === 401) {
-      Auth.logout();
-      window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.'));
-      return false;
-    }
+    const res = await fetch(WORKER_URL, { method: 'POST', headers: Auth.dmHeaders(), body: JSON.stringify({ type, payload }) });
+    if (res.status === 401) { Auth.logout(); window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.')); return false; }
     return res.ok;
   } catch { return false; }
 }
 
 async function loadAll() {
   setStatus('Loading…', 'ing');
-  // Local cache first (instant render)
   try {
-    const tl = JSON.parse(localStorage.getItem('dm_timeline') || 'null');
-    if (Array.isArray(tl)) timeline = tl;
-    const ch = JSON.parse(localStorage.getItem('dm_characters') || 'null');
-    if (Array.isArray(ch)) characters = ch;
-    const np = JSON.parse(localStorage.getItem('dm_npcs') || 'null');
-    if (Array.isArray(np)) npcs = np;
-    const md = JSON.parse(localStorage.getItem('dm_map_data') || 'null');
-    if (md && md.locations) worldData = md;
+    const tl = JSON.parse(localStorage.getItem('dm_timeline') || 'null'); if (Array.isArray(tl)) timeline = tl;
+    const ch = JSON.parse(localStorage.getItem('dm_characters') || 'null'); if (Array.isArray(ch)) characters = ch;
+    const np = JSON.parse(localStorage.getItem('dm_npcs') || 'null'); if (Array.isArray(np)) npcs = np;
+    const md = JSON.parse(localStorage.getItem('dm_map_data') || 'null'); if (md && md.locations) worldData = md;
   } catch {}
   renderList(); renderEditor(); renderSidebar();
 
-  const [tl, ch, np, md] = await Promise.all([
-    dmGet('timeline_dm'),
-    dmGet('characters'),
-    dmGet('npcs'),
-    dmGet('map_data_dm'),
-  ]);
+  const [tl, ch, np, md] = await Promise.all([dmGet('timeline_dm'), dmGet('characters'), dmGet('npcs'), dmGet('map_data_dm')]);
   if (Array.isArray(tl)) { timeline = tl; localStorage.setItem('dm_timeline', JSON.stringify(tl)); }
   if (Array.isArray(ch)) { characters = ch; localStorage.setItem('dm_characters', JSON.stringify(ch)); }
   if (Array.isArray(np)) { npcs = np; localStorage.setItem('dm_npcs', JSON.stringify(np)); }
   if (md && md.locations) { worldData = md; localStorage.setItem('dm_map_data', JSON.stringify(md)); }
-
   renderList(); renderEditor(); renderSidebar();
   setStatus('Saved', 'ok');
 }
@@ -580,7 +1082,8 @@ function escapeHtml(s) {
 function uid() { return 'tle_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 function lootUid() { return 'lt_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
-function sessionsAll() { return timeline.filter(t => (t.kind || 'event') === 'session'); }
+function entriesAll() { return timeline.slice(); }   // all kinds
+function normalizeKind(k) { return VALID_KINDS.includes(k) ? k : 'event'; }
 
 function sortKey(s) { return (s.dateSort || s.dateReal || '') + '|' + (s.title || ''); }
 
@@ -588,8 +1091,7 @@ function flattenLocations() {
   const out = [];
   (worldData.locations || []).forEach(l => {
     out.push({ id: l.id, name: l.name, parent: '' });
-    const sub = l.subMap?.locations || [];
-    sub.forEach(sl => out.push({ id: sl.id, name: sl.name, parent: l.name }));
+    (l.subMap?.locations || []).forEach(sl => out.push({ id: sl.id, name: sl.name, parent: l.name }));
   });
   return out;
 }
@@ -599,7 +1101,6 @@ function nameToCharacterId(name) {
   const norm = String(name).trim().toLowerCase();
   let c = characters.find(c => (c.name || '').toLowerCase() === norm);
   if (c) return c.id;
-  // First name match
   c = characters.find(c => (c.name || '').toLowerCase().split(' ')[0] === norm.split(' ')[0] && norm.split(' ').length === 1);
   return c ? c.id : null;
 }
@@ -618,11 +1119,8 @@ function nameToNpcId(name) {
 }
 
 function characterName(id) { return characters.find(c => c.id === id)?.name || ''; }
-function locationName(id) {
-  const all = flattenLocations();
-  return all.find(l => l.id === id)?.name || '';
-}
-function npcName(id) { return npcs.find(n => n.id === id)?.name || ''; }
+function locationName(id)  { return flattenLocations().find(l => l.id === id)?.name || ''; }
+function npcName(id)       { return npcs.find(n => n.id === id)?.name || ''; }
 
 // ═══════════════════════════════════════════════════════════════
 //  MARKDOWN PARSING / EMITTING
@@ -652,49 +1150,40 @@ function parseFrontmatter(text) {
     if (!kv) { i++; continue; }
     const key = kv[1];
     let val = kv[2];
-
     if (val === '') {
-      // collect indented list items, if any
-      const items = [];
-      let j = i + 1;
+      const items = []; let j = i + 1;
       while (j < lines.length && /^\s+-\s+/.test(lines[j])) {
         let v = lines[j].replace(/^\s+-\s+/, '').trim();
         v = v.replace(/^["'](.*)["']$/, '$1');
-        items.push(v);
-        j++;
+        items.push(v); j++;
       }
       if (items.length) { meta[key] = items; i = j; continue; }
-      meta[key] = '';
-      i++; continue;
+      meta[key] = ''; i++; continue;
     }
-
-    // inline array
     const arr = val.trim().match(/^\[(.*)\]$/);
     if (arr) {
       meta[key] = arr[1].split(',').map(s => s.trim().replace(/^["'](.*)["']$/, '$1')).filter(Boolean);
       i++; continue;
     }
-
     val = val.trim().replace(/^["'](.*)["']$/, '$1');
-    meta[key] = val;
-    i++;
+    meta[key] = val; i++;
   }
   return { meta, rest: text.slice(m[0].length) };
 }
 
 function splitSections(markdown) {
-  // Returns array of {name, content}. Content excludes the heading line.
   const lines = markdown.split(/\r?\n/);
   const sections = [];
   let current = null;
   let buf = [];
+  let currentHeadingLine = '';
   for (const line of lines) {
     const h = line.match(/^##\s+(.+?)\s*$/);
     if (h) {
       if (current !== null) sections.push({ name: current, raw: buf.join('\n'), heading: currentHeadingLine });
       else if (buf.length) sections.push({ name: '__preamble__', raw: buf.join('\n'), heading: '' });
       current = stripWikilink(h[1]).replace(/:\s*$/, '').trim();
-      var currentHeadingLine = line;
+      currentHeadingLine = line;
       buf = [];
     } else {
       buf.push(line);
@@ -706,16 +1195,19 @@ function splitSections(markdown) {
 }
 
 function findSection(sections, candidates) {
-  // case-insensitive match against any name in `candidates`
   const wants = candidates.map(c => c.toLowerCase());
   return sections.find(s => wants.includes(s.name.toLowerCase()));
 }
 
-function parseSessionMarkdown(text, fileName) {
+// Parse a Markdown file into an entry (kind comes from frontmatter `type:`).
+function parseEntryMarkdown(text, fileName) {
   const { meta, rest } = parseFrontmatter(text);
   const sections = splitSections(rest);
 
-  // body = ## Summary content (minus ^summary anchor & trailing ---)
+  // Determine kind from frontmatter
+  const rawType = String(meta.type || '').trim().toLowerCase();
+  const kind = VALID_KINDS.includes(rawType) ? rawType : 'session';
+
   const summarySec = findSection(sections, ['Summary', 'Session Summary']);
   let body = '';
   if (summarySec) {
@@ -725,19 +1217,16 @@ function parseSessionMarkdown(text, fileName) {
       .trim();
   }
 
-  // dmNotes = ## Log content
   const logSec = findSection(sections, ['Log']);
   const dmNotes = logSec ? logSec.raw.trim() : '';
 
-  // prep = everything between Summary and Log (preserving headings)
   const ignore = new Set();
   if (summarySec) ignore.add(summarySec);
   if (logSec) ignore.add(logSec);
   const preamble = sections.find(s => s.name === '__preamble__');
   if (preamble) ignore.add(preamble);
 
-  // Determine ordering: only include sections that come AFTER Summary and BEFORE Log
-  let inMid = !summarySec; // if no summary, everything before log is prep
+  let inMid = !summarySec;
   const prepParts = [];
   for (const s of sections) {
     if (s === summarySec) { inMid = true; continue; }
@@ -748,32 +1237,25 @@ function parseSessionMarkdown(text, fileName) {
   }
   const prep = prepParts.join('\n').trim();
 
-  // Title — name from frontmatter, or filename stem
   let title = (meta.name || '').trim();
   if (!title && fileName) title = fileName.replace(/\.md$/i, '');
-  if (!title) title = 'Untitled session';
+  if (!title) title = 'Untitled entry';
 
-  // Dates
   const dateReal = (meta.date || '').trim();
   const dateInGame = (meta.game_date || '').trim();
   const dateSort = dateReal && /^\d{4}-\d{2}-\d{2}$/.test(dateReal) ? dateReal : '';
 
-  // Tags
   let tags = [];
   if (Array.isArray(meta.tags)) tags = meta.tags.slice();
   else if (typeof meta.tags === 'string' && meta.tags) tags = meta.tags.split(',').map(s => s.trim()).filter(Boolean);
 
-  // Attendance / characters — extract wikilink targets from `characters` frontmatter (string OR array)
   const charsField = meta.characters;
   let charNames = [];
   if (Array.isArray(charsField)) {
     charNames = charsField.flatMap(v => extractWikilinkTargets(v).length ? extractWikilinkTargets(v) : [stripWikilink(v)]);
   } else if (typeof charsField === 'string' && charsField.trim()) {
     charNames = extractWikilinkTargets(charsField);
-    if (!charNames.length) {
-      // Fallback: comma-split
-      charNames = charsField.split(',').map(s => stripWikilink(s.trim())).filter(Boolean);
-    }
+    if (!charNames.length) charNames = charsField.split(',').map(s => stripWikilink(s.trim())).filter(Boolean);
   }
   const attendance = [];
   const unresolvedChars = [];
@@ -783,7 +1265,6 @@ function parseSessionMarkdown(text, fileName) {
     else unresolvedChars.push(n);
   });
 
-  // Locations
   let locNames = [];
   const locField = meta.location;
   if (Array.isArray(locField)) {
@@ -800,7 +1281,6 @@ function parseSessionMarkdown(text, fileName) {
     else unresolvedLocs.push(n);
   });
 
-  // Stash frontmatter extras we didn't consume so they round-trip on export
   const consumed = new Set(['type','name','world','campaign','date','game_date','location','characters','tags','id','attendance']);
   const frontmatterExtras = {};
   for (const k of Object.keys(meta)) if (!consumed.has(k)) frontmatterExtras[k] = meta[k];
@@ -808,7 +1288,7 @@ function parseSessionMarkdown(text, fileName) {
   const id = (meta.id && String(meta.id).trim()) || null;
 
   return {
-    id, title, body, prep, dmNotes,
+    id, kind, title, body, prep, dmNotes,
     dateReal, dateInGame, dateSort,
     tags, attendance, locationIds, npcIds: [], visibleTo: [],
     loot: [], combats: [],
@@ -820,7 +1300,7 @@ function parseSessionMarkdown(text, fileName) {
 
 function emitFrontmatter(s) {
   const lines = ['---'];
-  lines.push('type: session');
+  lines.push('type: ' + normalizeKind(s.kind || 'session'));
   if (s.id) lines.push('id: ' + s.id);
   if (s.title) lines.push('name: ' + yamlQuote(s.title));
   const world = s.frontmatterExtras?.world || s.raw?.world || '';
@@ -830,25 +1310,21 @@ function emitFrontmatter(s) {
   lines.push('date: ' + yamlQuote(s.dateReal || ''));
   lines.push('game_date: ' + (s.dateInGame ? yamlQuote(s.dateInGame) : ''));
 
-  // location: emit as first linked location wikilink, or as a list of wikilinks if multiple
   const locs = (s.locationIds || []).map(id => locationName(id)).filter(Boolean);
   if (locs.length === 1) lines.push('location: ' + yamlQuote(`[[${locs[0]}]]`));
   else if (locs.length > 1) lines.push('location: ' + yamlQuote(locs.map(n => `[[${n}]]`).join(', ')));
   else lines.push('location: ');
 
-  // characters: emit as wikilinks
   const chars = (s.attendance || []).map(id => characterName(id)).filter(Boolean);
   if (chars.length) lines.push('characters: ' + yamlQuote(chars.map(n => `[[${n}]]`).join(', ')));
   else lines.push('characters: ');
 
-  // tags as inline array
   if (s.tags && s.tags.length) lines.push('tags: [' + s.tags.map(t => t.replace(/[\[\],]/g, '')).join(', ') + ']');
   else lines.push('tags: []');
 
-  // Frontmatter extras (anything we didn't consume on import) — re-emit unchanged
   if (s.frontmatterExtras) {
     for (const [k, v] of Object.entries(s.frontmatterExtras)) {
-      if (['world','campaign'].includes(k)) continue; // already emitted
+      if (['world','campaign'].includes(k)) continue;
       if (Array.isArray(v)) lines.push(`${k}: [${v.map(x => yamlInlineItem(x)).join(', ')}]`);
       else lines.push(`${k}: ` + (v === '' ? '' : yamlQuote(v)));
     }
@@ -861,7 +1337,6 @@ function emitFrontmatter(s) {
 function yamlQuote(v) {
   if (v == null) return '';
   const s = String(v);
-  // Quote if contains : { } [ ] , & * # ? | < > = ! % @ ` " ' or starts with - or starts with #
   if (/[:{}\[\],&*#?|<>=!%@`"']/g.test(s) || /^[-\s]/.test(s) || /^\d{4}-\d{2}-\d{2}$/.test(s)) {
     return '"' + s.replace(/"/g, '\\"') + '"';
   }
@@ -873,9 +1348,6 @@ function yamlInlineItem(v) {
   return s;
 }
 
-// ── Prep-section parse/serialize ─────────────────────────────────
-// `prep` is stored as a single Markdown string for round-trip with the vault.
-// The editor splits it into [{heading, body}] cards; saves serialise back.
 function parsePrepSections(md) {
   if (!md || !md.trim()) return [];
   const lines = md.split(/\r?\n/);
@@ -895,22 +1367,16 @@ function parsePrepSections(md) {
         const pre = preBuf.join('\n').replace(/^\n+|\n+$/g, '');
         if (pre) out.push({ heading: '', body: pre });
         preBuf = [];
-      } else {
-        flush();
-      }
+      } else flush();
       curHeading = stripWikilink(h[1]).trim();
-    } else if (curHeading === null) {
-      preBuf.push(line);
-    } else {
-      buf.push(line);
-    }
+    } else if (curHeading === null) preBuf.push(line);
+    else buf.push(line);
   }
   if (curHeading !== null) flush();
   else {
     const pre = preBuf.join('\n').replace(/^\n+|\n+$/g, '');
     if (pre) out.push({ heading: '', body: pre });
   }
-  // Stamp each section with a transient uid so collapse-state survives moves/deletes.
   out.forEach(s => { s.uid = newPrepUid(); });
   return out;
 }
@@ -926,22 +1392,16 @@ function serializePrepSections(secs) {
   }).filter(Boolean).join('\n\n').trim();
 }
 
-function emitSessionMarkdown(s) {
+function emitEntryMarkdown(s) {
   const fm = emitFrontmatter(s);
   const parts = [fm, ''];
-
-  // ## Summary
   parts.push('## Summary', '');
   if (s.body && s.body.trim()) parts.push(s.body.trim(), '');
   parts.push('^summary', '');
-
-  // Prep block — already contains its own ## headings
   if (s.prep && s.prep.trim()) {
     parts.push('---', '');
     parts.push(s.prep.trim(), '');
   }
-
-  // Structured loot — emit as a sub-section IF user has structured loot rows
   if (s.loot && s.loot.length) {
     parts.push('## Recorded Loot', '');
     s.loot.forEach(l => {
@@ -953,8 +1413,6 @@ function emitSessionMarkdown(s) {
     });
     parts.push('');
   }
-
-  // Attached combats — DM-only summary
   if (s.combats && s.combats.length) {
     parts.push('## Combats', '');
     s.combats.forEach(c => {
@@ -962,11 +1420,8 @@ function emitSessionMarkdown(s) {
     });
     parts.push('');
   }
-
-  // ## Log
   parts.push('---', '', '## Log', '');
   if (s.dmNotes && s.dmNotes.trim()) parts.push(s.dmNotes.trim(), '');
-
   return parts.join('\n').replace(/\n{3,}/g, '\n\n');
 }
 
@@ -984,7 +1439,7 @@ function refreshYearFilter() {
   const sel = document.getElementById('year-filter');
   const prev = sel.value;
   const years = new Set();
-  sessionsAll().forEach(s => {
+  entriesAll().forEach(s => {
     const y = (s.dateSort || s.dateReal || '').slice(0, 4);
     if (/^\d{4}$/.test(y)) years.add(y);
   });
@@ -997,11 +1452,12 @@ function renderList() {
   refreshYearFilter();
   const q = (document.getElementById('search').value || '').toLowerCase();
   const yr = document.getElementById('year-filter').value;
-  const all = sessionsAll()
-    .slice()
-    .sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
+  const kf = document.getElementById('kind-filter').value;
+  const all = entriesAll().slice().sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
 
   const filtered = all.filter(s => {
+    const k = normalizeKind(s.kind);
+    if (kf && k !== kf) return false;
     if (yr && (s.dateSort || s.dateReal || '').slice(0, 4) !== yr) return false;
     if (q && !(`${s.title || ''} ${s.body || ''} ${(s.tags || []).join(' ')}`.toLowerCase().includes(q))) return false;
     return true;
@@ -1012,21 +1468,23 @@ function renderList() {
 
   const container = document.getElementById('list-content');
   if (!filtered.length) {
-    container.innerHTML = `<div class="list-empty">${all.length === 0 ? 'No sessions yet. Click <b>+ NEW SESSION</b> or import .md files from your vault.' : 'No sessions match your filter.'}</div>`;
+    container.innerHTML = `<div class="list-empty">${all.length === 0 ? 'No entries yet. Click <b>+ NEW ENTRY</b> or import .md files from your vault.' : 'No entries match your filter.'}</div>`;
     return;
   }
 
   const cardHtml = s => {
+    const k = normalizeKind(s.kind);
     const sel = s.id === editingId ? 'selected' : '';
-    const num = sessionNumber(s);
+    const num = (k === 'session') ? sessionNumber(s) : '';
     const attN = (s.attendance || []).length;
     const date = (s.dateReal || s.dateSort || '').slice(0, 10);
-    return `<div class="session-card ${sel}" onclick="selectSession('${s.id}')">
-      <div class="session-card-row">
-        ${num ? `<span class="session-card-num">${escapeHtml(num)}</span>` : ''}
-        <div class="session-card-title">${escapeHtml(s.title || 'Untitled')}</div>
+    return `<div class="entry-card kind-${k} ${sel}" onclick="selectSession('${s.id}')">
+      <div class="entry-card-row">
+        <span class="entry-card-kind kind-${k}">${k}</span>
+        ${num ? `<span class="entry-card-num">${escapeHtml(num)}</span>` : ''}
+        <div class="entry-card-title">${escapeHtml(s.title || 'Untitled')}</div>
       </div>
-      <div class="session-card-meta">
+      <div class="entry-card-meta">
         ${date ? `<span>${escapeHtml(date)}</span>` : ''}
         ${attN ? `<span class="att">${attN} attended</span>` : ''}
         ${s.combats?.length ? `<span>⚔ ${s.combats.length}</span>` : ''}
@@ -1040,7 +1498,6 @@ function renderList() {
     return;
   }
 
-  // Timeline / calendar view: group by Year-Month, sticky headers
   const groups = new Map();
   filtered.forEach(s => {
     const ym = (s.dateSort || s.dateReal || '').slice(0, 7) || '—';
@@ -1060,7 +1517,6 @@ function renderList() {
 }
 
 function sessionNumber(s) {
-  // Try to extract "Session N" from the title; otherwise just return ''
   const m = (s.title || '').match(/session\s+(\d+[A-Z]?)/i);
   return m ? `#${m[1]}` : '';
 }
@@ -1073,14 +1529,13 @@ function selectSession(id) {
   if (!s) return;
   editingId = id;
   loadIntoWork(s);
-  renderList();
-  renderEditor();
-  renderSidebar();
+  renderList(); renderEditor(); renderSidebar();
   document.getElementById('pane-editor').scrollTop = 0;
 }
 
 function loadIntoWork(s) {
   work = {
+    kind: normalizeKind(s.kind),
     title: s.title || '',
     body: s.body || '',
     prep: s.prep || '',
@@ -1097,43 +1552,43 @@ function loadIntoWork(s) {
     combats: (s.combats || []).slice(),
     frontmatterExtras: { ...(s.frontmatterExtras || {}) },
     prepSections: parsePrepSections(s.prep || ''),
-    prepCollapsed: new Set(),  // start fully expanded; per-session minimize state is transient
+    prepCollapsed: new Set(),
   };
 }
 
-function newSession() {
+// Create a new entry. Kind defaults to the currently-filtered kind, else 'session'.
+function newEntry(forceKind) {
   editingId = '__new__';
   work = blankWork();
+  const filterKind = document.getElementById('kind-filter')?.value || '';
+  work.kind = normalizeKind(forceKind || filterKind || 'session');
   work.dateReal = new Date().toISOString().slice(0, 10);
   work.dateSort = work.dateReal;
-  // Seed the prep sections from the user's vault template so a fresh session
-  // matches the structure they'd see in Obsidian (all bodies empty).
-  work.prepSections = DEFAULT_PREP_SECTIONS.map(s => ({ ...s, uid: newPrepUid() }));
-  renderList();
-  renderEditor();
-  renderSidebar();
+  if (work.kind === 'session' || work.kind === 'planned') {
+    work.prepSections = DEFAULT_PREP_SECTIONS.map(s => ({ ...s, uid: newPrepUid() }));
+  } else {
+    work.prepSections = [];
+  }
+  renderList(); renderEditor(); renderSidebar();
   setTimeout(() => document.getElementById('f-title')?.focus(), 30);
 }
+
+// Kept for any callsites (toolbar button); proxies to newEntry.
+function newSession() { newEntry('session'); }
 
 function cancelEdit() {
   editingId = null;
   work = blankWork();
-  renderList();
-  renderEditor();
-  renderSidebar();
+  renderList(); renderEditor(); renderSidebar();
 }
 
 function renderEditor() {
   const empty = document.getElementById('editor-empty');
   const ed = document.getElementById('editor');
-  if (!editingId) {
-    empty.style.display = '';
-    ed.style.display = 'none';
-    return;
-  }
-  empty.style.display = 'none';
-  ed.style.display = '';
+  if (!editingId) { empty.style.display = ''; ed.style.display = 'none'; return; }
+  empty.style.display = 'none'; ed.style.display = '';
 
+  document.getElementById('f-kind').value = work.kind || 'session';
   document.getElementById('f-title').value = work.title;
   document.getElementById('f-dateReal').value = work.dateReal;
   document.getElementById('f-dateInGame').value = work.dateInGame;
@@ -1148,47 +1603,54 @@ function renderEditor() {
   renderCombats();
 }
 
+function onKindChange() {
+  const v = document.getElementById('f-kind').value;
+  work.kind = normalizeKind(v);
+  syncHeader();
+  renderSidebar();
+}
+
+const KIND_LABELS = { session:'Session', event:'Event', milestone:'Milestone', planned:'Planned' };
+
 function syncHeader() {
-  const t = document.getElementById('f-title').value || 'Untitled session';
+  const t = document.getElementById('f-title').value || 'Untitled entry';
   const d = document.getElementById('f-dateReal').value || '';
+  const k = document.getElementById('f-kind')?.value || work.kind || 'session';
   document.getElementById('hdr-title').textContent = t;
-  document.getElementById('hdr-sub').textContent = d ? `Real-world: ${d}` : '—';
-  // Keep work in sync so the sidebar updates live
+  document.getElementById('hdr-sub').textContent = (KIND_LABELS[k] || k) + (d ? ` · ${d}` : '');
   work.title = document.getElementById('f-title').value;
   work.dateReal = d;
+  work.kind = normalizeKind(k);
   renderSidebar();
 }
 
 function renderChips() {
-  // Attendance + visibleTo: characters
   const attEl = document.getElementById('f-attend-chips');
   const visEl = document.getElementById('f-visible-chips');
   if (!characters.length) {
-    attEl.innerHTML = '<div class="chip-empty">No characters yet. Add some in the Atlas Workshop → Players tab.</div>';
-    visEl.innerHTML = '<div class="chip-empty">No characters to grant visibility to.</div>';
+    attEl.innerHTML = '<div class="pick-empty">No characters yet. Add some in the Atlas Workshop → Players tab.</div>';
+    visEl.innerHTML = '<div class="pick-empty">No characters to grant visibility to.</div>';
   } else {
     const sortChars = characters.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     attEl.innerHTML = sortChars.map(c =>
-      `<span class="chip attend ${work.attendance.includes(c.id) ? 'on' : ''}" onclick="toggleChip('attendance','${c.id}')">${escapeHtml(c.name || '')}${c.player ? ` <span style="opacity:0.6">· ${escapeHtml(c.player)}</span>` : ''}</span>`
+      `<span class="pick-chip attend ${work.attendance.includes(c.id) ? 'on' : ''}" onclick="toggleChip('attendance','${c.id}')">${escapeHtml(c.name || '')}${c.player ? ` <span style="opacity:0.6">· ${escapeHtml(c.player)}</span>` : ''}</span>`
     ).join('');
     visEl.innerHTML = sortChars.map(c =>
-      `<span class="chip ${work.visibleTo.includes(c.id) ? 'on' : ''}" onclick="toggleChip('visibleTo','${c.id}')">${escapeHtml(c.name || '')}</span>`
+      `<span class="pick-chip ${work.visibleTo.includes(c.id) ? 'on' : ''}" onclick="toggleChip('visibleTo','${c.id}')">${escapeHtml(c.name || '')}</span>`
     ).join('');
   }
-  // Locations
   const locEl = document.getElementById('f-loc-chips');
   const locs = flattenLocations().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  if (!locs.length) locEl.innerHTML = '<div class="chip-empty">No locations yet.</div>';
+  if (!locs.length) locEl.innerHTML = '<div class="pick-empty">No locations yet.</div>';
   else locEl.innerHTML = locs.map(l =>
-    `<span class="chip ${work.locationIds.includes(l.id) ? 'on' : ''}" onclick="toggleChip('locationIds','${l.id}')">${escapeHtml(l.name)}${l.parent ? ` <span style="opacity:0.6">· ${escapeHtml(l.parent)}</span>` : ''}</span>`
+    `<span class="pick-chip ${work.locationIds.includes(l.id) ? 'on' : ''}" onclick="toggleChip('locationIds','${l.id}')">${escapeHtml(l.name)}${l.parent ? ` <span style="opacity:0.6">· ${escapeHtml(l.parent)}</span>` : ''}</span>`
   ).join('');
-  // NPCs
   const npcEl = document.getElementById('f-npc-chips');
-  if (!npcs.length) npcEl.innerHTML = '<div class="chip-empty">No NPCs yet.</div>';
+  if (!npcs.length) npcEl.innerHTML = '<div class="pick-empty">No NPCs yet.</div>';
   else {
     const sortNpcs = npcs.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     npcEl.innerHTML = sortNpcs.map(n =>
-      `<span class="chip ${work.npcIds.includes(n.id) ? 'on' : ''}" onclick="toggleChip('npcIds','${n.id}')">${escapeHtml(n.name || '')}</span>`
+      `<span class="pick-chip ${work.npcIds.includes(n.id) ? 'on' : ''}" onclick="toggleChip('npcIds','${n.id}')">${escapeHtml(n.name || '')}</span>`
     ).join('');
   }
 }
@@ -1198,17 +1660,16 @@ function toggleChip(which, id) {
   if (!Array.isArray(arr)) return;
   const i = arr.indexOf(id);
   if (i >= 0) arr.splice(i, 1); else arr.push(id);
-  renderChips();
-  renderSidebar();
+  renderChips(); renderSidebar();
 }
 
-// ── Prep sections (card editor) ──────────────────────────────────
+// ── Prep sections ──
 function renderPrepSections() {
   const wrap = document.getElementById('f-prep-sections');
   if (!wrap) return;
   const secs = work.prepSections || [];
   if (!secs.length) {
-    wrap.innerHTML = `<div class="chip-empty">No prep sections yet. Add one below — typing a name and hitting Enter creates a section.</div>`;
+    wrap.innerHTML = `<div class="pick-empty">No prep sections yet. Add one below — typing a name and hitting Enter creates a section.</div>`;
     return;
   }
   const lastIdx = secs.length - 1;
@@ -1229,19 +1690,15 @@ function renderPrepSections() {
             <button class="prep-ctrl del" type="button" onclick="removePrepSection(${i})" title="Delete section">✕</button>
           </div>
         </div>
-        <textarea rows="${rows}"
-                  placeholder="${escapeHtml(placeholder)}"
-                  oninput="updatePrepBody(${i}, this.value)">${escapeHtml(s.body || '')}</textarea>
+        <textarea rows="${rows}" placeholder="${escapeHtml(placeholder)}" oninput="updatePrepBody(${i}, this.value)">${escapeHtml(s.body || '')}</textarea>
       </div>
     `;
   }).join('')}</div>`;
 }
 
-// Toggle one section. DOM-only flip — no re-render — so unsaved typing in the textarea is preserved.
 function togglePrepCollapse(uid) {
   if (!uid) return;
-  if (work.prepCollapsed.has(uid)) work.prepCollapsed.delete(uid);
-  else work.prepCollapsed.add(uid);
+  if (work.prepCollapsed.has(uid)) work.prepCollapsed.delete(uid); else work.prepCollapsed.add(uid);
   const el = document.querySelector(`.prep-section[data-uid="${uid.replace(/"/g, '\\"')}"]`);
   if (el) el.classList.toggle('collapsed');
 }
@@ -1249,27 +1706,14 @@ function collapseAllPrep() {
   (work.prepSections || []).forEach(s => { if (s.uid) work.prepCollapsed.add(s.uid); });
   renderPrepSections();
 }
-function expandAllPrep() {
-  work.prepCollapsed.clear();
-  renderPrepSections();
-}
-
-function updatePrepHeading(i, v) {
-  if (!work.prepSections[i]) return;
-  work.prepSections[i].heading = v;
-  // Don't re-render — the input has focus and we'd lose caret position.
-}
-
-function updatePrepBody(i, v) {
-  if (!work.prepSections[i]) return;
-  work.prepSections[i].body = v;
-}
+function expandAllPrep() { work.prepCollapsed.clear(); renderPrepSections(); }
+function updatePrepHeading(i, v) { if (work.prepSections[i]) work.prepSections[i].heading = v; }
+function updatePrepBody(i, v)    { if (work.prepSections[i]) work.prepSections[i].body = v; }
 
 function addPrepSection(headingHint) {
   const heading = (headingHint || '').trim();
   work.prepSections.push({ uid: newPrepUid(), heading, body: '' });
   renderPrepSections();
-  // Focus the new section: body if we know the heading, otherwise the heading field.
   setTimeout(() => {
     const cards = document.querySelectorAll('#f-prep-sections .prep-section');
     const last = cards[cards.length - 1];
@@ -1278,14 +1722,12 @@ function addPrepSection(headingHint) {
     else last.querySelector('.prep-heading')?.focus();
   }, 20);
 }
-
 function addPrepFromInput() {
   const el = document.getElementById('prep-new-heading');
   if (!el) return;
   addPrepSection(el.value);
   el.value = '';
 }
-
 function removePrepSection(i) {
   const s = work.prepSections[i];
   const label = (s?.heading || '').trim() || '(unnamed section)';
@@ -1293,7 +1735,6 @@ function removePrepSection(i) {
   work.prepSections.splice(i, 1);
   renderPrepSections();
 }
-
 function movePrepSection(i, dir) {
   const j = i + dir;
   if (j < 0 || j >= work.prepSections.length) return;
@@ -1308,7 +1749,7 @@ function renderLoot() {
   const dl = document.getElementById('loot-recipients');
   dl.innerHTML = ['Party', ...characters.map(c => c.name)].map(n => `<option value="${escapeHtml(n)}">`).join('');
   if (!work.loot.length) {
-    wrap.innerHTML = '<div class="chip-empty">No structured loot rows yet. Use these for per-recipient tracking; freeform Markdown loot lists in the Prep block work too.</div>';
+    wrap.innerHTML = '<div class="pick-empty">No structured loot rows yet. Use these for per-recipient tracking; freeform Markdown loot lists in the Prep block work too.</div>';
     return;
   }
   wrap.innerHTML = work.loot.map((l, i) => `
@@ -1328,16 +1769,12 @@ function addLootRow() {
     if (rows.length) rows[rows.length - 1].focus();
   }, 20);
 }
-function removeLootRow(i) {
-  work.loot.splice(i, 1);
-  renderLoot();
-  renderSidebar();
-}
+function removeLootRow(i) { work.loot.splice(i, 1); renderLoot(); renderSidebar(); }
 
 function renderCombats() {
   const box = document.getElementById('f-combats');
   if (!work.combats.length) {
-    box.innerHTML = '<div class="chip-empty">No combats attached. Push from the War Table → Export.</div>';
+    box.innerHTML = '<div class="pick-empty">No combats attached. Push from the War Table → Export.</div>';
     return;
   }
   box.innerHTML = work.combats.map((c, i) =>
@@ -1350,16 +1787,15 @@ function renderCombats() {
 }
 function removeCombat(i) {
   const c = work.combats[i];
-  if (!confirm(`Detach combat "${c?.title || 'Combat'}" from this session? Its log and summary are removed from the Chronicle.`)) return;
+  if (!confirm(`Detach combat "${c?.title || 'Combat'}" from this entry? Its log and summary are removed from the Chronicle.`)) return;
   work.combats.splice(i, 1);
-  renderCombats();
-  renderSidebar();
+  renderCombats(); renderSidebar();
 }
 
 function collectFromForm() {
+  work.kind = normalizeKind(document.getElementById('f-kind').value || 'session');
   work.title = document.getElementById('f-title').value.trim();
   work.body = document.getElementById('f-body').value;
-  // prep is the canonical Markdown blob — rebuild it from the section cards.
   work.prep = serializePrepSections(work.prepSections || []);
   work.dmNotes = document.getElementById('f-dmNotes').value;
   work.dateReal = document.getElementById('f-dateReal').value;
@@ -1367,7 +1803,6 @@ function collectFromForm() {
   work.dateSort = document.getElementById('f-dateSort').value || work.dateReal || '';
   work.tags = (document.getElementById('f-tags').value || '')
     .split(',').map(s => s.trim()).filter(Boolean);
-  // Drop blank loot rows
   work.loot = work.loot.filter(l => (l.item || '').trim()).map(l => ({
     id: l.id || lootUid(),
     item: (l.item || '').trim(),
@@ -1378,10 +1813,10 @@ function collectFromForm() {
 
 async function saveSession() {
   collectFromForm();
-  if (!work.title) { alert('Session needs a title.'); return; }
+  if (!work.title) { alert('Entry needs a title.'); return; }
 
   const payload = {
-    kind: 'session',
+    kind: work.kind,
     title: work.title,
     body: work.body.trim(),
     prep: work.prep,
@@ -1391,7 +1826,7 @@ async function saveSession() {
     dateSort: work.dateSort || work.dateReal || '',
     attendance: work.attendance.slice(),
     locationIds: work.locationIds.slice(),
-    characterIds: work.attendance.slice(),  // mirror attendance into characterIds for chronicle linking
+    characterIds: work.attendance.slice(),
     npcIds: work.npcIds.slice(),
     visibleTo: work.visibleTo.slice(),
     tags: work.tags.slice(),
@@ -1406,37 +1841,33 @@ async function saveSession() {
     editingId = id;
   } else {
     const idx = timeline.findIndex(t => t.id === editingId);
-    if (idx < 0) { alert('Session not found.'); return; }
+    if (idx < 0) { alert('Entry not found.'); return; }
     timeline[idx] = { ...timeline[idx], ...payload };
   }
   await persistTimeline();
-  renderList();
-  renderEditor();
-  renderSidebar();
+  renderList(); renderEditor(); renderSidebar();
 }
 
 async function deleteSession() {
   if (!editingId || editingId === '__new__') { cancelEdit(); return; }
   const s = timeline.find(t => t.id === editingId);
   if (!s) return;
-  if (!confirm(`Delete "${s.title || 'this session'}"? This cannot be undone.`)) return;
+  if (!confirm(`Delete "${s.title || 'this entry'}"? This cannot be undone.`)) return;
   timeline = timeline.filter(t => t.id !== editingId);
   editingId = null;
   await persistTimeline();
-  renderList();
-  renderEditor();
-  renderSidebar();
+  renderList(); renderEditor(); renderSidebar();
 }
 
 // ═══════════════════════════════════════════════════════════════
 //  SIDEBAR
 // ═══════════════════════════════════════════════════════════════
 function renderSidebar() {
-  document.getElementById('g-total').textContent = sessionsAll().length;
-  const current = editingId ? (timeline.find(t => t.id === editingId) || work) : null;
+  document.getElementById('g-total').textContent = entriesAll().length;
   const editingNew = editingId === '__new__';
 
   document.getElementById('g-which').textContent = editingId ? (work.title || 'Untitled') : '—';
+  document.getElementById('g-kind').textContent = editingId ? (KIND_LABELS[work.kind] || '—') : '—';
   document.getElementById('g-att').textContent = editingId ? (work.attendance.length || 0) : '—';
   document.getElementById('g-loot').textContent = editingId ? (work.loot.length || 0) : '—';
   document.getElementById('g-combats').textContent = editingId ? (work.combats.length || 0) : '—';
@@ -1447,21 +1878,18 @@ function renderSidebar() {
       .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
       .map(c => `<span class="badge ${work.attendance.includes(c.id) ? '' : 'absent'}">${escapeHtml(c.name || '')}</span>`)
       .join('');
-  } else {
-    badges.innerHTML = '';
-  }
+  } else badges.innerHTML = '';
 
   const ex1 = document.getElementById('ex-one');
   ex1.disabled = !editingId || editingNew;
 
   const recent = document.getElementById('recent-imports');
-  if (!recentImports.length) {
-    recent.innerHTML = 'No imports this session.';
-  } else {
+  if (!recentImports.length) recent.innerHTML = 'No imports this session.';
+  else {
     recent.innerHTML = recentImports.slice(-6).reverse().map(r => `
-      <div style="padding:3px 0;border-bottom:1px dashed var(--border);font-size:0.82rem">
-        <span style="color:${r.kind === 'new' ? '#8e8' : '#d4a820'}">${r.kind === 'new' ? '+ new' : '↻ updated'}</span>
-        <span style="color:var(--ink)">${escapeHtml(r.title || r.file)}</span>
+      <div style="padding:3px 0;border-bottom:1px dashed var(--c-border);font-size:var(--text-sm)">
+        <span style="color:${r.kind === 'new' ? 'var(--c-success)' : 'var(--c-brass-bright)'}">${r.kind === 'new' ? '+ new' : '↻ updated'}</span>
+        <span style="color:var(--c-ink)">${escapeHtml(r.title || r.file)}</span>
       </div>
     `).join('');
   }
@@ -1475,11 +1903,8 @@ function openImport() {
   document.getElementById('import-results').innerHTML = '';
   document.getElementById('paste-md').value = '';
 }
-function closeImport() {
-  document.getElementById('import-overlay').classList.remove('visible');
-}
+function closeImport() { document.getElementById('import-overlay').classList.remove('visible'); }
 
-// Drag-drop wiring
 function wireDrop() {
   const dz = document.getElementById('drop-zone');
   ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => {
@@ -1503,23 +1928,21 @@ async function handleFiles(fileList) {
   for (const f of files) {
     try {
       const text = await f.text();
-      const parsed = parseSessionMarkdown(text, f.name);
+      const parsed = parseEntryMarkdown(text, f.name);
       applyImport(parsed, f.name);
     } catch (err) {
       showImportResult({ kind: 'err', name: f.name, detail: 'Failed to parse: ' + (err.message || err) });
     }
   }
   await persistTimeline();
-  renderList();
-  renderEditor();
-  renderSidebar();
+  renderList(); renderEditor(); renderSidebar();
 }
 
 function importPasted() {
   const text = document.getElementById('paste-md').value.trim();
   if (!text) return;
   try {
-    const parsed = parseSessionMarkdown(text, 'pasted-' + Date.now() + '.md');
+    const parsed = parseEntryMarkdown(text, 'pasted-' + Date.now() + '.md');
     applyImport(parsed, 'pasted markdown');
     persistTimeline().then(() => { renderList(); renderEditor(); renderSidebar(); });
   } catch (err) {
@@ -1528,13 +1951,12 @@ function importPasted() {
 }
 
 function applyImport(parsed, fileLabel) {
-  // Match by id (frontmatter) or fall back to title match
   let existing = null;
   if (parsed.id) existing = timeline.find(t => t.id === parsed.id);
-  if (!existing) existing = timeline.find(t => (t.kind || 'event') === 'session' && (t.title || '').trim() === (parsed.title || '').trim());
+  if (!existing) existing = timeline.find(t => normalizeKind(t.kind) === parsed.kind && (t.title || '').trim() === (parsed.title || '').trim());
 
   const entry = {
-    kind: 'session',
+    kind: parsed.kind,
     title: parsed.title,
     body: parsed.body,
     prep: parsed.prep,
@@ -1553,24 +1975,20 @@ function applyImport(parsed, fileLabel) {
     frontmatterExtras: parsed.frontmatterExtras || {},
   };
 
-  let kind = 'new';
-  if (existing) {
-    Object.assign(existing, entry);
-    kind = 'updated';
-  } else {
-    timeline.push({ id: parsed.id || uid(), ...entry });
-  }
+  let mode = 'new';
+  if (existing) { Object.assign(existing, entry); mode = 'updated'; }
+  else timeline.push({ id: parsed.id || uid(), ...entry });
 
-  recentImports.push({ kind: kind === 'new' ? 'new' : 'upd', title: parsed.title, file: fileLabel });
+  recentImports.push({ kind: mode === 'new' ? 'new' : 'upd', title: parsed.title, file: fileLabel });
 
   const unresolved = [];
   if (parsed.unresolvedChars.length) unresolved.push('Characters not matched: ' + parsed.unresolvedChars.join(', '));
   if (parsed.unresolvedLocs.length) unresolved.push('Locations not matched: ' + parsed.unresolvedLocs.join(', '));
 
   showImportResult({
-    kind: kind === 'new' ? 'new' : 'upd',
+    kind: mode === 'new' ? 'new' : 'upd',
     name: parsed.title || fileLabel,
-    detail: unresolved.length ? unresolved.join(' · ') : 'OK',
+    detail: unresolved.length ? unresolved.join(' · ') : `OK · ${KIND_LABELS[parsed.kind] || parsed.kind}`,
   });
 }
 
@@ -1589,8 +2007,9 @@ function showImportResult({ kind, name, detail }) {
 // ═══════════════════════════════════════════════════════════════
 //  EXPORT
 // ═══════════════════════════════════════════════════════════════
-function safeFilename(title) {
-  return (title || 'session').replace(/[\/\\:*?"<>|]/g, '-').replace(/\s+/g, ' ').trim() + '.md';
+function safeFilename(title, kind) {
+  const safe = (title || (kind || 'entry')).replace(/[\/\\:*?"<>|]/g, '-').replace(/\s+/g, ' ').trim();
+  return safe + '.md';
 }
 
 function downloadMarkdown(filename, content) {
@@ -1607,21 +2026,19 @@ function exportCurrent() {
   collectFromForm();
   const s = timeline.find(t => t.id === editingId);
   if (!s) return;
-  // Refresh on-disk fields from the live work copy before emitting
-  const merged = { ...s, ...work, id: s.id, kind: 'session' };
-  const md = emitSessionMarkdown(merged);
-  downloadMarkdown(safeFilename(s.title), md);
+  const merged = { ...s, ...work, id: s.id, kind: normalizeKind(work.kind) };
+  const md = emitEntryMarkdown(merged);
+  downloadMarkdown(safeFilename(s.title, merged.kind), md);
 }
 
 async function exportAll() {
-  const all = sessionsAll().slice().sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
-  if (!all.length) { alert('No sessions to export.'); return; }
+  const all = entriesAll().slice().sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
+  if (!all.length) { alert('No entries to export.'); return; }
   if (all.length > 20 && !confirm(`Download ${all.length} files? Your browser may prompt you to allow multiple downloads.`)) return;
   for (let i = 0; i < all.length; i++) {
     const s = all[i];
-    const md = emitSessionMarkdown(s);
-    downloadMarkdown(safeFilename(s.title), md);
-    // Small delay so the browser doesn't drop later downloads
+    const md = emitEntryMarkdown(s);
+    downloadMarkdown(safeFilename(s.title, s.kind), md);
     await new Promise(r => setTimeout(r, 120));
   }
 }
@@ -1629,9 +2046,7 @@ async function exportAll() {
 // ═══════════════════════════════════════════════════════════════
 //  NPC QUICK-ADD + PREP SCAN
 // ═══════════════════════════════════════════════════════════════
-function slugify(s) {
-  return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-}
+function slugify(s) { return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
 function uniqueNpcId(name, extraUsed) {
   const used = new Set([...npcs.map(n => n.id), ...(extraUsed || [])]);
   let base = slugify(name) || 'npc';
@@ -1664,7 +2079,6 @@ function openAddNpc(prefill) {
   document.getElementById('npc-f-name').value = (prefill && prefill.name) || '';
   document.getElementById('npc-f-role').value = (prefill && prefill.role) || '';
   document.getElementById('npc-f-status').value = 'alive';
-  // Default to the session's first linked location if any
   let defaultLoc = '';
   if (work && work.locationIds && work.locationIds.length) defaultLoc = work.locationIds[0];
   document.getElementById('npc-f-location').value = defaultLoc;
@@ -1674,20 +2088,16 @@ function openAddNpc(prefill) {
   document.getElementById('npc-overlay').classList.add('visible');
   setTimeout(() => document.getElementById('npc-f-name').focus(), 30);
 }
-function closeAddNpc() {
-  document.getElementById('npc-overlay').classList.remove('visible');
-}
+function closeAddNpc() { document.getElementById('npc-overlay').classList.remove('visible'); }
 
 async function saveNewNpc() {
   const name = document.getElementById('npc-f-name').value.trim();
   if (!name) { alert('NPC needs a name.'); return; }
-  // Reject duplicate names (case-insensitive) so the chip grid stays clean.
   if (npcs.some(n => (n.name || '').toLowerCase() === name.toLowerCase())) {
     if (!confirm(`An NPC named "${name}" already exists. Create a duplicate anyway?`)) return;
   }
   const npc = {
-    id: uniqueNpcId(name),
-    name,
+    id: uniqueNpcId(name), name,
     role: document.getElementById('npc-f-role').value.trim(),
     status: document.getElementById('npc-f-status').value,
     currentLocationId: document.getElementById('npc-f-location').value || null,
@@ -1695,38 +2105,27 @@ async function saveNewNpc() {
     description: document.getElementById('npc-f-description').value.trim(),
     notes: '',
     dmNotes: document.getElementById('npc-f-dmNotes').value.trim(),
-    knownTo: [],
-    history: [],
-    tags: [],
+    knownTo: [], history: [], tags: [],
   };
   npcs.push(npc);
   const ok = await saveNPCsKV();
   if (!ok) {
-    // Roll back if the worker rejected; otherwise the local roster drifts from KV.
     npcs.pop();
     alert('Failed to save NPC — check your DM session and try again.');
     return;
   }
-  // Auto-link to the current session if one is being edited
-  if (editingId) {
-    if (!work.npcIds.includes(npc.id)) work.npcIds.push(npc.id);
-  }
+  if (editingId) { if (!work.npcIds.includes(npc.id)) work.npcIds.push(npc.id); }
   closeAddNpc();
-  renderChips();
-  renderSidebar();
+  renderChips(); renderSidebar();
 }
 
-// ── Scan prep for unresolved NPC references ──
 function findCandidateNpcsInPrep(prepText) {
   if (!prepText) return [];
   const names = new Set();
-
-  // 1. Every [[Wikilink]] anywhere in prep
   const re = /\[\[([^|\]]+)(?:\|[^\]]+)?\]\]/g;
   let m;
   while ((m = re.exec(prepText))) names.add(m[1].trim());
 
-  // 2. Bare list items under any ## NPCs / ## NPC heading
   const lines = prepText.split(/\r?\n/);
   let inNpcSection = false;
   for (const line of lines) {
@@ -1739,55 +2138,45 @@ function findCandidateNpcsInPrep(prepText) {
     if (!inNpcSection) continue;
     const li = line.match(/^\s*-\s+(?:\[[ xX]?\]\s+)?(.+)$/);
     if (!li) continue;
-    // If the line has its own [[Wikilink]], the earlier full-prep scan already
-    // captured it — don't double-add the surrounding "Senior Examiner Naila Vass".
     if (/\[\[/.test(li[1])) continue;
-    // Drop trailing "— description" and parentheticals so just the name remains
     let n = li[1].trim();
-    n = n.split(/\s+[—–-]\s+/)[0].trim();   // trim em-dash separator
-    n = n.replace(/\*\*/g, '').trim();         // strip bold markers
+    n = n.split(/\s+[—–-]\s+/)[0].trim();
+    n = n.replace(/\*\*/g, '').trim();
     n = n.replace(/\s*\(.*?\)\s*$/, '').trim();
     if (n) names.add(n);
   }
-
-  // 3. Filter out characters, locations, and existing NPCs (case-insensitive)
   const charNames = new Set(characters.map(c => (c.name || '').toLowerCase()));
   const locNames = new Set(flattenLocations().map(l => (l.name || '').toLowerCase()));
   const npcNames = new Set(npcs.map(n => (n.name || '').toLowerCase()));
-
   return [...names].filter(n => {
     const lc = n.toLowerCase();
     if (!lc) return false;
-    if (charNames.has(lc)) return false;
-    if (locNames.has(lc)) return false;
-    if (npcNames.has(lc)) return false;
+    if (charNames.has(lc) || locNames.has(lc) || npcNames.has(lc)) return false;
     return true;
   }).sort((a, b) => a.localeCompare(b));
 }
 
 function openScanPrep() {
-  if (!editingId) { alert('Select or create a session first.'); return; }
+  if (!editingId) { alert('Select or create an entry first.'); return; }
   collectFromForm();
   _scanCandidates = findCandidateNpcsInPrep(work.prep || '');
   const wrap = document.getElementById('scan-list');
   if (!_scanCandidates.length) {
-    wrap.innerHTML = '<div class="chip-empty" style="padding:0.6rem 0">Nothing to add. Every NPC referenced in your prep is already in the roster (or matches a location/character).</div>';
+    wrap.innerHTML = '<div class="pick-empty" style="padding:0.6rem 0">Nothing to add. Every NPC referenced in your prep is already in the roster (or matches a location/character).</div>';
     document.getElementById('scan-create-btn').disabled = true;
   } else {
     document.getElementById('scan-create-btn').disabled = false;
     wrap.innerHTML = _scanCandidates.map((name, i) => `
-      <div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px dashed var(--border)">
-        <input type="checkbox" id="scan-cb-${i}" checked style="accent-color:var(--gold);width:14px;height:14px;cursor:pointer">
-        <label for="scan-cb-${i}" style="font-family:'Cinzel',serif;font-size:0.86rem;color:var(--ink);min-width:180px;cursor:pointer">${escapeHtml(name)}</label>
-        <input type="text" id="scan-role-${i}" placeholder="role (optional)" style="flex:1;background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:4px 7px;font-family:'Crimson Text',serif;font-size:0.84rem;outline:none">
+      <div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px dashed var(--c-border)">
+        <input type="checkbox" id="scan-cb-${i}" checked style="accent-color:var(--c-brass);width:14px;height:14px;cursor:pointer">
+        <label for="scan-cb-${i}" style="font-family:var(--font-display);font-size:var(--text-sm);color:var(--c-ink);min-width:180px;cursor:pointer">${escapeHtml(name)}</label>
+        <input type="text" id="scan-role-${i}" placeholder="role (optional)" style="flex:1;background:var(--c-bg);border:1px solid var(--c-border);border-radius:var(--radius-sm);color:var(--c-ink);padding:4px 7px;font-family:var(--font-body);font-size:var(--text-sm);outline:none">
       </div>
     `).join('');
   }
   document.getElementById('scan-overlay').classList.add('visible');
 }
-function closeScanPrep() {
-  document.getElementById('scan-overlay').classList.remove('visible');
-}
+function closeScanPrep() { document.getElementById('scan-overlay').classList.remove('visible'); }
 
 async function createScannedNpcs() {
   const picks = _scanCandidates
@@ -1801,39 +2190,22 @@ async function createScannedNpcs() {
     const id = uniqueNpcId(p.name, usedIds);
     usedIds.push(id);
     const npc = {
-      id,
-      name: p.name,
-      role: p.role,
-      status: 'alive',
+      id, name: p.name, role: p.role, status: 'alive',
       currentLocationId: defaultLoc,
-      currentActivity: '',
-      description: '',
-      notes: '',
-      dmNotes: '',
-      knownTo: [],
-      history: [],
-      tags: [],
+      currentActivity: '', description: '', notes: '', dmNotes: '',
+      knownTo: [], history: [], tags: [],
     };
-    npcs.push(npc);
-    created.push(npc.id);
+    npcs.push(npc); created.push(npc.id);
   }
   const ok = await saveNPCsKV();
   if (!ok) {
-    // Roll back additions if the worker rejected the save
-    for (const id of created) {
-      const idx = npcs.findIndex(n => n.id === id);
-      if (idx >= 0) npcs.splice(idx, 1);
-    }
+    for (const id of created) { const idx = npcs.findIndex(n => n.id === id); if (idx >= 0) npcs.splice(idx, 1); }
     alert('Failed to save NPCs — check your DM session and try again.');
     return;
   }
-  // Auto-link all newly created NPCs to the current session
-  for (const id of created) {
-    if (!work.npcIds.includes(id)) work.npcIds.push(id);
-  }
+  for (const id of created) { if (!work.npcIds.includes(id)) work.npcIds.push(id); }
   closeScanPrep();
-  renderChips();
-  renderSidebar();
+  renderChips(); renderSidebar();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1842,9 +2214,7 @@ async function createScannedNpcs() {
 window.addEventListener('DOMContentLoaded', () => {
   wireDrop();
   loadAll();
-  // Keep work in sync as the user types — light-touch (debounced not needed for low traffic)
-  // Prep textareas have their own per-section oninput handlers; everything else syncs sidebar.
-  ['f-title','f-dateReal','f-dateInGame','f-dateSort','f-tags','f-body','f-dmNotes']
+  ['f-kind','f-title','f-dateReal','f-dateInGame','f-dateSort','f-tags','f-body','f-dmNotes']
     .forEach(id => document.getElementById(id)?.addEventListener('input', () => {
       collectFromForm();
       renderSidebar();
