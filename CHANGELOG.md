@@ -9,6 +9,42 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### The Ledger: parchment → dark theme conversion
+
+User asked for the parchment look to be retired. The Ledger
+(`index.html`) is now in the same dark slate + brass + teal
+palette as the rest of the site.
+
+What changed:
+- Local palette swapped: parchment cream → slate dark; ink
+  dark-brown → ink light-grey; amber → brass; etc.
+- `.scroll` container now a dark panel (panel surface, slate
+  border, multi-layer brass-rim shadow) — was a literal
+  parchment slab.
+- Hero: `h1` uppercase, fluid type via `clamp()`, brass shadow.
+- Class-group labels (MARTIAL / HYBRID / CASTER): pill chips
+  with kind-specific borders. Martial = salmon-red; Hybrid =
+  brass; Caster = purple — all picked to read against the dark
+  surface without looking neon.
+- Tier badges (T1/T2/T3): pill shape with semantic colors
+  (green / purple / amber) re-mixed for dark backgrounds.
+- Perk cards: dark panel surface, hover lift + shadow,
+  selected state shows tier-colored outer ring.
+- Form inputs: 3px brass focus rings everywhere, italic
+  placeholders.
+- Tracker: dark panel surface, brass count number, brass-glowing
+  pips on fill.
+- Send button: brass gradient with multi-layer shadow that
+  glows on hover.
+- Feedback states (sending / success / error): tier-tinted dark
+  backgrounds replacing the parchment-pastel versions.
+- Now links `theme.css` and aliases shared tokens to the local
+  palette (the page joins the design system properly — the
+  previous "intentional opt-out" comment is removed).
+
+Per the previous audit pass, `<main id="main">` is preserved.
+JS untouched.
+
 ### Mobile + a11y audit pass
 
 Audited every page at 375px width and ran an accessibility sweep
