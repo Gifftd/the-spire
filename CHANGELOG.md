@@ -9,6 +9,43 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### Atlas Workshop: deeper visual refresh
+
+Follow-up to the foundation pass — `map-dm.html` gets a meaningful
+visual lift on top of the shared theme.css baseline. JS / HTML
+structure untouched; CSS-only refresh keeps all functionality stable.
+
+What's improved:
+- **Topbar**: 48px → 52px to match the other workshops; brighter
+  gold title; subtle drop-shadow under the bar; refined
+  breadcrumb with vertical-gradient background.
+- **Buttons**: all `.btn-*` variants modernized — larger padding,
+  better letter-spacing, modern easing on hover, colored glow
+  on `:hover` for primary actions (gold/green/red/purple),
+  `translateY(1px)` on `:active` for tactile feedback.
+- **Editor tabs**: active tab gets a subtle gold tint background
+  + the existing underline; hover state nudges background to
+  separate visited/unvisited.
+- **Form fields**: 3px brass focus ring (`box-shadow: 0 0 0 3px
+  rgba(184,134,11,0.16)`) — matches the rest of the design
+  system; placeholders styled with `opacity: 0.6` + italic.
+- **Section headers**: brighter gold + uppercase + bottom border
+  separator (consistent with timeline.html / sessions-dm.html).
+- **Cards**: `.loc-list-item`, `.char-card`, `.item-card` —
+  added hover state with subtle background lift + slight
+  `translateX(1px)` for the location list; selected state shows
+  a thin gold outer glow.
+- **DM Token modal**: backdrop-blur upped, fade-in + rise-in
+  entrance animation matching the rest of the modals;
+  border-radius bumped to 6px; multi-layer shadow with gold
+  glow accent.
+- **Character code pill**: brighter gold + soft glow on hover.
+
+Visual regressions: none. The aliasing block from the foundation
+pass means any theme.css component classes (if used) would
+inherit the local gold-deep palette — but this commit doesn't
+adopt any new theme components yet; that's a future pass.
+
 ### UI foundation pass: Atlas Workshop, War Table, Apothecary, Menagerie
 
 Path A baseline rolled out to the four remaining DM tools without
