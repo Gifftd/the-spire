@@ -9,6 +9,46 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### Apothecary: deeper visual refresh
+
+Final DM tool refresh in this pass. CSS-only on top of the
+foundation pass — JS/HTML untouched.
+
+What's improved:
+- **Topbar**: fluid type for the hero (`clamp(1.2rem, 1rem + 1vw,
+  1.55rem)`), subtle brass glow on the title, refined DM chip
+  (pill shape, brighter brass).
+- **Tabs**: active tab gets a subtle brass background tint plus
+  the underline; hover separates from unvisited.
+- **Form inputs** (`input,select,textarea`): 3px teal focus ring
+  via `box-shadow`, italic 0.6-opacity placeholders, 3px radius.
+- **List rows**: hover slides the row 2px right; active row gets
+  a teal left border + tinted background.
+- **Rarity chips** (common/uncommon/rare): pill shape, bolder
+  weight, tier-tinted backgrounds.
+- **Affinity chips** (fire/cold/lightning/nature/radiant/…):
+  pill shape, slightly larger, subtle background fill.
+- **Buttons** (`.btn`, `.btn.brass`, `.btn.ghost`, `.btn.danger`,
+  `.btn.sm`): modern easing, colored glow on hover,
+  `translateY(1px)` on `:active`. Primary button flips to
+  brand-color background on hover for stronger contrast.
+- **Quantity stepper** (`.qstep`): larger touch target (28×28),
+  hover state with teal color shift, tactile press.
+- **Analysis cards**: 6px radius, multi-layer shadow with hover
+  elevation, brighter teal stat values with subtle glow,
+  uppercase brass labels.
+- **Analysis section headers**: brighter brass + uppercase +
+  trailing border (consistent with the rest of the system).
+- **Column heads** (`.col-head`): brighter brass + uppercase +
+  trailing border.
+- **Home link**: subtle background fill in normal state to
+  separate from ghost buttons.
+- **Toast**: refined entrance animation (translateY + opacity),
+  multi-layer teal/rust glow shadow based on type.
+
+No regressions to ingredients / potions / negatives / library /
+inventory / recipes / analysis / import flows.
+
 ### Menagerie: deeper visual refresh
 
 CSS-only refresh on top of the foundation pass. JS/HTML untouched.
