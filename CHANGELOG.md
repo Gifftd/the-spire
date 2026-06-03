@@ -9,6 +9,49 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### Atlas Workshop: side-panel editing for NPCs, Players, Timeline
+
+Follow-up to the pop-out editor. The previous pop-out widened
+the column but the edit FORM still appeared *below* the list —
+meaning with 50 NPCs you scrolled past all of them to reach the
+form. User: "It should open to the side."
+
+It does now.
+
+How it works:
+- Clicking an NPC / Player / Timeline card (or **+ Add**) now:
+  1. **Auto-enters pop-out mode** if it isn't already (no need
+     to click "Pop out" first — the wider canvas is implicit
+     in the edit intent).
+  2. The detail form **pulls out to a fixed-position side
+     panel** on the right side of the drawer (500–550px wide).
+  3. The list stays on the left, scrollable, with the selected
+     card highlighted.
+- The detail panel gets an injected **✕ Close** button at the
+  top — clicking it cancels the edit and dismisses the panel.
+- Sidebar mode (without pop-out) still has the inline-below
+  behavior — nothing changes there.
+
+Implementation: CSS-only layout switch via `:has()` — the panel
+selectors match `#npc-detail`, `#char-detail`, `#tl-detail` when
+their inline style does NOT contain `none` (i.e., they're
+visible). When that's true, `position: fixed` pulls them out
+and `padding-right` on the pane reserves space.
+
+JS minimal additions:
+- `ensureEditorExpanded()` — auto-toggles pop-out on edit.
+- `ensureDetailCloseBtn()` — injects a close button into each
+  detail panel on first open. Idempotent.
+- Hooked into `addCharacter`, `editCharacter`, `addNPCEntity`,
+  `editNPCEntity`, `addTimelineEntry`, `editTimelineEntry`.
+
+No data flows changed. No existing JS logic touched. Cancel /
+Save / Delete buttons continue to work as before.
+
+Narrow viewports (<1200px): the detail panel widens to
+`min(550px, 90vw)` and no longer reserves space — it overlays
+the list instead. Mobile-friendly.
+
 ### Atlas Workshop: pop-out editor for comfortable editing
 
 The 320px right sidebar editor was getting cramped — long
