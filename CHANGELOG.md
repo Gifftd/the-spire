@@ -9,6 +9,37 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### War Table: deeper visual refresh
+
+Same CSS-only pattern as the Atlas Workshop refresh. JS and HTML
+untouched; visual polish on top of the foundation pass.
+
+What's improved:
+- **Topbar**: brighter gold title (uppercase, semibold), subtle
+  drop-shadow + faint gold rim, taller padding.
+- **Mode pill**: uppercase, larger padding, combat mode gets a
+  red glow + softer pulse (`opacity: 1 ↔ 0.65`).
+- **Round display**: uppercase label + larger semibold gold
+  number for the round counter.
+- **All buttons** (`.btn-gold`, `.btn-red`, `.btn-green`,
+  `.btn-teal`, `.btn-purple`, `.btn-ghost`): modern easing,
+  colored glow on hover, `translateY(1px)` on `:active`,
+  consistent uppercase + letter-spacing.
+- **Combatant cards**: smoother transitions, PC/enemy left
+  border brightens on hover, active card translates 2px right
+  + multi-layer glow + outer ring.
+- **Form fields** (`.exp-input`, `.loot-row input`,
+  `.modal-field`, `.bestiary-filters`): 3px brass focus ring
+  (`box-shadow`), italic placeholders at 0.6 opacity.
+- **Sidebar titles**: uppercase + brighter gold + bottom border
+  separator (matches Chronicle/Sessions design).
+- **Modals**: stronger backdrop-blur, fade-in + rise-in entrance
+  animations, multi-layer gold-glow shadow, refined close
+  button hover state.
+
+No regressions to combatant logic, drag-and-drop, HP adjustments,
+bestiary picker, or the chronicle-export flow.
+
 ### Atlas Workshop: deeper visual refresh
 
 Follow-up to the foundation pass — `map-dm.html` gets a meaningful
