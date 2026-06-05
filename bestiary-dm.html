@@ -250,6 +250,13 @@
     .fm-badge{font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;padding:2px 7px;border-radius:8px;margin-left:8px;vertical-align:middle}
     .fm-badge.solo{border:1px solid var(--rust);color:#e3a08e;background:rgba(154,90,90,0.15)}
     .fm-badge.minion{border:1px solid var(--ink-faint);color:var(--ink-faint);background:rgba(255,255,255,0.04)}
+    /* Smaller list-row variant of the same chips, sits next to the role chip. */
+    .cat-chip{font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;margin-left:6px;vertical-align:middle;white-space:nowrap}
+    .cat-chip.solo{border:1px solid var(--rust);color:#e3a08e;background:rgba(154,90,90,0.10)}
+    .cat-chip.minion{border:1px solid #8b9bb5;color:#a8b9d0;background:rgba(94,118,150,0.10)}
+    .cat-chip.companion{border:1px solid #82a878;color:#a8c89b;background:rgba(102,140,90,0.10)}
+    .cat-chip.retainer{border:1px solid var(--brass);color:var(--brass-bright);background:rgba(184,138,90,0.10)}
+    .cat-chip.villain-party{border:1px solid #b07ac8;color:#d4a3e8;background:rgba(140,90,180,0.10)}
     .role-chip{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.08em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--teal);color:var(--teal-bright);background:rgba(60,153,150,0.08);margin-left:6px;white-space:nowrap}
     .source-chip{font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--ink-faint);color:var(--ink-faint);background:transparent;margin-left:6px;vertical-align:middle;white-space:nowrap}
     .source-chip.s-mm-2024{border-color:#6c8db5;color:#8eb5e8}
@@ -466,6 +473,15 @@
                 <option value="mountain">Mountain</option><option value="swamp">Swamp</option>
                 <option value="underdark">Underdark</option><option value="underwater">Underwater</option>
                 <option value="urban">Urban</option><option value="planar">Planar</option>
+              </select>
+              <select id="m-category-filter" onchange="renderList()" title="Filter by Flee Mortals encounter category">
+                <option value="">All categories</option>
+                <option value="standard">Standard</option>
+                <option value="minion">Minion</option>
+                <option value="solo">Solo</option>
+                <option value="companion">Companion</option>
+                <option value="retainer">Retainer</option>
+                <option value="villain-party">Villain Party</option>
               </select>
               <button class="btn ghost sm" onclick="clearFilters()">Clear</button>
             </div>
@@ -1095,7 +1111,34 @@
       document.getElementById('m-cr-max').value = '';
       const rf = document.getElementById('m-role-filter'); if (rf) rf.value = '';
       const tf = document.getElementById('m-terrain-filter'); if (tf) tf.value = '';
+      const cf = document.getElementById('m-category-filter'); if (cf) cf.value = '';
       renderList();
+    }
+
+    // Encounter-category resolver. Returns 'minion', 'solo', 'companion',
+    // 'retainer', 'villain-party', 'custom', or 'standard'. Honors explicit
+    // flags first, then `fmCategory`, then falls back to the source/
+    // _custom shape for older imports.
+    function categoryOf(m){
+      if (!m) return 'standard';
+      if (m._custom) return 'custom';
+      if (m.isMinion) return 'minion';
+      if (m.isSolo) return 'solo';
+      const fc = (m.fmCategory || '').toLowerCase();
+      if (fc) return fc;
+      return 'standard';
+    }
+    // Small chip for the Browse list. Returns '' for plain 'standard' or
+    // 'custom' (the Custom chip already labels that case).
+    const CAT_LABELS = {
+      minion: 'Minion', solo: 'Solo', companion: 'Companion',
+      retainer: 'Retainer', 'villain-party': 'Villain'
+    };
+    function categoryChipHTML(m){
+      const cat = categoryOf(m);
+      const label = CAT_LABELS[cat];
+      if (!label) return '';
+      return `<span class="cat-chip ${esc(cat)}" title="Flee Mortals encounter category">${esc(label)}</span>`;
     }
 
     /* ── List ── */
@@ -1108,6 +1151,7 @@
       const crMax = parseFloat(document.getElementById('m-cr-max').value);
       const roleF = (document.getElementById('m-role-filter')||{}).value || '';
       const terrF = (document.getElementById('m-terrain-filter')||{}).value || '';
+      const catF  = (document.getElementById('m-category-filter')||{}).value || '';
       const filtered = all.filter(m => {
         if (q && !(m.name||'').toLowerCase().includes(q)) return false;
         if (typeF && m.type !== typeF) return false;
@@ -1117,6 +1161,7 @@
         if (!isNaN(crMax) && (!isFinite(cr) || cr > crMax)) return false;
         if (roleF && m.role !== roleF) return false;
         if (terrF && !((m.terrain||[]).includes(terrF))) return false;
+        if (catF && categoryOf(m) !== catF) return false;
         return true;
       });
       filtered.sort((a,b) => (+a.cr||0) - (+b.cr||0) || (a.name||'').localeCompare(b.name||''));
@@ -1141,9 +1186,10 @@
         const srcChip = m.source && !m._custom
           ? `<span class="source-chip s-${esc(String(m.source).replace(/[^a-zA-Z0-9-]+/g,'-').toLowerCase())}" title="Source book">${esc(m.source)}</span>`
           : '';
+        const catChip = categoryChipHTML(m);
         return `
         <div class="row${key===activeId?' active':''}" onclick="selectMonster('${esc(key)}')">
-          <div class="nm">${esc(m.name)}${m._custom?'<span class="custom-chip">Custom</span>':''}${srcChip}${roleChip}<small>${esc(m.size||'')} ${esc(m.type||'')}</small>
+          <div class="nm">${esc(m.name)}${m._custom?'<span class="custom-chip">Custom</span>':''}${srcChip}${catChip}${roleChip}<small>${esc(m.size||'')} ${esc(m.type||'')}</small>
             <div class="terrain-strip">${terrChips}${more}</div>
           </div>
           <span class="cr-chip ${crTier(m.cr)}">CR ${esc(m.crText || m.cr || '?')}</span>

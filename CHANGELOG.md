@@ -708,6 +708,54 @@ existing `timeline` POST/GET. No redeploy required.
 
 ## [Unreleased] — 2026-05-29
 
+### Menagerie + War Table: Solo / Minion category chips + filter
+
+Now that the FM scrape correctly captures `isMinion` / `isSolo` /
+`fmCategory`, surface those tags in the UI so DMs can scan-and-find
+at a glance — and filter the bestiary down to "show me only the
+minions I have at CR 1/2 and below."
+
+#### Menagerie (`bestiary-dm.html`)
+
+- **Browse row** now shows a small category chip beside the role
+  chip: Minion (slate blue), Solo (rust), Companion (sage green),
+  Retainer (brass), Villain (purple). Standard / Custom monsters
+  get no chip (the Custom chip already labels customs).
+- **Browse toolbar** gains a **Category** filter dropdown: All /
+  Standard / Minion / Solo / Companion / Retainer / Villain Party.
+- New `categoryOf(m)` resolver and `categoryChipHTML(m)` helper that
+  honors the explicit `isMinion`/`isSolo` flags first, then
+  `fmCategory`, then `_custom`, then defaults to 'standard'.
+- `clearFilters()` resets the new category dropdown.
+
+#### War Table (`initiative-dm.html`)
+
+- **Bestiary picker row** and **cart pick row** get the same chip
+  next to the source chip — `.bestiary-cat-chip` with parallel
+  per-category color variants.
+- **Combatant card** also gets the chip: when a monster is added
+  from the picker, `c.bestiaryCategory` is stamped alongside
+  `c.bestiarySource`, and the card's name line renders the chip
+  inline. So in live initiative you can tell at a glance that the
+  three identical-name combatants are actually one Minion + two
+  Standards.
+- New `bestiaryCategoryChipHTML(m)` helper in the picker code.
+
+#### Visual layout
+
+| Chip class | Where it shows | Example |
+|---|---|---|
+| `cat-chip.minion` | Menagerie list row | slate-blue MINION |
+| `cat-chip.solo` | Menagerie list row | rust SOLO |
+| `bestiary-cat-chip.minion` | War Table picker / cart / card | slate-blue MINION |
+| `fm-badge.minion` | Menagerie stat-block header | larger pill (already there) |
+
+The big-pill `.fm-badge` on the stat-block header was added earlier;
+this commit adds the smaller list-and-card variants so you don't
+have to click into the detail to spot a minion.
+
+---
+
 ### FM scrape: minion / solo capture fix (45 minions, 17 solos recovered)
 
 The initial FM scrape captured zero `isMinion:true` and zero

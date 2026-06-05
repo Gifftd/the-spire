@@ -403,6 +403,12 @@ body {
 .bestiary-source-chip.s-tob-v1 { border-color: #a89478; color: #d2bd96; }
 .bestiary-source-chip.s-fm-v1 { border-color: #c29478; color: #e3a08e; }
 .bestiary-source-chip.s-custom { border-color: var(--gold); color: var(--gold); }
+.bestiary-cat-chip { font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 1px 6px; border-radius: 8px; margin-left: 6px; vertical-align: middle; white-space: nowrap; }
+.bestiary-cat-chip.solo { border: 1px solid #b86060; color: #e3a08e; background: rgba(154,90,90,0.10); }
+.bestiary-cat-chip.minion { border: 1px solid #8b9bb5; color: #a8b9d0; background: rgba(94,118,150,0.10); }
+.bestiary-cat-chip.companion { border: 1px solid #82a878; color: #a8c89b; background: rgba(102,140,90,0.10); }
+.bestiary-cat-chip.retainer { border: 1px solid var(--gold); color: var(--gold); background: rgba(184,138,90,0.10); }
+.bestiary-cat-chip.villain-party { border: 1px solid #b07ac8; color: #d4a3e8; background: rgba(140,90,180,0.10); }
 .bestiary-empty-note { padding: 1.5rem 1rem; text-align: center; color: var(--ink-faint); font-style: italic; font-size: 0.9rem; }
 
 /* Saved encounters */
@@ -1131,6 +1137,22 @@ function bestiarySourceChipHTML(m){
   if (!m || m._custom) return '';
   return sourceChipHTML(m.source);
 }
+
+// Encounter-category chip: Minion / Solo / Companion / Retainer /
+// Villain Party. Returns '' for standard or custom monsters (the
+// Custom chip handles those).
+function bestiaryCategoryChipHTML(m){
+  if (!m) return '';
+  let cat = '';
+  if (m.isMinion) cat = 'minion';
+  else if (m.isSolo) cat = 'solo';
+  else if (m.fmCategory && m.fmCategory !== 'standard') cat = m.fmCategory;
+  if (!cat) return '';
+  const labels = { minion:'Minion', solo:'Solo', companion:'Companion', retainer:'Retainer', 'villain-party':'Villain' };
+  const label = labels[cat] || '';
+  if (!label) return '';
+  return `<span class="bestiary-cat-chip ${bpEsc(cat)}" title="Flee Mortals encounter category">${label}</span>`;
+}
 function bpCrTier(cr){
   const c = +cr;
   if (!isFinite(c)) return 't-low';
@@ -1250,7 +1272,7 @@ function bestiaryRowHTML(m){
   return `
     <div class="bestiary-row${inPicks?' in-picks':''}" id="bprow-${bpEsc(m.id)}" onclick="addPick('${bpEsc(m.id)}')">
       <div class="bestiary-row-head">
-        <div class="bestiary-row-nm">${bpEsc(m.name)}${m._custom?'<span class="bestiary-custom-chip">Custom</span>':''}${bestiarySourceChipHTML(m)}<small>${bpEsc(m.size||'')} ${bpEsc(m.type||'')}${m.alignment?` · ${bpEsc(m.alignment)}`:''}</small></div>
+        <div class="bestiary-row-nm">${bpEsc(m.name)}${m._custom?'<span class="bestiary-custom-chip">Custom</span>':''}${bestiarySourceChipHTML(m)}${bestiaryCategoryChipHTML(m)}<small>${bpEsc(m.size||'')} ${bpEsc(m.type||'')}${m.alignment?` · ${bpEsc(m.alignment)}`:''}</small></div>
         <div class="bestiary-row-meta">
           <span>${m.ac ?? '—'}<small>AC</small></span>
           <span>${m.hp ?? '—'}<small>HP</small></span>
@@ -1362,7 +1384,7 @@ function renderPicks(){
       return `
         <div class="pick-row${p.expanded?' expanded':''}">
           <div class="pick-head">
-            <div class="pick-nm">${bpEsc(m.name)}${m._custom?'<span class="bestiary-custom-chip">Custom</span>':''}${bestiarySourceChipHTML(m)}<small>CR ${bpEsc(m.crText || m.cr || '?')} · ${xpEach.toLocaleString()} XP ea</small></div>
+            <div class="pick-nm">${bpEsc(m.name)}${m._custom?'<span class="bestiary-custom-chip">Custom</span>':''}${bestiarySourceChipHTML(m)}${bestiaryCategoryChipHTML(m)}<small>CR ${bpEsc(m.crText || m.cr || '?')} · ${xpEach.toLocaleString()} XP ea</small></div>
             <div class="pick-qty">
               <button onclick="updatePick('${safeId}','qty',${p.qty-1})">−</button>
               <span class="q">${p.qty}</span>
@@ -1758,7 +1780,12 @@ function loadAllPicks(){
         dead: false,
         hidden: p.hidden,
         bestiaryId: m.id,
-        bestiarySource: m._custom ? 'custom' : (m.source || 'imported')
+        bestiarySource: m._custom ? 'custom' : (m.source || 'imported'),
+        // Capture the FM encounter category so the combatant card can
+        // surface a Minion/Solo chip without re-looking-up the bestiary.
+        bestiaryCategory: m.isMinion ? 'minion'
+                       : m.isSolo ? 'solo'
+                       : (m.fmCategory && m.fmCategory !== 'standard' ? m.fmCategory : '')
       };
       state.combatants.push(c);
       if (mode === 'combat') snapshotCombatant(c);
@@ -1919,6 +1946,7 @@ function render() {
             ${isActive ? '<span class="active-arrow">▶</span>' : ''}
             ${c.name}
             ${c.bestiarySource ? sourceChipHTML(c.bestiarySource) : ''}
+            ${c.bestiaryCategory ? `<span class="bestiary-cat-chip ${c.bestiaryCategory}" title="Flee Mortals encounter category">${({minion:'Minion',solo:'Solo',companion:'Companion',retainer:'Retainer','villain-party':'Villain'})[c.bestiaryCategory]||c.bestiaryCategory}</span>` : ''}
             ${hiddenBadge}
           </div>
           ${condChips}
