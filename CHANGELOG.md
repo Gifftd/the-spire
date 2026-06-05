@@ -708,6 +708,84 @@ existing `timeline` POST/GET. No redeploy required.
 
 ## [Unreleased] — 2026-05-29
 
+### FM scrape: minion / solo capture fix (45 minions, 17 solos recovered)
+
+The initial FM scrape captured zero `isMinion:true` and zero
+`isSolo:true` monsters because the CR-line parser assumed every line
+followed the `CR <X> <Role>` template with an optional Minion/Solo
+suffix. The actual DDB DOM uses three variants:
+
+```
+CR 1/4 Skirmisher        ← standard (role token first)
+CR 1/4 Minion            ← minion (no role token, just Minion)
+CR 20 Solo               ← solo (no role token, just Solo)
+```
+
+The `(\w+)` capture group ate "Minion" / "Solo" as the role, which
+then failed the `FM_ROLES.includes(r)` check — leaving both `fmRole`
+and `isMinion`/`isSolo` empty.
+
+#### Fix
+
+Replaces the suffix-only regex with a tokenizing pass over the
+post-CR portion of the line. Each token is checked independently
+against three buckets:
+
+- `'Minion'` → `isMinion = true`, `fmCategory = 'minion'`
+- `'Solo'` → `isSolo = true`, `fmCategory = 'solo'`
+- one of the 9 FM roles → `fmRole = <token>`
+
+Handles all observed orderings including the hybrid `CR 20 Brute
+Solo` form.
+
+#### Re-scrape results
+
+Across the same 5 FM pages: **45 minions** + **17 solos** captured
+out of 305 FM monsters. Updated `fmCategory` distribution:
+
+| Category | Before | After |
+|----------|--------|-------|
+| Standard (no special category) | 243 | 159 |
+| Villain-party NPC | 35 | 35 |
+| Companion | 26 | 26 |
+| Retainer | 23 | 23 |
+| **Minion** | 0 | **45** |
+| **Solo** | 0 | **17** |
+
+Examples now correctly tagged:
+- Angulotl Tadpole — CR 1/4 Minion
+- Bugbear Regular — CR 1 Minion
+- Air Spark — CR 15 Minion
+- Durixaviinox — CR 20 Solo (Brute)
+- Yserthrax — CR 22 Solo (Brute, FM dragon)
+- Shtriga Nonna — CR 6 Solo (Controller)
+
+#### Downstream impact
+
+- The Menagerie's Browse list shows the `Solo` / `Minion` badges in
+  the header (already wired in the earlier renderer changes — just
+  needed the underlying flags set).
+- The War Table's FM encounter math correctly weights minions
+  fractionally per the Minion Encounter Building table, and solos
+  route to the Solo Creatures Encounters table.
+- The chimera generator's library extractor picks up minion stat
+  blocks as separate entries — useful since minions have radically
+  different action shape (single attack, fixed damage, no rolls).
+
+DM action: re-import the refreshed `bestiary.json` via the
+Menagerie's Import tab (Replace recommended for a clean v7 + minion
+state, or Merge with the `_legacyId` fallback for the upgrade path).
+The auto-rebuild ingests the now-tagged minions and solos into the
+feature library in the same operation.
+
+#### `scripts/scrape_fm_ddb.js`
+
+Patched the CR-line parser to use the tokenize-each-word approach
+so subsequent scrapes start clean. Added a `// VERIFY` comment with
+all four observed line variants.
+
+---
+
 ### Bestiary + War Table: source chip everywhere
 
 Adds a color-coded source chip (mm-2024 / tob-v1 / fm-v1 / custom)
