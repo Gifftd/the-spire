@@ -123,15 +123,21 @@
           out.subtype = m1[3] || ''; out.alignment = m1[4].trim();
           continue;
         }
-        const m2 = ln.match(/^CR\s+([\d/]+)\s+(\w+)(\s+(?:Minion|Solo))?/i);
+        // FM "CR X …" line variants observed on DDB:
+        //   "CR 1/4 Skirmisher"       — standard
+        //   "CR 1/4 Minion"           — minion (no role token at all)
+        //   "CR 20 Solo"              — solo (no role token)
+        //   "CR 20 Brute Solo"        — solo with a role (rare but possible)
+        // The original regex assumed a role always came first, which
+        // missed the no-role minion/solo cases. Tokenize the post-CR
+        // suffix and check each word independently.
+        const m2 = ln.match(/^CR\s+([\d/]+)\s+(.+)$/i);
         if (m2){
           out.crText = m2[1]; out.cr = crToNum(m2[1]);
-          const r = m2[2].trim();
-          if (FM_ROLES.includes(r)) out.fmRole = r;
-          if (m2[3]){
-            const mod = m2[3].trim().toLowerCase();
-            if (mod === 'minion'){ out.isMinion = true; out.fmCategory = out.fmCategory || 'minion'; }
-            if (mod === 'solo'){ out.isSolo = true; out.fmCategory = out.fmCategory || 'solo'; }
+          for (const tok of m2[2].trim().split(/\s+/)){
+            if (tok === 'Minion'){ out.isMinion = true; out.fmCategory = out.fmCategory || 'minion'; }
+            else if (tok === 'Solo'){ out.isSolo = true; out.fmCategory = out.fmCategory || 'solo'; }
+            else if (FM_ROLES.includes(tok)){ out.fmRole = tok; }
           }
           continue;
         }
