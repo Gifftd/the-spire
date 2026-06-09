@@ -394,8 +394,35 @@ function refreshGate() {
 document.getElementById('btn-add-pc').addEventListener('click', addPC);
 document.getElementById('btn-add-monster').addEventListener('click',
   () => alert('Encounter picker lands in Task 26.'));
-document.getElementById('btn-import-war-table').addEventListener('click',
-  () => alert('Import party lands in Task 24.'));
+document.getElementById('btn-import-war-table').addEventListener('click', () => {
+  let imported = [];
+  try {
+    const raw = localStorage.getItem('init_pcs');
+    if (raw) imported = JSON.parse(raw) || [];
+  } catch (e) { console.warn('init_pcs load failed', e); }
+  if (!Array.isArray(imported) || !imported.length) {
+    alert('No War Table party found in localStorage. Add PCs in the War Table first.');
+    return;
+  }
+  const existingNames = new Set(party.map(p => p.identity.name.toLowerCase()));
+  let added = 0;
+  for (const ip of imported) {
+    if (!ip || typeof ip.name !== 'string') continue;
+    if (existingNames.has(ip.name.toLowerCase())) continue;
+    const pm = defaultPC();
+    pm.identity.name = ip.name;
+    pm.combat.maxHp = ip.maxHp || 30;
+    pm.combat.hp = ip.maxHp || 30;
+    pm.combat.ac = ip.ac || 16;
+    pm.combat.initBonus = ip.init || 2;
+    party.push(pm);
+    expandedPC.add(pm.id);
+    added++;
+  }
+  saveParty();
+  renderParty();
+  alert(`Imported ${added} PC${added !== 1 ? 's' : ''} from the War Table. Defaults filled in for abilities/actions — review before running.`);
+});
 document.getElementById('btn-run').addEventListener('click',
   () => alert('Run lands in Task 31.'));
 
