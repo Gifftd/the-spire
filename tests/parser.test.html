@@ -212,6 +212,24 @@ test('Pass 3.5: flat heal with no dice', () => {
   assertEq(out.heal.flat, 5);
   assertEq(out.heal.dice, null);
 });
+test('Recharge: "Breath (Recharge 5-6)" → recharge minRoll 5', () => {
+  const body = 'Each creature in a 30-foot cone must succeed on a DC 17 Constitution saving throw or take 56 (16d6) Fire damage.';
+  const out = CrucibleParser.parseAction('Breath (Recharge 5-6)', body, null, 4);
+  assertEq(out.kind, 'save');
+  assertEq(out.recharge, { dice:'d6', minRoll:5 });
+});
+test('UsesPerDay: "(1/Day)" → usesPerDay 1', () => {
+  const body = 'Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Bludgeoning damage.';
+  const out = CrucibleParser.parseAction('Smite (1/Day)', body, null, 2);
+  assertEq(out.kind, 'attack');
+  assertEq(out.usesPerDay, 1);
+});
+test('Recharge + UsesPerDay on the same action', () => {
+  const body = 'Each creature in a 20-foot-radius sphere must make a DC 15 Dexterity saving throw, taking 24 (7d6) Fire damage on a failed save, or half on a success.';
+  const out = CrucibleParser.parseAction('Fireball (Recharge 6)(3/Day)', body, null, 3);
+  assertEq(out.recharge, { dice:'d6', minRoll:6 });
+  assertEq(out.usesPerDay, 3);
+});
 </script>
 </body>
 </html>

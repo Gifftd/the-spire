@@ -210,13 +210,29 @@
     };
   }
 
+  // ─────────── Recharge / uses-per-day ───────────
+  // Always runs, attached to whatever Pass 1-3.5 produced.
+  const RECHARGE_RE = /\(\s*Recharge\s+(\d)(?:\s*[-–]\s*(\d))?\s*\)/i;
+  const USES_RE     = /\(\s*(\d+)\s*\/\s*Day\s*\)/i;
+
+  function attachResourceGating(parsed, actionName) {
+    if (!parsed) return parsed;
+    const r = actionName.match(RECHARGE_RE);
+    if (r) parsed.recharge = { dice: 'd6', minRoll: parseInt(r[1], 10) };
+    else if (parsed.recharge === undefined) parsed.recharge = null;
+    const u = actionName.match(USES_RE);
+    if (u) parsed.usesPerDay = parseInt(u[1], 10);
+    else if (parsed.usesPerDay === undefined) parsed.usesPerDay = null;
+    return parsed;
+  }
+
   // Master entry point.
   function parseAction(actionName, actionBody, monsterAbilities, monsterPb) {
     const body = actionBody || '';
-    const p1 = tryMultiattack(actionName, body); if (p1) return p1;
-    const p2 = tryAttack(actionName, body);      if (p2) return p2;
-    const p3 = trySave(actionName, body);        if (p3) return p3;
-    const p35 = tryHeal(actionName, body);       if (p35) return p35;
+    const p1 = tryMultiattack(actionName, body); if (p1) return attachResourceGating(p1, actionName);
+    const p2 = tryAttack(actionName, body);      if (p2) return attachResourceGating(p2, actionName);
+    const p3 = trySave(actionName, body);        if (p3) return attachResourceGating(p3, actionName);
+    const p35 = tryHeal(actionName, body);       if (p35) return attachResourceGating(p35, actionName);
     return unparsed(actionName, body);
   }
 
