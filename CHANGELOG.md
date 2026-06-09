@@ -9,6 +9,53 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### The Crucible — monster role policies (v1.5)
+
+- Replaced the single "focus-fire lowest-HP" monster heuristic with a
+  role-policy registry. Each monster resolves to one of nine FM roles
+  (Soldier / Brute / Artillery / Ambusher / Controller / Leader /
+  Skirmisher / Solo / Minion) and uses role-specific target-picking
+  and action-picking rules. Soldier is the default; v1 behavior is
+  preserved end-to-end.
+- Role resolution priority: explicit DM override → FM `fmRole` tag →
+  inferred from stat patterns (heal action → Leader, all-ranged →
+  Artillery, control-save condition → Controller, high-HP + multiattack
+  → Brute, 1/Day finisher + small kit → Ambusher, else Soldier).
+- PC quick-form gains an `actionRange` dropdown per action
+  (`melee` / `ranged` / `both`). The rangedness score derived from
+  the action mix maps to a position bucket (`frontline` / `midline` /
+  `backline`) which appears as a clickable pill on the PC card.
+  Clicking cycles an override: `derived → frontline → midline →
+  backline → derived (cleared)`.
+- Monster override panel adds a Role dropdown; the choice persists in
+  `bestiary_custom` alongside `parsedActions` and `regeneration`.
+- Engine helpers exposed: `actionEv`, `rangedness`, `position`,
+  `bucket`, `inferRole`, `resolveRole`, plus the `ROLE_POLICIES`
+  registry. ~50 new test assertions including 4 integration scenarios
+  (Brute prefers frontline, Artillery prefers backline, role override
+  flips behavior, v1 backward compat).
+- Worker untouched. No KV schema changes. New PC fields
+  (`actionRange`, `positionOverride`) live in the existing
+  `localStorage['crucible-party']` payload; new monster field
+  (`roleOverride`) is an additional field on `bestiary_custom`
+  records — backward-compatible if absent.
+
+**Manual UI checklist (post-deploy):**
+- [ ] Add a PC with one melee + one ranged action → position pill reads
+      `midline`.
+- [ ] Click the pill four times → cycles `midline → frontline →
+      midline → backline → midline (cleared)`; persists across reload.
+- [ ] Pick a Bugbear → encounter pill shows the role (FM-tagged in
+      gold, inferred in slate, override in teal); modal Role dropdown
+      shows `(currently: <source>)`.
+- [ ] Change the role to Artillery; save; hard-refresh; the role
+      persists in `bestiary_custom`.
+- [ ] Run 500 trials, Bugbear-as-Brute vs. a frontline+backline mixed
+      party → per-PC outcomes show frontline PC absorbing more attacks
+      than backline.
+- [ ] Run any v1-era encounter (Soldier-default monster) → behavior
+      and verdict band are indistinguishable from pre-upgrade.
+
 ### The Crucible — UI + integration
 
 - New page `crucible-dm.html` (DM-only): three-pane layout for party,
