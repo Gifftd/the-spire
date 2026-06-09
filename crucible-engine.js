@@ -149,6 +149,68 @@
     return 0;
   }
 
+  function tagActions(actions) {
+    for (const a of (actions || [])) {
+      a._isMelee  = actionIsMelee(a);
+      a._isRanged = actionIsRanged(a);
+    }
+  }
+
+  function bestEvAction(actions, target, ctx, filter) {
+    const candidates = filter ? (actions || []).filter(filter) : (actions || []).slice();
+    if (!candidates.length) return null;
+    for (const a of candidates) a._ev = actionEv(a, target, ctx);
+    candidates.sort((a, b) => (b._ev || 0) - (a._ev || 0));
+    return candidates[0];
+  }
+
+  function lowestPick(arr, keyFn, tieKeyFn, rng) {
+    if (!arr || !arr.length) return null;
+    const minK = Math.min(...arr.map(keyFn));
+    let ties = arr.filter(x => keyFn(x) === minK);
+    if (tieKeyFn && ties.length > 1) {
+      const minT = Math.min(...ties.map(tieKeyFn));
+      ties = ties.filter(x => tieKeyFn(x) === minT);
+    }
+    if (ties.length === 1) return ties[0];
+    const r = rng ? rng() : 0;
+    return ties[Math.floor(r * ties.length)];
+  }
+
+  function targetsInBucket(all, me, prefBucket, fallbackOrder) {
+    const enemies = aliveEnemies(me, all);
+    const inBucket = enemies.filter(e => positionOf(e) === prefBucket);
+    if (inBucket.length) return inBucket;
+    for (const b of (fallbackOrder || [])) {
+      const f = enemies.filter(e => positionOf(e) === b);
+      if (f.length) return f;
+    }
+    return enemies;
+  }
+
+  // Position lookup for a combatant — only PCs have a position bucket.
+  // Monster targets default to 'frontline' so they sort first when a
+  // bucket-aware policy ever scores a mixed-side scenario (shouldn't happen
+  // in v1.5 — monster-side roles always target PCs).
+  function positionOf(combatant) {
+    if (!combatant || combatant.side !== 'pc' || !combatant.pm) return 'frontline';
+    return position(combatant.pm);
+  }
+
+  // Temporary stub — replaced by full version in Task 4.
+  function position(pm) {
+    if (!pm || !pm.actions || !pm.actions.length) return 'frontline';
+    let ranged = 0, both = 0;
+    for (const a of pm.actions) {
+      if (a.actionRange === 'ranged') ranged++;
+      else if (a.actionRange === 'both') both++;
+    }
+    const r = (ranged + 0.5 * both) / pm.actions.length;
+    if (r < 0.3) return 'frontline';
+    if (r > 0.7) return 'backline';
+    return 'midline';
+  }
+
   // ─────────── Combatant materialization ───────────
   // Turns the PartyMember + monster-pick lists into a flat combatants[].
   // PCs are one-per-PartyMember; monsters expand to N independent copies.
@@ -898,6 +960,7 @@
     runTrial, runSim,
     // Role-policy helpers
     clamp01, sumDice, actionIsMelee, actionIsRanged, targetSaveBonus, actionEv,
+    tagActions, bestEvAction, lowestPick, targetsInBucket, position, positionOf,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Crucible;

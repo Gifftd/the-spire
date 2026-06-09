@@ -742,6 +742,71 @@ test('actionEv: unknown kind → 0', () => {
   assertEq(Crucible.actionEv({ kind:'utility' }, { ac:10 }, { livingEnemyCount:1 }), 0);
   assertEq(Crucible.actionEv({ kind:'unparsed' }, { ac:10 }, { livingEnemyCount:1 }), 0);
 });
+test('lowestPick: returns lowest by key', () => {
+  const arr = [{ n:'a', hp:10 }, { n:'b', hp:5 }, { n:'c', hp:15 }];
+  const r = Crucible.lowestPick(arr, x => x.hp, null, () => 0);
+  assertEq(r.n, 'b');
+});
+test('lowestPick: ties broken by tiebreak key', () => {
+  const arr = [{ n:'a', hp:5, ac:18 }, { n:'b', hp:5, ac:12 }, { n:'c', hp:15, ac:10 }];
+  const r = Crucible.lowestPick(arr, x => x.hp, x => x.ac, () => 0);
+  assertEq(r.n, 'b');
+});
+test('tagActions: sets _isMelee/_isRanged on each action', () => {
+  const acts = [
+    { reach:5, range:null },
+    { reach:null, range:[80,320] },
+    { actionRange:'both' },
+  ];
+  Crucible.tagActions(acts);
+  assertEq(acts[0]._isMelee, true);
+  assertEq(acts[0]._isRanged, false);
+  assertEq(acts[1]._isMelee, false);
+  assertEq(acts[1]._isRanged, true);
+  assertEq(acts[2]._isMelee, true);
+  assertEq(acts[2]._isRanged, true);
+});
+test('bestEvAction: returns highest-EV action passing filter', () => {
+  const tgt = { ac:13, side:'monster' };
+  const ctx = { livingEnemyCount: 1 };
+  const a1 = { kind:'attack', toHit:5, damage:[{ dice:'1d6', mod:0, type:'fire' }] };   // low EV
+  const a2 = { kind:'attack', toHit:5, damage:[{ dice:'2d8', mod:4, type:'slashing' }] }; // high EV
+  const a3 = { kind:'attack', toHit:0, damage:[{ dice:'1d4', mod:0, type:'piercing' }] }; // lowest
+  const r = Crucible.bestEvAction([a1, a2, a3], tgt, ctx, a => a.kind === 'attack');
+  assertEq(r, a2);
+});
+test('bestEvAction: returns null when filter excludes everything', () => {
+  const r = Crucible.bestEvAction([{ kind:'utility' }], { ac:13 }, { livingEnemyCount:1 },
+                                  a => a.kind === 'attack');
+  assertEq(r, null);
+});
+test('targetsInBucket: returns enemies in preferred bucket', () => {
+  // Set up combatants with PC pm carrying actionRange data so position(pm) works.
+  const front = { side:'pc', pm:{ actions:[{ actionRange:'melee' }, { actionRange:'melee' }] },
+                  downed:false, dead:false, hp:30 };
+  const mid   = { side:'pc', pm:{ actions:[{ actionRange:'melee' }, { actionRange:'ranged' }] },
+                  downed:false, dead:false, hp:20 };
+  const back  = { side:'pc', pm:{ actions:[{ actionRange:'ranged' }, { actionRange:'ranged' }] },
+                  downed:false, dead:false, hp:10 };
+  const me = { side:'monster' };
+  const all = [me, front, mid, back];
+  const frontPick = Crucible.targetsInBucket(all, me, 'frontline', ['midline', 'backline']);
+  assertEq(frontPick.length, 1);
+  assertEq(frontPick[0], front);
+  const backPick = Crucible.targetsInBucket(all, me, 'backline', ['midline', 'frontline']);
+  assertEq(backPick.length, 1);
+  assertEq(backPick[0], back);
+});
+test('targetsInBucket: falls back when bucket is empty', () => {
+  const back = { side:'pc', pm:{ actions:[{ actionRange:'ranged' }, { actionRange:'ranged' }] },
+                 downed:false, dead:false, hp:10 };
+  const me = { side:'monster' };
+  const all = [me, back];
+  const r = Crucible.targetsInBucket(all, me, 'frontline', ['midline', 'backline']);
+  // No frontline or midline; falls back to backline.
+  assertEq(r.length, 1);
+  assertEq(r[0], back);
+});
 </script>
 </body>
 </html>
