@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Spire — The Crucible</title>
+  <meta name="theme-color" content="#060a0e">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    body { background: var(--c-bg, #0e1418); color: var(--c-ink, #dde7e9);
+           font-family: 'Crimson Text', serif; margin:0; min-height:100vh; }
+    .topbar { display:flex; gap:0.5rem; align-items:center;
+              padding:0.6rem 1rem; border-bottom:1px solid var(--c-border, #1c2429);
+              background:var(--c-surface, #152028); }
+    .topbar h1 { font-family:'Cinzel', serif; font-size:1.1rem; margin:0 1rem 0 0;
+                 color:var(--c-accent, #7ec5c5); letter-spacing:0.05em; }
+    .topbar .spacer { flex:1; }
+    .btn { padding:0.4rem 0.8rem; background:var(--c-surface-2, #1d3a4a);
+           color:var(--c-ink); border:1px solid var(--c-border); cursor:pointer;
+           border-radius:4px; font-family:'Crimson Text', serif; }
+    .btn:hover { background:var(--c-surface-3, #224a5f); }
+    .btn-teal { background:var(--c-accent, #4a9595); color:#0e1418; border-color:#4a9595; }
+    .btn-teal:disabled { opacity:0.4; cursor:not-allowed; }
+    .layout { display:grid; grid-template-columns: 320px 400px 1fr;
+              gap:0; min-height: calc(100vh - 56px); }
+    .pane { padding:1rem; border-right:1px solid var(--c-border, #1c2429);
+            overflow-y:auto; max-height: calc(100vh - 56px); }
+    .pane:last-child { border-right:none; }
+    .pane h2 { font-family:'Cinzel', serif; font-size:0.95rem; margin:0 0 0.75rem;
+               color:var(--c-accent, #7ec5c5); letter-spacing:0.06em; }
+    @media (max-width: 1100px) {
+      .layout { grid-template-columns: 1fr; }
+      .pane { border-right:none; border-bottom:1px solid var(--c-border); max-height:none; }
+    }
+    .empty-state { color:var(--c-ink-faint, #8b9da3); font-style:italic;
+                   padding:1rem; text-align:center; }
+  </style>
+</head>
+<body>
+<script src="auth.js"></script>
+
+<div class="topbar">
+  <h1>⚔ The Crucible</h1>
+  <button class="btn btn-teal" id="btn-run" disabled>Run Simulation ▶</button>
+  <select id="trials-select" class="btn">
+    <option value="100">100 trials</option>
+    <option value="500" selected>500 trials</option>
+    <option value="2000">2000 trials</option>
+  </select>
+  <div class="spacer"></div>
+  <a class="btn" href="home.html">⌂ Home</a>
+</div>
+
+<div class="layout">
+  <section class="pane" id="pane-party">
+    <h2>PARTY <span id="party-count" style="color:var(--c-ink-faint)"></span></h2>
+    <div id="party-list" class="empty-state">No PCs yet. (Pane A under construction.)</div>
+    <button class="btn" id="btn-add-pc" style="margin-top:0.5rem">+ Add PC</button>
+    <button class="btn" id="btn-import-war-table" style="margin-top:0.5rem">Import from War Table</button>
+  </section>
+
+  <section class="pane" id="pane-encounter">
+    <h2>ENCOUNTER</h2>
+    <div id="encounter-list" class="empty-state">No monsters yet. (Pane B under construction.)</div>
+    <button class="btn" id="btn-add-monster" style="margin-top:0.5rem">+ Add from Bestiary</button>
+    <div id="fm-budget" style="margin-top:1rem; padding:0.5rem; background:var(--c-surface);
+         border-left:3px solid var(--c-accent); font-size:0.85rem;"></div>
+  </section>
+
+  <section class="pane" id="pane-results">
+    <h2>RESULTS</h2>
+    <div id="results-area" class="empty-state">Run a simulation to see how this fight plays out.</div>
+  </section>
+</div>
+
+<script src="crucible-parser.js"></script>
+<script src="crucible-engine.js"></script>
+<script>
+// ─────────── DM auth gate ───────────
+Auth.requireRole('dm', { redirect: 'home.html?notice=dm-only' });
+
+// ─────────── Wire-up stubs (filled in as tasks land) ───────────
+document.getElementById('btn-add-pc').addEventListener('click', () => {
+  alert('Add PC: implemented in Task 22.');
+});
+document.getElementById('btn-add-monster').addEventListener('click', () => {
+  alert('Add monster: implemented in Task 26.');
+});
+document.getElementById('btn-import-war-table').addEventListener('click', () => {
+  alert('Import party: implemented in Task 24.');
+});
+document.getElementById('btn-run').addEventListener('click', () => {
+  alert('Run: implemented in Task 31.');
+});
+</script>
+</body>
+</html>
