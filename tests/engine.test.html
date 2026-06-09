@@ -681,6 +681,67 @@ test('targetSaveBonus: monster uses statblock save or mod', () => {
   }};
   assertEq(Crucible.targetSaveBonus(t2, 'con'), 2);
 });
+
+// ─────── Task 2: actionEv — expected-damage scorer ───────
+
+test('actionEv: attack EV decreases as target AC rises', () => {
+  const action = { kind:'attack', toHit:5, damage:[{ dice:'1d8', mod:3, type:'slashing' }] };
+  const ctx = { livingEnemyCount: 1 };
+  const ev10 = Crucible.actionEv(action, { ac:10, side:'monster' }, ctx);
+  const ev18 = Crucible.actionEv(action, { ac:18, side:'monster' }, ctx);
+  const ev25 = Crucible.actionEv(action, { ac:25, side:'monster' }, ctx);
+  assertTrue(ev10 > ev18, `ev10=${ev10} > ev18=${ev18}`);
+  assertTrue(ev18 > ev25, `ev18=${ev18} > ev25=${ev25}`);
+});
+test('actionEv: save EV is positive when halfOnSave is true', () => {
+  const action = {
+    kind:'save', saveAbility:'dex', saveDc:15, aoeTargets:1, halfOnSave:true,
+    damageOnFail:[{ dice:'8d6', mod:0, type:'fire' }]
+  };
+  const t = { side:'pc', pm:{
+    identity:{ level:5 },
+    abilities:{ str:10, dex:10, con:10, int:10, wis:10, cha:10 },
+    profs:{ saves:{} }
+  }};
+  const ev = Crucible.actionEv(action, t, { livingEnemyCount: 1 });
+  // 8d6 mean = 28; even at full save, half = 14, so EV must be positive and >0.
+  assertTrue(ev > 5, `expected EV > 5, got ${ev}`);
+});
+test('actionEv: save EV scales with aoeTargets', () => {
+  const action = {
+    kind:'save', saveAbility:'dex', saveDc:15, aoeTargets:4, halfOnSave:true,
+    damageOnFail:[{ dice:'8d6', mod:0, type:'fire' }]
+  };
+  const t = { side:'pc', pm:{
+    identity:{ level:5 },
+    abilities:{ str:10, dex:10, con:10, int:10, wis:10, cha:10 },
+    profs:{ saves:{} }
+  }};
+  const evOne  = Crucible.actionEv(action, t, { livingEnemyCount: 1 });
+  const evFour = Crucible.actionEv(action, t, { livingEnemyCount: 4 });
+  assertTrue(evFour > evOne * 3.5, `expected 4× targets ~4×EV, got ${evFour} vs ${evOne}`);
+});
+test('actionEv: multiattack sums sub-EVs', () => {
+  const subBite = { sourceActionName:'Bite', kind:'attack', toHit:5,
+                    damage:[{ dice:'1d8', mod:3, type:'piercing' }] };
+  const subClaw = { sourceActionName:'Claw', kind:'attack', toHit:5,
+                    damage:[{ dice:'1d6', mod:3, type:'slashing' }] };
+  const multi = {
+    sourceActionName:'Multiattack', kind:'multiattack',
+    multiattackPlan:[{ actionName:'Bite', count:1 }, { actionName:'Claw', count:2 }],
+    _ownerActions: [subBite, subClaw],
+  };
+  const t = { ac:13, side:'monster' };
+  const ctx = { livingEnemyCount: 1 };
+  const ev = Crucible.actionEv(multi, t, ctx);
+  const expected = Crucible.actionEv(subBite, t, ctx) + 2 * Crucible.actionEv(subClaw, t, ctx);
+  // Floating point: allow tiny tolerance.
+  assertTrue(Math.abs(ev - expected) < 0.001, `ev=${ev} expected≈${expected}`);
+});
+test('actionEv: unknown kind → 0', () => {
+  assertEq(Crucible.actionEv({ kind:'utility' }, { ac:10 }, { livingEnemyCount:1 }), 0);
+  assertEq(Crucible.actionEv({ kind:'unparsed' }, { ac:10 }, { livingEnemyCount:1 }), 0);
+});
 </script>
 </body>
 </html>

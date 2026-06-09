@@ -118,6 +118,37 @@
     return ab.save != null ? ab.save : (ab.mod || 0);
   }
 
+  // Expected damage of an action against a specific target.
+  // For multiattack, sub-actions are resolved via the multiAction's
+  // `_ownerActions` reference (set by the caller before scoring).
+  function actionEv(action, target, ctx) {
+    if (!action || !target) return 0;
+    if (action.kind === 'attack') {
+      const p = clamp01((21 + (action.toHit || 0) - (target.ac || 10)) / 20);
+      const dmg = sumDice(action.damage);
+      return p * dmg * 1.05;     // +5% nominal crit tail
+    }
+    if (action.kind === 'save') {
+      const sb = targetSaveBonus(target, action.saveAbility);
+      const failP = clamp01((action.saveDc - sb - 1) / 20);
+      const dmgFail = sumDice(action.damageOnFail);
+      const dmgSave = action.halfOnSave ? dmgFail / 2 : 0;
+      const live = (ctx && ctx.livingEnemyCount) || 1;
+      const targets = Math.min(action.aoeTargets || 1, live);
+      return targets * (failP * dmgFail + (1 - failP) * dmgSave);
+    }
+    if (action.kind === 'multiattack') {
+      const subs = action._ownerActions || [];
+      let sum = 0;
+      for (const step of (action.multiattackPlan || [])) {
+        const sub = subs.find(a => (a.sourceActionName || a.name) === step.actionName);
+        if (sub) sum += (step.count || 1) * actionEv(sub, target, ctx);
+      }
+      return sum;
+    }
+    return 0;
+  }
+
   // ─────────── Combatant materialization ───────────
   // Turns the PartyMember + monster-pick lists into a flat combatants[].
   // PCs are one-per-PartyMember; monsters expand to N independent copies.
@@ -865,8 +896,8 @@
     resolveSave, resolveHeal,
     applyDamage, resolveMultiattack, pickAction,
     runTrial, runSim,
-    // Role-policy helpers (Task 1)
-    clamp01, sumDice, actionIsMelee, actionIsRanged, targetSaveBonus,
+    // Role-policy helpers
+    clamp01, sumDice, actionIsMelee, actionIsRanged, targetSaveBonus, actionEv,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Crucible;
