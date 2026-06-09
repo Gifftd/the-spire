@@ -416,6 +416,81 @@
                         a => ['attack','save','multiattack'].includes(a.kind));
   }
 
+  // ── Controller ──
+  function pickTargetController(me, all, ctx) {
+    const enemies = aliveEnemies(me, all);
+    if (!enemies.length) return null;
+    const actions = availableMonsterActions(me);
+    const aoeSave = actions.find(a => a.kind === 'save' && (a.aoeTargets || 0) >= 2);
+    if (aoeSave && enemies.length >= 2) return enemies;   // resolver handles multi-target
+    // Single-target save: pick the weakest save bonus vs that ability.
+    const bestSave = actions.find(a => a.kind === 'save');
+    if (bestSave) {
+      let lowest = enemies[0];
+      let lowestBonus = targetSaveBonus(lowest, bestSave.saveAbility);
+      for (const e of enemies) {
+        const b = targetSaveBonus(e, bestSave.saveAbility);
+        if (b < lowestBonus) { lowest = e; lowestBonus = b; }
+      }
+      return lowest;
+    }
+    return lowestPick(enemies, c => c.hp, c => c.ac, ctx.rng);
+  }
+  function pickActionController(me, target, ctx) {
+    const actions = availableMonsterActions(me);
+    tagActions(actions);
+    const scoreTarget = Array.isArray(target) ? target[0] : target;
+    const lockdown = bestEvAction(actions, scoreTarget, ctx,
+                                  a => a.kind === 'save' && a.condition);
+    if (lockdown) return lockdown;
+    const saveDmg  = bestEvAction(actions, scoreTarget, ctx,
+                                  a => a.kind === 'save');
+    if (saveDmg) return saveDmg;
+    const ma = actions.find(a => a.kind === 'multiattack');
+    if (ma) { ma._ownerActions = actions; return ma; }
+    return bestEvAction(actions, scoreTarget, ctx,
+                        a => a.kind === 'attack');
+  }
+
+  // ── Leader ──
+  // Note: healTriage already ran and returned null (no ally to heal).
+  function pickTargetLeader(me, all, ctx) {
+    return lowestPick(aliveEnemies(me, all), c => c.hp, c => c.ac, ctx.rng);
+  }
+  function pickActionLeader(me, target, ctx) {
+    const actions = availableMonsterActions(me);
+    tagActions(actions);
+    const saveEffect = bestEvAction(actions, target, ctx, a => a.kind === 'save');
+    if (saveEffect) return saveEffect;
+    const ma = actions.find(a => a.kind === 'multiattack');
+    if (ma) { ma._ownerActions = actions; return ma; }
+    return bestEvAction(actions, target, ctx, a => a.kind === 'attack');
+  }
+
+  // ── Solo ──
+  function pickTargetSolo(me, all, ctx) {
+    return lowestPick(aliveEnemies(me, all), c => c.hp, c => c.ac, ctx.rng);
+  }
+  function pickActionSolo(me, target, ctx) {
+    const actions = availableMonsterActions(me);
+    tagActions(actions);
+    const ma = actions.find(a => a.kind === 'multiattack');
+    if (ma) { ma._ownerActions = actions; return ma; }
+    // Conservation: in rounds 1-2 with no ally downed, skip (1/Day) actions.
+    const allyDowned = ctx.all
+      ? ctx.all.some(c => c && c.side === me.side && c !== me && c.downed)
+      : false;
+    const conserve = ctx.round < 3 && !allyDowned;
+    const filter = conserve
+      ? (a => a.usesPerDay !== 1 && ['attack','save'].includes(a.kind))
+      : (a => ['attack','save'].includes(a.kind));
+    const choice = bestEvAction(actions, target, ctx, filter);
+    if (choice) return choice;
+    // Conservation drained the candidate pool — fall back to any available action.
+    return bestEvAction(actions, target, ctx,
+                        a => ['attack','save'].includes(a.kind));
+  }
+
   const ROLE_POLICIES = {
     soldier:    { pickTarget: pickTargetSoldier,    pickAction: pickActionSoldier },
     brute:      { pickTarget: pickTargetBrute,      pickAction: pickActionBrute },
@@ -423,6 +498,9 @@
     artillery:  { pickTarget: pickTargetArtillery,  pickAction: pickActionArtillery },
     skirmisher: { pickTarget: pickTargetSkirmisher, pickAction: pickActionSkirmisher },
     ambusher:   { pickTarget: pickTargetAmbusher,   pickAction: pickActionAmbusher },
+    controller: { pickTarget: pickTargetController, pickAction: pickActionController },
+    leader:     { pickTarget: pickTargetLeader,     pickAction: pickActionLeader },
+    solo:       { pickTarget: pickTargetSolo,       pickAction: pickActionSolo },
   };
 
   // ─────────── Combatant materialization ───────────
@@ -955,6 +1033,7 @@
             const policyCtx = {
               round, rng, tactics,
               livingEnemyCount: aliveEnemies(c, all).length,
+              all,
             };
             const tgt = policy.pickTarget(c, all, policyCtx);
             if (!tgt) continue;

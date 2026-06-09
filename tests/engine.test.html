@@ -1143,6 +1143,134 @@ test('Ambusher pickAction round 2+: falls back to best EV', () => {
   const a = Crucible.ROLE_POLICIES.ambusher.pickAction(me, { ac:14 }, ctx);
   assertEq(a.sourceActionName, 'Stab');
 });
+
+test('Controller pickTarget: returns array for AoE save when ≥2 enemies', () => {
+  const aoeSave = { kind:'save', saveAbility:'dex', saveDc:15, aoeTargets:4,
+                    halfOnSave:true, damageOnFail:[{ dice:'8d6', mod:0, type:'fire' }] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[aoeSave] },
+               slotsLeft:{}, rechargeReady:{} };
+  const e1 = { side:'pc', name:'A', hp:30, ac:14,
+               pm:{ actions:[{ actionRange:'melee' }] }, downed:false, dead:false };
+  const e2 = { side:'pc', name:'B', hp:20, ac:13,
+               pm:{ actions:[{ actionRange:'ranged' }] }, downed:false, dead:false };
+  const ctx = { round:1, rng:()=>0, tactics:{} };
+  const t = Crucible.ROLE_POLICIES.controller.pickTarget(me, [me, e1, e2], ctx);
+  assertTrue(Array.isArray(t), 'controller returns array for AoE');
+  assertEq(t.length, 2);
+});
+test('Controller pickTarget: single-save picks lowest save bonus', () => {
+  const singleSave = { kind:'save', saveAbility:'wis', saveDc:15, aoeTargets:1,
+                       condition:'paralyzed', damageOnFail:[], halfOnSave:false };
+  const me = { side:'monster',
+               monster:{ parsedActions:[singleSave] },
+               slotsLeft:{}, rechargeReady:{} };
+  const lowWis = { side:'pc', name:'Brawler', hp:30, ac:14,
+                   pm:{ identity:{ level:5 },
+                        abilities:{ str:14, dex:10, con:12, int:8, wis:8, cha:8 },
+                        profs:{ saves:{} },
+                        actions:[{ actionRange:'melee' }] },
+                   downed:false, dead:false };
+  const highWis = { side:'pc', name:'Cleric', hp:30, ac:15,
+                    pm:{ identity:{ level:5 },
+                         abilities:{ str:10, dex:10, con:12, int:10, wis:16, cha:10 },
+                         profs:{ saves:{ wis:true } },
+                         actions:[{ actionRange:'melee' }] },
+                    downed:false, dead:false };
+  const ctx = { round:1, rng:()=>0, tactics:{} };
+  const t = Crucible.ROLE_POLICIES.controller.pickTarget(me, [me, lowWis, highWis], ctx);
+  assertEq(t.name, 'Brawler');
+});
+test('Controller pickAction: prefers save-with-condition over save-with-damage', () => {
+  const saveDmg  = { kind:'save', sourceActionName:'Fireball', saveAbility:'dex', saveDc:15,
+                     aoeTargets:4, halfOnSave:true,
+                     damageOnFail:[{ dice:'8d6', mod:0, type:'fire' }] };
+  const lockdown = { kind:'save', sourceActionName:'Hold Person', saveAbility:'wis', saveDc:15,
+                     aoeTargets:1, condition:'paralyzed', halfOnSave:false,
+                     damageOnFail:[] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[saveDmg, lockdown] },
+               slotsLeft:{}, rechargeReady:{} };
+  const target = { side:'pc',
+                   pm:{ identity:{ level:5 },
+                        abilities:{ str:10, dex:10, con:10, int:10, wis:10, cha:10 },
+                        profs:{ saves:{} } } };
+  const ctx = { round:1, rng:()=>0, tactics:{}, livingEnemyCount:2 };
+  const a = Crucible.ROLE_POLICIES.controller.pickAction(me, target, ctx);
+  assertEq(a.sourceActionName, 'Hold Person');
+});
+
+test('Leader pickTarget: lowest-HP enemy when no heal trigger', () => {
+  const me = { side:'monster' };
+  const e1 = { side:'pc', name:'A', hp:30, ac:14,
+               pm:{ actions:[{ actionRange:'melee' }] }, downed:false, dead:false };
+  const e2 = { side:'pc', name:'B', hp:10, ac:13,
+               pm:{ actions:[{ actionRange:'melee' }] }, downed:false, dead:false };
+  const ctx = { round:1, rng:()=>0, tactics:{} };
+  const t = Crucible.ROLE_POLICIES.leader.pickTarget(me, [me, e1, e2], ctx);
+  assertEq(t.name, 'B');
+});
+test('Leader pickAction: prefers save-effect over attack', () => {
+  const atk  = { kind:'attack', sourceActionName:'Mace', toHit:5, reach:5,
+                 damage:[{ dice:'1d6', mod:3, type:'bludgeoning' }] };
+  const save = { kind:'save', sourceActionName:'Command', saveAbility:'wis', saveDc:14,
+                 aoeTargets:1, condition:'frightened', halfOnSave:false,
+                 damageOnFail:[] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[atk, save] },
+               slotsLeft:{}, rechargeReady:{} };
+  const target = { side:'pc', ac:13,
+                   pm:{ identity:{ level:5 },
+                        abilities:{ str:10, dex:10, con:10, int:10, wis:10, cha:10 },
+                        profs:{ saves:{} } } };
+  const ctx = { round:1, rng:()=>0, tactics:{}, livingEnemyCount:1 };
+  const a = Crucible.ROLE_POLICIES.leader.pickAction(me, target, ctx);
+  assertEq(a.sourceActionName, 'Command');
+});
+
+test('Solo pickAction round 1: conserves (1/Day) when no ally downed', () => {
+  const atk1     = { kind:'attack', sourceActionName:'Slam', toHit:8, reach:10,
+                     damage:[{ dice:'2d10', mod:6, type:'bludgeoning' }] };
+  const finisher = { kind:'attack', sourceActionName:'Devastate', toHit:8, reach:10,
+                     usesPerDay: 1,
+                     damage:[{ dice:'10d10', mod:10, type:'bludgeoning' }] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[atk1, finisher] },
+               slotsLeft:{}, rechargeReady:{} };
+  const ctx = { round:1, rng:()=>0, tactics:{}, livingEnemyCount:4 };
+  const a = Crucible.ROLE_POLICIES.solo.pickAction(me, { ac:18 }, ctx);
+  assertEq(a.sourceActionName, 'Slam');
+});
+test('Solo pickAction round 3: uses (1/Day) when available', () => {
+  const atk1     = { kind:'attack', sourceActionName:'Slam', toHit:8, reach:10,
+                     damage:[{ dice:'2d10', mod:6, type:'bludgeoning' }] };
+  const finisher = { kind:'attack', sourceActionName:'Devastate', toHit:8, reach:10,
+                     usesPerDay: 1,
+                     damage:[{ dice:'10d10', mod:10, type:'bludgeoning' }] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[atk1, finisher] },
+               slotsLeft:{}, rechargeReady:{} };
+  const ctx = { round:3, rng:()=>0, tactics:{}, livingEnemyCount:4 };
+  const a = Crucible.ROLE_POLICIES.solo.pickAction(me, { ac:18 }, ctx);
+  assertEq(a.sourceActionName, 'Devastate');
+});
+test('Solo pickAction: novas immediately if an ally is downed', () => {
+  const atk1     = { kind:'attack', sourceActionName:'Slam', toHit:8, reach:10,
+                     damage:[{ dice:'2d10', mod:6, type:'bludgeoning' }] };
+  const finisher = { kind:'attack', sourceActionName:'Devastate', toHit:8, reach:10,
+                     usesPerDay: 1,
+                     damage:[{ dice:'10d10', mod:10, type:'bludgeoning' }] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[atk1, finisher] },
+               slotsLeft:{}, rechargeReady:{} };
+  // An ally is downed → break conservation even in round 1.
+  const downedAlly = { side:'monster', downed:true, dead:false };
+  const ctx = { round:1, rng:()=>0, tactics:{}, livingEnemyCount:4 };
+  // pickActionSolo signature uses `all` to detect downed allies; pass via test helper.
+  const a = Crucible.ROLE_POLICIES.solo.pickAction(me, { ac:18 },
+              Object.assign({}, ctx, { all: [me, downedAlly] }));
+  assertEq(a.sourceActionName, 'Devastate');
+});
 </script>
 </body>
 </html>
