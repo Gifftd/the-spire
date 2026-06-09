@@ -256,6 +256,53 @@ test('rechargeRoll: marks recharge ready when d6 ≥ minRoll', () => {
   }
   assertTrue(fired, 'recharge should fire in some of 30 attempts at 5-6/d6');
 });
+test('pickEnemyTarget(focus): lowest-HP living enemy', () => {
+  const me = { side:'pc' };
+  const enemies = [
+    { side:'monster', name:'A', hp:10, ac:13, downed:false, dead:false },
+    { side:'monster', name:'B', hp:3,  ac:14, downed:false, dead:false },
+    { side:'monster', name:'C', hp:5,  ac:12, downed:false, dead:false },
+  ];
+  const t = Crucible.pickEnemyTarget(me, [me, ...enemies], { aiHint:'focus' }, Crucible.makeRng(1));
+  assertEq(t.name, 'B');
+});
+test('pickEnemyTarget(focus): ties by lowest AC', () => {
+  const me = { side:'pc' };
+  const enemies = [
+    { side:'monster', name:'A', hp:5, ac:15, downed:false, dead:false },
+    { side:'monster', name:'B', hp:5, ac:12, downed:false, dead:false },
+  ];
+  const t = Crucible.pickEnemyTarget(me, [me, ...enemies], { aiHint:'focus' }, Crucible.makeRng(1));
+  assertEq(t.name, 'B');
+});
+test('pickEnemyTarget: skips downed/dead enemies', () => {
+  const me = { side:'pc' };
+  const enemies = [
+    { side:'monster', name:'A', hp:0, ac:15, downed:true,  dead:false },
+    { side:'monster', name:'B', hp:1, ac:14, downed:false, dead:false },
+    { side:'monster', name:'C', hp:5, ac:12, downed:false, dead:true  },
+  ];
+  const t = Crucible.pickEnemyTarget(me, [me, ...enemies], { aiHint:'focus' }, Crucible.makeRng(1));
+  assertEq(t.name, 'B');
+});
+test('healTriage: ally downed and self has reviveDowned heal → trigger', () => {
+  const ally = { side:'pc', name:'Cleric', downed:false, dead:false, hp:20, maxHp:20, lastHealRound:-99 };
+  const wounded = { side:'pc', name:'Tank', downed:true, dead:false, hp:0, maxHp:30, lastHealRound:-99 };
+  const action = { type:'heal', heal:{ target:'ally', reviveDowned:true }, usesPerDay:null };
+  ally.pm = { actions:[action] };
+  ally.slotsLeft = {};
+  ally.rechargeReady = {};
+  const dec = Crucible.healTriage(ally, [ally, wounded], 1);
+  assertEq(dec.action, action);
+  assertEq(dec.targets[0].name, 'Tank');
+});
+test('healTriage: no qualifying ally → returns null (sim falls through)', () => {
+  const ally = { side:'pc', name:'Cleric', downed:false, dead:false, hp:20, maxHp:20, lastHealRound:-99 };
+  const peer = { side:'pc', name:'Tank', downed:false, dead:false, hp:30, maxHp:30 };
+  ally.pm = { actions:[{ type:'heal', heal:{ target:'ally', reviveDowned:true } }] };
+  ally.slotsLeft = {}; ally.rechargeReady = {};
+  assertEq(Crucible.healTriage(ally, [ally, peer], 1), null);
+});
 </script>
 </body>
 </html>

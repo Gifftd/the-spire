@@ -206,12 +206,100 @@
     return false;
   }
 
+  // ─────────── Target selection ───────────
+  function aliveEnemies(me, all) {
+    return all.filter(c => c !== me && c.side !== me.side && !c.dead && !c.downed);
+  }
+  function aliveAllies(me, all, includeSelf) {
+    return all.filter(c => c.side === me.side && !c.dead && (includeSelf || c !== me));
+  }
+
+  function pickEnemyTarget(me, all, tactics, rng) {
+    const candidates = aliveEnemies(me, all);
+    if (!candidates.length) return null;
+    const mode = (tactics && tactics.aiHint) || 'focus';
+    if (mode === 'random') {
+      return candidates[Math.floor(rng() * candidates.length)];
+    }
+    // focus (default): lowest HP, then lowest AC, then random.
+    let best = candidates[0];
+    for (const c of candidates) {
+      if (c.hp < best.hp) best = c;
+      else if (c.hp === best.hp && c.ac < best.ac) best = c;
+    }
+    // Final random tiebreak among true ties.
+    const ties = candidates.filter(c => c.hp === best.hp && c.ac === best.ac);
+    return ties[Math.floor(rng() * ties.length)];
+  }
+
+  // ─────────── Action availability ───────────
+  function isAvailable(c, action) {
+    if (action.usesPerDay != null) {
+      const left = c.slotsLeft[action.sourceActionName || action.name];
+      if (left == null) return action.usesPerDay > 0;
+      return left > 0;
+    }
+    if (action.recharge) {
+      return !!c.rechargeReady[action.sourceActionName || action.name];
+    }
+    return true;
+  }
+  function consumeUse(c, action) {
+    if (action.usesPerDay != null) {
+      const key = action.sourceActionName || action.name;
+      if (c.slotsLeft[key] == null) c.slotsLeft[key] = action.usesPerDay;
+      c.slotsLeft[key] = Math.max(0, c.slotsLeft[key] - 1);
+    }
+    if (action.recharge) {
+      c.rechargeReady[action.sourceActionName || action.name] = false;
+    }
+  }
+
+  // ─────────── Heal triage ───────────
+  // Returns { action, targets:[combatant,...] } if a heal should fire,
+  // else null. Caller falls through to normal action pick when null.
+  function healTriage(me, all, currentRound) {
+    const myActions = me.side === 'pc'
+      ? (me.pm && me.pm.actions) || []
+      : (me.monster && me.monster.parsedActions) || [];
+    // Available heals only.
+    const heals = myActions.filter(a =>
+      (a.type === 'heal' || a.kind === 'heal') && isAvailable(me, a));
+    if (!heals.length) return null;
+
+    const allies = aliveAllies(me, all, true);
+    const downed = allies.filter(a => a.downed);
+    const wounded = allies.filter(a => !a.downed && a.hp <= 0.5 * a.maxHp);
+
+    // (a) Any downed ally → use a reviveDowned heal.
+    if (downed.length) {
+      const reviveHeal = heals.find(a => (a.heal && a.heal.reviveDowned));
+      if (reviveHeal) {
+        // Target the lowest-HP downed ally.
+        downed.sort((x, y) => x.hp - y.hp);
+        return { action: reviveHeal, targets: [downed[0]] };
+      }
+    }
+    // (b) Wounded ally + cooldown since last heal.
+    if (wounded.length && currentRound - me.lastHealRound >= 1) {
+      const heal = heals[0];
+      const target = heal.heal && heal.heal.target;
+      wounded.sort((x, y) => x.hp - y.hp);
+      if (target === 'ally-aoe') return { action: heal, targets: wounded };
+      if (target === 'self')     return { action: heal, targets: [me] };
+      return { action: heal, targets: [wounded[0]] };
+    }
+    return null;
+  }
+
   // ─────────── Public exports ───────────
   const Crucible = {
     makeRng, rollDie, rollDice,
     mod, pb, saveBonus, toHit, saveDc, pcDamageMod,
     buildCombatants, rollInitiative, initOrder,
     tickConditions, rollRecharge, applyRegen, turnStart,
+    pickEnemyTarget, isAvailable, consumeUse, healTriage,
+    aliveEnemies, aliveAllies,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Crucible;
