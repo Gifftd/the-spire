@@ -322,8 +322,41 @@
                         a => ['attack','save'].includes(a.kind));
   }
 
+  // ── Brute ──
+  function pickTargetBrute(me, all, ctx) {
+    const candidates = targetsInBucket(all, me, 'frontline', ['midline', 'backline']);
+    return lowestPick(candidates, c => c.ac, c => c.hp, ctx.rng);
+  }
+  function pickActionBrute(me, target, ctx) {
+    const actions = availableMonsterActions(me);
+    tagActions(actions);
+    // Multiattack wins if available — Brutes love to multiattack.
+    const ma = actions.find(a => a.kind === 'multiattack');
+    if (ma) { ma._ownerActions = actions; return ma; }
+    const melee = bestEvAction(actions, target, ctx,
+                               a => a._isMelee && ['attack','save'].includes(a.kind));
+    if (melee) return melee;
+    return bestEvAction(actions, target, ctx,
+                        a => ['attack','save'].includes(a.kind));
+  }
+
+  // ── Minion ──
+  function pickTargetMinion(me, all, ctx) {
+    const candidates = targetsInBucket(all, me, 'frontline', ['midline', 'backline']);
+    return candidates[0] || null;
+  }
+  function pickActionMinion(me, target, ctx) {
+    const actions = availableMonsterActions(me);
+    // First available at-will attack/save — no DPR thinking.
+    return actions.find(a => ['attack','save'].includes(a.kind) &&
+                             a.usesPerDay == null && !a.recharge) ||
+           actions.find(a => ['attack','save'].includes(a.kind)) || null;
+  }
+
   const ROLE_POLICIES = {
     soldier: { pickTarget: pickTargetSoldier, pickAction: pickActionSoldier },
+    brute:   { pickTarget: pickTargetBrute,   pickAction: pickActionBrute },
+    minion:  { pickTarget: pickTargetMinion,  pickAction: pickActionMinion },
   };
 
   // ─────────── Combatant materialization ───────────

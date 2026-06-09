@@ -976,6 +976,69 @@ test('Soldier pickAction: multiattack wins when available', () => {
   const a = Crucible.ROLE_POLICIES.soldier.pickAction(me, target, ctx);
   assertEq(a.sourceActionName, 'Multiattack');
 });
+
+// ─────── Task 7: Brute and Minion policies ───────
+
+test('Brute pickTarget: prefers frontline, ties by lowest AC', () => {
+  const front1 = { side:'pc', name:'Tank',     hp:40, ac:18,
+                   pm:{ actions:[{ actionRange:'melee' }] }, downed:false, dead:false };
+  const front2 = { side:'pc', name:'Fighter',  hp:35, ac:15,
+                   pm:{ actions:[{ actionRange:'melee' }] }, downed:false, dead:false };
+  const back   = { side:'pc', name:'Wizard',   hp:15, ac:12,
+                   pm:{ actions:[{ actionRange:'ranged' }] }, downed:false, dead:false };
+  const me = { side:'monster' };
+  const all = [me, front1, front2, back];
+  const ctx = { round:1, rng:() => 0, tactics:{} };
+  const t = Crucible.ROLE_POLICIES.brute.pickTarget(me, all, ctx);
+  // Both Tank and Fighter are frontline; ties by lowest AC → Fighter (AC15).
+  assertEq(t.name, 'Fighter');
+});
+test('Brute pickAction: melee wins over higher-EV ranged', () => {
+  const melee  = { kind:'attack', sourceActionName:'Slam', toHit:5, reach:5,
+                   damage:[{ dice:'1d6', mod:3, type:'bludgeoning' }] };
+  const ranged = { kind:'attack', sourceActionName:'Boulder', toHit:5, range:[20,60],
+                   damage:[{ dice:'2d10', mod:3, type:'bludgeoning' }] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[ranged, melee] },
+               slotsLeft:{}, rechargeReady:{} };
+  const target = { ac:15 };
+  const ctx = { round:1, rng:()=>0, tactics:{}, livingEnemyCount:1 };
+  const a = Crucible.ROLE_POLICIES.brute.pickAction(me, target, ctx);
+  assertEq(a.sourceActionName, 'Slam');
+});
+test('Brute pickAction: falls back to ranged if no melee', () => {
+  const ranged = { kind:'attack', sourceActionName:'Boulder', toHit:5, range:[20,60],
+                   damage:[{ dice:'2d10', mod:3, type:'bludgeoning' }] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[ranged] },
+               slotsLeft:{}, rechargeReady:{} };
+  const target = { ac:15 };
+  const ctx = { round:1, rng:()=>0, tactics:{}, livingEnemyCount:1 };
+  const a = Crucible.ROLE_POLICIES.brute.pickAction(me, target, ctx);
+  assertEq(a.sourceActionName, 'Boulder');
+});
+
+test('Minion pickTarget: picks the first frontline enemy', () => {
+  const front = { side:'pc', name:'Tank', hp:40, ac:18,
+                  pm:{ actions:[{ actionRange:'melee' }] }, downed:false, dead:false };
+  const back  = { side:'pc', name:'Wizard', hp:15, ac:12,
+                  pm:{ actions:[{ actionRange:'ranged' }] }, downed:false, dead:false };
+  const me = { side:'monster' };
+  const all = [me, front, back];
+  const ctx = { round:1, rng:()=>0, tactics:{} };
+  const t = Crucible.ROLE_POLICIES.minion.pickTarget(me, all, ctx);
+  assertEq(t.name, 'Tank');
+});
+test('Minion pickAction: first available at-will attack', () => {
+  const a1 = { kind:'attack', sourceActionName:'Shortsword', toHit:3,
+               damage:[{ dice:'1d6', mod:1, type:'piercing' }] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[a1] },
+               slotsLeft:{}, rechargeReady:{} };
+  const ctx = { round:1, rng:()=>0, tactics:{}, livingEnemyCount:1 };
+  const a = Crucible.ROLE_POLICIES.minion.pickAction(me, { ac:15 }, ctx);
+  assertEq(a.sourceActionName, 'Shortsword');
+});
 </script>
 </body>
 </html>
