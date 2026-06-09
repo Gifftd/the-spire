@@ -436,8 +436,56 @@ document.getElementById('btn-import-war-table').addEventListener('click', () => 
   renderParty();
   alert(`Imported ${added} PC${added !== 1 ? 's' : ''} from the War Table. Defaults filled in for abilities/actions — review before running.`);
 });
-document.getElementById('btn-run').addEventListener('click',
-  () => alert('Run lands in Task 31.'));
+let lastSimResult = null;
+let lastSimSeed = null;
+
+document.getElementById('btn-run').addEventListener('click', async () => {
+  if (document.getElementById('btn-run').disabled) return;
+  const trials = parseInt(document.getElementById('trials-select').value) || 500;
+  const tactics = { aiHint:'focus', resources:'nova' };
+  const seedFromUrl = new URL(location.href).searchParams.get('seed');
+  const seed = seedFromUrl ? parseInt(seedFromUrl) : Math.floor(Math.random() * 1e9);
+  lastSimSeed = seed;
+  const root = document.getElementById('results-area');
+  root.className = '';
+  root.innerHTML = `
+    <div style="padding:1rem; text-align:center;">
+      <div style="font-family:'Cinzel',serif; margin-bottom:0.5rem;">Running ${trials} trials…</div>
+      <div id="progress-bar" style="width:100%; height:10px; background:var(--c-bg); border:1px solid var(--c-border); border-radius:4px; overflow:hidden;">
+        <div id="progress-fill" style="height:100%; width:0%; background:var(--c-accent); transition:width 100ms;"></div>
+      </div>
+      <div id="progress-text" style="margin-top:0.5rem; color:var(--c-ink-faint);">0/${trials}</div>
+      <div id="winrate-live" style="margin-top:0.5rem; color:var(--c-ink-faint);"></div>
+    </div>`;
+  try {
+    const result = await Crucible.runSim({
+      party,
+      monsterPicks: picks,
+      trials, tactics, seed,
+      onProgress: ({ completed, winRate }) => {
+        const pct = Math.round((completed / trials) * 100);
+        document.getElementById('progress-fill').style.width = pct + '%';
+        document.getElementById('progress-text').textContent = `${completed}/${trials}`;
+        document.getElementById('winrate-live').textContent =
+          `live win-rate: ${(winRate * 100).toFixed(0)}%`;
+      },
+    });
+    lastSimResult = result;
+    renderResults(result);
+  } catch (e) {
+    root.innerHTML = `<div style="color:#e77878; padding:1rem">Sim failed: ${escapeHtml(e.message || String(e))}</div>`;
+  }
+});
+
+function renderResults(r) {
+  const root = document.getElementById('results-area');
+  root.innerHTML = `
+    <div style="padding:1rem;">
+      <h3 style="font-family:'Cinzel',serif; color:var(--c-accent)">Run finished — ${r.trials} trials</h3>
+      <pre style="font-size:0.8em; max-height:60vh; overflow:auto">${escapeHtml(JSON.stringify(r.headline, null, 2))}</pre>
+      <div style="color:var(--c-ink-faint); font-size:0.8em">Seed: ${lastSimSeed}</div>
+    </div>`;
+}
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Bestiary loader
