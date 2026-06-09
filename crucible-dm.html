@@ -737,52 +737,67 @@ function formatEvent(ev) {
 // ═══════════════════════════════════════════════════════════════════════
 //  Bestiary loader
 // ═══════════════════════════════════════════════════════════════════════
-//  Merges bestiary.json + fm.json + bestiary_custom (KV) into one array.
-//  Cached on `window._CRUCIBLE_BESTIARY`. Fallback: localStorage cache
-//  written on each successful fetch.
+//  Pulls the bestiary from the worker (`?type=bestiary` + `?type=bestiary_custom`),
+//  same source the War Table uses. Third-party content lives only in KV
+//  (the local bestiary.json/fm.json files are dev scrape artifacts; the public
+//  repo + GitHub Pages don't ship them). Cached on `window._CRUCIBLE_BESTIARY`
+//  + a localStorage fallback for offline.
 const WORKER_URL = (typeof CRUCIBLE_WORKER_URL !== 'undefined')
   ? CRUCIBLE_WORKER_URL
   : 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
 
+// Track the last load's status so the picker can show a useful empty-state
+// message ("worker said 401 — sign in again" vs "KV is empty" vs "offline").
+let _bestiaryLoadStatus = null;
+
 async function loadBestiary() {
   if (window._CRUCIBLE_BESTIARY) return window._CRUCIBLE_BESTIARY;
   const out = [];
-  // Try fresh fetch.
+  const headers = Auth.dmHeaders ? Auth.dmHeaders() : {};
   try {
-    const [mm, fm] = await Promise.all([
-      fetch('bestiary.json').then(r => r.json()),
-      fetch('fm.json').then(r => r.json()),
+    const [r, rc] = await Promise.all([
+      fetch(WORKER_URL + '?type=bestiary',        { cache:'no-store', headers }),
+      fetch(WORKER_URL + '?type=bestiary_custom', { cache:'no-store', headers }),
     ]);
-    for (const m of (mm.monsters || [])) out.push({ ...m, _source: 'mm-2024' });
-    for (const m of (fm.monsters || [])) out.push({ ...m, _source: 'fm-v1' });
+    if (r.status === 401 || rc.status === 401) {
+      _bestiaryLoadStatus = 'auth';
+      showWarn('DM session expired — sign in again on the home page.');
+    } else {
+      const imported = r.ok  ? await r.json() : { monsters: [] };
+      const custom   = rc.ok ? await rc.json() : [];
+      // Both endpoints tolerate envelope-or-bare-array shapes.
+      const arr  = Array.isArray(imported) ? imported
+                  : (Array.isArray(imported && imported.monsters) ? imported.monsters : []);
+      const cust = Array.isArray(custom)   ? custom
+                  : (Array.isArray(custom   && custom.monsters)   ? custom.monsters   : []);
+      // Tag every monster with `_source` so the picker disambiguates duplicates
+      // by name between MM-2024 and FM-v1 sources.
+      for (const m of arr)  out.push({ ...m, _source: m.source || m._source || '' });
+      for (const m of cust) out.push({ ...m, _source: m.source || m._source || 'custom', _custom: true });
+      _bestiaryLoadStatus = out.length ? 'ok' : 'empty';
+    }
   } catch (e) {
     console.warn('Bestiary fetch failed; trying cache.', e);
+    _bestiaryLoadStatus = 'offline';
     try {
       const raw = localStorage.getItem('crucible-bestiary-cache');
       if (raw) {
         const cached = JSON.parse(raw);
         if (Array.isArray(cached.monsters)) {
           out.push(...cached.monsters);
+          _bestiaryLoadStatus = 'cache';
           showWarn('Using cached bestiary from ' + cached.cachedAt);
         }
       }
     } catch (e2) { console.warn('Cache read failed', e2); }
   }
-  // Try bestiary_custom (DM-authored).
-  try {
-    const headers = Auth.dmHeaders ? Auth.dmHeaders() : {};
-    const r = await fetch(WORKER_URL + '?type=bestiary_custom', { headers });
-    if (r.ok) {
-      const custom = await r.json();
-      const monsters = (custom && custom.monsters) || [];
-      for (const m of monsters) out.push({ ...m, _custom: true });
-    }
-  } catch (e) { console.warn('bestiary_custom fetch failed', e); }
   // Cache for offline.
-  try {
-    localStorage.setItem('crucible-bestiary-cache',
-      JSON.stringify({ cachedAt: new Date().toISOString().slice(0, 10), monsters: out }));
-  } catch (e) { /* localStorage quota */ }
+  if (out.length) {
+    try {
+      localStorage.setItem('crucible-bestiary-cache',
+        JSON.stringify({ cachedAt: new Date().toISOString().slice(0, 10), monsters: out }));
+    } catch (e) { /* localStorage quota */ }
+  }
   window._CRUCIBLE_BESTIARY = out;
   return out;
 }
@@ -819,6 +834,16 @@ async function openPickerModal() {
   function renderList(q) {
     const ql = (q || '').toLowerCase();
     const items = bestiary.filter(m => !ql || (m.name || '').toLowerCase().includes(ql));
+    if (!bestiary.length) {
+      const msg = {
+        auth:    'DM session expired — go back to the home page and sign in again.',
+        empty:   'The bestiary KV is empty. Open the Menagerie and import a bestiary first.',
+        offline: 'Could not reach the worker. Check your connection and try again.',
+        cache:   'Showing nothing — cache is empty and worker is unreachable.',
+      }[_bestiaryLoadStatus] || 'No monsters loaded. Open the Menagerie to import one.';
+      listEl.innerHTML = `<div style="padding:1rem; color:var(--c-ink-faint); font-style:italic; text-align:center;">${escapeHtml(msg)}</div>`;
+      return;
+    }
     listEl.innerHTML = items.slice(0, 200).map(m => `
       <div style="padding:0.4rem; border-bottom:1px dashed var(--c-border); display:flex; justify-content:space-between;">
         <span>${escapeHtml(m.name || '?')}
@@ -1065,15 +1090,19 @@ async function saveOverride(pickId) {
   const pick = picks.find(p => p.pickId === pickId);
   if (!pick) return;
   const m = pick.monster;
-  // Read current bestiary_custom, upsert this monster's overrides.
+  // Read current bestiary_custom (bare array; tolerate envelope), upsert this
+  // monster's overrides, write back as a bare array — matches the shape used
+  // by the Menagerie editor and bestiary-dm.
   try {
     const headers = Auth.dmHeaders ? Auth.dmHeaders() : {};
-    const r = await fetch(WORKER_URL + '?type=bestiary_custom', { headers });
-    const current = r.ok ? await r.json() : { monsters: [] };
-    const list = (current && current.monsters) || [];
-    const idx = list.findIndex(x => x.name === m.name && (x._source || '') === (m._source || ''));
+    const r = await fetch(WORKER_URL + '?type=bestiary_custom', { cache:'no-store', headers });
+    if (r.status === 401) { alert('Save failed: DM session expired — sign in again.'); return; }
+    const current = r.ok ? await r.json() : [];
+    const list = Array.isArray(current) ? current
+               : (Array.isArray(current && current.monsters) ? current.monsters : []);
+    const idx = list.findIndex(x => x.name === m.name && (x._source || x.source || '') === (m._source || m.source || ''));
     const overrideRecord = {
-      name: m.name, _source: m._source,
+      name: m.name, _source: m._source || m.source || '',
       parsedActions: m.parsedActions,
       regeneration: m.regeneration || null,
       overriddenAt: new Date().toISOString(),
@@ -1083,7 +1112,7 @@ async function saveOverride(pickId) {
     const saveR = await fetch(WORKER_URL, {
       method: 'POST',
       headers: { 'Content-Type':'application/json', ...headers },
-      body: JSON.stringify({ type:'bestiary_custom', payload:{ monsters: list } }),
+      body: JSON.stringify({ type:'bestiary_custom', payload: list }),
     });
     if (saveR.ok) {
       alert('Override saved to bestiary_custom.');
