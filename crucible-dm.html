@@ -136,11 +136,23 @@ function renderParty() {
 function renderPCCard(pm) {
   const expanded = expandedPC.has(pm.id);
   const summary = `${pm.identity.name} · L${pm.identity.level} · ${pm.combat.hp}HP · AC${pm.combat.ac}`;
+  const posLabel = pcPositionLabel(pm);
+  const pillColor = pm.positionOverride ? 'var(--c-accent)' : 'var(--c-ink-faint)';
   return `
     <div class="pc-card" style="border:1px solid var(--c-border); border-radius:4px; margin-bottom:0.5rem; padding:0.5rem;">
-      <div onclick="togglePC('${pm.id}')" style="cursor:pointer; display:flex; justify-content:space-between;">
-        <b>${escapeHtml(summary)}</b>
-        <span style="color:var(--c-ink-faint)">${expanded ? '▾' : '▸'}</span>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div onclick="togglePC('${pm.id}')" style="cursor:pointer; flex:1;">
+          <b>${escapeHtml(summary)}</b>
+        </div>
+        <span onclick="cyclePositionOverride('${pm.id}'); event.stopPropagation();"
+              title="Click to cycle override"
+              style="cursor:pointer; font-size:0.7rem; padding:0.15rem 0.5rem;
+                     border:1px solid ${pillColor}; color:${pillColor};
+                     border-radius:9999px; margin-left:0.5rem; white-space:nowrap;">
+          ${escapeHtml(posLabel)}
+        </span>
+        <span style="color:var(--c-ink-faint); margin-left:0.5rem; cursor:pointer;"
+              onclick="togglePC('${pm.id}')">${expanded ? '▾' : '▸'}</span>
       </div>
       ${expanded ? renderPCEditor(pm) : ''}
     </div>`;
@@ -298,6 +310,26 @@ function updatePC(id, path, value) {
   for (let i = 0; i < parts.length - 1; i++) o = o[parts[i]];
   o[parts[parts.length-1]] = value;
   saveParty();
+}
+
+// Compute a PC's active position bucket using engine helpers.
+function pcPositionLabel(pm) {
+  if (!pm) return 'frontline';
+  const active = (typeof Crucible !== 'undefined' && Crucible.position)
+                  ? Crucible.position(pm)
+                  : 'frontline';
+  const overridden = !!pm.positionOverride;
+  return overridden ? `${active} (override)` : active;
+}
+
+// Cycle the override state machine: derived → frontline → midline → backline → derived (clear).
+function cyclePositionOverride(pmId) {
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  const order = [null, 'frontline', 'midline', 'backline'];
+  const cur = pm.positionOverride || null;
+  const idx = order.indexOf(cur);
+  pm.positionOverride = order[(idx + 1) % order.length];
+  saveParty(); renderParty();
 }
 function addPC() {
   const pm = defaultPC();
