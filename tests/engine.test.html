@@ -1039,6 +1039,110 @@ test('Minion pickAction: first available at-will attack', () => {
   const a = Crucible.ROLE_POLICIES.minion.pickAction(me, { ac:15 }, ctx);
   assertEq(a.sourceActionName, 'Shortsword');
 });
+
+// ─────── Task 8: Artillery, Skirmisher, Ambusher policies ───────
+
+test('Artillery pickTarget: prefers backline, ties by lowest HP', () => {
+  const front = { side:'pc', name:'Tank', hp:40, ac:18,
+                  pm:{ actions:[{ actionRange:'melee' }] }, downed:false, dead:false };
+  const back1 = { side:'pc', name:'Wizard', hp:18, ac:12,
+                  pm:{ actions:[{ actionRange:'ranged' }] }, downed:false, dead:false };
+  const back2 = { side:'pc', name:'Bard',   hp:25, ac:13,
+                  pm:{ actions:[{ actionRange:'ranged' }] }, downed:false, dead:false };
+  const me = { side:'monster' };
+  const all = [me, front, back1, back2];
+  const ctx = { round:1, rng:()=>0, tactics:{} };
+  const t = Crucible.ROLE_POLICIES.artillery.pickTarget(me, all, ctx);
+  assertEq(t.name, 'Wizard');   // backline tie → lowest HP
+});
+test('Artillery pickAction: ranged wins over higher-EV melee', () => {
+  const melee  = { kind:'attack', sourceActionName:'Bite',  toHit:5, reach:5,
+                   damage:[{ dice:'2d10', mod:5, type:'piercing' }] };
+  const ranged = { kind:'attack', sourceActionName:'Bolt', toHit:5, range:[80,320],
+                   damage:[{ dice:'1d8', mod:3, type:'force' }] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[melee, ranged] },
+               slotsLeft:{}, rechargeReady:{} };
+  const ctx = { round:1, rng:()=>0, tactics:{}, livingEnemyCount:1 };
+  const a = Crucible.ROLE_POLICIES.artillery.pickAction(me, { ac:13 }, ctx);
+  assertEq(a.sourceActionName, 'Bolt');
+});
+
+test('Skirmisher pickTarget with ranged actions: highest-rangedness, lowest HP tiebreak', () => {
+  const front = { side:'pc', name:'Tank', hp:10, ac:18,
+                  pm:{ actions:[{ actionRange:'melee' }, { actionRange:'melee' }] },
+                  downed:false, dead:false };
+  const back1 = { side:'pc', name:'Wizard', hp:18, ac:12,
+                  pm:{ actions:[{ actionRange:'ranged' }, { actionRange:'ranged' }] },
+                  downed:false, dead:false };
+  const back2 = { side:'pc', name:'Sorcerer', hp:14, ac:13,
+                  pm:{ actions:[{ actionRange:'ranged' }, { actionRange:'ranged' }] },
+                  downed:false, dead:false };
+  const me = { side:'monster',
+               monster:{ parsedActions:[
+                 { kind:'attack', sourceActionName:'Bow', toHit:5, range:[80,320],
+                   damage:[{ dice:'1d8', mod:3, type:'piercing' }] }
+               ]},
+               slotsLeft:{}, rechargeReady:{} };
+  const all = [me, front, back1, back2];
+  const ctx = { round:1, rng:()=>0, tactics:{} };
+  const t = Crucible.ROLE_POLICIES.skirmisher.pickTarget(me, all, ctx);
+  // Both back1 and back2 are highest-rangedness (1.0); tie → lowest HP → Sorcerer (14 < 18).
+  assertEq(t.name, 'Sorcerer');
+});
+test('Skirmisher pickAction: prefers ranged attack', () => {
+  const melee  = { kind:'attack', sourceActionName:'Dagger', toHit:5, reach:5,
+                   damage:[{ dice:'1d4', mod:3, type:'piercing' }] };
+  const ranged = { kind:'attack', sourceActionName:'Bow', toHit:5, range:[80,320],
+                   damage:[{ dice:'1d8', mod:3, type:'piercing' }] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[melee, ranged] },
+               slotsLeft:{}, rechargeReady:{} };
+  const ctx = { round:1, rng:()=>0, tactics:{}, livingEnemyCount:1 };
+  const a = Crucible.ROLE_POLICIES.skirmisher.pickAction(me, { ac:13 }, ctx);
+  assertEq(a.sourceActionName, 'Bow');
+});
+
+test('Ambusher pickTarget: lowest HP, ties by lowest AC', () => {
+  const a = { side:'pc', name:'A', hp:5, ac:18,
+              pm:{ actions:[{ actionRange:'melee' }] }, downed:false, dead:false };
+  const b = { side:'pc', name:'B', hp:5, ac:12,
+              pm:{ actions:[{ actionRange:'melee' }] }, downed:false, dead:false };
+  const c = { side:'pc', name:'C', hp:20, ac:10,
+              pm:{ actions:[{ actionRange:'melee' }] }, downed:false, dead:false };
+  const me = { side:'monster' };
+  const all = [me, a, b, c];
+  const ctx = { round:1, rng:()=>0, tactics:{} };
+  const t = Crucible.ROLE_POLICIES.ambusher.pickTarget(me, all, ctx);
+  assertEq(t.name, 'B');
+});
+test('Ambusher pickAction round 1: prefers (1/Day) finisher', () => {
+  const atWill   = { kind:'attack', sourceActionName:'Stab', toHit:5, reach:5,
+                     damage:[{ dice:'1d6', mod:3, type:'piercing' }] };
+  const finisher = { kind:'attack', sourceActionName:'Assassinate', toHit:7, reach:5,
+                     usesPerDay: 1,
+                     damage:[{ dice:'6d6', mod:5, type:'piercing' }] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[atWill, finisher] },
+               slotsLeft:{}, rechargeReady:{} };
+  const ctx = { round:1, rng:()=>0, tactics:{}, livingEnemyCount:1 };
+  const a = Crucible.ROLE_POLICIES.ambusher.pickAction(me, { ac:14 }, ctx);
+  assertEq(a.sourceActionName, 'Assassinate');
+});
+test('Ambusher pickAction round 2+: falls back to best EV', () => {
+  const atWill   = { kind:'attack', sourceActionName:'Stab', toHit:5, reach:5,
+                     damage:[{ dice:'1d6', mod:3, type:'piercing' }] };
+  // After round 1, finisher's usesPerDay is exhausted; only atWill remains.
+  const finisher = { kind:'attack', sourceActionName:'Assassinate', toHit:7, reach:5,
+                     usesPerDay: 1,
+                     damage:[{ dice:'6d6', mod:5, type:'piercing' }] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[atWill, finisher] },
+               slotsLeft:{ 'Assassinate': 0 }, rechargeReady:{} };
+  const ctx = { round:2, rng:()=>0, tactics:{}, livingEnemyCount:1 };
+  const a = Crucible.ROLE_POLICIES.ambusher.pickAction(me, { ac:14 }, ctx);
+  assertEq(a.sourceActionName, 'Stab');
+});
 </script>
 </body>
 </html>

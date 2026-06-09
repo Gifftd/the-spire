@@ -353,10 +353,76 @@
            actions.find(a => ['attack','save'].includes(a.kind)) || null;
   }
 
+  // ── Artillery ──
+  function pickTargetArtillery(me, all, ctx) {
+    const candidates = targetsInBucket(all, me, 'backline', ['midline', 'frontline']);
+    return lowestPick(candidates, c => c.hp, c => c.ac, ctx.rng);
+  }
+  function pickActionArtillery(me, target, ctx) {
+    const actions = availableMonsterActions(me);
+    tagActions(actions);
+    const ma = actions.find(a => a.kind === 'multiattack');
+    if (ma) { ma._ownerActions = actions; return ma; }
+    const ranged = bestEvAction(actions, target, ctx,
+                                a => a._isRanged && ['attack','save'].includes(a.kind));
+    if (ranged) return ranged;
+    return bestEvAction(actions, target, ctx,
+                        a => ['attack','save'].includes(a.kind));
+  }
+
+  // ── Skirmisher ──
+  function pickTargetSkirmisher(me, all, ctx) {
+    const enemies = aliveEnemies(me, all);
+    const actions = availableMonsterActions(me);
+    const hasRanged = actions.some(a => actionIsRanged(a));
+    if (hasRanged && enemies.length) {
+      // Pick exposed squishies: highest rangedness, then lowest HP.
+      const sorted = enemies.slice().sort((a, b) => {
+        const ra = a.side === 'pc' && a.pm ? rangedness(a.pm) : 0;
+        const rb = b.side === 'pc' && b.pm ? rangedness(b.pm) : 0;
+        if (rb !== ra) return rb - ra;
+        return a.hp - b.hp;
+      });
+      return sorted[0];
+    }
+    return lowestPick(enemies, c => c.hp, c => c.ac, ctx.rng);
+  }
+  function pickActionSkirmisher(me, target, ctx) {
+    const actions = availableMonsterActions(me);
+    tagActions(actions);
+    const ranged = bestEvAction(actions, target, ctx,
+                                a => a._isRanged && a.kind === 'attack');
+    if (ranged) return ranged;
+    return bestEvAction(actions, target, ctx,
+                        a => ['attack','save','multiattack'].includes(a.kind));
+  }
+
+  // ── Ambusher ──
+  function pickTargetAmbusher(me, all, ctx) {
+    return lowestPick(aliveEnemies(me, all), c => c.hp, c => c.ac, ctx.rng);
+  }
+  function pickActionAmbusher(me, target, ctx) {
+    const actions = availableMonsterActions(me);
+    tagActions(actions);
+    // Round 1: prefer (1/Day) finishers if any available.
+    if (ctx.round === 1) {
+      const finisher = bestEvAction(actions, target, ctx,
+                                    a => a.usesPerDay === 1 &&
+                                         a.kind !== 'heal' &&
+                                         a.kind !== 'utility');
+      if (finisher) return finisher;
+    }
+    return bestEvAction(actions, target, ctx,
+                        a => ['attack','save','multiattack'].includes(a.kind));
+  }
+
   const ROLE_POLICIES = {
-    soldier: { pickTarget: pickTargetSoldier, pickAction: pickActionSoldier },
-    brute:   { pickTarget: pickTargetBrute,   pickAction: pickActionBrute },
-    minion:  { pickTarget: pickTargetMinion,  pickAction: pickActionMinion },
+    soldier:    { pickTarget: pickTargetSoldier,    pickAction: pickActionSoldier },
+    brute:      { pickTarget: pickTargetBrute,      pickAction: pickActionBrute },
+    minion:     { pickTarget: pickTargetMinion,     pickAction: pickActionMinion },
+    artillery:  { pickTarget: pickTargetArtillery,  pickAction: pickActionArtillery },
+    skirmisher: { pickTarget: pickTargetSkirmisher, pickAction: pickActionSkirmisher },
+    ambusher:   { pickTarget: pickTargetAmbusher,   pickAction: pickActionAmbusher },
   };
 
   // ─────────── Combatant materialization ───────────
