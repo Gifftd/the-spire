@@ -74,11 +74,50 @@
     };
   }
 
+  // ─────────── Pass 2 — Attack roll ───────────
+  const ATTACK_HEADER_RE = /(?:Melee or Ranged Attack Roll|Melee Attack Roll|Ranged Attack Roll|Melee Weapon Attack|Ranged Weapon Attack)\s*:/i;
+  const TOHIT_RE  = /(?:Attack Roll|Attack)\s*:\s*([+-]?\d+)/i;
+  const REACH_RE  = /reach\s+(\d+)\s*(?:ft|feet|')/i;
+  const RANGE_RE  = /range\s+(\d+)(?:\s*\/\s*(\d+))?\s*(?:ft|feet|')/i;
+  // Damage component: optional leading average "11", then "(1d8 + 3)" then "Type damage"
+  const DMG_RE    = /(?:\d+)?\s*\((\d+d\d+)(?:\s*([+-])\s*(\d+))?\)\s+([A-Za-z]+)\s+damage/gi;
+
+  function extractDamage(body) {
+    const out = [];
+    let m;
+    DMG_RE.lastIndex = 0;
+    while ((m = DMG_RE.exec(body)) !== null) {
+      const dice = m[1];
+      const sign = m[2] || '+';
+      const num  = m[3] ? parseInt(m[3], 10) : 0;
+      const mod  = sign === '-' ? -num : num;
+      out.push({ dice, mod, type: m[4].toLowerCase() });
+    }
+    return out;
+  }
+
+  function tryAttack(actionName, body) {
+    if (!ATTACK_HEADER_RE.test(body)) return null;
+    const th = body.match(TOHIT_RE);
+    const reachM = body.match(REACH_RE);
+    const rangeM = body.match(RANGE_RE);
+    return {
+      sourceActionName: actionName,
+      kind: 'attack',
+      toHit: th ? parseInt(th[1], 10) : 0,
+      reach: reachM ? parseInt(reachM[1], 10) : null,
+      range: rangeM ? [parseInt(rangeM[1], 10), rangeM[2] ? parseInt(rangeM[2], 10) : null] : null,
+      damage: extractDamage(body),
+      parsedBy: 'auto',
+      parsedAt: today(),
+    };
+  }
+
   // Master entry point.
   function parseAction(actionName, actionBody, monsterAbilities, monsterPb) {
     const body = actionBody || '';
-    const p1 = tryMultiattack(actionName, body);
-    if (p1) return p1;
+    const p1 = tryMultiattack(actionName, body); if (p1) return p1;
+    const p2 = tryAttack(actionName, body);      if (p2) return p2;
     return unparsed(actionName, body);
   }
 

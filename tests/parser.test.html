@@ -102,6 +102,45 @@ test('Pass 1: no multiattack language → falls through (NOT multiattack)', () =
   const out = CrucibleParser.parseAction('Bite', 'Melee Attack Roll: +5', null, 2);
   assertTrue(out.kind !== 'multiattack', 'should not classify as multiattack');
 });
+test('Pass 2: melee, single damage', () => {
+  const body = 'Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Bludgeoning damage.';
+  const out = CrucibleParser.parseAction('Club', body, null, 2);
+  assertEq(out.kind, 'attack');
+  assertEq(out.toHit, 5);
+  assertEq(out.reach, 5);
+  assertEq(out.damage, [{ dice:'1d8', mod:3, type:'bludgeoning' }]);
+});
+test('Pass 2: ranged, with short/long range', () => {
+  const body = 'Ranged Attack Roll: +6, range 80/320 ft. Hit: 8 (1d10 + 3) Piercing damage.';
+  const out = CrucibleParser.parseAction('Longbow', body, null, 2);
+  assertEq(out.kind, 'attack');
+  assertEq(out.range, [80, 320]);
+  assertEq(out.damage, [{ dice:'1d10', mod:3, type:'piercing' }]);
+});
+test('Pass 2: melee or ranged with rider damage', () => {
+  const body = 'Melee or Ranged Attack Roll: +5, reach 5 ft. or range 120 ft. Hit: 7 (1d8 + 3) Bludgeoning damage plus 11 (2d10) Lightning damage.';
+  const out = CrucibleParser.parseAction('Wind Staff', body, null, 2);
+  assertEq(out.toHit, 5);
+  assertEq(out.reach, 5);
+  assertEq(out.range, [120, null]);
+  assertEq(out.damage, [
+    { dice:'1d8',  mod:3, type:'bludgeoning' },
+    { dice:'2d10', mod:0, type:'lightning' },
+  ]);
+});
+test('Pass 2: negative to-hit handled', () => {
+  const body = 'Melee Attack Roll: -1, reach 5 ft. Hit: 1 (1d4 - 1) Piercing damage.';
+  const out = CrucibleParser.parseAction('Feeble Bite', body, null, 2);
+  assertEq(out.toHit, -1);
+  assertEq(out.damage, [{ dice:'1d4', mod:-1, type:'piercing' }]);
+});
+test('Pass 2: no parenthetical dice (flat) → empty damage list', () => {
+  const body = 'Melee Attack Roll: +3, reach 5 ft. Hit: nothing happens.';
+  const out = CrucibleParser.parseAction('Touch', body, null, 2);
+  assertEq(out.kind, 'attack');
+  assertEq(out.toHit, 3);
+  assertEq(out.damage, []);
+});
 </script>
 </body>
 </html>
