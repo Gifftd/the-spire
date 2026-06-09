@@ -426,7 +426,68 @@ document.getElementById('btn-import-war-table').addEventListener('click', () => 
 document.getElementById('btn-run').addEventListener('click',
   () => alert('Run lands in Task 31.'));
 
+// ═══════════════════════════════════════════════════════════════════════
+//  Bestiary loader
+// ═══════════════════════════════════════════════════════════════════════
+//  Merges bestiary.json + fm.json + bestiary_custom (KV) into one array.
+//  Cached on `window._CRUCIBLE_BESTIARY`. Fallback: localStorage cache
+//  written on each successful fetch.
+const WORKER_URL = (typeof CRUCIBLE_WORKER_URL !== 'undefined')
+  ? CRUCIBLE_WORKER_URL
+  : 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+
+async function loadBestiary() {
+  if (window._CRUCIBLE_BESTIARY) return window._CRUCIBLE_BESTIARY;
+  const out = [];
+  // Try fresh fetch.
+  try {
+    const [mm, fm] = await Promise.all([
+      fetch('bestiary.json').then(r => r.json()),
+      fetch('fm.json').then(r => r.json()),
+    ]);
+    for (const m of (mm.monsters || [])) out.push({ ...m, _source: 'mm-2024' });
+    for (const m of (fm.monsters || [])) out.push({ ...m, _source: 'fm-v1' });
+  } catch (e) {
+    console.warn('Bestiary fetch failed; trying cache.', e);
+    try {
+      const raw = localStorage.getItem('crucible-bestiary-cache');
+      if (raw) {
+        const cached = JSON.parse(raw);
+        if (Array.isArray(cached.monsters)) {
+          out.push(...cached.monsters);
+          showWarn('Using cached bestiary from ' + cached.cachedAt);
+        }
+      }
+    } catch (e2) { console.warn('Cache read failed', e2); }
+  }
+  // Try bestiary_custom (DM-authored).
+  try {
+    const headers = Auth.dmHeaders ? Auth.dmHeaders() : {};
+    const r = await fetch(WORKER_URL + '?type=bestiary_custom', { headers });
+    if (r.ok) {
+      const custom = await r.json();
+      const monsters = (custom && custom.monsters) || [];
+      for (const m of monsters) out.push({ ...m, _custom: true });
+    }
+  } catch (e) { console.warn('bestiary_custom fetch failed', e); }
+  // Cache for offline.
+  try {
+    localStorage.setItem('crucible-bestiary-cache',
+      JSON.stringify({ cachedAt: new Date().toISOString().slice(0, 10), monsters: out }));
+  } catch (e) { /* localStorage quota */ }
+  window._CRUCIBLE_BESTIARY = out;
+  return out;
+}
+
+function showWarn(msg) {
+  // Lightweight toast; replaced by a proper warnings list in Task 32.
+  console.warn('[Crucible]', msg);
+}
+
 renderParty();
+
+// Eagerly start loading bestiary in the background — picker becomes instant.
+loadBestiary().catch(e => console.warn('Bestiary preload failed', e));
 </script>
 </body>
 </html>
