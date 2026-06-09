@@ -190,11 +190,93 @@ function renderPCEditor(pm) {
     </div>`;
 }
 
+const expandedAction = new Set();
 function renderActionRow(pm, act) {
-  // Placeholder — full editor lands in Task 23.
-  return `<div style="padding:0.25rem; border-bottom:1px dashed var(--c-border); font-size:0.85rem">
-    ${escapeHtml(act.name)} <span style="color:var(--c-ink-faint)">(${act.type})</span>
-  </div>`;
+  const isOpen = expandedAction.has(act.id);
+  const summary = `${act.name} · ${act.type}` +
+    (act.damage ? ` · ${act.damage.dice}+${act.damage.mod === '+atkAbility' ? act.atkAbility.toUpperCase() : act.damage.mod}` : '') +
+    (act.heal ? ` · heals ${act.heal.dice || act.heal.flat || 0}` : '');
+  return `
+    <div style="padding:0.25rem; border-bottom:1px dashed var(--c-border); font-size:0.85rem">
+      <div style="cursor:pointer; display:flex; justify-content:space-between"
+        onclick="toggleAction('${act.id}')">
+        <span>${escapeHtml(summary)}</span>
+        <span style="color:var(--c-ink-faint)">${isOpen ? '▾' : '▸'}</span>
+      </div>
+      ${isOpen ? renderActionEditor(pm, act) : ''}
+    </div>`;
+}
+
+function renderActionEditor(pm, act) {
+  const typeSel = ['attack','save','heal','utility'].map(t =>
+    `<option value="${t}" ${act.type===t?'selected':''}>${t}</option>`).join('');
+  const abSel = ['str','dex','con','int','wis','cha'].map(t =>
+    `<option value="${t}" ${act.atkAbility===t?'selected':''}>${t.toUpperCase()}</option>`).join('');
+  let body = '';
+  if (act.type === 'attack') {
+    const d = act.damage || {};
+    body = `
+      <label>Atk ability <select onchange="updateAction('${pm.id}','${act.id}','atkAbility',this.value)">${abSel}</select></label>
+      <label>Override to-hit (blank = derived) <input type="number" value="${act.atkBonusOverride ?? ''}"
+        oninput="updateAction('${pm.id}','${act.id}','atkBonusOverride', this.value === '' ? null : parseInt(this.value))" class="pc-input"></label>
+      <label>Damage dice <input type="text" value="${escapeHtml(d.dice||'')}"
+        oninput="updateActionDamage('${pm.id}','${act.id}','dice', this.value)" class="pc-input" placeholder="1d8"></label>
+      <label>Damage mod ('+atkAbility' or number) <input type="text" value="${escapeHtml(String(d.mod||''))}"
+        oninput="updateActionDamage('${pm.id}','${act.id}','mod', this.value)" class="pc-input"></label>
+      <label>Type <input type="text" value="${escapeHtml(d.type||'')}"
+        oninput="updateActionDamage('${pm.id}','${act.id}','type', this.value)" class="pc-input"></label>
+      <label>Rider dice (optional) <input type="text" value="${escapeHtml(d.riderDice||'')}"
+        oninput="updateActionDamage('${pm.id}','${act.id}','riderDice', this.value||null)" class="pc-input"></label>
+      <label>Rider type (optional) <input type="text" value="${escapeHtml(d.riderType||'')}"
+        oninput="updateActionDamage('${pm.id}','${act.id}','riderType', this.value||null)" class="pc-input"></label>`;
+  } else if (act.type === 'save') {
+    const s = act.save || {};
+    body = `
+      <label>Save ability <select onchange="updateActionSave('${pm.id}','${act.id}','ability',this.value)">${abSel}</select></label>
+      <label>DC override (blank = derived) <input type="number" value="${s.dcOverride ?? ''}"
+        oninput="updateActionSave('${pm.id}','${act.id}','dcOverride', this.value === '' ? null : parseInt(this.value))" class="pc-input"></label>
+      <label>Damage dice <input type="text" value="${escapeHtml((act.damage&&act.damage.dice)||'')}"
+        oninput="updateActionDamage('${pm.id}','${act.id}','dice', this.value)" class="pc-input"></label>
+      <label>Type <input type="text" value="${escapeHtml((act.damage&&act.damage.type)||'')}"
+        oninput="updateActionDamage('${pm.id}','${act.id}','type', this.value)" class="pc-input"></label>
+      <label><input type="checkbox" ${s.halfOnSave?'checked':''}
+        onchange="updateActionSave('${pm.id}','${act.id}','halfOnSave', this.checked)"> half on save</label>
+      <label>AoE targets <input type="number" value="${act.aoeTargets||0}" min="0" max="20"
+        oninput="updateAction('${pm.id}','${act.id}','aoeTargets', parseInt(this.value)||0)" class="pc-input"></label>`;
+  } else if (act.type === 'heal') {
+    const h = act.heal || {};
+    body = `
+      <label>Heal dice (e.g. 1d8) <input type="text" value="${escapeHtml(h.dice||'')}"
+        oninput="updateActionHeal('${pm.id}','${act.id}','dice', this.value||null)" class="pc-input"></label>
+      <label>Heal mod ('+atkAbility' or number) <input type="text" value="${escapeHtml(String(h.mod||''))}"
+        oninput="updateActionHeal('${pm.id}','${act.id}','mod', this.value)" class="pc-input"></label>
+      <label>Flat (no-dice) <input type="number" value="${h.flat||0}"
+        oninput="updateActionHeal('${pm.id}','${act.id}','flat', parseInt(this.value)||0)" class="pc-input"></label>
+      <label>Target
+        <select onchange="updateActionHeal('${pm.id}','${act.id}','target', this.value)">
+          ${['self','ally','ally-aoe'].map(t => `<option value="${t}" ${h.target===t?'selected':''}>${t}</option>`).join('')}
+        </select></label>
+      <label><input type="checkbox" ${h.reviveDowned?'checked':''}
+        onchange="updateActionHeal('${pm.id}','${act.id}','reviveDowned', this.checked)"> revives downed</label>`;
+  }
+  return `
+    <div style="padding:0.25rem 0.5rem; background:var(--c-surface);">
+      <label>Name <input type="text" value="${escapeHtml(act.name)}"
+        oninput="updateAction('${pm.id}','${act.id}','name', this.value)" class="pc-input"></label>
+      <label>Type <select onchange="changeActionType('${pm.id}','${act.id}', this.value)">${typeSel}</select></label>
+      ${body}
+      <label>Uses/day (blank=at-will) <input type="number" value="${act.usesPerDay ?? ''}"
+        oninput="updateAction('${pm.id}','${act.id}','usesPerDay', this.value === '' ? null : parseInt(this.value))" class="pc-input"></label>
+      <label>Recharge minRoll (blank=none) <input type="number" min="2" max="6" value="${act.recharge ? act.recharge.minRoll : ''}"
+        oninput="updateAction('${pm.id}','${act.id}','recharge', this.value === '' ? null : { dice:'d6', minRoll: parseInt(this.value) })" class="pc-input"></label>
+      <button class="btn" style="font-size:0.75rem; margin-top:0.25rem"
+        onclick="removeAction('${pm.id}','${act.id}')">✕ Remove action</button>
+    </div>`;
+}
+
+function toggleAction(id) {
+  if (expandedAction.has(id)) expandedAction.delete(id); else expandedAction.add(id);
+  renderParty();
 }
 
 function togglePC(id) {
@@ -223,8 +305,68 @@ function removePC(id) {
   saveParty();
   renderParty();
 }
+function updateAction(pmId, aId, field, value) {
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  const act = pm.actions.find(a => a.id === aId); if (!act) return;
+  act[field] = value; saveParty(); renderParty();
+}
+function updateActionDamage(pmId, aId, field, value) {
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  const act = pm.actions.find(a => a.id === aId); if (!act) return;
+  act.damage = act.damage || {};
+  act.damage[field] = value; saveParty(); renderParty();
+}
+function updateActionSave(pmId, aId, field, value) {
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  const act = pm.actions.find(a => a.id === aId); if (!act) return;
+  act.save = act.save || {};
+  act.save[field] = value; saveParty(); renderParty();
+}
+function updateActionHeal(pmId, aId, field, value) {
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  const act = pm.actions.find(a => a.id === aId); if (!act) return;
+  act.heal = act.heal || { target:'ally', aoeTargets:0, reviveDowned:false };
+  act.heal[field] = value; saveParty(); renderParty();
+}
+function changeActionType(pmId, aId, newType) {
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  const act = pm.actions.find(a => a.id === aId); if (!act) return;
+  act.type = newType;
+  if (newType === 'heal') {
+    act.heal = act.heal || { dice:'1d4', mod:'+atkAbility', flat:0,
+                              target:'ally', aoeTargets:0, reviveDowned:false };
+    act.damage = null; act.save = null;
+  } else if (newType === 'save') {
+    act.save = act.save || { ability:'dex', dcOverride:null, halfOnSave:true,
+                             effectOnFail:'damage', condition:null };
+    act.damage = act.damage || { dice:'8d6', mod:0, type:'fire', riderDice:null, riderType:null };
+    act.heal = null;
+  } else if (newType === 'attack') {
+    act.damage = act.damage || { dice:'1d8', mod:'+atkAbility', type:'slashing',
+                                  riderDice:null, riderType:null };
+    act.heal = null;
+  } else {
+    act.damage = null; act.save = null; act.heal = null;
+  }
+  saveParty(); renderParty();
+}
+function removeAction(pmId, aId) {
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  pm.actions = pm.actions.filter(a => a.id !== aId);
+  saveParty(); renderParty();
+}
 function addAction(pmId) {
-  alert('Action editor lands in Task 23.');
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  const a = { id:'a-' + Math.random().toString(36).slice(2,6),
+              name:'New action', source:'weapon', type:'attack',
+              atkAbility:'str', atkBonusOverride:null,
+              damage:{ dice:'1d8', mod:'+atkAbility', type:'slashing',
+                       riderDice:null, riderType:null },
+              save:null, heal:null, aoeTargets:0,
+              usesPerDay:null, recharge:null, attacksPerAction:1 };
+  pm.actions.push(a);
+  expandedAction.add(a.id);
+  saveParty(); renderParty();
 }
 
 function escapeHtml(s) {
