@@ -9,6 +9,20 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### The Crucible — round-loop sim engine
+
+- `crucible-engine.js` now ships a full Monte-Carlo round-loop simulator:
+  `buildCombatants` (with FM solo extra-turn slot), `turnStart`
+  (condition tick + recharge + regen tick with damage-type suppression),
+  target selection and heal triage, action resolution for attack / save /
+  heal / multiattack (including FM minion rule and crit dice doubling),
+  and `runSim` aggregator with `requestAnimationFrame`-chunked trials,
+  three percentile-picked representative event logs, and per-PC /
+  per-action aggregation.
+- `tests/engine.test.html` covers 39 assertions including the five
+  spec scenarios (duel reproducibility, standard band, outnumbered band,
+  healer-helps, troll-fire flips).
+
 ### The Crucible — combat-sim parser + engine helpers
 
 - New `crucible-engine.js` with seeded Mulberry32 RNG, dice roller
