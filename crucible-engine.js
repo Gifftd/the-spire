@@ -44,11 +44,40 @@
     return total;
   }
 
+  // ─────────── Derived stats (PC + monster) ───────────
+  // Inputs: ability scores, level, proficiency flags. Outputs: numbers
+  // the sim consumes. PCs store inputs and derive at use; monsters carry
+  // pre-computed numbers from the parser (the parser feeds `toHit` and
+  // `saveDc` directly in ParsedAction).
+  function mod(score) { return Math.floor((Number(score) - 10) / 2); }
+  function pb(level)  { return Math.ceil(1 + (Number(level) || 1) / 4); }
+  function saveBonus(pm, ability) {
+    const m = mod(pm.abilities[ability]);
+    const isProf = !!(pm.profs && pm.profs.saves && pm.profs.saves[ability]);
+    return m + (isProf ? pb(pm.identity.level) : 0);
+  }
+  function toHit(pm, action) {
+    if (action.atkBonusOverride != null) return action.atkBonusOverride;
+    return mod(pm.abilities[action.atkAbility]) + pb(pm.identity.level);
+  }
+  function saveDc(pm, action) {
+    if (action.save && action.save.dcOverride != null) return action.save.dcOverride;
+    return 8 + mod(pm.abilities[action.atkAbility]) + pb(pm.identity.level);
+  }
+
+  // Resolve the numeric damage modifier from a PC action's
+  // damage.mod field — supports '+atkAbility' or a numeric string.
+  function pcDamageMod(pm, action) {
+    const raw = action.damage && action.damage.mod;
+    if (raw === '+atkAbility') return mod(pm.abilities[action.atkAbility]);
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : 0;
+  }
+
   // ─────────── Public exports ───────────
   const Crucible = {
-    makeRng,
-    rollDie,
-    rollDice,
+    makeRng, rollDie, rollDice,
+    mod, pb, saveBonus, toHit, saveDc, pcDamageMod,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Crucible;

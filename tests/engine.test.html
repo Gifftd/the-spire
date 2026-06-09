@@ -116,6 +116,42 @@ test('rollDice with crit=true doubles dice (not mod)', () => {
   assertTrue(maxNormal <= 11, 'normal cap 11, got ' + maxNormal);
   assertTrue(maxCrit > 11, 'crit must beat normal max, got ' + maxCrit);
 });
+test('mod: 10→0, 14→+2, 8→-1, 20→+5', () => {
+  assertEq(Crucible.mod(10), 0);
+  assertEq(Crucible.mod(14), 2);
+  assertEq(Crucible.mod(8), -1);
+  assertEq(Crucible.mod(20), 5);
+});
+test('pb: L1→2, L4→2, L5→3, L17→6, L20→6', () => {
+  assertEq(Crucible.pb(1), 2);
+  assertEq(Crucible.pb(4), 2);
+  assertEq(Crucible.pb(5), 3);
+  assertEq(Crucible.pb(17), 6);
+  assertEq(Crucible.pb(20), 6);
+});
+test('saveBonus: proficient adds PB, otherwise just mod', () => {
+  const pm = { identity:{level:5}, abilities:{str:14,dex:16,con:12,int:10,wis:12,cha:10},
+               profs:{saves:{str:false,dex:true,con:false,int:false,wis:false,cha:false}} };
+  assertEq(Crucible.saveBonus(pm, 'str'), 2);       // +2, not proficient
+  assertEq(Crucible.saveBonus(pm, 'dex'), 3 + 3);   // +3 from DEX, +3 PB at L5
+  assertEq(Crucible.saveBonus(pm, 'con'), 1);       // +1, not proficient
+});
+test('toHit: uses atkAbility + PB unless override', () => {
+  const pm = { identity:{level:5}, abilities:{str:16,dex:10,con:10,int:10,wis:10,cha:10},
+               profs:{saves:{}} };
+  const a1 = { atkAbility:'str', atkBonusOverride:null };
+  assertEq(Crucible.toHit(pm, a1), 3 + 3);          // STR +3, PB +3
+  const a2 = { atkAbility:'str', atkBonusOverride:9 };
+  assertEq(Crucible.toHit(pm, a2), 9);              // override wins
+});
+test('saveDc: 8 + atkAbility mod + PB unless override', () => {
+  const pm = { identity:{level:5}, abilities:{wis:18,str:10,dex:10,con:10,int:10,cha:10},
+               profs:{saves:{}} };
+  const a = { atkAbility:'wis', save:{ dcOverride:null } };
+  assertEq(Crucible.saveDc(pm, a), 8 + 4 + 3);      // 15
+  const ao = { atkAbility:'wis', save:{ dcOverride:17 } };
+  assertEq(Crucible.saveDc(pm, ao), 17);
+});
 </script>
 </body>
 </html>
