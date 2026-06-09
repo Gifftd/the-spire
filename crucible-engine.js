@@ -436,6 +436,71 @@
     return { totalHealed, revives };
   }
 
+  // ─────────── Apply damage to a target (post-roll) ───────────
+  // Already-multiplied damage value. Handles FM minion rule, downed/dead
+  // transitions, killing-blow attribution, and event emission.
+  function applyDamage(target, amount, type, attacker, events, round, attackerName, actionName) {
+    if (!target || target.dead) return;
+    if (amount <= 0) return;
+    if (target.side === 'monster' && target.isMinion) {
+      target.hp = 0;
+      target.dead = true;
+    } else {
+      target.hp = Math.max(0, target.hp - amount);
+      if (target.hp === 0) {
+        if (target.side === 'pc' && !target.downed) {
+          target.downed = true;
+          target.deathRound = round;
+          target.killedBy = { attacker: attackerName, action: actionName };
+        }
+        if (target.side === 'monster' && !target.dead) {
+          target.dead = true;
+          target.deathRound = round;
+          target.killedBy = { attacker: attackerName, action: actionName };
+        }
+      }
+    }
+    if (target.damageTypesReceivedThisTurn) target.damageTypesReceivedThisTurn.add(type);
+    events.push({ round, type:'damage', actor: attackerName, target: target.name,
+                  action: actionName, amount, dmgType: type });
+  }
+
+  // ─────────── Resolve a multiattack ───────────
+  // For each sub-action in the plan, fire it `count` times. Each sub-attack
+  // picks its own target via the same focus rule.
+  function resolveMultiattack(me, all, multiAction, tactics, rng, events, round) {
+    const myActions = me.side === 'monster'
+      ? (me.monster && me.monster.parsedActions) || []
+      : (me.pm && me.pm.actions) || [];
+    let warnings = [];
+    for (const step of (multiAction.multiattackPlan || [])) {
+      const sub = myActions.find(a =>
+        (a.sourceActionName || a.name) === step.actionName);
+      if (!sub || sub.kind === 'unparsed') {
+        warnings.push(`Multiattack sub-action '${step.actionName}' not found on ${me.name} — treated as a single attack.`);
+        continue;
+      }
+      for (let i = 0; i < (step.count || 1); i++) {
+        const tgt = pickEnemyTarget(me, all, tactics, rng);
+        if (!tgt) break;
+        if (sub.kind === 'attack') {
+          const r = me.side === 'monster'
+            ? resolveAttackMonster(me, tgt, sub, rng, events, round)
+            : resolveAttackPc(me, tgt, sub, rng, events, round);
+          // Convert damageByType into applyDamage calls.
+          for (const [t, dmg] of Object.entries(r.damageByType || {})) {
+            applyDamage(tgt, dmg, t, me, events, round, me.name, sub.sourceActionName || sub.name);
+          }
+        }
+        // Save sub-actions inside a multiattack are rare; resolve if encountered.
+        else if (sub.kind === 'save') {
+          resolveSave(me, [tgt], sub, rng, events, round);
+        }
+      }
+    }
+    return { warnings };
+  }
+
   // ─────────── Public exports ───────────
   const Crucible = {
     makeRng, rollDie, rollDice,
@@ -446,6 +511,7 @@
     aliveEnemies, aliveAllies,
     damageMultiplier, resolveAttackMonster, resolveAttackPc,
     resolveSave, resolveHeal,
+    applyDamage, resolveMultiattack,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Crucible;
