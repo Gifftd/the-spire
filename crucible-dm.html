@@ -384,16 +384,27 @@ STYLE.textContent = `
 `;
 document.head.appendChild(STYLE);
 
-// ─────────── Validation gate placeholder ───────────
+// ─────────── Validation gate ───────────
 function refreshGate() {
-  document.getElementById('btn-run').disabled = party.length === 0 ||
-    !document.getElementById('encounter-list').dataset.hasPicks;
+  const reasons = [];
+  if (party.length === 0) reasons.push('Add at least one PC.');
+  if (picks.length === 0) reasons.push('Add at least one monster.');
+  for (const pm of party) {
+    if (!pm.combat.hp || pm.combat.hp <= 0) reasons.push(`PC '${pm.identity.name}': HP must be > 0.`);
+    if (!pm.combat.ac || pm.combat.ac < 5) reasons.push(`PC '${pm.identity.name}': AC must be ≥ 5.`);
+    if (!pm.actions || !pm.actions.length) reasons.push(`PC '${pm.identity.name}': no actions defined.`);
+  }
+  for (const p of picks) {
+    const valid = (p.monster.parsedActions || []).some(pa => pa.kind !== 'unparsed');
+    if (!valid) reasons.push(`Monster '${p.monster.name}': no usable actions — fill them in via Review.`);
+  }
+  document.getElementById('btn-run').disabled = reasons.length > 0;
+  document.getElementById('btn-run').title = reasons.join('\n');
 }
 
 // ─────────── Event wiring ───────────
 document.getElementById('btn-add-pc').addEventListener('click', addPC);
-document.getElementById('btn-add-monster').addEventListener('click',
-  () => alert('Encounter picker lands in Task 26.'));
+// btn-add-monster is wired at the bottom of the encounter picker block.
 document.getElementById('btn-import-war-table').addEventListener('click', () => {
   let imported = [];
   try {
@@ -483,6 +494,124 @@ function showWarn(msg) {
   // Lightweight toast; replaced by a proper warnings list in Task 32.
   console.warn('[Crucible]', msg);
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Encounter picker
+// ═══════════════════════════════════════════════════════════════════════
+let picks = [];  // [{ pickId, monster, count }]
+function uidPick() { return 'p-' + Math.random().toString(36).slice(2, 6); }
+
+async function openPickerModal() {
+  const bestiary = await loadBestiary();
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:10; display:flex; align-items:center; justify-content:center;';
+  modal.innerHTML = `
+    <div style="background:var(--c-surface); border:1px solid var(--c-border); border-radius:6px; width:min(720px,90vw); max-height:80vh; display:flex; flex-direction:column;">
+      <div style="padding:0.75rem 1rem; border-bottom:1px solid var(--c-border); display:flex; justify-content:space-between;">
+        <b style="font-family:'Cinzel',serif; color:var(--c-accent);">Pick monsters</b>
+        <button class="btn" onclick="document.body.removeChild(this.closest('[data-modal]'))">✕</button>
+      </div>
+      <div style="padding:0.5rem 1rem;">
+        <input type="text" id="picker-filter" class="pc-input" placeholder="Filter by name…" autofocus>
+      </div>
+      <div id="picker-list" style="flex:1; overflow-y:auto; padding:0 1rem;"></div>
+    </div>`;
+  modal.dataset.modal = '1';
+  document.body.appendChild(modal);
+  const listEl = modal.querySelector('#picker-list');
+  function renderList(q) {
+    const ql = (q || '').toLowerCase();
+    const items = bestiary.filter(m => !ql || (m.name || '').toLowerCase().includes(ql));
+    listEl.innerHTML = items.slice(0, 200).map(m => `
+      <div style="padding:0.4rem; border-bottom:1px dashed var(--c-border); display:flex; justify-content:space-between;">
+        <span>${escapeHtml(m.name || '?')}
+          <span style="color:var(--c-ink-faint); font-size:0.85em">
+            CR ${escapeHtml(String(m.crText || m.cr || '?'))} · HP ${m.hp ?? '?'} · AC ${m.ac ?? '?'}
+          </span>${m._custom ? ' <span style="color:#b88a5a">(custom)</span>' : ''}
+        </span>
+        <button class="btn" data-pick="${escapeHtml(m.name)}" data-source="${escapeHtml(m._source||'')}">Add</button>
+      </div>`).join('') +
+      (items.length > 200 ? `<div style="padding:0.5rem; color:var(--c-ink-faint)">…and ${items.length-200} more. Refine the filter.</div>` : '');
+  }
+  renderList('');
+  modal.querySelector('#picker-filter').addEventListener('input', e => renderList(e.target.value));
+  listEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-pick]');
+    if (!btn) return;
+    const name = btn.dataset.pick;
+    const source = btn.dataset.source;
+    const m = bestiary.find(x => x.name === name && (x._source || '') === source);
+    if (!m) return;
+    addPick(m);
+    document.body.removeChild(modal);
+  });
+}
+
+function addPick(monster) {
+  // Clone the monster so we can attach parsedActions without mutating the
+  // shared bestiary list.
+  const m = JSON.parse(JSON.stringify(monster));
+  CrucibleParser.parseAllMonsterActions(m);
+  picks.push({ pickId: uidPick(), monster: m, count: 1 });
+  renderEncounter();
+}
+
+function removePick(id) {
+  picks = picks.filter(p => p.pickId !== id);
+  renderEncounter();
+}
+function setPickCount(id, n) {
+  const p = picks.find(x => x.pickId === id);
+  if (!p) return;
+  p.count = Math.max(1, parseInt(n) || 1);
+  renderEncounter();
+}
+
+function renderEncounter() {
+  const root = document.getElementById('encounter-list');
+  if (!picks.length) {
+    root.className = 'empty-state';
+    root.textContent = 'No monsters yet. Click "+ Add from Bestiary."';
+    root.dataset.hasPicks = '';
+    refreshGate();
+    return;
+  }
+  root.className = '';
+  root.dataset.hasPicks = '1';
+  root.innerHTML = picks.map(p => `
+    <div style="border:1px solid var(--c-border); border-radius:4px; padding:0.4rem; margin-bottom:0.4rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span><b>${escapeHtml(p.monster.name)}</b>
+          <span style="color:var(--c-ink-faint); font-size:0.85em">
+            CR ${escapeHtml(String(p.monster.crText || p.monster.cr || '?'))} · HP ${p.monster.hp ?? '?'} · AC ${p.monster.ac ?? '?'}
+          </span></span>
+        <span>
+          ×<input type="number" min="1" max="20" value="${p.count}" style="width:3rem"
+                  onchange="setPickCount('${p.pickId}', this.value)" class="pc-input">
+          <button class="btn" onclick="removePick('${p.pickId}')">✕</button>
+        </span>
+      </div>
+      <details>
+        <summary style="cursor:pointer; color:var(--c-ink-faint); font-size:0.85em">Parsed actions (${p.monster.parsedActions.length})</summary>
+        <ul style="font-size:0.8em; margin:0.25rem 0 0; padding-left:1rem;">
+          ${p.monster.parsedActions.map(pa => `
+            <li>${escapeHtml(pa.sourceActionName)} —
+              <span style="color:${pa.kind === 'unparsed' ? '#e77878' : 'var(--c-ink-faint)'}">${pa.kind}</span></li>`).join('')}
+        </ul>
+        <button class="btn" style="font-size:0.75em; margin-top:0.25rem"
+          onclick="openOverridePanel('${p.pickId}')">Review parsed actions</button>
+      </details>
+    </div>`).join('');
+  refreshGate();
+}
+
+// Stub — replaced in Task 27.
+function openOverridePanel(pickId) {
+  alert('Override panel lands in Task 27.');
+}
+
+// Wire the Add button.
+document.getElementById('btn-add-monster').onclick = openPickerModal;
 
 renderParty();
 
