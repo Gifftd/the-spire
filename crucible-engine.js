@@ -74,10 +74,83 @@
     return Number.isFinite(n) ? n : 0;
   }
 
+  // ─────────── Combatant materialization ───────────
+  // Turns the PartyMember + monster-pick lists into a flat combatants[].
+  // PCs are one-per-PartyMember; monsters expand to N independent copies.
+  function buildCombatants(party, monsterPicks, rng, rollHp) {
+    const out = [];
+    for (const pm of (party || [])) {
+      out.push({
+        id: 'pc:' + pm.id,
+        side: 'pc',
+        name: pm.identity.name || 'PC',
+        pm,                                   // ← full PC record
+        hp: pm.combat.hp, maxHp: pm.combat.maxHp, ac: pm.combat.ac,
+        initBonus: pm.combat.initBonus || 0,
+        isMinion: false, isSolo: false,
+        conditions: new Map(),                // condition → rounds remaining
+        downed: false, dead: false,
+        slotsLeft: {}, rechargeReady: {},     // by action name
+        damageTypesReceivedLastTurn: new Set(),
+        damageTypesReceivedThisTurn: new Set(),
+        lastHealRound: -99,
+      });
+    }
+    for (const pick of (monsterPicks || [])) {
+      const m = pick.monster;
+      const n = pick.count || 1;
+      for (let i = 1; i <= n; i++) {
+        const hp = rollHp && m.hpFormula
+          ? Math.max(1, rollDice(m.hpFormula, rng))
+          : (m.hp || 1);
+        const slotsLeft = {}, rechargeReady = {};
+        for (const pa of (m.parsedActions || [])) {
+          if (pa.usesPerDay != null) slotsLeft[pa.sourceActionName] = pa.usesPerDay;
+          if (pa.recharge)          rechargeReady[pa.sourceActionName] = true;
+        }
+        out.push({
+          id: pick.pickId + ':' + i,
+          side: 'monster',
+          name: n > 1 ? `${m.name} #${i}` : m.name,
+          monster: m,
+          hp, maxHp: hp, ac: m.ac || 10,
+          initBonus: m.initiative != null ? m.initiative
+                    : Math.floor(((m.abilities && m.abilities.dex && m.abilities.dex.mod) || 0)),
+          isMinion: !!m.isMinion, isSolo: !!m.isSolo,
+          conditions: new Map(),
+          downed: false, dead: false,
+          slotsLeft, rechargeReady,
+          damageTypesReceivedLastTurn: new Set(),
+          damageTypesReceivedThisTurn: new Set(),
+          lastHealRound: -99,
+          regeneration: m.regeneration || null,
+        });
+      }
+    }
+    return out;
+  }
+
+  // ─────────── Initiative ───────────
+  function rollInitiative(combatants, rng) {
+    for (const c of combatants) c.init = rollDie(20, rng) + (c.initBonus || 0);
+  }
+  // Returns slot list in descending init order. Each entry is
+  // { c, init }. Solos receive a second slot at init - 10 (FM rule).
+  function initOrder(combatants) {
+    const slots = [];
+    for (const c of combatants) {
+      slots.push({ c, init: c.init, name: c.name });
+      if (c.isSolo) slots.push({ c, init: c.init - 10, name: c.name });
+    }
+    slots.sort((a, b) => b.init - a.init);
+    return slots;
+  }
+
   // ─────────── Public exports ───────────
   const Crucible = {
     makeRng, rollDie, rollDice,
     mod, pb, saveBonus, toHit, saveDc, pcDamageMod,
+    buildCombatants, rollInitiative, initOrder,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Crucible;

@@ -152,6 +152,49 @@ test('saveDc: 8 + atkAbility mod + PB unless override', () => {
   const ao = { atkAbility:'wis', save:{ dcOverride:17 } };
   assertEq(Crucible.saveDc(pm, ao), 17);
 });
+test('buildCombatants: 1 PC + 2 goblins → 3 combatants with side flags', () => {
+  const party = [{
+    id:'pm1', identity:{ name:'Aria', level:5 },
+    abilities:{ str:10,dex:14,con:14,int:10,wis:10,cha:10 },
+    profs:{ saves:{} },
+    combat:{ hp:30, maxHp:30, ac:16, initBonus:2 },
+    actions:[],
+  }];
+  const monsters = [{
+    pickId:'p1', count:2,
+    monster:{ name:'Goblin', hp:7, ac:15, initiative:2, isMinion:false,
+              isSolo:false, parsedActions:[] },
+  }];
+  const rng = Crucible.makeRng(1);
+  const c = Crucible.buildCombatants(party, monsters, rng, false);
+  assertEq(c.length, 3);
+  assertEq(c[0].side, 'pc');
+  assertEq(c[1].side, 'monster');
+  assertEq(c[1].name, 'Goblin #1');
+  assertEq(c[2].name, 'Goblin #2');
+});
+test('rollInitiative: each combatant gets an init in [1+bonus, 20+bonus]', () => {
+  const cs = [
+    { name:'A', initBonus: 2, side:'pc' },
+    { name:'B', initBonus: 0, side:'monster' },
+  ];
+  const rng = Crucible.makeRng(11);
+  Crucible.rollInitiative(cs, rng);
+  for (const c of cs) {
+    assertTrue(c.init >= 1 + c.initBonus && c.init <= 20 + c.initBonus,
+      c.name + ' init out of range: ' + c.init);
+  }
+});
+test('initOrder: solos get an extra slot at init - 10', () => {
+  const cs = [
+    { name:'Solo', init: 18, isSolo: true,  side:'monster' },
+    { name:'Mob1', init: 12, isSolo: false, side:'monster' },
+  ];
+  const order = Crucible.initOrder(cs);
+  // Solo at 18 first, mob at 12, then solo again at 8.
+  assertEq(order.map(s => s.name + '@' + s.init),
+           ['Solo@18','Mob1@12','Solo@8']);
+});
 </script>
 </body>
 </html>
