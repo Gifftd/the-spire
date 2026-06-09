@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Spire — The Crucible</title>
+  <meta name="theme-color" content="#060a0e">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    body { background: var(--c-bg, #0e1418); color: var(--c-ink, #dde7e9);
+           font-family: 'Crimson Text', serif; margin:0; min-height:100vh; }
+    .topbar { display:flex; gap:0.5rem; align-items:center;
+              padding:0.6rem 1rem; border-bottom:1px solid var(--c-border, #1c2429);
+              background:var(--c-surface, #152028); }
+    .topbar h1 { font-family:'Cinzel', serif; font-size:1.1rem; margin:0 1rem 0 0;
+                 color:var(--c-accent, #7ec5c5); letter-spacing:0.05em; }
+    .topbar .spacer { flex:1; }
+    .btn { padding:0.4rem 0.8rem; background:var(--c-surface-2, #1d3a4a);
+           color:var(--c-ink); border:1px solid var(--c-border); cursor:pointer;
+           border-radius:4px; font-family:'Crimson Text', serif; }
+    .btn:hover { background:var(--c-surface-3, #224a5f); }
+    .btn-teal { background:var(--c-accent, #4a9595); color:#0e1418; border-color:#4a9595; }
+    .btn-teal:disabled { opacity:0.4; cursor:not-allowed; }
+    .layout { display:grid; grid-template-columns: 320px 400px 1fr;
+              gap:0; min-height: calc(100vh - 56px); }
+    .pane { padding:1rem; border-right:1px solid var(--c-border, #1c2429);
+            overflow-y:auto; max-height: calc(100vh - 56px); }
+    .pane:last-child { border-right:none; }
+    .pane h2 { font-family:'Cinzel', serif; font-size:0.95rem; margin:0 0 0.75rem;
+               color:var(--c-accent, #7ec5c5); letter-spacing:0.06em; }
+    @media (max-width: 1100px) {
+      .layout { grid-template-columns: 1fr; }
+      .pane { border-right:none; border-bottom:1px solid var(--c-border); max-height:none; }
+    }
+    .empty-state { color:var(--c-ink-faint, #8b9da3); font-style:italic;
+                   padding:1rem; text-align:center; }
+  </style>
+</head>
+<body>
+<script src="auth.js"></script>
+
+<div class="topbar">
+  <h1>⚔ The Crucible</h1>
+  <button class="btn btn-teal" id="btn-run" disabled>Run Simulation ▶</button>
+  <select id="trials-select" class="btn">
+    <option value="100">100 trials</option>
+    <option value="500" selected>500 trials</option>
+    <option value="2000">2000 trials</option>
+  </select>
+  <div class="spacer"></div>
+  <a class="btn" href="home.html">⌂ Home</a>
+</div>
+
+<div class="layout">
+  <section class="pane" id="pane-party">
+    <h2>PARTY <span id="party-count" style="color:var(--c-ink-faint)"></span></h2>
+    <div id="party-list" class="empty-state">No PCs yet. (Pane A under construction.)</div>
+    <button class="btn" id="btn-add-pc" style="margin-top:0.5rem">+ Add PC</button>
+    <button class="btn" id="btn-import-war-table" style="margin-top:0.5rem">Import from War Table</button>
+  </section>
+
+  <section class="pane" id="pane-encounter">
+    <h2>ENCOUNTER</h2>
+    <div id="encounter-list" class="empty-state">No monsters yet. (Pane B under construction.)</div>
+    <button class="btn" id="btn-add-monster" style="margin-top:0.5rem">+ Add from Bestiary</button>
+    <div id="fm-budget" style="margin-top:1rem; padding:0.5rem; background:var(--c-surface);
+         border-left:3px solid var(--c-accent); font-size:0.85rem;"></div>
+  </section>
+
+  <section class="pane" id="pane-results">
+    <h2>RESULTS</h2>
+    <div id="results-area" class="empty-state">Run a simulation to see how this fight plays out.</div>
+  </section>
+</div>
+
+<script src="crucible-parser.js"></script>
+<script src="crucible-engine.js"></script>
+<script>
+// ─────────── DM auth gate ───────────
+Auth.requireRole('dm', { redirect: 'home.html?notice=dm-only' });
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Party state — persisted to localStorage['crucible-party']
+// ═══════════════════════════════════════════════════════════════════════
+let party = loadParty();
+
+function loadParty() {
+  try {
+    const raw = localStorage.getItem('crucible-party');
+    if (raw) return JSON.parse(raw);
+  } catch (e) { console.warn('crucible-party load failed', e); }
+  return [];
+}
+function saveParty() {
+  localStorage.setItem('crucible-party', JSON.stringify(party));
+}
+function uid() { return 'pm-' + Math.random().toString(36).slice(2, 8); }
+
+function defaultPC() {
+  return {
+    id: uid(),
+    identity: { name:'New PC', player:'', class:'', subclass:'', level:5, race:'' },
+    abilities: { str:14, dex:14, con:14, int:10, wis:12, cha:10 },
+    profs:    { saves: { str:false, dex:false, con:false, int:false, wis:false, cha:false } },
+    combat:   { hp:30, maxHp:30, ac:16, initBonus:2, speed:30 },
+    actions:  [{ id:'a-' + Math.random().toString(36).slice(2,6),
+                 name:'Longsword', source:'weapon', type:'attack',
+                 atkAbility:'str', atkBonusOverride:null,
+                 damage:{ dice:'1d8', mod:'+atkAbility', type:'slashing',
+                          riderDice:null, riderType:null },
+                 save:null, heal:null, aoeTargets:0,
+                 usesPerDay:null, recharge:null, attacksPerAction:1 }],
+    tactics:  { aiHint:'focus', resources:'nova' },
+    _expanded: true,
+  };
+}
+
+const expandedPC = new Set();    // pmIds currently expanded
+function renderParty() {
+  const root = document.getElementById('party-list');
+  document.getElementById('party-count').textContent = '(' + party.length + ')';
+  if (!party.length) {
+    root.className = 'empty-state';
+    root.textContent = 'No PCs yet. Click "+ Add PC" or "Import from War Table."';
+    refreshGate();
+    renderFmBudget();
+    return;
+  }
+  root.className = '';
+  root.innerHTML = party.map(pm => renderPCCard(pm)).join('');
+  refreshGate();
+  renderFmBudget();
+}
+
+function renderPCCard(pm) {
+  const expanded = expandedPC.has(pm.id);
+  const summary = `${pm.identity.name} · L${pm.identity.level} · ${pm.combat.hp}HP · AC${pm.combat.ac}`;
+  return `
+    <div class="pc-card" style="border:1px solid var(--c-border); border-radius:4px; margin-bottom:0.5rem; padding:0.5rem;">
+      <div onclick="togglePC('${pm.id}')" style="cursor:pointer; display:flex; justify-content:space-between;">
+        <b>${escapeHtml(summary)}</b>
+        <span style="color:var(--c-ink-faint)">${expanded ? '▾' : '▸'}</span>
+      </div>
+      ${expanded ? renderPCEditor(pm) : ''}
+    </div>`;
+}
+
+function renderPCEditor(pm) {
+  const a = pm.abilities;
+  const p = pm.profs.saves;
+  return `
+    <div style="padding:0.5rem 0; border-top:1px solid var(--c-border); margin-top:0.5rem;">
+      <div style="font-family:'Cinzel',serif; font-size:0.8rem; color:var(--c-accent); margin-bottom:0.25rem">IDENTITY</div>
+      <input type="text" value="${escapeHtml(pm.identity.name)}" placeholder="Name"
+        oninput="updatePC('${pm.id}', 'identity.name', this.value)" class="pc-input">
+      <input type="number" value="${pm.identity.level}" placeholder="Level" min="1" max="20"
+        oninput="updatePC('${pm.id}', 'identity.level', parseInt(this.value)||1)" class="pc-input">
+      <input type="text" value="${escapeHtml(pm.identity.class||'')}" placeholder="Class"
+        oninput="updatePC('${pm.id}', 'identity.class', this.value)" class="pc-input">
+
+      <div style="font-family:'Cinzel',serif; font-size:0.8rem; color:var(--c-accent); margin:0.5rem 0 0.25rem">STATS</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.25rem">
+        <label>HP <input type="number" value="${pm.combat.maxHp}" min="1"
+          oninput="updatePC('${pm.id}', 'combat.maxHp', parseInt(this.value)||1); updatePC('${pm.id}', 'combat.hp', parseInt(this.value)||1)" class="pc-input"></label>
+        <label>AC <input type="number" value="${pm.combat.ac}" min="5" max="30"
+          oninput="updatePC('${pm.id}', 'combat.ac', parseInt(this.value)||10)" class="pc-input"></label>
+        <label>Init <input type="number" value="${pm.combat.initBonus}" min="-5" max="15"
+          oninput="updatePC('${pm.id}', 'combat.initBonus', parseInt(this.value)||0)" class="pc-input"></label>
+      </div>
+
+      <div style="font-family:'Cinzel',serif; font-size:0.8rem; color:var(--c-accent); margin:0.5rem 0 0.25rem">ABILITY SCORES</div>
+      <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:0.25rem">
+        ${['str','dex','con','int','wis','cha'].map(k => `
+          <label style="font-size:0.75rem">${k.toUpperCase()}
+            <input type="number" value="${a[k]}" min="1" max="30"
+              oninput="updatePC('${pm.id}', 'abilities.${k}', parseInt(this.value)||10)" class="pc-input">
+            <span style="font-size:0.7rem; color:var(--c-ink-faint)">save:
+              <input type="checkbox" ${p[k] ? 'checked':''}
+                onchange="updatePC('${pm.id}', 'profs.saves.${k}', this.checked)"></span>
+          </label>`).join('')}
+      </div>
+
+      <div style="font-family:'Cinzel',serif; font-size:0.8rem; color:var(--c-accent); margin:0.5rem 0 0.25rem">ACTIONS</div>
+      <div id="actions-${pm.id}">${(pm.actions || []).map(act => renderActionRow(pm, act)).join('')}</div>
+      <button class="btn" style="font-size:0.8rem; margin-top:0.25rem"
+        onclick="addAction('${pm.id}')">+ Add action</button>
+
+      <div style="margin-top:0.5rem; display:flex; gap:0.5rem;">
+        <button class="btn" style="font-size:0.8rem" onclick="removePC('${pm.id}')">✕ Remove PC</button>
+      </div>
+    </div>`;
+}
+
+const expandedAction = new Set();
+function renderActionRow(pm, act) {
+  const isOpen = expandedAction.has(act.id);
+  const summary = `${act.name} · ${act.type}` +
+    (act.damage ? ` · ${act.damage.dice}+${act.damage.mod === '+atkAbility' ? act.atkAbility.toUpperCase() : act.damage.mod}` : '') +
+    (act.heal ? ` · heals ${act.heal.dice || act.heal.flat || 0}` : '');
+  return `
+    <div style="padding:0.25rem; border-bottom:1px dashed var(--c-border); font-size:0.85rem">
+      <div style="cursor:pointer; display:flex; justify-content:space-between"
+        onclick="toggleAction('${act.id}')">
+        <span>${escapeHtml(summary)}</span>
+        <span style="color:var(--c-ink-faint)">${isOpen ? '▾' : '▸'}</span>
+      </div>
+      ${isOpen ? renderActionEditor(pm, act) : ''}
+    </div>`;
+}
+
+function renderActionEditor(pm, act) {
+  const typeSel = ['attack','save','heal','utility'].map(t =>
+    `<option value="${t}" ${act.type===t?'selected':''}>${t}</option>`).join('');
+  const abSel = ['str','dex','con','int','wis','cha'].map(t =>
+    `<option value="${t}" ${act.atkAbility===t?'selected':''}>${t.toUpperCase()}</option>`).join('');
+  let body = '';
+  if (act.type === 'attack') {
+    const d = act.damage || {};
+    body = `
+      <label>Atk ability <select onchange="updateAction('${pm.id}','${act.id}','atkAbility',this.value)">${abSel}</select></label>
+      <label>Override to-hit (blank = derived) <input type="number" value="${act.atkBonusOverride ?? ''}"
+        oninput="updateAction('${pm.id}','${act.id}','atkBonusOverride', this.value === '' ? null : parseInt(this.value))" class="pc-input"></label>
+      <label>Damage dice <input type="text" value="${escapeHtml(d.dice||'')}"
+        oninput="updateActionDamage('${pm.id}','${act.id}','dice', this.value)" class="pc-input" placeholder="1d8"></label>
+      <label>Damage mod ('+atkAbility' or number) <input type="text" value="${escapeHtml(String(d.mod||''))}"
+        oninput="updateActionDamage('${pm.id}','${act.id}','mod', this.value)" class="pc-input"></label>
+      <label>Type <input type="text" value="${escapeHtml(d.type||'')}"
+        oninput="updateActionDamage('${pm.id}','${act.id}','type', this.value)" class="pc-input"></label>
+      <label>Rider dice (optional) <input type="text" value="${escapeHtml(d.riderDice||'')}"
+        oninput="updateActionDamage('${pm.id}','${act.id}','riderDice', this.value||null)" class="pc-input"></label>
+      <label>Rider type (optional) <input type="text" value="${escapeHtml(d.riderType||'')}"
+        oninput="updateActionDamage('${pm.id}','${act.id}','riderType', this.value||null)" class="pc-input"></label>`;
+  } else if (act.type === 'save') {
+    const s = act.save || {};
+    body = `
+      <label>Save ability <select onchange="updateActionSave('${pm.id}','${act.id}','ability',this.value)">${abSel}</select></label>
+      <label>DC override (blank = derived) <input type="number" value="${s.dcOverride ?? ''}"
+        oninput="updateActionSave('${pm.id}','${act.id}','dcOverride', this.value === '' ? null : parseInt(this.value))" class="pc-input"></label>
+      <label>Damage dice <input type="text" value="${escapeHtml((act.damage&&act.damage.dice)||'')}"
+        oninput="updateActionDamage('${pm.id}','${act.id}','dice', this.value)" class="pc-input"></label>
+      <label>Type <input type="text" value="${escapeHtml((act.damage&&act.damage.type)||'')}"
+        oninput="updateActionDamage('${pm.id}','${act.id}','type', this.value)" class="pc-input"></label>
+      <label><input type="checkbox" ${s.halfOnSave?'checked':''}
+        onchange="updateActionSave('${pm.id}','${act.id}','halfOnSave', this.checked)"> half on save</label>
+      <label>AoE targets <input type="number" value="${act.aoeTargets||0}" min="0" max="20"
+        oninput="updateAction('${pm.id}','${act.id}','aoeTargets', parseInt(this.value)||0)" class="pc-input"></label>`;
+  } else if (act.type === 'heal') {
+    const h = act.heal || {};
+    body = `
+      <label>Heal dice (e.g. 1d8) <input type="text" value="${escapeHtml(h.dice||'')}"
+        oninput="updateActionHeal('${pm.id}','${act.id}','dice', this.value||null)" class="pc-input"></label>
+      <label>Heal mod ('+atkAbility' or number) <input type="text" value="${escapeHtml(String(h.mod||''))}"
+        oninput="updateActionHeal('${pm.id}','${act.id}','mod', this.value)" class="pc-input"></label>
+      <label>Flat (no-dice) <input type="number" value="${h.flat||0}"
+        oninput="updateActionHeal('${pm.id}','${act.id}','flat', parseInt(this.value)||0)" class="pc-input"></label>
+      <label>Target
+        <select onchange="updateActionHeal('${pm.id}','${act.id}','target', this.value)">
+          ${['self','ally','ally-aoe'].map(t => `<option value="${t}" ${h.target===t?'selected':''}>${t}</option>`).join('')}
+        </select></label>
+      <label><input type="checkbox" ${h.reviveDowned?'checked':''}
+        onchange="updateActionHeal('${pm.id}','${act.id}','reviveDowned', this.checked)"> revives downed</label>`;
+  }
+  return `
+    <div style="padding:0.25rem 0.5rem; background:var(--c-surface);">
+      <label>Name <input type="text" value="${escapeHtml(act.name)}"
+        oninput="updateAction('${pm.id}','${act.id}','name', this.value)" class="pc-input"></label>
+      <label>Type <select onchange="changeActionType('${pm.id}','${act.id}', this.value)">${typeSel}</select></label>
+      ${body}
+      <label>Uses/day (blank=at-will) <input type="number" value="${act.usesPerDay ?? ''}"
+        oninput="updateAction('${pm.id}','${act.id}','usesPerDay', this.value === '' ? null : parseInt(this.value))" class="pc-input"></label>
+      <label>Recharge minRoll (blank=none) <input type="number" min="2" max="6" value="${act.recharge ? act.recharge.minRoll : ''}"
+        oninput="updateAction('${pm.id}','${act.id}','recharge', this.value === '' ? null : { dice:'d6', minRoll: parseInt(this.value) })" class="pc-input"></label>
+      <button class="btn" style="font-size:0.75rem; margin-top:0.25rem"
+        onclick="removeAction('${pm.id}','${act.id}')">✕ Remove action</button>
+    </div>`;
+}
+
+function toggleAction(id) {
+  if (expandedAction.has(id)) expandedAction.delete(id); else expandedAction.add(id);
+  renderParty();
+}
+
+function togglePC(id) {
+  if (expandedPC.has(id)) expandedPC.delete(id); else expandedPC.add(id);
+  renderParty();
+}
+function updatePC(id, path, value) {
+  const pm = party.find(x => x.id === id);
+  if (!pm) return;
+  const parts = path.split('.');
+  let o = pm;
+  for (let i = 0; i < parts.length - 1; i++) o = o[parts[i]];
+  o[parts[parts.length-1]] = value;
+  saveParty();
+}
+function addPC() {
+  const pm = defaultPC();
+  party.push(pm);
+  expandedPC.add(pm.id);
+  saveParty();
+  renderParty();
+}
+function removePC(id) {
+  party = party.filter(p => p.id !== id);
+  expandedPC.delete(id);
+  saveParty();
+  renderParty();
+}
+function updateAction(pmId, aId, field, value) {
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  const act = pm.actions.find(a => a.id === aId); if (!act) return;
+  act[field] = value; saveParty(); renderParty();
+}
+function updateActionDamage(pmId, aId, field, value) {
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  const act = pm.actions.find(a => a.id === aId); if (!act) return;
+  act.damage = act.damage || {};
+  act.damage[field] = value; saveParty(); renderParty();
+}
+function updateActionSave(pmId, aId, field, value) {
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  const act = pm.actions.find(a => a.id === aId); if (!act) return;
+  act.save = act.save || {};
+  act.save[field] = value; saveParty(); renderParty();
+}
+function updateActionHeal(pmId, aId, field, value) {
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  const act = pm.actions.find(a => a.id === aId); if (!act) return;
+  act.heal = act.heal || { target:'ally', aoeTargets:0, reviveDowned:false };
+  act.heal[field] = value; saveParty(); renderParty();
+}
+function changeActionType(pmId, aId, newType) {
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  const act = pm.actions.find(a => a.id === aId); if (!act) return;
+  act.type = newType;
+  if (newType === 'heal') {
+    act.heal = act.heal || { dice:'1d4', mod:'+atkAbility', flat:0,
+                              target:'ally', aoeTargets:0, reviveDowned:false };
+    act.damage = null; act.save = null;
+  } else if (newType === 'save') {
+    act.save = act.save || { ability:'dex', dcOverride:null, halfOnSave:true,
+                             effectOnFail:'damage', condition:null };
+    act.damage = act.damage || { dice:'8d6', mod:0, type:'fire', riderDice:null, riderType:null };
+    act.heal = null;
+  } else if (newType === 'attack') {
+    act.damage = act.damage || { dice:'1d8', mod:'+atkAbility', type:'slashing',
+                                  riderDice:null, riderType:null };
+    act.heal = null;
+  } else {
+    act.damage = null; act.save = null; act.heal = null;
+  }
+  saveParty(); renderParty();
+}
+function removeAction(pmId, aId) {
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  pm.actions = pm.actions.filter(a => a.id !== aId);
+  saveParty(); renderParty();
+}
+function addAction(pmId) {
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  const a = { id:'a-' + Math.random().toString(36).slice(2,6),
+              name:'New action', source:'weapon', type:'attack',
+              atkAbility:'str', atkBonusOverride:null,
+              damage:{ dice:'1d8', mod:'+atkAbility', type:'slashing',
+                       riderDice:null, riderType:null },
+              save:null, heal:null, aoeTargets:0,
+              usesPerDay:null, recharge:null, attacksPerAction:1 };
+  pm.actions.push(a);
+  expandedAction.add(a.id);
+  saveParty(); renderParty();
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, ch =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
+// ─────────── Style for inputs ───────────
+const STYLE = document.createElement('style');
+STYLE.textContent = `
+  .pc-input { width:100%; padding:0.2rem 0.4rem; font-family:inherit;
+              background:var(--c-bg); color:var(--c-ink);
+              border:1px solid var(--c-border); border-radius:3px; }
+  .pc-input:focus { outline:1px solid var(--c-accent); }
+`;
+document.head.appendChild(STYLE);
+
+// ─────────── Validation gate ───────────
+function refreshGate() {
+  const reasons = [];
+  if (party.length === 0) reasons.push('Add at least one PC.');
+  if (picks.length === 0) reasons.push('Add at least one monster.');
+  for (const pm of party) {
+    if (!pm.combat.hp || pm.combat.hp <= 0) reasons.push(`PC '${pm.identity.name}': HP must be > 0.`);
+    if (!pm.combat.ac || pm.combat.ac < 5) reasons.push(`PC '${pm.identity.name}': AC must be ≥ 5.`);
+    if (!pm.actions || !pm.actions.length) reasons.push(`PC '${pm.identity.name}': no actions defined.`);
+  }
+  for (const p of picks) {
+    const valid = (p.monster.parsedActions || []).some(pa => pa.kind !== 'unparsed');
+    if (!valid) reasons.push(`Monster '${p.monster.name}': no usable actions — fill them in via Review.`);
+  }
+  document.getElementById('btn-run').disabled = reasons.length > 0;
+  document.getElementById('btn-run').title = reasons.join('\n');
+}
+
+// ─────────── Event wiring ───────────
+document.getElementById('btn-add-pc').addEventListener('click', addPC);
+// btn-add-monster is wired at the bottom of the encounter picker block.
+document.getElementById('btn-import-war-table').addEventListener('click', () => {
+  let imported = [];
+  try {
+    const raw = localStorage.getItem('init_pcs');
+    if (raw) imported = JSON.parse(raw) || [];
+  } catch (e) { console.warn('init_pcs load failed', e); }
+  if (!Array.isArray(imported) || !imported.length) {
+    alert('No War Table party found in localStorage. Add PCs in the War Table first.');
+    return;
+  }
+  const existingNames = new Set(party.map(p => p.identity.name.toLowerCase()));
+  let added = 0;
+  for (const ip of imported) {
+    if (!ip || typeof ip.name !== 'string') continue;
+    if (existingNames.has(ip.name.toLowerCase())) continue;
+    const pm = defaultPC();
+    pm.identity.name = ip.name;
+    pm.combat.maxHp = ip.maxHp || 30;
+    pm.combat.hp = ip.maxHp || 30;
+    pm.combat.ac = ip.ac || 16;
+    pm.combat.initBonus = ip.init || 2;
+    party.push(pm);
+    expandedPC.add(pm.id);
+    added++;
+  }
+  saveParty();
+  renderParty();
+  alert(`Imported ${added} PC${added !== 1 ? 's' : ''} from the War Table. Defaults filled in for abilities/actions — review before running.`);
+});
+let lastSimResult = null;
+let lastSimSeed = null;
+
+document.getElementById('btn-run').addEventListener('click', async () => {
+  if (document.getElementById('btn-run').disabled) return;
+  const trials = parseInt(document.getElementById('trials-select').value) || 500;
+  const tactics = { aiHint:'focus', resources:'nova' };
+  const seedFromUrl = new URL(location.href).searchParams.get('seed');
+  const seed = seedFromUrl ? parseInt(seedFromUrl) : Math.floor(Math.random() * 1e9);
+  lastSimSeed = seed;
+  const root = document.getElementById('results-area');
+  root.className = '';
+  root.innerHTML = `
+    <div style="padding:1rem; text-align:center;">
+      <div style="font-family:'Cinzel',serif; margin-bottom:0.5rem;">Running ${trials} trials…</div>
+      <div id="progress-bar" style="width:100%; height:10px; background:var(--c-bg); border:1px solid var(--c-border); border-radius:4px; overflow:hidden;">
+        <div id="progress-fill" style="height:100%; width:0%; background:var(--c-accent); transition:width 100ms;"></div>
+      </div>
+      <div id="progress-text" style="margin-top:0.5rem; color:var(--c-ink-faint);">0/${trials}</div>
+      <div id="winrate-live" style="margin-top:0.5rem; color:var(--c-ink-faint);"></div>
+    </div>`;
+  try {
+    const result = await Crucible.runSim({
+      party,
+      monsterPicks: picks,
+      trials, tactics, seed,
+      onProgress: ({ completed, winRate }) => {
+        const pct = Math.round((completed / trials) * 100);
+        document.getElementById('progress-fill').style.width = pct + '%';
+        document.getElementById('progress-text').textContent = `${completed}/${trials}`;
+        document.getElementById('winrate-live').textContent =
+          `live win-rate: ${(winRate * 100).toFixed(0)}%`;
+      },
+    });
+    lastSimResult = result;
+    renderResults(result);
+  } catch (e) {
+    root.innerHTML = `<div style="color:#e77878; padding:1rem">Sim failed: ${escapeHtml(e.message || String(e))}</div>`;
+  }
+});
+
+function bandLabel(r) {
+  const win = r.headline.winRate;
+  const tpk = r.headline.partyTpkRate;
+  const downed = r.headline.avgDowned;
+  if (tpk >= 0.15)  return { label: 'TPK-LIKELY', color: '#a3344b' };
+  if (win >= 0.9 && downed < 0.5)  return { label: 'EASY',      color: '#7fd49a' };
+  if (win >= 0.7 && downed < 1.5)  return { label: 'STANDARD',  color: '#dbb965' };
+  if (win >= 0.45)                  return { label: 'HARD',      color: '#e09a5a' };
+  return { label: 'DEADLY', color: '#e77878' };
+}
+
+function renderResults(r) {
+  const root = document.getElementById('results-area');
+  const band = bandLabel(r);
+  const fm = computeFmBudget();
+  root.innerHTML = `
+    <div style="padding:1rem;">
+      <div style="display:flex; gap:1rem; align-items:flex-start;">
+        <div>
+          <button class="btn" onclick="document.getElementById('btn-run').click()">↻ Rerun</button>
+          <button class="btn" onclick="copyReport()">📋 Copy report</button>
+        </div>
+        <div style="flex:1; text-align:right; color:var(--c-ink-faint); font-size:0.85em">
+          Seed: <span onclick="copySeed()" style="cursor:pointer; text-decoration:underline">${lastSimSeed}</span>
+          · ${r.trials} trials
+        </div>
+      </div>
+
+      <div style="margin:1rem 0; padding:1rem; background:var(--c-surface); border-left:5px solid ${band.color}; border-radius:4px;">
+        <div style="font-family:'Cinzel',serif; font-size:1.4rem; color:${band.color}; letter-spacing:0.05em">
+          ${band.label}
+        </div>
+        ${fm ? `<div style="margin-top:0.5rem; color:var(--c-ink-faint); font-size:0.9rem">
+          FM said <b>${fm.band.toUpperCase()}</b>; sim says <b style="color:${band.color}">${band.label}</b>.
+        </div>` : ''}
+        <div style="margin-top:0.75rem; display:flex; gap:1.5rem; flex-wrap:wrap;">
+          <div><div style="color:var(--c-ink-faint); font-size:0.75rem">WIN RATE</div>
+            <div style="font-size:1.25rem">${(r.headline.winRate*100).toFixed(1)}%</div></div>
+          <div><div style="color:var(--c-ink-faint); font-size:0.75rem">AVG ROUNDS</div>
+            <div style="font-size:1.25rem">${r.headline.avgRounds.toFixed(1)}</div></div>
+          <div><div style="color:var(--c-ink-faint); font-size:0.75rem">AVG DOWNED</div>
+            <div style="font-size:1.25rem">${r.headline.avgDowned.toFixed(2)}</div></div>
+          <div><div style="color:var(--c-ink-faint); font-size:0.75rem">TPK RATE</div>
+            <div style="font-size:1.25rem">${(r.headline.partyTpkRate*100).toFixed(1)}%</div></div>
+        </div>
+      </div>
+
+      <div id="result-perpc"></div>
+      <div id="result-dist"></div>
+      <div id="result-peraction"></div>
+      <div id="result-replays"></div>
+
+      ${r.warnings.length ? `
+      <details style="margin-top:1rem;"><summary style="color:#dbb965">⚠ ${r.warnings.length} warning(s)</summary>
+        <ul>${r.warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>
+      </details>` : ''}
+      ${r.errors.length ? `
+      <details style="margin-top:1rem;"><summary style="color:#e77878">✗ ${r.errors.length} error(s)</summary>
+        <ul>${r.errors.slice(0,5).map(e => `<li>Trial ${e.trial}: ${escapeHtml(e.message)}</li>`).join('')}</ul>
+      </details>` : ''}
+    </div>`;
+
+  renderPerPc(r);
+  renderDistribution(r);
+  renderPerAction(r);
+  renderReplays(r);
+}
+
+function copySeed() {
+  if (lastSimSeed == null) return;
+  navigator.clipboard.writeText(String(lastSimSeed)).then(() =>
+    alert('Seed ' + lastSimSeed + ' copied. Use ?seed=' + lastSimSeed + ' to replay.'));
+}
+function copyReport() {
+  if (!lastSimResult) return;
+  const r = lastSimResult;
+  const fm = computeFmBudget();
+  const band = bandLabel(r);
+  const md = [
+    `# Crucible run — ${band.label}`,
+    '',
+    fm ? `**FM band:** ${fm.band.toUpperCase()} (level ${fm.level} × ${fm.size}, total CR ${fm.totalCr})` : '',
+    `**Sim band:** ${band.label}`,
+    `**Trials:** ${r.trials} · **Seed:** ${lastSimSeed}`,
+    `**Win rate:** ${(r.headline.winRate*100).toFixed(1)}% · ` +
+    `**Avg rounds:** ${r.headline.avgRounds.toFixed(1)} · ` +
+    `**Avg downed:** ${r.headline.avgDowned.toFixed(2)} · ` +
+    `**TPK rate:** ${(r.headline.partyTpkRate*100).toFixed(1)}%`,
+    '',
+    '## Per-PC outcomes',
+    '',
+    '| PC | down % | ≥½ HP loss % | avg HP | avg fell at | avg healed |',
+    '|---|---:|---:|---:|---:|---:|',
+    ...r.perPc.map(p =>
+      `| ${p.name} | ${(p.downRate*100).toFixed(0)}% | ${(p.halfHpRate*100).toFixed(0)}% | ${p.avgHpRemaining.toFixed(1)} | ${p.deathRound.mean != null ? 'R'+p.deathRound.mean.toFixed(1) : '—'} | ${p.avgHealReceived.toFixed(1)} |`),
+    '',
+    '## Top actions by combined impact',
+    '',
+    '| Actor | Action | Kind | Uses | Total dmg | Total healed | Kills |',
+    '|---|---|---|---:|---:|---:|---:|',
+    ...r.perAction.slice().sort((a,b) => (b.totalDmg+b.totalHealed) - (a.totalDmg+a.totalHealed))
+      .slice(0, 10).map(row =>
+        `| ${row.actor} | ${row.name} | ${row.kind} | ${row.uses} | ${row.totalDmg} | ${row.totalHealed} | ${row.killsCaused} |`),
+  ].filter(Boolean).join('\n');
+  navigator.clipboard.writeText(md).then(() => alert('Report copied as markdown.'));
+}
+function renderPerPc(r) {
+  const root = document.getElementById('result-perpc');
+  if (!r.perPc.length) { root.innerHTML = ''; return; }
+  root.innerHTML = `
+    <details open style="margin-top:0.5rem;">
+      <summary style="font-family:'Cinzel',serif; color:var(--c-accent); cursor:pointer;">Per-PC outcomes</summary>
+      <table style="width:100%; font-size:0.85rem; border-collapse:collapse; margin-top:0.5rem;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--c-border); color:var(--c-ink-faint); text-align:left;">
+            <th style="padding:0.25rem">PC</th>
+            <th style="padding:0.25rem; text-align:right">down %</th>
+            <th style="padding:0.25rem; text-align:right">≥½ HP loss %</th>
+            <th style="padding:0.25rem; text-align:right">avg HP</th>
+            <th style="padding:0.25rem; text-align:right">avg fell at</th>
+            <th style="padding:0.25rem; text-align:right">avg healed</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${r.perPc.map(p => `
+            <tr style="border-bottom:1px dashed var(--c-border)">
+              <td style="padding:0.25rem">${escapeHtml(p.name)}</td>
+              <td style="padding:0.25rem; text-align:right; color:${p.downRate >= 0.3 ? '#e77878' : 'inherit'}">${(p.downRate*100).toFixed(0)}%</td>
+              <td style="padding:0.25rem; text-align:right">${(p.halfHpRate*100).toFixed(0)}%</td>
+              <td style="padding:0.25rem; text-align:right">${p.avgHpRemaining.toFixed(1)}</td>
+              <td style="padding:0.25rem; text-align:right">${p.deathRound.mean != null ? 'R' + p.deathRound.mean.toFixed(1) : '—'}</td>
+              <td style="padding:0.25rem; text-align:right">${p.avgHealReceived.toFixed(1)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </details>`;
+}
+function renderDistribution(r) {
+  const root = document.getElementById('result-dist');
+  const downed = r.distribution.downedHist;
+  const rounds = r.distribution.roundsHist;
+  const maxD = Math.max(...downed, 1);
+  const maxR = Math.max(...rounds, 1);
+  root.innerHTML = `
+    <details open style="margin-top:0.5rem;">
+      <summary style="font-family:'Cinzel',serif; color:var(--c-accent); cursor:pointer;">Distribution</summary>
+      <div style="display:flex; gap:1.5rem; margin-top:0.5rem;">
+        <div style="flex:1">
+          <div style="font-size:0.8rem; color:var(--c-ink-faint); margin-bottom:0.25rem">PCs downed per fight</div>
+          ${renderBars(downed.map((n, i) => ({ label: String(i), value: n })), maxD)}
+        </div>
+        <div style="flex:1">
+          <div style="font-size:0.8rem; color:var(--c-ink-faint); margin-bottom:0.25rem">Rounds to resolution</div>
+          ${renderBars(rounds.map((n, i) => ({ label: 'R' + i, value: n })).slice(1), maxR)}
+        </div>
+      </div>
+    </details>`;
+}
+
+function renderBars(rows, max) {
+  return `<svg viewBox="0 0 200 100" preserveAspectRatio="none" style="width:100%; height:100px; border:1px solid var(--c-border); border-radius:4px;">
+    ${rows.map((row, i) => {
+      const w = 200 / rows.length;
+      const h = Math.round((row.value / max) * 90);
+      return `<g>
+        <rect x="${i*w + 1}" y="${100 - h}" width="${w - 2}" height="${h}" fill="#4a9595"/>
+        <text x="${i*w + w/2}" y="98" text-anchor="middle" font-size="6" fill="#a0adb2">${escapeHtml(row.label)}</text>
+      </g>`;
+    }).join('')}
+  </svg>`;
+}
+
+function renderPerAction(r) {
+  const root = document.getElementById('result-peraction');
+  const rows = r.perAction.slice().sort((a, b) =>
+    (b.totalDmg + b.totalHealed) - (a.totalDmg + a.totalHealed));
+  root.innerHTML = `
+    <details open style="margin-top:0.5rem;">
+      <summary style="font-family:'Cinzel',serif; color:var(--c-accent); cursor:pointer;">Action effectiveness</summary>
+      <table style="width:100%; font-size:0.85rem; border-collapse:collapse; margin-top:0.5rem;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--c-border); color:var(--c-ink-faint); text-align:left;">
+            <th style="padding:0.25rem">Actor</th>
+            <th style="padding:0.25rem">Action</th>
+            <th style="padding:0.25rem">Kind</th>
+            <th style="padding:0.25rem; text-align:right">Uses</th>
+            <th style="padding:0.25rem; text-align:right">Hits</th>
+            <th style="padding:0.25rem; text-align:right">Total dmg</th>
+            <th style="padding:0.25rem; text-align:right">Total healed</th>
+            <th style="padding:0.25rem; text-align:right">Avg/use</th>
+            <th style="padding:0.25rem; text-align:right">Kills</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(row => `
+            <tr style="border-bottom:1px dashed var(--c-border)">
+              <td style="padding:0.25rem">${row.actor}</td>
+              <td style="padding:0.25rem">${escapeHtml(row.name)}</td>
+              <td style="padding:0.25rem; color:var(--c-ink-faint)">${row.kind}</td>
+              <td style="padding:0.25rem; text-align:right">${row.uses}</td>
+              <td style="padding:0.25rem; text-align:right">${row.hits}</td>
+              <td style="padding:0.25rem; text-align:right">${row.totalDmg}</td>
+              <td style="padding:0.25rem; text-align:right">${row.totalHealed}</td>
+              <td style="padding:0.25rem; text-align:right">${row.avgDmg.toFixed(1)}</td>
+              <td style="padding:0.25rem; text-align:right">${row.killsCaused}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </details>`;
+}
+let activeReplay = 'median';
+function renderReplays(r) {
+  const root = document.getElementById('result-replays');
+  if (!r.representative || !r.representative.low) { root.innerHTML = ''; return; }
+  root.innerHTML = `
+    <details style="margin-top:0.5rem;">
+      <summary style="font-family:'Cinzel',serif; color:var(--c-accent); cursor:pointer;">Representative fights</summary>
+      <div style="margin-top:0.5rem; display:flex; gap:0.5rem;">
+        <button class="btn" onclick="switchReplay('low')">Low (p10)</button>
+        <button class="btn" onclick="switchReplay('median')">Median</button>
+        <button class="btn" onclick="switchReplay('high')">High (p90)</button>
+      </div>
+      <pre id="replay-pre" style="margin-top:0.5rem; font-size:0.8rem; max-height:400px; overflow-y:auto; padding:0.5rem; background:var(--c-bg); border:1px solid var(--c-border); border-radius:4px;"></pre>
+    </details>`;
+  switchReplay(activeReplay);
+}
+
+function switchReplay(which) {
+  activeReplay = which;
+  if (!lastSimResult || !lastSimResult.representative) return;
+  const trial = lastSimResult.representative[which];
+  if (!trial) return;
+  const pre = document.getElementById('replay-pre');
+  if (!pre) return;
+  pre.textContent = trial.events.map(formatEvent).join('\n') +
+    '\n\n===\nWinner: ' + trial.winner +
+    '\nRounds: ' + trial.rounds +
+    '\nPCs surviving HP: ' + trial.partyView.map(p =>
+      `${p.name}=${p.hp}${p.downed?'(downed)':''}`).join(', ');
+}
+
+function formatEvent(ev) {
+  switch (ev.type) {
+    case 'attack':
+      return `R${ev.round} · ${ev.actor} → ${ev.target} · ${ev.action} (roll ${ev.roll}${ev.crit?' CRIT':''}) → ${ev.hit?'hit':'miss'}${ev.damageDealt?' '+ev.damageDealt+' dmg':''}`;
+    case 'save':
+      return `R${ev.round} · ${ev.actor} → ${ev.target} · ${ev.action} save: ${ev.passed?'passed':'failed'}${ev.damageDealt?' '+ev.damageDealt+' dmg':''}`;
+    case 'heal':
+      return `R${ev.round} · ${ev.actor} heals ${ev.target} · ${ev.action} → +${ev.amount}${ev.revived?' REVIVED':''}`;
+    case 'damage':
+      return `R${ev.round} · ${ev.target} takes ${ev.amount} ${ev.dmgType} (from ${ev.action})`;
+    case 'regen':
+      return `R${ev.round} · ${ev.actor} regenerates +${ev.amount} → ${ev.hpAfter} HP`;
+  }
+  return JSON.stringify(ev);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Bestiary loader
+// ═══════════════════════════════════════════════════════════════════════
+//  Merges bestiary.json + fm.json + bestiary_custom (KV) into one array.
+//  Cached on `window._CRUCIBLE_BESTIARY`. Fallback: localStorage cache
+//  written on each successful fetch.
+const WORKER_URL = (typeof CRUCIBLE_WORKER_URL !== 'undefined')
+  ? CRUCIBLE_WORKER_URL
+  : 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+
+async function loadBestiary() {
+  if (window._CRUCIBLE_BESTIARY) return window._CRUCIBLE_BESTIARY;
+  const out = [];
+  // Try fresh fetch.
+  try {
+    const [mm, fm] = await Promise.all([
+      fetch('bestiary.json').then(r => r.json()),
+      fetch('fm.json').then(r => r.json()),
+    ]);
+    for (const m of (mm.monsters || [])) out.push({ ...m, _source: 'mm-2024' });
+    for (const m of (fm.monsters || [])) out.push({ ...m, _source: 'fm-v1' });
+  } catch (e) {
+    console.warn('Bestiary fetch failed; trying cache.', e);
+    try {
+      const raw = localStorage.getItem('crucible-bestiary-cache');
+      if (raw) {
+        const cached = JSON.parse(raw);
+        if (Array.isArray(cached.monsters)) {
+          out.push(...cached.monsters);
+          showWarn('Using cached bestiary from ' + cached.cachedAt);
+        }
+      }
+    } catch (e2) { console.warn('Cache read failed', e2); }
+  }
+  // Try bestiary_custom (DM-authored).
+  try {
+    const headers = Auth.dmHeaders ? Auth.dmHeaders() : {};
+    const r = await fetch(WORKER_URL + '?type=bestiary_custom', { headers });
+    if (r.ok) {
+      const custom = await r.json();
+      const monsters = (custom && custom.monsters) || [];
+      for (const m of monsters) out.push({ ...m, _custom: true });
+    }
+  } catch (e) { console.warn('bestiary_custom fetch failed', e); }
+  // Cache for offline.
+  try {
+    localStorage.setItem('crucible-bestiary-cache',
+      JSON.stringify({ cachedAt: new Date().toISOString().slice(0, 10), monsters: out }));
+  } catch (e) { /* localStorage quota */ }
+  window._CRUCIBLE_BESTIARY = out;
+  return out;
+}
+
+function showWarn(msg) {
+  // Lightweight toast; replaced by a proper warnings list in Task 32.
+  console.warn('[Crucible]', msg);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Encounter picker
+// ═══════════════════════════════════════════════════════════════════════
+let picks = [];  // [{ pickId, monster, count }]
+function uidPick() { return 'p-' + Math.random().toString(36).slice(2, 6); }
+
+async function openPickerModal() {
+  const bestiary = await loadBestiary();
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:10; display:flex; align-items:center; justify-content:center;';
+  modal.innerHTML = `
+    <div style="background:var(--c-surface); border:1px solid var(--c-border); border-radius:6px; width:min(720px,90vw); max-height:80vh; display:flex; flex-direction:column;">
+      <div style="padding:0.75rem 1rem; border-bottom:1px solid var(--c-border); display:flex; justify-content:space-between;">
+        <b style="font-family:'Cinzel',serif; color:var(--c-accent);">Pick monsters</b>
+        <button class="btn" onclick="document.body.removeChild(this.closest('[data-modal]'))">✕</button>
+      </div>
+      <div style="padding:0.5rem 1rem;">
+        <input type="text" id="picker-filter" class="pc-input" placeholder="Filter by name…" autofocus>
+      </div>
+      <div id="picker-list" style="flex:1; overflow-y:auto; padding:0 1rem;"></div>
+    </div>`;
+  modal.dataset.modal = '1';
+  document.body.appendChild(modal);
+  const listEl = modal.querySelector('#picker-list');
+  function renderList(q) {
+    const ql = (q || '').toLowerCase();
+    const items = bestiary.filter(m => !ql || (m.name || '').toLowerCase().includes(ql));
+    listEl.innerHTML = items.slice(0, 200).map(m => `
+      <div style="padding:0.4rem; border-bottom:1px dashed var(--c-border); display:flex; justify-content:space-between;">
+        <span>${escapeHtml(m.name || '?')}
+          <span style="color:var(--c-ink-faint); font-size:0.85em">
+            CR ${escapeHtml(String(m.crText || m.cr || '?'))} · HP ${m.hp ?? '?'} · AC ${m.ac ?? '?'}
+          </span>${m._custom ? ' <span style="color:#b88a5a">(custom)</span>' : ''}
+        </span>
+        <button class="btn" data-pick="${escapeHtml(m.name)}" data-source="${escapeHtml(m._source||'')}">Add</button>
+      </div>`).join('') +
+      (items.length > 200 ? `<div style="padding:0.5rem; color:var(--c-ink-faint)">…and ${items.length-200} more. Refine the filter.</div>` : '');
+  }
+  renderList('');
+  modal.querySelector('#picker-filter').addEventListener('input', e => renderList(e.target.value));
+  listEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-pick]');
+    if (!btn) return;
+    const name = btn.dataset.pick;
+    const source = btn.dataset.source;
+    const m = bestiary.find(x => x.name === name && (x._source || '') === source);
+    if (!m) return;
+    addPick(m);
+    document.body.removeChild(modal);
+  });
+}
+
+function addPick(monster) {
+  // Clone the monster so we can attach parsedActions without mutating the
+  // shared bestiary list.
+  const m = JSON.parse(JSON.stringify(monster));
+  CrucibleParser.parseAllMonsterActions(m);
+  picks.push({ pickId: uidPick(), monster: m, count: 1 });
+  renderEncounter();
+}
+
+function removePick(id) {
+  picks = picks.filter(p => p.pickId !== id);
+  renderEncounter();
+}
+function setPickCount(id, n) {
+  const p = picks.find(x => x.pickId === id);
+  if (!p) return;
+  p.count = Math.max(1, parseInt(n) || 1);
+  renderEncounter();
+}
+
+function renderEncounter() {
+  const root = document.getElementById('encounter-list');
+  if (!picks.length) {
+    root.className = 'empty-state';
+    root.textContent = 'No monsters yet. Click "+ Add from Bestiary."';
+    root.dataset.hasPicks = '';
+    refreshGate();
+    renderFmBudget();
+    return;
+  }
+  root.className = '';
+  root.dataset.hasPicks = '1';
+  root.innerHTML = picks.map(p => `
+    <div style="border:1px solid var(--c-border); border-radius:4px; padding:0.4rem; margin-bottom:0.4rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span><b>${escapeHtml(p.monster.name)}</b>
+          <span style="color:var(--c-ink-faint); font-size:0.85em">
+            CR ${escapeHtml(String(p.monster.crText || p.monster.cr || '?'))} · HP ${p.monster.hp ?? '?'} · AC ${p.monster.ac ?? '?'}
+          </span></span>
+        <span>
+          ×<input type="number" min="1" max="20" value="${p.count}" style="width:3rem"
+                  onchange="setPickCount('${p.pickId}', this.value)" class="pc-input">
+          <button class="btn" onclick="removePick('${p.pickId}')">✕</button>
+        </span>
+      </div>
+      <details>
+        <summary style="cursor:pointer; color:var(--c-ink-faint); font-size:0.85em">Parsed actions (${p.monster.parsedActions.length})</summary>
+        <ul style="font-size:0.8em; margin:0.25rem 0 0; padding-left:1rem;">
+          ${p.monster.parsedActions.map(pa => `
+            <li>${escapeHtml(pa.sourceActionName)} —
+              <span style="color:${pa.kind === 'unparsed' ? '#e77878' : 'var(--c-ink-faint)'}">${pa.kind}</span></li>`).join('')}
+        </ul>
+        <button class="btn" style="font-size:0.75em; margin-top:0.25rem"
+          onclick="openOverridePanel('${p.pickId}')">Review parsed actions</button>
+      </details>
+    </div>`).join('');
+  refreshGate();
+  renderFmBudget();
+}
+
+function openOverridePanel(pickId) {
+  const pick = picks.find(p => p.pickId === pickId);
+  if (!pick) return;
+  const m = pick.monster;
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:10; display:flex; align-items:center; justify-content:center;';
+  modal.innerHTML = `
+    <div data-modal style="background:var(--c-surface); border:1px solid var(--c-border); border-radius:6px; width:min(800px,95vw); max-height:90vh; display:flex; flex-direction:column;">
+      <div style="padding:0.75rem 1rem; border-bottom:1px solid var(--c-border); display:flex; justify-content:space-between;">
+        <b style="font-family:'Cinzel',serif; color:var(--c-accent);">Review parsed actions — ${escapeHtml(m.name)}</b>
+        <button class="btn" onclick="document.body.removeChild(this.closest('[data-modal]').parentElement)">✕</button>
+      </div>
+      <div style="flex:1; overflow-y:auto; padding:1rem;">
+        <div id="override-list"></div>
+        ${m.regeneration ? `
+          <div style="margin-top:1rem; padding:0.5rem; border:1px solid var(--c-border); border-radius:4px;">
+            <b>Regeneration:</b>
+            <label>Amount <input type="number" value="${m.regeneration.amount}" class="pc-input"
+              oninput="overrideRegen('${pickId}', 'amount', parseInt(this.value)||0)"></label>
+            <label>Suppressed by (comma-separated)
+              <input type="text" value="${(m.regeneration.suppressedBy||[]).join(', ')}" class="pc-input"
+                oninput="overrideRegen('${pickId}', 'suppressedBy', this.value.split(',').map(s=>s.trim()).filter(Boolean))"></label>
+          </div>` : ''}
+      </div>
+      <div style="padding:0.5rem 1rem; border-top:1px solid var(--c-border); text-align:right">
+        <button class="btn btn-teal" onclick="saveOverride('${pickId}')">Save to bestiary_custom</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  renderOverrideList(pick, modal.querySelector('#override-list'));
+}
+
+function renderOverrideList(pick, root) {
+  const m = pick.monster;
+  root.innerHTML = m.parsedActions.map((pa, idx) => `
+    <details ${pa.kind === 'unparsed' ? 'open' : ''} style="border:1px solid var(--c-border); border-radius:4px; padding:0.5rem; margin-bottom:0.5rem;">
+      <summary><b>${escapeHtml(pa.sourceActionName)}</b>
+        <span style="color:${pa.kind === 'unparsed' ? '#e77878' : 'var(--c-ink-faint)'};">${pa.kind}</span></summary>
+      <div style="padding:0.5rem 0;">
+        <label>Kind
+          <select onchange="overrideField('${pick.pickId}', ${idx}, 'kind', this.value); openOverridePanel('${pick.pickId}'); closeTopModal(); openOverridePanel('${pick.pickId}')">
+            ${['attack','save','heal','multiattack','utility','unparsed'].map(k =>
+              `<option value="${k}" ${pa.kind===k?'selected':''}>${k}</option>`).join('')}
+          </select></label>
+        ${renderOverrideFields(pa, pick.pickId, idx)}
+        ${pa._raw ? `<details><summary>Raw body</summary><pre style="white-space:pre-wrap; font-size:0.8em">${escapeHtml(pa._raw)}</pre></details>` : ''}
+      </div>
+    </details>`).join('');
+}
+
+function renderOverrideFields(pa, pickId, idx) {
+  if (pa.kind === 'attack') {
+    return `
+      <label>To-hit <input type="number" value="${pa.toHit ?? 0}" class="pc-input"
+        oninput="overrideField('${pickId}', ${idx}, 'toHit', parseInt(this.value)||0)"></label>
+      <label>Damage entries (one per line: dice±mod type, e.g. "1d8+3 slashing")
+        <textarea rows="3" class="pc-input"
+          oninput="overrideDamageList('${pickId}', ${idx}, this.value)">${(pa.damage||[]).map(d =>
+            `${d.dice}${d.mod >= 0 ? '+' : ''}${d.mod} ${d.type}`).join('\n')}</textarea></label>`;
+  } else if (pa.kind === 'save') {
+    return `
+      <label>Save ability
+        <select onchange="overrideField('${pickId}', ${idx}, 'saveAbility', this.value)">
+          ${['str','dex','con','int','wis','cha'].map(a =>
+            `<option value="${a}" ${pa.saveAbility===a?'selected':''}>${a.toUpperCase()}</option>`).join('')}
+        </select></label>
+      <label>DC <input type="number" value="${pa.saveDc ?? 10}" class="pc-input"
+        oninput="overrideField('${pickId}', ${idx}, 'saveDc', parseInt(this.value)||10)"></label>
+      <label>AoE targets <input type="number" value="${pa.aoeTargets ?? 1}" class="pc-input"
+        oninput="overrideField('${pickId}', ${idx}, 'aoeTargets', parseInt(this.value)||1)"></label>
+      <label><input type="checkbox" ${pa.halfOnSave ? 'checked' : ''}
+        onchange="overrideField('${pickId}', ${idx}, 'halfOnSave', this.checked)"> half on save</label>
+      <label>Damage on fail (dice±mod type per line)
+        <textarea rows="2" class="pc-input"
+          oninput="overrideDamageOnFailList('${pickId}', ${idx}, this.value)">${(pa.damageOnFail||[]).map(d =>
+            `${d.dice}${d.mod >= 0 ? '+' : ''}${d.mod} ${d.type}`).join('\n')}</textarea></label>`;
+  } else if (pa.kind === 'heal') {
+    const h = pa.heal || {};
+    return `
+      <label>Dice <input type="text" value="${h.dice||''}" class="pc-input"
+        oninput="overrideHealField('${pickId}', ${idx}, 'dice', this.value || null)"></label>
+      <label>Mod <input type="number" value="${h.mod||0}" class="pc-input"
+        oninput="overrideHealField('${pickId}', ${idx}, 'mod', parseInt(this.value)||0)"></label>
+      <label>Flat <input type="number" value="${h.flat||0}" class="pc-input"
+        oninput="overrideHealField('${pickId}', ${idx}, 'flat', parseInt(this.value)||0)"></label>
+      <label>Target
+        <select onchange="overrideHealField('${pickId}', ${idx}, 'target', this.value)">
+          ${['self','ally','ally-aoe'].map(t => `<option value="${t}" ${h.target===t?'selected':''}>${t}</option>`).join('')}
+        </select></label>
+      <label><input type="checkbox" ${h.reviveDowned?'checked':''}
+        onchange="overrideHealField('${pickId}', ${idx}, 'reviveDowned', this.checked)"> revives downed</label>`;
+  } else if (pa.kind === 'multiattack') {
+    return `
+      <label>Plan (one per line: count×ActionName)
+        <textarea rows="3" class="pc-input"
+          oninput="overrideMultiattackPlan('${pickId}', ${idx}, this.value)">${(pa.multiattackPlan||[]).map(p =>
+            `${p.count}×${p.actionName}`).join('\n')}</textarea></label>`;
+  }
+  return '<i style="color:var(--c-ink-faint)">No fields for this kind.</i>';
+}
+
+function closeTopModal() {
+  const m = document.querySelector('[data-modal]');
+  if (m && m.parentElement) document.body.removeChild(m.parentElement);
+}
+function overrideField(pickId, idx, field, value) {
+  const pick = picks.find(p => p.pickId === pickId); if (!pick) return;
+  const pa = pick.monster.parsedActions[idx]; if (!pa) return;
+  pa[field] = value;
+  pa.parsedBy = 'manual';
+}
+function overrideHealField(pickId, idx, field, value) {
+  const pick = picks.find(p => p.pickId === pickId); if (!pick) return;
+  const pa = pick.monster.parsedActions[idx]; if (!pa) return;
+  pa.heal = pa.heal || { target:'ally', aoeTargets:0, reviveDowned:false };
+  pa.heal[field] = value;
+  pa.parsedBy = 'manual';
+}
+function overrideDamageList(pickId, idx, raw) {
+  const pick = picks.find(p => p.pickId === pickId); if (!pick) return;
+  const pa = pick.monster.parsedActions[idx]; if (!pa) return;
+  pa.damage = parseDamageLines(raw);
+  pa.parsedBy = 'manual';
+}
+function overrideDamageOnFailList(pickId, idx, raw) {
+  const pick = picks.find(p => p.pickId === pickId); if (!pick) return;
+  const pa = pick.monster.parsedActions[idx]; if (!pa) return;
+  pa.damageOnFail = parseDamageLines(raw);
+  pa.parsedBy = 'manual';
+}
+function overrideMultiattackPlan(pickId, idx, raw) {
+  const pick = picks.find(p => p.pickId === pickId); if (!pick) return;
+  const pa = pick.monster.parsedActions[idx]; if (!pa) return;
+  pa.multiattackPlan = raw.split('\n').map(line => {
+    const m = line.match(/^\s*(\d+)\s*[x×]\s*(.+?)\s*$/i);
+    if (!m) return null;
+    return { count: parseInt(m[1]), actionName: m[2] };
+  }).filter(Boolean);
+  pa.parsedBy = 'manual';
+}
+function parseDamageLines(raw) {
+  return raw.split('\n').map(line => {
+    const m = line.match(/^\s*(\d+d\d+)\s*([+-])\s*(\d+)\s+(\w+)\s*$/i)
+           || line.match(/^\s*(\d+d\d+)\s+(\w+)\s*$/i);
+    if (!m) return null;
+    if (m.length === 5) {
+      return { dice: m[1], mod: m[2] === '-' ? -parseInt(m[3]) : parseInt(m[3]), type: m[4].toLowerCase() };
+    }
+    return { dice: m[1], mod: 0, type: m[2].toLowerCase() };
+  }).filter(Boolean);
+}
+function overrideRegen(pickId, field, value) {
+  const pick = picks.find(p => p.pickId === pickId); if (!pick) return;
+  pick.monster.regeneration = pick.monster.regeneration || {};
+  pick.monster.regeneration[field] = value;
+}
+
+async function saveOverride(pickId) {
+  const pick = picks.find(p => p.pickId === pickId);
+  if (!pick) return;
+  const m = pick.monster;
+  // Read current bestiary_custom, upsert this monster's overrides.
+  try {
+    const headers = Auth.dmHeaders ? Auth.dmHeaders() : {};
+    const r = await fetch(WORKER_URL + '?type=bestiary_custom', { headers });
+    const current = r.ok ? await r.json() : { monsters: [] };
+    const list = (current && current.monsters) || [];
+    const idx = list.findIndex(x => x.name === m.name && (x._source || '') === (m._source || ''));
+    const overrideRecord = {
+      name: m.name, _source: m._source,
+      parsedActions: m.parsedActions,
+      regeneration: m.regeneration || null,
+      overriddenAt: new Date().toISOString(),
+    };
+    if (idx >= 0) list[idx] = { ...list[idx], ...overrideRecord };
+    else list.push(overrideRecord);
+    const saveR = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', ...headers },
+      body: JSON.stringify({ type:'bestiary_custom', payload:{ monsters: list } }),
+    });
+    if (saveR.ok) {
+      alert('Override saved to bestiary_custom.');
+      // Invalidate cache.
+      delete window._CRUCIBLE_BESTIARY;
+      closeTopModal();
+      renderEncounter();
+    } else {
+      alert('Save failed: ' + saveR.status);
+    }
+  } catch (e) {
+    alert('Save failed: ' + (e.message || e));
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  FM CR-budget math (copied from War Table; keep in sync if FM changes)
+// ═══════════════════════════════════════════════════════════════════════
+const FM_CR_BUDGET = {
+  1: {e:0.125, s:0.125, h:0.25,  cap:1 }, 2: {e:0.125, s:0.25,  h:0.5,   cap:3 },
+  3: {e:0.25,  s:0.5,   h:0.75,  cap:4 }, 4: {e:0.5,   s:0.75,  h:1,     cap:6 },
+  5: {e:1,     s:1.5,   h:2.5,   cap:8 }, 6: {e:1.5,   s:2,     h:3,     cap:9 },
+  7: {e:2,     s:2.5,   h:3.5,   cap:10}, 8: {e:2.5,   s:3,     h:4,     cap:12},
+  9: {e:3,     s:3.5,   h:4.5,   cap:13}, 10:{e:3.5,   s:4,     h:5,     cap:15},
+  11:{e:4,     s:4.5,   h:5.5,   cap:16}, 12:{e:4.5,   s:5,     h:6,     cap:17},
+  13:{e:5,     s:5.5,   h:6.5,   cap:19}, 14:{e:5.5,   s:6,     h:7,     cap:20},
+  15:{e:6,     s:6.5,   h:7.5,   cap:22}, 16:{e:6.5,   s:7,     h:8,     cap:24},
+  17:{e:7,     s:7.5,   h:8.5,   cap:25}, 18:{e:7.5,   s:8,     h:9,     cap:26},
+  19:{e:8,     s:8.5,   h:9.5,   cap:28}, 20:{e:8.5,   s:9,     h:10,    cap:30}
+};
+const FM_MINIONS_PER_STD = {
+  0:5,0.125:5,0.25:5,0.5:5,1:5,2:5,3:5,4:5,
+  5:8,6:8,7:8,8:8,
+  9:10,10:10,11:10,12:10,13:10,14:10,15:10,16:10,17:10,18:10,
+  19:10,20:10,21:10,22:10,23:10,24:10,25:10,26:10,27:10,28:10,29:10,30:10
+};
+function minionsPerStd(cr) {
+  const c = +cr || 0;
+  if (FM_MINIONS_PER_STD[c] != null) return FM_MINIONS_PER_STD[c];
+  return 10;
+}
+function fmDifficultyBand(totalCR, budget) {
+  if (totalCR <= 0) return 'none';
+  if (totalCR < budget.easy * 0.9)      return 'trivial';
+  if (totalCR <= budget.easy * 1.1)     return 'easy';
+  if (totalCR <= budget.standard * 1.1) return 'standard';
+  if (totalCR <= budget.hard * 1.1)     return 'hard';
+  return 'extreme';
+}
+function fmSoloBand(soloCr, level, size) {
+  const row = FM_CR_BUDGET[Math.max(1, Math.min(20, level))];
+  const diff = row.cap - (+soloCr || 0);
+  if (size <= 5) {
+    if (diff >= 7) return 'trivial';
+    if (diff >= 5) return 'easy';
+    if (diff >= 3) return 'standard';
+    if (diff >= 0) return 'hard';
+    return 'extreme';
+  }
+  if (diff >= 6) return 'trivial';
+  if (diff >= 4) return 'easy';
+  if (diff >= 2) return 'standard';
+  if (diff >= 0) return 'hard';
+  return 'extreme';
+}
+
+function computeFmBudget() {
+  if (!party.length || !picks.length) return null;
+  const levels = party.map(p => p.identity.level);
+  const avgLevel = Math.round(levels.reduce((s,v) => s+v, 0) / levels.length);
+  const size = party.length;
+  const row = FM_CR_BUDGET[Math.max(1, Math.min(20, avgLevel))];
+  const budget = { easy: row.e * size, standard: row.s * size, hard: row.h * size,
+                   capCr: row.cap, level: avgLevel, size };
+  // Total CR (with minions discounted, solos handled separately).
+  let totalCr = 0;
+  const soloPicks = picks.filter(p => p.monster.isSolo);
+  for (const p of picks) {
+    if (p.monster.isSolo) continue;
+    let cr = +(p.monster.cr || 0);
+    if (p.monster.isMinion) cr = cr / minionsPerStd(p.monster.cr);
+    totalCr += cr * (p.count || 1);
+  }
+  let band;
+  if (soloPicks.length) {
+    band = fmSoloBand(soloPicks[0].monster.cr, avgLevel, size);
+  } else {
+    band = fmDifficultyBand(totalCr, budget);
+  }
+  return { level: avgLevel, size, band, totalCr: +totalCr.toFixed(2), capCr: budget.capCr };
+}
+
+function renderFmBudget() {
+  const el = document.getElementById('fm-budget');
+  const b = computeFmBudget();
+  if (!b) { el.textContent = ''; return; }
+  const color = { trivial:'#5a9da3', easy:'#7fd49a', standard:'#dbb965',
+                  hard:'#e09a5a', extreme:'#e77878' }[b.band] || '#dde7e9';
+  el.innerHTML = `<b style="color:${color}">FM budget says: ${b.band.toUpperCase()}</b>
+    <span style="color:var(--c-ink-faint); font-size:0.85em">
+    · L${b.level} × ${b.size} · total CR ${b.totalCr} · cap ${b.capCr}</span>`;
+}
+
+// Wire the Add button.
+document.getElementById('btn-add-monster').onclick = openPickerModal;
+
+renderParty();
+
+// Eagerly start loading bestiary in the background — picker becomes instant.
+loadBestiary().catch(e => console.warn('Bestiary preload failed', e));
+
+// Honor ?seed=N on page load — fill it into the run state if present.
+(function honorSeedParam() {
+  const url = new URL(location.href);
+  const seedStr = url.searchParams.get('seed');
+  if (seedStr) {
+    // Display the planned seed by stashing it in lastSimSeed before run;
+    // the run handler reads from URL each time anyway.
+    document.title = 'The Crucible · seed=' + seedStr;
+  }
+})();
+</script>
+</body>
+</html>

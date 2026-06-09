@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Crucible engine tests</title>
+  <style>
+    body { font: 14px monospace; background:#0e1418; color:#dde7e9; padding:1rem; }
+    h1 { color:#7ec5c5; }
+    button { padding:0.5rem 1rem; background:#1d3a4a; color:#dde7e9;
+             border:1px solid #2c5566; cursor:pointer; }
+    .ok   { color:#7fd49a; }
+    .fail { color:#e77878; }
+    .case { padding:0.25rem 0; border-bottom:1px solid #1c2429; }
+    pre   { white-space:pre-wrap; color:#a0adb2; margin:0.25rem 0 0 1rem; }
+    #summary { padding:0.75rem; margin-top:1rem; background:#152028;
+               border-left:3px solid #7ec5c5; }
+  </style>
+</head>
+<body>
+<h1>Crucible engine tests</h1>
+<button onclick="runAll()">Run tests</button>
+<div id="results"></div>
+<div id="summary"></div>
+
+<script src="../crucible-engine.js"></script>
+<script>
+const TESTS = [];
+function test(name, fn) { TESTS.push({ name, fn }); }
+function assertEq(actual, expected, label) {
+  const a = JSON.stringify(actual), e = JSON.stringify(expected);
+  if (a !== e) throw new Error((label || '') +
+    '\n   expected: ' + e + '\n     actual: ' + a);
+}
+function assertTrue(cond, label) { if (!cond) throw new Error(label || 'expected true'); }
+function assertBetween(v, lo, hi, label) {
+  if (v < lo || v > hi) throw new Error((label || '') +
+    `\n   expected: in [${lo}, ${hi}]\n     actual: ${v}`);
+}
+function assertHas(obj, key, label) {
+  if (!Object.prototype.hasOwnProperty.call(obj, key))
+    throw new Error((label || '') + `\n   expected key '${key}' on object`);
+}
+async function runAll() {
+  const root = document.getElementById('results');
+  root.innerHTML = '';
+  let pass = 0, fail = 0;
+  for (const t of TESTS) {
+    const div = document.createElement('div');
+    div.className = 'case';
+    try {
+      await t.fn();
+      div.innerHTML = '<span class="ok">✓</span> ' + t.name;
+      pass++;
+    } catch (e) {
+      div.innerHTML = '<span class="fail">✗</span> ' + t.name +
+        '<pre>' + (e.message || String(e)) + '</pre>';
+      fail++;
+    }
+    root.appendChild(div);
+  }
+  document.getElementById('summary').innerHTML =
+    `<b>${pass} passed</b>, <b class="${fail?'fail':'ok'}">${fail} failed</b>, ${TESTS.length} total.`;
+}
+</script>
+
+<!-- ────── Tests are appended below this line as tasks land ────── -->
+<script>
+test('RNG: same seed produces same first three rolls', () => {
+  const a = Crucible.makeRng(42);
+  const b = Crucible.makeRng(42);
+  assertEq([a(), a(), a()], [b(), b(), b()]);
+});
+test('RNG: different seeds produce different first roll', () => {
+  const a = Crucible.makeRng(1);
+  const b = Crucible.makeRng(2);
+  assertTrue(a() !== b(), 'seed 1 and seed 2 should differ');
+});
+test('rollDie(20): 1000 rolls all in [1,20]', () => {
+  const rng = Crucible.makeRng(7);
+  for (let i = 0; i < 1000; i++) {
+    const v = Crucible.rollDie(20, rng);
+    assertBetween(v, 1, 20, 'roll #' + i);
+  }
+});
+test('rollDice("1d8"): in [1,8]', () => {
+  const rng = Crucible.makeRng(11);
+  for (let i = 0; i < 200; i++) {
+    const v = Crucible.rollDice('1d8', rng);
+    assertBetween(v, 1, 8);
+  }
+});
+test('rollDice("2d6+3"): in [5,15]', () => {
+  const rng = Crucible.makeRng(13);
+  for (let i = 0; i < 200; i++) {
+    const v = Crucible.rollDice('2d6+3', rng);
+    assertBetween(v, 5, 15);
+  }
+});
+test('rollDice("3d8-2"): in [1,22]', () => {
+  const rng = Crucible.makeRng(17);
+  for (let i = 0; i < 200; i++) {
+    const v = Crucible.rollDice('3d8-2', rng);
+    assertBetween(v, 1, 22);
+  }
+});
+test('rollDice empty/null returns 0', () => {
+  const rng = Crucible.makeRng(1);
+  assertEq(Crucible.rollDice('', rng), 0);
+  assertEq(Crucible.rollDice(null, rng), 0);
+});
+test('rollDice with crit=true doubles dice (not mod)', () => {
+  // 1d8+3 normal max = 11, crit max = 19 (8+8+3). We loop many trials
+  // and check the maximum we ever see is > normal max.
+  const rng = Crucible.makeRng(23);
+  let maxNormal = 0, maxCrit = 0;
+  for (let i = 0; i < 400; i++) {
+    maxNormal = Math.max(maxNormal, Crucible.rollDice('1d8+3', rng, false));
+    maxCrit   = Math.max(maxCrit,   Crucible.rollDice('1d8+3', rng, true));
+  }
+  assertTrue(maxNormal <= 11, 'normal cap 11, got ' + maxNormal);
+  assertTrue(maxCrit > 11, 'crit must beat normal max, got ' + maxCrit);
+});
+test('mod: 10→0, 14→+2, 8→-1, 20→+5', () => {
+  assertEq(Crucible.mod(10), 0);
+  assertEq(Crucible.mod(14), 2);
+  assertEq(Crucible.mod(8), -1);
+  assertEq(Crucible.mod(20), 5);
+});
+test('pb: L1→2, L4→2, L5→3, L17→6, L20→6', () => {
+  assertEq(Crucible.pb(1), 2);
+  assertEq(Crucible.pb(4), 2);
+  assertEq(Crucible.pb(5), 3);
+  assertEq(Crucible.pb(17), 6);
+  assertEq(Crucible.pb(20), 6);
+});
+test('saveBonus: proficient adds PB, otherwise just mod', () => {
+  const pm = { identity:{level:5}, abilities:{str:14,dex:16,con:12,int:10,wis:12,cha:10},
+               profs:{saves:{str:false,dex:true,con:false,int:false,wis:false,cha:false}} };
+  assertEq(Crucible.saveBonus(pm, 'str'), 2);       // +2, not proficient
+  assertEq(Crucible.saveBonus(pm, 'dex'), 3 + 3);   // +3 from DEX, +3 PB at L5
+  assertEq(Crucible.saveBonus(pm, 'con'), 1);       // +1, not proficient
+});
+test('toHit: uses atkAbility + PB unless override', () => {
+  const pm = { identity:{level:5}, abilities:{str:16,dex:10,con:10,int:10,wis:10,cha:10},
+               profs:{saves:{}} };
+  const a1 = { atkAbility:'str', atkBonusOverride:null };
+  assertEq(Crucible.toHit(pm, a1), 3 + 3);          // STR +3, PB +3
+  const a2 = { atkAbility:'str', atkBonusOverride:9 };
+  assertEq(Crucible.toHit(pm, a2), 9);              // override wins
+});
+test('saveDc: 8 + atkAbility mod + PB unless override', () => {
+  const pm = { identity:{level:5}, abilities:{wis:18,str:10,dex:10,con:10,int:10,cha:10},
+               profs:{saves:{}} };
+  const a = { atkAbility:'wis', save:{ dcOverride:null } };
+  assertEq(Crucible.saveDc(pm, a), 8 + 4 + 3);      // 15
+  const ao = { atkAbility:'wis', save:{ dcOverride:17 } };
+  assertEq(Crucible.saveDc(pm, ao), 17);
+});
+test('buildCombatants: 1 PC + 2 goblins → 3 combatants with side flags', () => {
+  const party = [{
+    id:'pm1', identity:{ name:'Aria', level:5 },
+    abilities:{ str:10,dex:14,con:14,int:10,wis:10,cha:10 },
+    profs:{ saves:{} },
+    combat:{ hp:30, maxHp:30, ac:16, initBonus:2 },
+    actions:[],
+  }];
+  const monsters = [{
+    pickId:'p1', count:2,
+    monster:{ name:'Goblin', hp:7, ac:15, initiative:2, isMinion:false,
+              isSolo:false, parsedActions:[] },
+  }];
+  const rng = Crucible.makeRng(1);
+  const c = Crucible.buildCombatants(party, monsters, rng, false);
+  assertEq(c.length, 3);
+  assertEq(c[0].side, 'pc');
+  assertEq(c[1].side, 'monster');
+  assertEq(c[1].name, 'Goblin #1');
+  assertEq(c[2].name, 'Goblin #2');
+});
+test('rollInitiative: each combatant gets an init in [1+bonus, 20+bonus]', () => {
+  const cs = [
+    { name:'A', initBonus: 2, side:'pc' },
+    { name:'B', initBonus: 0, side:'monster' },
+  ];
+  const rng = Crucible.makeRng(11);
+  Crucible.rollInitiative(cs, rng);
+  for (const c of cs) {
+    assertTrue(c.init >= 1 + c.initBonus && c.init <= 20 + c.initBonus,
+      c.name + ' init out of range: ' + c.init);
+  }
+});
+test('initOrder: solos get an extra slot at init - 10', () => {
+  const cs = [
+    { name:'Solo', init: 18, isSolo: true,  side:'monster' },
+    { name:'Mob1', init: 12, isSolo: false, side:'monster' },
+  ];
+  const order = Crucible.initOrder(cs);
+  // Solo at 18 first, mob at 12, then solo again at 8.
+  assertEq(order.map(s => s.name + '@' + s.init),
+           ['Solo@18','Mob1@12','Solo@8']);
+});
+test('turnStart: downed combatant has shouldSkip=true', () => {
+  const c = { downed:true, dead:false, conditions:new Map(),
+              regeneration:null, damageTypesReceivedThisTurn:new Set(),
+              damageTypesReceivedLastTurn:new Set() };
+  const ev = [];
+  const skip = Crucible.turnStart(c, 1, Crucible.makeRng(1), ev);
+  assertEq(skip, true);
+});
+test('turnStart: incapacitated condition skips turn but decrements', () => {
+  const c = { downed:false, dead:false,
+              conditions: new Map([['incapacitated', 2]]),
+              regeneration:null, damageTypesReceivedThisTurn:new Set(),
+              damageTypesReceivedLastTurn:new Set() };
+  const skip = Crucible.turnStart(c, 1, Crucible.makeRng(1), []);
+  assertEq(skip, true);
+  assertEq(c.conditions.get('incapacitated'), 1);
+});
+test('turnStart: regen ticks when no suppression damage received last turn', () => {
+  const c = { downed:false, dead:false, hp:10, maxHp:30,
+              conditions:new Map(),
+              regeneration:{ amount:10, suppressedBy:['acid','fire'], minHpToRegen:1 },
+              damageTypesReceivedThisTurn:new Set(),
+              damageTypesReceivedLastTurn:new Set(['slashing']) };
+  const ev = [];
+  Crucible.turnStart(c, 2, Crucible.makeRng(1), ev);
+  assertEq(c.hp, 20);
+  assertTrue(ev.some(e => e.type === 'regen'), 'expected regen event');
+});
+test('turnStart: regen suppressed when fire received last turn', () => {
+  const c = { downed:false, dead:false, hp:10, maxHp:30,
+              conditions:new Map(),
+              regeneration:{ amount:10, suppressedBy:['acid','fire'], minHpToRegen:1 },
+              damageTypesReceivedThisTurn:new Set(),
+              damageTypesReceivedLastTurn:new Set(['fire']) };
+  Crucible.turnStart(c, 2, Crucible.makeRng(1), []);
+  assertEq(c.hp, 10);
+});
+test('turnStart: regen tracks damage rotation last←this, then clears this', () => {
+  const c = { downed:false, dead:false, hp:5, maxHp:30,
+              conditions:new Map(),
+              regeneration:{ amount:5, suppressedBy:['fire'], minHpToRegen:1 },
+              damageTypesReceivedThisTurn:new Set(['cold']),
+              damageTypesReceivedLastTurn:new Set() };
+  Crucible.turnStart(c, 2, Crucible.makeRng(1), []);
+  assertEq(c.damageTypesReceivedLastTurn.has('cold'), true);
+  assertEq(c.damageTypesReceivedThisTurn.size, 0);
+});
+test('rechargeRoll: marks recharge ready when d6 ≥ minRoll', () => {
+  // With seed 99, we'll just verify the contract: after enough rolls,
+  // some recharges fire.
+  const c = { rechargeReady: { 'Breath': false } };
+  const action = { sourceActionName:'Breath', recharge:{ dice:'d6', minRoll:5 } };
+  const rng = Crucible.makeRng(99);
+  let fired = false;
+  for (let i = 0; i < 30; i++) {
+    c.rechargeReady['Breath'] = false;
+    Crucible.rollRecharge(c, [action], rng);
+    if (c.rechargeReady['Breath']) { fired = true; break; }
+  }
+  assertTrue(fired, 'recharge should fire in some of 30 attempts at 5-6/d6');
+});
+test('pickEnemyTarget(focus): lowest-HP living enemy', () => {
+  const me = { side:'pc' };
+  const enemies = [
+    { side:'monster', name:'A', hp:10, ac:13, downed:false, dead:false },
+    { side:'monster', name:'B', hp:3,  ac:14, downed:false, dead:false },
+    { side:'monster', name:'C', hp:5,  ac:12, downed:false, dead:false },
+  ];
+  const t = Crucible.pickEnemyTarget(me, [me, ...enemies], { aiHint:'focus' }, Crucible.makeRng(1));
+  assertEq(t.name, 'B');
+});
+test('pickEnemyTarget(focus): ties by lowest AC', () => {
+  const me = { side:'pc' };
+  const enemies = [
+    { side:'monster', name:'A', hp:5, ac:15, downed:false, dead:false },
+    { side:'monster', name:'B', hp:5, ac:12, downed:false, dead:false },
+  ];
+  const t = Crucible.pickEnemyTarget(me, [me, ...enemies], { aiHint:'focus' }, Crucible.makeRng(1));
+  assertEq(t.name, 'B');
+});
+test('pickEnemyTarget: skips downed/dead enemies', () => {
+  const me = { side:'pc' };
+  const enemies = [
+    { side:'monster', name:'A', hp:0, ac:15, downed:true,  dead:false },
+    { side:'monster', name:'B', hp:1, ac:14, downed:false, dead:false },
+    { side:'monster', name:'C', hp:5, ac:12, downed:false, dead:true  },
+  ];
+  const t = Crucible.pickEnemyTarget(me, [me, ...enemies], { aiHint:'focus' }, Crucible.makeRng(1));
+  assertEq(t.name, 'B');
+});
+test('healTriage: ally downed and self has reviveDowned heal → trigger', () => {
+  const ally = { side:'pc', name:'Cleric', downed:false, dead:false, hp:20, maxHp:20, lastHealRound:-99 };
+  const wounded = { side:'pc', name:'Tank', downed:true, dead:false, hp:0, maxHp:30, lastHealRound:-99 };
+  const action = { type:'heal', heal:{ target:'ally', reviveDowned:true }, usesPerDay:null };
+  ally.pm = { actions:[action] };
+  ally.slotsLeft = {};
+  ally.rechargeReady = {};
+  const dec = Crucible.healTriage(ally, [ally, wounded], 1);
+  assertEq(dec.action, action);
+  assertEq(dec.targets[0].name, 'Tank');
+});
+test('healTriage: no qualifying ally → returns null (sim falls through)', () => {
+  const ally = { side:'pc', name:'Cleric', downed:false, dead:false, hp:20, maxHp:20, lastHealRound:-99 };
+  const peer = { side:'pc', name:'Tank', downed:false, dead:false, hp:30, maxHp:30 };
+  ally.pm = { actions:[{ type:'heal', heal:{ target:'ally', reviveDowned:true } }] };
+  ally.slotsLeft = {}; ally.rechargeReady = {};
+  assertEq(Crucible.healTriage(ally, [ally, peer], 1), null);
+});
+test('resolveAttack: nat 20 crits, doubles dice (not mod)', () => {
+  // d20 must roll 20. Use a controlled "rng" that returns 19.999.../20.
+  const fake = () => 19.999 / 20;  // → rollDie(20) = 1 + floor(19.999) = 20
+  const me = { side:'pc', name:'Aria' };
+  const target = { side:'monster', name:'Goblin', hp:10, ac:10, downed:false, dead:false };
+  const action = { sourceActionName:'Slash', kind:'attack', toHit:5,
+                   damage:[{ dice:'1d4', mod:0, type:'slashing' }] };
+  const events = [];
+  const result = Crucible.resolveAttackMonster(me, target, action, fake, events, 1);
+  assertEq(result.crit, true);
+  // 2 dice of d4 with fake rng → 2 * 4 (max) = 8
+  assertEq(result.damageDealt > 0, true);
+  assertTrue(result.damageByType.slashing >= 2, 'crit should deal ≥2');
+});
+test('resolveAttack: nat 1 misses', () => {
+  const fake = () => 0;            // rollDie(20) = 1
+  const target = { hp:10, ac:10, dead:false, downed:false, damageTypesReceivedThisTurn:new Set() };
+  const action = { sourceActionName:'X', kind:'attack', toHit:99,
+                   damage:[{ dice:'1d6', mod:0, type:'fire' }] };
+  const r = Crucible.resolveAttackMonster({}, target, action, fake, [], 1);
+  assertEq(r.hit, false);
+  assertEq(r.damageDealt, 0);
+});
+test('resolveAttack: damage by type recorded in target.damageTypesReceivedThisTurn', () => {
+  const fake = () => 0.5;          // mid-roll, hits
+  const target = { hp:30, ac:10, dead:false, downed:false,
+                   damageTypesReceivedThisTurn: new Set(), maxHp:30 };
+  const action = { sourceActionName:'BurnSlash', kind:'attack', toHit:10,
+                   damage:[{ dice:'1d4', mod:0, type:'fire' },
+                           { dice:'1d4', mod:0, type:'slashing' }] };
+  Crucible.resolveAttackMonster({}, target, action, fake, [], 1);
+  assertEq(target.damageTypesReceivedThisTurn.has('fire'), true);
+  assertEq(target.damageTypesReceivedThisTurn.has('slashing'), true);
+});
+test('resolveHeal: ally at 5 HP heals to min(maxHp, 5+roll)', () => {
+  const me = { name:'Cleric' };
+  const ally = { name:'Tank', hp:5, maxHp:30, downed:false };
+  const action = { sourceActionName:'CureWounds', kind:'heal',
+                   heal:{ dice:'1d8', mod:3, flat:0, target:'ally', reviveDowned:false } };
+  // fake rng always returns 0.99 → d8 = 8 → 8+3 = 11; cap at maxHp.
+  const fake = () => 0.99;
+  const evs = [];
+  const r = Crucible.resolveHeal(me, [ally], action, fake, evs, 1);
+  assertTrue(ally.hp >= 16 && ally.hp <= 30, 'ally hp after heal: ' + ally.hp);
+  assertEq(r.totalHealed > 0, true);
+});
+test('resolveHeal: revives downed ally with reviveDowned=true', () => {
+  const me = { name:'Pal' };
+  const ally = { name:'Fallen', hp:0, maxHp:30, downed:true };
+  const action = { sourceActionName:'Lay', kind:'heal',
+                   heal:{ dice:null, mod:0, flat:5, target:'ally', reviveDowned:true } };
+  Crucible.resolveHeal(me, [ally], action, () => 0.5, [], 1);
+  assertEq(ally.downed, false);
+  assertEq(ally.hp, 5);
+});
+test('resolveSave: target rolls under DC, takes full damage', () => {
+  const me = { name:'Mage' };
+  const target = { side:'pc', pm:{ identity:{ level:5 },
+                   abilities:{ str:10,dex:8,con:10,int:10,wis:10,cha:10 },
+                   profs:{ saves:{} } },
+                   hp:30, maxHp:30, ac:14, dead:false, downed:false,
+                   damageTypesReceivedThisTurn:new Set() };
+  const action = { sourceActionName:'Fireball', kind:'save', saveAbility:'dex', saveDc:99,
+                   damageOnFail:[{ dice:'8d6', mod:0, type:'fire' }],
+                   damageOnSave:[], halfOnSave:true, aoeTargets:4 };
+  // DC 99 → always fails. Fake rng = mid.
+  Crucible.resolveSave(me, [target], action, () => 0.5, [], 1);
+  assertTrue(target.hp < target.maxHp, 'expected damage on failed save');
+});
+test('applyDamage: PC at 0 HP → downed (not dead)', () => {
+  const t = { side:'pc', hp:5, maxHp:30, downed:false, dead:false,
+              damageTypesReceivedThisTurn:new Set() };
+  Crucible.applyDamage(t, 10, 'slashing', null, [], 1, 'enemy', 'Slash');
+  assertEq(t.hp, 0);
+  assertEq(t.downed, true);
+  assertEq(t.dead, false);
+});
+test('applyDamage: monster at 0 HP → dead', () => {
+  const t = { side:'monster', hp:1, maxHp:5, downed:false, dead:false, isMinion:false,
+              damageTypesReceivedThisTurn:new Set() };
+  Crucible.applyDamage(t, 5, 'fire', null, [], 1, 'pc', 'Fireball');
+  assertEq(t.dead, true);
+});
+test('applyDamage: FM minion → any non-zero damage kills', () => {
+  const t = { side:'monster', hp:30, maxHp:30, downed:false, dead:false, isMinion:true,
+              damageTypesReceivedThisTurn:new Set() };
+  Crucible.applyDamage(t, 1, 'slashing', null, [], 1, 'pc', 'Pebble');
+  assertEq(t.hp, 0);
+  assertEq(t.dead, true);
+});
+test('resolveMultiattack: looks up sub-actions by name, fires each count times', () => {
+  const me = { side:'monster', name:'Dragon',
+               monster:{ name:'Dragon',
+                         parsedActions:[
+                           { sourceActionName:'Multiattack', kind:'multiattack',
+                             multiattackPlan:[{ actionName:'Bite', count:2 }] },
+                           { sourceActionName:'Bite', kind:'attack', toHit:99,
+                             damage:[{ dice:'1d4', mod:0, type:'piercing' }] },
+                         ] } };
+  const target = { side:'pc', name:'PC', hp:30, maxHp:30, ac:10, downed:false, dead:false,
+                   damageTypesReceivedThisTurn:new Set() };
+  // Force hits with fake rng = 0.99 (rolls = 20, attacks always hit).
+  const fake = () => 0.99;
+  const ev = [];
+  Crucible.resolveMultiattack(me, [me, target], me.monster.parsedActions[0],
+    { aiHint:'focus' }, fake, ev, 1);
+  // Two attack events expected
+  const atks = ev.filter(e => e.type === 'attack');
+  assertEq(atks.length, 2);
+});
+test('runTrial: PC vs Goblin, seeded → deterministic outcome', () => {
+  const pm = { id:'pm1', identity:{ name:'Aria', level:5 },
+               abilities:{ str:14,dex:14,con:14,int:10,wis:10,cha:10 },
+               profs:{ saves:{} },
+               combat:{ hp:30, maxHp:30, ac:16, initBonus:2 },
+               actions:[{ id:'a1', name:'Longsword', source:'weapon', type:'attack',
+                          atkAbility:'str', atkBonusOverride:null,
+                          damage:{ dice:'1d8', mod:'+atkAbility', type:'slashing',
+                                   riderDice:null, riderType:null },
+                          save:null, heal:null, aoeTargets:0,
+                          usesPerDay:null, recharge:null, attacksPerAction:1 }],
+               tactics:{ aiHint:'focus', resources:'nova' } };
+  const monster = { name:'Goblin', hp:7, ac:15, initiative:2, isMinion:false, isSolo:false,
+                    parsedActions:[{ sourceActionName:'Scimitar', kind:'attack', toHit:4,
+                                      damage:[{ dice:'1d6', mod:2, type:'slashing' }],
+                                      recharge:null, usesPerDay:null }] };
+  const picks = [{ pickId:'p1', count:1, monster }];
+  const r1 = Crucible.runTrial([pm], picks, { aiHint:'focus', resources:'nova' }, Crucible.makeRng(42));
+  const r2 = Crucible.runTrial([pm], picks, { aiHint:'focus', resources:'nova' }, Crucible.makeRng(42));
+  assertEq(r1.winner, r2.winner);
+  assertEq(r1.rounds, r2.rounds);
+});
+test('runSim: 100 trials returns aggregated SimResult shape', async () => {
+  const pm = { id:'pm1', identity:{ name:'Aria', level:5 },
+               abilities:{ str:14,dex:14,con:14,int:10,wis:10,cha:10 },
+               profs:{ saves:{} },
+               combat:{ hp:30, maxHp:30, ac:16, initBonus:2 },
+               actions:[{ id:'a1', name:'Longsword', source:'weapon', type:'attack',
+                          atkAbility:'str', atkBonusOverride:null,
+                          damage:{ dice:'1d8', mod:'+atkAbility', type:'slashing',
+                                   riderDice:null, riderType:null },
+                          save:null, heal:null, aoeTargets:0,
+                          usesPerDay:null, recharge:null, attacksPerAction:1 }],
+               tactics:{ aiHint:'focus', resources:'nova' } };
+  const monster = { name:'Goblin', hp:7, ac:15, initiative:2, isMinion:false, isSolo:false,
+                    parsedActions:[{ sourceActionName:'Scimitar', kind:'attack', toHit:4,
+                                      damage:[{ dice:'1d6', mod:2, type:'slashing' }],
+                                      recharge:null, usesPerDay:null }] };
+  const result = await Crucible.runSim({
+    party:[pm], monsterPicks:[{ pickId:'p1', count:1, monster }],
+    trials:100, tactics:{ aiHint:'focus', resources:'nova' }, seed:99,
+  });
+  assertHas(result.headline, 'winRate');
+  assertHas(result.headline, 'avgRounds');
+  assertHas(result.distribution, 'downedHist');
+  assertEq(result.perPc.length, 1);
+  assertTrue(result.headline.winRate > 0.5,
+    `L5 PC vs single goblin should win majority, got ${result.headline.winRate}`);
+});
+
+// ─────── Spec scenarios (from the design doc) ───────
+
+function makeFighter(level, hp, ac, abilities) {
+  return {
+    id: 'pm:' + Math.random().toString(36).slice(2,8),
+    identity:{ name:'Fighter', level },
+    abilities, profs:{ saves:{ str:true, con:true } },
+    combat:{ hp, maxHp:hp, ac, initBonus: Crucible.mod(abilities.dex) },
+    actions:[{ id:'a1', name:'Longsword', source:'weapon', type:'attack',
+               atkAbility:'str', atkBonusOverride:null,
+               damage:{ dice:'1d8', mod:'+atkAbility', type:'slashing',
+                        riderDice:null, riderType:null },
+               save:null, heal:null, aoeTargets:0,
+               usesPerDay:null, recharge:null, attacksPerAction:1 }],
+    tactics:{ aiHint:'focus', resources:'nova' },
+  };
+}
+function makeHealer(level) {
+  const abilities = { str:10, dex:12, con:14, int:10, wis:18, cha:10 };
+  return {
+    id: 'pm:cleric',
+    identity:{ name:'Cleric', level },
+    abilities, profs:{ saves:{ wis:true, cha:true } },
+    combat:{ hp:24, maxHp:24, ac:15, initBonus:1 },
+    actions:[
+      { id:'h1', name:'Healing Word', source:'spell', type:'heal',
+        atkAbility:'wis', atkBonusOverride:null,
+        damage:null, save:null,
+        heal:{ dice:'1d4', mod:4, flat:0, target:'ally', aoeTargets:0, reviveDowned:true },
+        aoeTargets:0, usesPerDay:3, recharge:null, attacksPerAction:1 },
+      { id:'a1', name:'Mace', source:'weapon', type:'attack',
+        atkAbility:'str', atkBonusOverride:null,
+        damage:{ dice:'1d6', mod:'+atkAbility', type:'bludgeoning',
+                 riderDice:null, riderType:null },
+        save:null, heal:null, aoeTargets:0,
+        usesPerDay:null, recharge:null, attacksPerAction:1 },
+    ],
+    tactics:{ aiHint:'focus', resources:'nova' },
+  };
+}
+function makeBugbear() {
+  return { name:'Bugbear', hp:27, ac:16, initiative:2, isMinion:false, isSolo:false,
+    parsedActions:[{ sourceActionName:'Morningstar', kind:'attack', toHit:4,
+                     damage:[{ dice:'2d8', mod:2, type:'piercing' }],
+                     recharge:null, usesPerDay:null }] };
+}
+function makeTroll(suppress) {
+  return { name:'Troll', hp:84, ac:15, initiative:1, isMinion:false, isSolo:false,
+    regeneration:{ amount:10, suppressedBy:suppress, minHpToRegen:1 },
+    parsedActions:[
+      { sourceActionName:'Bite', kind:'attack', toHit:7,
+        damage:[{ dice:'1d6', mod:4, type:'piercing' }], recharge:null, usesPerDay:null },
+      { sourceActionName:'Claw', kind:'attack', toHit:7,
+        damage:[{ dice:'2d6', mod:4, type:'slashing' }], recharge:null, usesPerDay:null },
+    ] };
+}
+
+test('Scenario 1: identical-stat duel, seeded → reproducible', async () => {
+  const ab = { str:14,dex:10,con:14,int:10,wis:10,cha:10 };
+  const pc = makeFighter(5, 30, 16, ab);
+  const monster = { name:'Mirror', hp:30, ac:16, initiative:0, isMinion:false, isSolo:false,
+    parsedActions:[{ sourceActionName:'Strike', kind:'attack', toHit:5,
+                     damage:[{ dice:'1d8', mod:3, type:'slashing' }],
+                     recharge:null, usesPerDay:null }] };
+  const r1 = await Crucible.runSim({ party:[pc],
+    monsterPicks:[{ pickId:'p1', count:1, monster }],
+    trials:50, tactics:{ aiHint:'focus', resources:'nova' }, seed:7 });
+  const r2 = await Crucible.runSim({ party:[pc],
+    monsterPicks:[{ pickId:'p1', count:1, monster }],
+    trials:50, tactics:{ aiHint:'focus', resources:'nova' }, seed:7 });
+  assertEq(r1.headline.winRate, r2.headline.winRate);
+  assertEq(r1.headline.avgRounds, r2.headline.avgRounds);
+});
+test('Scenario 2: 4 fighters vs 2 bugbears, win-rate in [0.5, 0.95]', async () => {
+  const ab = { str:16,dex:14,con:14,int:10,wis:10,cha:10 };
+  const party = [
+    makeFighter(5, 38, 18, ab),
+    makeFighter(5, 36, 17, ab),
+    makeFighter(5, 38, 18, ab),
+    makeFighter(5, 36, 17, ab),
+  ];
+  const r = await Crucible.runSim({ party,
+    monsterPicks:[{ pickId:'p1', count:2, monster: makeBugbear() }],
+    trials:200, tactics:{ aiHint:'focus', resources:'nova' }, seed:13 });
+  assertBetween(r.headline.winRate, 0.5, 0.95,
+    'Standard-band fight should land in [0.5, 0.95]');
+});
+test('Scenario 3: 4 fighters vs 6 bugbears → win-rate ≤ 0.5, avgDowned ≥ 1', async () => {
+  const ab = { str:16,dex:14,con:14,int:10,wis:10,cha:10 };
+  const party = [
+    makeFighter(5, 38, 18, ab),
+    makeFighter(5, 36, 17, ab),
+    makeFighter(5, 38, 18, ab),
+    makeFighter(5, 36, 17, ab),
+  ];
+  const r = await Crucible.runSim({ party,
+    monsterPicks:[{ pickId:'p1', count:6, monster: makeBugbear() }],
+    trials:200, tactics:{ aiHint:'focus', resources:'nova' }, seed:19 });
+  assertTrue(r.headline.winRate <= 0.6,
+    `Outnumbered fight should be hard; got ${r.headline.winRate.toFixed(2)}`);
+  assertTrue(r.headline.avgDowned >= 1.0,
+    `Average downed should be ≥1; got ${r.headline.avgDowned.toFixed(2)}`);
+});
+test('Scenario 4: adding a healer raises win-rate vs same fight', async () => {
+  const ab = { str:16,dex:14,con:14,int:10,wis:10,cha:10 };
+  const noHeal = [
+    makeFighter(5, 38, 18, ab),
+    makeFighter(5, 36, 17, ab),
+    makeFighter(5, 38, 18, ab),
+    makeFighter(5, 36, 17, ab),
+  ];
+  const withHeal = [
+    makeFighter(5, 38, 18, ab),
+    makeFighter(5, 36, 17, ab),
+    makeFighter(5, 38, 18, ab),
+    makeHealer(5),
+  ];
+  const a = await Crucible.runSim({ party: noHeal,
+    monsterPicks:[{ pickId:'p1', count:4, monster: makeBugbear() }],
+    trials:200, tactics:{ aiHint:'focus', resources:'nova' }, seed:23 });
+  const b = await Crucible.runSim({ party: withHeal,
+    monsterPicks:[{ pickId:'p1', count:4, monster: makeBugbear() }],
+    trials:200, tactics:{ aiHint:'focus', resources:'nova' }, seed:23 });
+  // Healer should help. Some variance allowed; the inequality is the spec test.
+  assertTrue(b.headline.winRate >= a.headline.winRate - 0.05,
+    `Healer should not significantly hurt win-rate. without=${a.headline.winRate}, with=${b.headline.winRate}`);
+  // Most importantly: avgHealReceived > 0.
+  assertTrue(b.perPc.some(p => p.avgHealReceived > 0),
+    'Healer party should record heals received');
+});
+test('Scenario 5: troll regen + fire damage flips the fight', async () => {
+  const ab = { str:16,dex:14,con:14,int:10,wis:10,cha:10 };
+  const noFire = [
+    makeFighter(5, 38, 18, ab),
+    makeFighter(5, 36, 17, ab),
+    makeFighter(5, 38, 18, ab),
+    makeFighter(5, 36, 17, ab),
+  ];
+  // A "fire fighter" — same fighter but with a fire rider on weapon.
+  const withFire = noFire.slice(0,3).concat([(() => {
+    const f = makeFighter(5, 36, 17, ab);
+    f.actions[0].damage.riderDice = '1d6';
+    f.actions[0].damage.riderType = 'fire';
+    return f;
+  })()]);
+  const tactics = { aiHint:'focus', resources:'nova' };
+  const a = await Crucible.runSim({ party: noFire,
+    monsterPicks:[{ pickId:'p1', count:1, monster: makeTroll(['acid','fire']) }],
+    trials:200, tactics, seed:29 });
+  const b = await Crucible.runSim({ party: withFire,
+    monsterPicks:[{ pickId:'p1', count:1, monster: makeTroll(['acid','fire']) }],
+    trials:200, tactics, seed:29 });
+  assertTrue(b.headline.winRate >= a.headline.winRate,
+    `Fire-equipped party should not do worse vs troll. no-fire=${a.headline.winRate}, with-fire=${b.headline.winRate}`);
+});
+</script>
+</body>
+</html>

@@ -9,6 +9,75 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### The Crucible — UI + integration
+
+- New page `crucible-dm.html` (DM-only): three-pane layout for party,
+  encounter, and simulation results. Uses theme.css tokens (Cinzel /
+  Crimson Text, slate/teal). Mobile-friendly stack layout.
+- Party quick-form (Pane A): identity, ability scores, save profs,
+  HP/AC/init, and an action editor that supports `attack`, `save`,
+  and `heal` actions. PartyMember model is a strict subset of an
+  eventual full character sheet — only inputs are stored, all combat
+  numbers derive at use. Persists to `localStorage['crucible-party']`.
+  "Import from War Table" pulls names/HP/AC from `localStorage.init_pcs`.
+- Encounter picker (Pane B): reuses the merged bestiary (MM 2024 + FM +
+  bestiary_custom). Each picked monster is parsed via
+  `parseAllMonsterActions` and exposes a "Review parsed actions" panel
+  that lets the DM correct the parser's output and save back to
+  `bestiary_custom`. FM CR-budget footer reports intended difficulty.
+- Run controls + Results (Pane C): trial selector (100/500/2000),
+  progress bar + live win-rate during run, post-run verdict band
+  (EASY / STANDARD / HARD / DEADLY / TPK-LIKELY) with FM comparison,
+  per-PC outcomes table (down rate, ≥½-HP-loss rate, avg HP, avg
+  fell-at round, avg healed), distribution histograms (PCs downed
+  and rounds-to-resolution as SVG bars, no chart library), action-
+  effectiveness table, and Low / Median / High representative-trial
+  replay logs.
+- Reproducibility: each run's seed is shown, click to copy.
+  `?seed=N` URL param replays a specific run.
+- "Copy report" (markdown) pastes the headline + per-PC + top actions
+  into Discord / notes.
+- New "The Crucible" tool card in `home.html`'s Keeper's Wing.
+
+**Manual UI checklist (post-deploy):**
+- [ ] Sign in as DM; reach `crucible-dm.html` via the home card.
+- [ ] Add a PC (no defaults edited) → save works → reload preserves.
+- [ ] Add a Goblin via picker → parsed actions list shows `attack`.
+- [ ] Run 500 trials → verdict, per-PC, distribution, action,
+      replay sections all render.
+- [ ] Override panel: edit Goblin's Scimitar toHit → save → reload →
+      override persists.
+- [ ] `?seed=12345` reruns produce identical headline numbers.
+- [ ] Mobile (≤1100px): panes stack; forms collapse comfortably.
+
+### The Crucible — round-loop sim engine
+
+- `crucible-engine.js` now ships a full Monte-Carlo round-loop simulator:
+  `buildCombatants` (with FM solo extra-turn slot), `turnStart`
+  (condition tick + recharge + regen tick with damage-type suppression),
+  target selection and heal triage, action resolution for attack / save /
+  heal / multiattack (including FM minion rule and crit dice doubling),
+  and `runSim` aggregator with `requestAnimationFrame`-chunked trials,
+  three percentile-picked representative event logs, and per-PC /
+  per-action aggregation.
+- `tests/engine.test.html` covers 39 assertions including the five
+  spec scenarios (duel reproducibility, standard band, outnumbered band,
+  healer-helps, troll-fire flips).
+
+### The Crucible — combat-sim parser + engine helpers
+
+- New `crucible-engine.js` with seeded Mulberry32 RNG, dice roller
+  (with crit doubling of dice but not modifier), and derived-stat helpers
+  (`mod`, `pb`, `saveBonus`, `toHit`, `saveDc`, `pcDamageMod`).
+- New `crucible-parser.js` with five passes (multiattack / attack / save /
+  heal / unparsed-fallback), a recharge + uses-per-day extractor that runs
+  alongside, a `parseRegeneration` helper for trait bodies, and a memoized
+  `parseAllMonsterActions` wrapper that respects pre-existing overrides.
+- New `tests/parser.test.html` and `tests/engine.test.html` — vanilla
+  HTML pages with inline assert harnesses. 30 parser fixtures + 13 engine
+  helper assertions, all green. Tests run manually by opening the file
+  and clicking "Run tests."
+
 ### Atlas Workshop: side-panel editing for NPCs, Players, Timeline
 
 Follow-up to the pop-out editor. The previous pop-out widened
