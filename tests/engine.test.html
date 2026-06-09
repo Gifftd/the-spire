@@ -1271,6 +1271,158 @@ test('Solo pickAction: novas immediately if an ally is downed', () => {
               Object.assign({}, ctx, { all: [me, downedAlly] }));
   assertEq(a.sourceActionName, 'Devastate');
 });
+
+// ─────── Role-policy integration scenarios ───────
+
+function makePcMelee(level, hp, ac, name) {
+  return {
+    id: 'pm:' + Math.random().toString(36).slice(2,8),
+    identity:{ name, level },
+    abilities:{ str:16, dex:12, con:14, int:10, wis:10, cha:10 },
+    profs:{ saves:{ str:true, con:true } },
+    combat:{ hp, maxHp:hp, ac, initBonus:1 },
+    actions:[
+      { id:'a1', name:'Longsword', source:'weapon', type:'attack',
+        atkAbility:'str', atkBonusOverride:null, actionRange:'melee',
+        damage:{ dice:'1d8', mod:'+atkAbility', type:'slashing',
+                 riderDice:null, riderType:null },
+        save:null, heal:null, aoeTargets:0,
+        usesPerDay:null, recharge:null, attacksPerAction:1 },
+      { id:'a2', name:'Shortsword', source:'weapon', type:'attack',
+        atkAbility:'str', atkBonusOverride:null, actionRange:'melee',
+        damage:{ dice:'1d6', mod:'+atkAbility', type:'piercing',
+                 riderDice:null, riderType:null },
+        save:null, heal:null, aoeTargets:0,
+        usesPerDay:null, recharge:null, attacksPerAction:1 },
+    ],
+    tactics:{ aiHint:'focus', resources:'nova' },
+  };
+}
+function makePcRanged(level, hp, ac, name) {
+  return {
+    id: 'pm:' + Math.random().toString(36).slice(2,8),
+    identity:{ name, level },
+    abilities:{ str:8, dex:14, con:12, int:16, wis:12, cha:10 },
+    profs:{ saves:{ int:true, wis:true } },
+    combat:{ hp, maxHp:hp, ac, initBonus:2 },
+    actions:[
+      { id:'r1', name:'Firebolt', source:'spell', type:'attack',
+        atkAbility:'int', atkBonusOverride:null, actionRange:'ranged',
+        damage:{ dice:'1d10', mod:'+atkAbility', type:'fire',
+                 riderDice:null, riderType:null },
+        save:null, heal:null, aoeTargets:0,
+        usesPerDay:null, recharge:null, attacksPerAction:1 },
+      { id:'r2', name:'Magic Missile', source:'spell', type:'attack',
+        atkAbility:'int', atkBonusOverride:99, actionRange:'ranged',
+        damage:{ dice:'3d4', mod:3, type:'force',
+                 riderDice:null, riderType:null },
+        save:null, heal:null, aoeTargets:0,
+        usesPerDay:null, recharge:null, attacksPerAction:1 },
+    ],
+    tactics:{ aiHint:'focus', resources:'nova' },
+  };
+}
+function makeBrute(name, cr, hp, ac) {
+  return { name, cr, hp, ac, initiative:1, isMinion:false, isSolo:false,
+    fmRole: 'brute',
+    parsedActions:[
+      { sourceActionName:'Slam', kind:'attack', toHit:6, reach:5,
+        damage:[{ dice:'2d8', mod:4, type:'bludgeoning' }],
+        recharge:null, usesPerDay:null },
+    ] };
+}
+function makeArtillery(name, cr, hp, ac) {
+  return { name, cr, hp, ac, initiative:2, isMinion:false, isSolo:false,
+    fmRole: 'artillery',
+    parsedActions:[
+      { sourceActionName:'Bolt', kind:'attack', toHit:5, range:[80,320],
+        damage:[{ dice:'1d10', mod:3, type:'piercing' }],
+        recharge:null, usesPerDay:null },
+    ] };
+}
+
+test('Scenario 6: Brute prefers frontline target', async () => {
+  const party = [
+    makePcMelee (5, 38, 18, 'Tank'),       // pure melee → frontline
+    makePcMelee (5, 36, 17, 'Fighter'),    // pure melee → frontline
+    makePcRanged(5, 24, 13, 'Wizard'),     // pure ranged → backline
+    makePcRanged(5, 24, 12, 'Sorcerer'),   // pure ranged → backline
+  ];
+  const r = await Crucible.runSim({ party,
+    monsterPicks:[{ pickId:'p1', count:2, monster: makeBrute('Ogre', 2, 60, 14) }],
+    trials:200, tactics:{ aiHint:'focus', resources:'nova' }, seed:101 });
+  // Brutes should focus the frontline. Sum down-rate of frontline vs backline
+  // and assert frontline is hit harder.
+  const front = r.perPc.filter(p => p.name === 'Tank' || p.name === 'Fighter');
+  const back  = r.perPc.filter(p => p.name === 'Wizard' || p.name === 'Sorcerer');
+  const frontDmg = front.reduce((s, p) => s + (p.maxHp - p.avgHpRemaining), 0);
+  const backDmg  = back.reduce ((s, p) => s + (p.maxHp - p.avgHpRemaining), 0);
+  assertTrue(frontDmg > backDmg * 1.3,
+    `Brute should focus frontline; front=${frontDmg.toFixed(1)} back=${backDmg.toFixed(1)}`);
+});
+
+test('Scenario 7: Artillery prefers backline target', async () => {
+  const party = [
+    makePcMelee (5, 38, 18, 'Tank'),
+    makePcMelee (5, 36, 17, 'Fighter'),
+    makePcRanged(5, 24, 13, 'Wizard'),
+    makePcRanged(5, 24, 12, 'Sorcerer'),
+  ];
+  const r = await Crucible.runSim({ party,
+    monsterPicks:[{ pickId:'p1', count:2, monster: makeArtillery('Sniper', 2, 30, 13) }],
+    trials:200, tactics:{ aiHint:'focus', resources:'nova' }, seed:103 });
+  const front = r.perPc.filter(p => p.name === 'Tank' || p.name === 'Fighter');
+  const back  = r.perPc.filter(p => p.name === 'Wizard' || p.name === 'Sorcerer');
+  const frontDmg = front.reduce((s, p) => s + (p.maxHp - p.avgHpRemaining), 0);
+  const backDmg  = back.reduce ((s, p) => s + (p.maxHp - p.avgHpRemaining), 0);
+  assertTrue(backDmg > frontDmg * 1.3,
+    `Artillery should focus backline; front=${frontDmg.toFixed(1)} back=${backDmg.toFixed(1)}`);
+});
+
+test('Scenario 8: Role override flips Brute → Artillery target distribution', async () => {
+  const party = [
+    makePcMelee (5, 38, 18, 'Tank'),
+    makePcMelee (5, 36, 17, 'Fighter'),
+    makePcRanged(5, 24, 13, 'Wizard'),
+    makePcRanged(5, 24, 12, 'Sorcerer'),
+  ];
+  // Take a Brute-tagged monster, override to artillery, re-run.
+  const overridden = makeBrute('OverriddenBrute', 2, 60, 14);
+  overridden.roleOverride = 'artillery';
+  // Give it a ranged attack so the artillery policy has something to pick.
+  overridden.parsedActions.push({
+    sourceActionName:'Hurl Boulder', kind:'attack', toHit:6, range:[40,120],
+    damage:[{ dice:'2d8', mod:4, type:'bludgeoning' }],
+    recharge:null, usesPerDay:null,
+  });
+  const r = await Crucible.runSim({ party,
+    monsterPicks:[{ pickId:'p1', count:2, monster: overridden }],
+    trials:200, tactics:{ aiHint:'focus', resources:'nova' }, seed:107 });
+  const front = r.perPc.filter(p => p.name === 'Tank' || p.name === 'Fighter');
+  const back  = r.perPc.filter(p => p.name === 'Wizard' || p.name === 'Sorcerer');
+  const frontDmg = front.reduce((s, p) => s + (p.maxHp - p.avgHpRemaining), 0);
+  const backDmg  = back.reduce ((s, p) => s + (p.maxHp - p.avgHpRemaining), 0);
+  // After override, behavior should flip — backline should now be hit harder.
+  assertTrue(backDmg > frontDmg,
+    `Override-to-Artillery should focus backline; front=${frontDmg.toFixed(1)} back=${backDmg.toFixed(1)}`);
+});
+
+test('Scenario 9: v1 spec scenario 2 still passes (backward compat)', async () => {
+  // Re-runs the original FM-standard scenario from Task 18 with Soldier-default monsters.
+  // Behavior must match v1 because Soldier policy delegates to existing target/action logic.
+  const ab = { str:16,dex:14,con:14,int:10,wis:10,cha:10 };
+  const party = [
+    makeFighter(5, 38, 18, ab),
+    makeFighter(5, 36, 17, ab),
+    makeFighter(5, 38, 18, ab),
+    makeFighter(5, 36, 17, ab),
+  ];
+  const r = await Crucible.runSim({ party,
+    monsterPicks:[{ pickId:'p1', count:2, monster: makeBugbear() }],
+    trials:200, tactics:{ aiHint:'focus', resources:'nova' }, seed:13 });
+  assertBetween(r.headline.winRate, 0.5, 0.95,
+    'v1 standard-band scenario must still land in [0.5, 0.95] post-upgrade');
+});
 </script>
 </body>
 </html>
