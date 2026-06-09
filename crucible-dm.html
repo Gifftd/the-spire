@@ -582,8 +582,79 @@ function renderPerPc(r) {
       </table>
     </details>`;
 }
-function renderDistribution(r)  { /* lands in Task 32 */ }
-function renderPerAction(r)     { /* lands in Task 32 */ }
+function renderDistribution(r) {
+  const root = document.getElementById('result-dist');
+  const downed = r.distribution.downedHist;
+  const rounds = r.distribution.roundsHist;
+  const maxD = Math.max(...downed, 1);
+  const maxR = Math.max(...rounds, 1);
+  root.innerHTML = `
+    <details open style="margin-top:0.5rem;">
+      <summary style="font-family:'Cinzel',serif; color:var(--c-accent); cursor:pointer;">Distribution</summary>
+      <div style="display:flex; gap:1.5rem; margin-top:0.5rem;">
+        <div style="flex:1">
+          <div style="font-size:0.8rem; color:var(--c-ink-faint); margin-bottom:0.25rem">PCs downed per fight</div>
+          ${renderBars(downed.map((n, i) => ({ label: String(i), value: n })), maxD)}
+        </div>
+        <div style="flex:1">
+          <div style="font-size:0.8rem; color:var(--c-ink-faint); margin-bottom:0.25rem">Rounds to resolution</div>
+          ${renderBars(rounds.map((n, i) => ({ label: 'R' + i, value: n })).slice(1), maxR)}
+        </div>
+      </div>
+    </details>`;
+}
+
+function renderBars(rows, max) {
+  return `<svg viewBox="0 0 200 100" preserveAspectRatio="none" style="width:100%; height:100px; border:1px solid var(--c-border); border-radius:4px;">
+    ${rows.map((row, i) => {
+      const w = 200 / rows.length;
+      const h = Math.round((row.value / max) * 90);
+      return `<g>
+        <rect x="${i*w + 1}" y="${100 - h}" width="${w - 2}" height="${h}" fill="#4a9595"/>
+        <text x="${i*w + w/2}" y="98" text-anchor="middle" font-size="6" fill="#a0adb2">${escapeHtml(row.label)}</text>
+      </g>`;
+    }).join('')}
+  </svg>`;
+}
+
+function renderPerAction(r) {
+  const root = document.getElementById('result-peraction');
+  const rows = r.perAction.slice().sort((a, b) =>
+    (b.totalDmg + b.totalHealed) - (a.totalDmg + a.totalHealed));
+  root.innerHTML = `
+    <details open style="margin-top:0.5rem;">
+      <summary style="font-family:'Cinzel',serif; color:var(--c-accent); cursor:pointer;">Action effectiveness</summary>
+      <table style="width:100%; font-size:0.85rem; border-collapse:collapse; margin-top:0.5rem;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--c-border); color:var(--c-ink-faint); text-align:left;">
+            <th style="padding:0.25rem">Actor</th>
+            <th style="padding:0.25rem">Action</th>
+            <th style="padding:0.25rem">Kind</th>
+            <th style="padding:0.25rem; text-align:right">Uses</th>
+            <th style="padding:0.25rem; text-align:right">Hits</th>
+            <th style="padding:0.25rem; text-align:right">Total dmg</th>
+            <th style="padding:0.25rem; text-align:right">Total healed</th>
+            <th style="padding:0.25rem; text-align:right">Avg/use</th>
+            <th style="padding:0.25rem; text-align:right">Kills</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(row => `
+            <tr style="border-bottom:1px dashed var(--c-border)">
+              <td style="padding:0.25rem">${row.actor}</td>
+              <td style="padding:0.25rem">${escapeHtml(row.name)}</td>
+              <td style="padding:0.25rem; color:var(--c-ink-faint)">${row.kind}</td>
+              <td style="padding:0.25rem; text-align:right">${row.uses}</td>
+              <td style="padding:0.25rem; text-align:right">${row.hits}</td>
+              <td style="padding:0.25rem; text-align:right">${row.totalDmg}</td>
+              <td style="padding:0.25rem; text-align:right">${row.totalHealed}</td>
+              <td style="padding:0.25rem; text-align:right">${row.avgDmg.toFixed(1)}</td>
+              <td style="padding:0.25rem; text-align:right">${row.killsCaused}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </details>`;
+}
 function renderReplays(r)       { /* lands in Task 33 */ }
 
 // ═══════════════════════════════════════════════════════════════════════
