@@ -807,6 +807,49 @@ test('targetsInBucket: falls back when bucket is empty', () => {
   assertEq(r.length, 1);
   assertEq(r[0], back);
 });
+test('rangedness: all melee → 0', () => {
+  const pm = { actions:[{ actionRange:'melee' }, { actionRange:'melee' }] };
+  assertEq(Crucible.rangedness(pm), 0);
+});
+test('rangedness: all ranged → 1', () => {
+  const pm = { actions:[{ actionRange:'ranged' }, { actionRange:'ranged' }] };
+  assertEq(Crucible.rangedness(pm), 1);
+});
+test('rangedness: half-and-half → 0.5', () => {
+  const pm = { actions:[{ actionRange:'melee' }, { actionRange:'ranged' }] };
+  assertEq(Crucible.rangedness(pm), 0.5);
+});
+test('rangedness: "both" counts as 0.5', () => {
+  const pm = { actions:[{ actionRange:'both' }, { actionRange:'both' }] };
+  assertEq(Crucible.rangedness(pm), 0.5);
+});
+test('rangedness: empty actions → 0', () => {
+  assertEq(Crucible.rangedness({ actions: [] }), 0);
+  assertEq(Crucible.rangedness({}), 0);
+});
+test('bucket: thresholds 0.3 and 0.7', () => {
+  assertEq(Crucible.bucket(0),    'frontline');
+  assertEq(Crucible.bucket(0.29), 'frontline');
+  assertEq(Crucible.bucket(0.3),  'midline');
+  assertEq(Crucible.bucket(0.5),  'midline');
+  assertEq(Crucible.bucket(0.7),  'midline');
+  assertEq(Crucible.bucket(0.71), 'backline');
+  assertEq(Crucible.bucket(1),    'backline');
+});
+test('position: uses override when set', () => {
+  const pm = {
+    actions:[{ actionRange:'melee' }, { actionRange:'melee' }],
+    positionOverride: 'backline',
+  };
+  assertEq(Crucible.position(pm), 'backline');
+});
+test('position: derives from actions when override is null', () => {
+  const pm = {
+    actions:[{ actionRange:'ranged' }, { actionRange:'ranged' }, { actionRange:'ranged' }],
+    positionOverride: null,
+  };
+  assertEq(Crucible.position(pm), 'backline');
+});
 </script>
 </body>
 </html>

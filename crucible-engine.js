@@ -197,18 +197,33 @@
     return position(combatant.pm);
   }
 
-  // Temporary stub — replaced by full version in Task 4.
-  function position(pm) {
-    if (!pm || !pm.actions || !pm.actions.length) return 'frontline';
+  // ─────────── Rangedness + position ───────────
+  // PC's rangedness score in [0, 1]: derived from how many of their actions
+  // are ranged. `both`-tagged actions count as 0.5. Empty actions → 0
+  // (validation gate already blocks runs without actions).
+  function rangedness(pm) {
+    if (!pm || !Array.isArray(pm.actions) || !pm.actions.length) return 0;
     let ranged = 0, both = 0;
     for (const a of pm.actions) {
       if (a.actionRange === 'ranged') ranged++;
       else if (a.actionRange === 'both') both++;
     }
-    const r = (ranged + 0.5 * both) / pm.actions.length;
-    if (r < 0.3) return 'frontline';
-    if (r > 0.7) return 'backline';
+    return (ranged + 0.5 * both) / pm.actions.length;
+  }
+
+  // Bucket a rangedness score into a position label.
+  // Thresholds match the spec: < 0.3 frontline, 0.3..0.7 midline, > 0.7 backline.
+  function bucket(score) {
+    if (!Number.isFinite(score)) return 'frontline';
+    if (score < 0.3) return 'frontline';
+    if (score > 0.7) return 'backline';
     return 'midline';
+  }
+
+  // Active position: explicit override wins over derived bucket.
+  function position(pm) {
+    if (pm && pm.positionOverride) return pm.positionOverride;
+    return bucket(rangedness(pm));
   }
 
   // ─────────── Combatant materialization ───────────
@@ -960,7 +975,8 @@
     runTrial, runSim,
     // Role-policy helpers
     clamp01, sumDice, actionIsMelee, actionIsRanged, targetSaveBonus, actionEv,
-    tagActions, bestEvAction, lowestPick, targetsInBucket, position, positionOf,
+    tagActions, bestEvAction, lowestPick, targetsInBucket,
+    rangedness, bucket, position, positionOf,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Crucible;
