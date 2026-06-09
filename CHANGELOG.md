@@ -9,6 +9,20 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### The Crucible — combat-sim parser + engine helpers
+
+- New `crucible-engine.js` with seeded Mulberry32 RNG, dice roller
+  (with crit doubling of dice but not modifier), and derived-stat helpers
+  (`mod`, `pb`, `saveBonus`, `toHit`, `saveDc`, `pcDamageMod`).
+- New `crucible-parser.js` with five passes (multiattack / attack / save /
+  heal / unparsed-fallback), a recharge + uses-per-day extractor that runs
+  alongside, a `parseRegeneration` helper for trait bodies, and a memoized
+  `parseAllMonsterActions` wrapper that respects pre-existing overrides.
+- New `tests/parser.test.html` and `tests/engine.test.html` — vanilla
+  HTML pages with inline assert harnesses. 30 parser fixtures + 13 engine
+  helper assertions, all green. Tests run manually by opening the file
+  and clicking "Run tests."
+
 ### Atlas Workshop: side-panel editing for NPCs, Players, Timeline
 
 Follow-up to the pop-out editor. The previous pop-out widened
