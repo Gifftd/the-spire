@@ -78,6 +78,44 @@ test('rollDie(20): 1000 rolls all in [1,20]', () => {
     assertBetween(v, 1, 20, 'roll #' + i);
   }
 });
+test('rollDice("1d8"): in [1,8]', () => {
+  const rng = Crucible.makeRng(11);
+  for (let i = 0; i < 200; i++) {
+    const v = Crucible.rollDice('1d8', rng);
+    assertBetween(v, 1, 8);
+  }
+});
+test('rollDice("2d6+3"): in [5,15]', () => {
+  const rng = Crucible.makeRng(13);
+  for (let i = 0; i < 200; i++) {
+    const v = Crucible.rollDice('2d6+3', rng);
+    assertBetween(v, 5, 15);
+  }
+});
+test('rollDice("3d8-2"): in [1,22]', () => {
+  const rng = Crucible.makeRng(17);
+  for (let i = 0; i < 200; i++) {
+    const v = Crucible.rollDice('3d8-2', rng);
+    assertBetween(v, 1, 22);
+  }
+});
+test('rollDice empty/null returns 0', () => {
+  const rng = Crucible.makeRng(1);
+  assertEq(Crucible.rollDice('', rng), 0);
+  assertEq(Crucible.rollDice(null, rng), 0);
+});
+test('rollDice with crit=true doubles dice (not mod)', () => {
+  // 1d8+3 normal max = 11, crit max = 19 (8+8+3). We loop many trials
+  // and check the maximum we ever see is > normal max.
+  const rng = Crucible.makeRng(23);
+  let maxNormal = 0, maxCrit = 0;
+  for (let i = 0; i < 400; i++) {
+    maxNormal = Math.max(maxNormal, Crucible.rollDice('1d8+3', rng, false));
+    maxCrit   = Math.max(maxCrit,   Crucible.rollDice('1d8+3', rng, true));
+  }
+  assertTrue(maxNormal <= 11, 'normal cap 11, got ' + maxNormal);
+  assertTrue(maxCrit > 11, 'crit must beat normal max, got ' + maxCrit);
+});
 </script>
 </body>
 </html>

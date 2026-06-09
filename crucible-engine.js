@@ -26,10 +26,29 @@
     return 1 + Math.floor(rng() * sides);
   }
 
+  // Parse and roll a dice formula. Forms accepted:
+  //   '1d8', '2d6+3', '3d8-2', '4d6 + 1', '1d20+0', '3'  (constant)
+  // crit=true → roll dice count twice (doubling dice, not modifier).
+  // Empty / null / undefined → 0.
+  const DICE_RE = /^\s*(?:(\d+)d(\d+))?\s*([+-]\s*\d+)?\s*$/i;
+  function rollDice(formula, rng, crit) {
+    if (!formula) return 0;
+    const m = String(formula).match(DICE_RE);
+    if (!m) return 0;
+    const count = parseInt(m[1] || '0', 10);
+    const sides = parseInt(m[2] || '0', 10);
+    const mod   = m[3] ? parseInt(m[3].replace(/\s+/g, ''), 10) : 0;
+    let total = mod;
+    const rolls = crit ? count * 2 : count;
+    for (let i = 0; i < rolls; i++) total += rollDie(sides, rng);
+    return total;
+  }
+
   // ─────────── Public exports ───────────
   const Crucible = {
     makeRng,
     rollDie,
+    rollDice,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Crucible;
