@@ -294,6 +294,38 @@
     return monster.inferredRole;
   }
 
+  // ─────────── Role policies ───────────
+  // Return the actor's available actions (own parsedActions).
+  // Monster-side here; PC-side keeps its own dispatch path.
+  function availableMonsterActions(me) {
+    const list = (me.monster && me.monster.parsedActions) || [];
+    return list.filter(a => isAvailable(me, a));
+  }
+
+  // ── Soldier ──
+  function pickTargetSoldier(me, all, ctx) {
+    return lowestPick(aliveEnemies(me, all), c => c.hp, c => c.ac, ctx.rng);
+  }
+  function pickActionSoldier(me, target, ctx) {
+    const actions = availableMonsterActions(me);
+    tagActions(actions);
+    // Multiattack first.
+    const ma = actions.find(a => a.kind === 'multiattack');
+    if (ma) { ma._ownerActions = actions; return ma; }
+    // Limited-resource (usesPerDay/recharge) before at-will, scored by EV.
+    const limited = bestEvAction(actions, target, ctx,
+                                 a => (a.usesPerDay != null || a.recharge) &&
+                                      ['attack','save'].includes(a.kind));
+    if (limited) return limited;
+    // At-will.
+    return bestEvAction(actions, target, ctx,
+                        a => ['attack','save'].includes(a.kind));
+  }
+
+  const ROLE_POLICIES = {
+    soldier: { pickTarget: pickTargetSoldier, pickAction: pickActionSoldier },
+  };
+
   // ─────────── Combatant materialization ───────────
   // Turns the PartyMember + monster-pick lists into a flat combatants[].
   // PCs are one-per-PartyMember; monsters expand to N independent copies.
@@ -816,15 +848,34 @@
           tally(c.side, heal.action.sourceActionName || heal.action.name,
                 'heal', false, 0, r.totalHealed, 0, r.revives);
         } else {
-          const action = pickAction(c);
-          if (!action) continue;
+          let action = null;
+          let targets = null;
+          if (c.side === 'monster') {
+            const role = resolveRole(c.monster);
+            const policy = ROLE_POLICIES[role] || ROLE_POLICIES.soldier;
+            const policyCtx = {
+              round, rng, tactics,
+              livingEnemyCount: aliveEnemies(c, all).length,
+            };
+            const tgt = policy.pickTarget(c, all, policyCtx);
+            if (!tgt) continue;
+            targets = Array.isArray(tgt) ? tgt : [tgt];
+            action = policy.pickAction(c, targets[0], policyCtx);
+            if (!action) continue;
+          } else {
+            // PC branch — unchanged from v1.
+            action = pickAction(c);
+            if (!action) continue;
+          }
           if (action.kind === 'multiattack') {
             consumeUse(c, action);
             const r = resolveMultiattack(c, all, action, tactics, rng, events, round);
             tally(c.side, action.sourceActionName, 'multi', false, 0, 0, 0, 0);
             warnings.push(...(r.warnings || []));
           } else if (action.kind === 'attack') {
-            const tgt = pickEnemyTarget(c, all, tactics, rng);
+            const tgt = (c.side === 'monster' && targets && targets[0])
+                          ? targets[0]
+                          : pickEnemyTarget(c, all, tactics, rng);
             if (!tgt) continue;
             consumeUse(c, action);
             const r = c.side === 'pc'
@@ -842,14 +893,17 @@
             tally(c.side, action.sourceActionName || action.name, 'attack',
                   r.hit, totalDmgThisAttack, 0, killed ? 1 : 0, 0);
           } else if (action.kind === 'save') {
-            // For AoE, pick `aoeTargets` lowest-HP enemies.
-            const enemies = aliveEnemies(c, all)
-              .sort((a, b) => a.hp - b.hp);
-            const n = Math.max(1, action.aoeTargets || 1);
-            const targets = enemies.slice(0, n);
-            if (!targets.length) continue;
+            let saveTargets;
+            if (c.side === 'monster' && targets && targets.length) {
+              saveTargets = targets;
+            } else {
+              const enemies = aliveEnemies(c, all).sort((a, b) => a.hp - b.hp);
+              const n = Math.max(1, action.aoeTargets || 1);
+              saveTargets = enemies.slice(0, n);
+            }
+            if (!saveTargets.length) continue;
             consumeUse(c, action);
-            const r = resolveSave(c, targets, action, rng, events, round);
+            const r = resolveSave(c, saveTargets, action, rng, events, round);
             tally(c.side, action.sourceActionName || action.name, 'save',
                   false, r.totalDmg, 0, 0, 0);
           } else if (action.kind === 'heal') {
@@ -1046,6 +1100,7 @@
     tagActions, bestEvAction, lowestPick, targetsInBucket,
     rangedness, bucket, position, positionOf,
     crHpMedian, inferRole, resolveRole, normalizeRole,
+    ROLE_POLICIES,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Crucible;

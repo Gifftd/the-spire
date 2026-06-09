@@ -942,6 +942,40 @@ test('resolveRole: unknown role normalizes to soldier', () => {
   const m = { roleOverride:'made-up-role', parsedActions:[] };
   assertEq(Crucible.resolveRole(m), 'soldier');
 });
+
+// ─────── Task 6: ROLE_POLICIES registry + Soldier policy ───────
+
+test('ROLE_POLICIES: registry exposes soldier with pickTarget/pickAction', () => {
+  const p = Crucible.ROLE_POLICIES.soldier;
+  assertTrue(typeof p.pickTarget === 'function', 'pickTarget is function');
+  assertTrue(typeof p.pickAction === 'function', 'pickAction is function');
+});
+test('Soldier pickTarget: lowest HP wins', () => {
+  const me = { side:'monster', name:'Mob' };
+  const enemies = [
+    { side:'pc', name:'A', hp:30, ac:18, downed:false, dead:false, pm:{ actions:[{ actionRange:'melee' }] } },
+    { side:'pc', name:'B', hp:5,  ac:14, downed:false, dead:false, pm:{ actions:[{ actionRange:'melee' }] } },
+    { side:'pc', name:'C', hp:20, ac:12, downed:false, dead:false, pm:{ actions:[{ actionRange:'melee' }] } },
+  ];
+  const ctx = { round:1, rng:() => 0, tactics:{} };
+  const t = Crucible.ROLE_POLICIES.soldier.pickTarget(me, [me, ...enemies], ctx);
+  assertEq(t.name, 'B');
+});
+test('Soldier pickAction: multiattack wins when available', () => {
+  const subAtk = { sourceActionName:'Bite', kind:'attack', toHit:5,
+                   damage:[{ dice:'1d8', mod:3, type:'piercing' }] };
+  const multi = {
+    sourceActionName:'Multiattack', kind:'multiattack',
+    multiattackPlan:[{ actionName:'Bite', count:2 }],
+  };
+  const me = { side:'monster',
+               monster:{ parsedActions:[multi, subAtk] },
+               slotsLeft:{}, rechargeReady:{} };
+  const target = { ac:15 };
+  const ctx = { round:1, rng:() => 0, tactics:{}, livingEnemyCount:1 };
+  const a = Crucible.ROLE_POLICIES.soldier.pickAction(me, target, ctx);
+  assertEq(a.sourceActionName, 'Multiattack');
+});
 </script>
 </body>
 </html>
