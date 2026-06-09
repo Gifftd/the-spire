@@ -850,6 +850,98 @@ test('position: derives from actions when override is null', () => {
   };
   assertEq(Crucible.position(pm), 'backline');
 });
+
+// ─────── Task 5: crHpMedian + inferRole + resolveRole ───────
+
+test('crHpMedian: lookup returns plausible numbers', () => {
+  // CR 1 should be ~33, CR 5 should be ~100, CR 10 should be ~205.
+  // We assert a range; the exact 2024 DMG values are in the table.
+  const cr1  = Crucible.crHpMedian(1);
+  const cr5  = Crucible.crHpMedian(5);
+  const cr10 = Crucible.crHpMedian(10);
+  assertTrue(cr1 > 0 && cr1 < 50, `cr1=${cr1}`);
+  assertTrue(cr5 > 50 && cr5 < 200, `cr5=${cr5}`);
+  assertTrue(cr10 > 150 && cr10 < 350, `cr10=${cr10}`);
+  // Fractional CRs work.
+  assertTrue(Crucible.crHpMedian(0.5) > 0, 'cr 1/2');
+  assertTrue(Crucible.crHpMedian(0.25) > 0, 'cr 1/4');
+});
+
+test('inferRole: heal action → leader', () => {
+  const m = { parsedActions:[{ kind:'heal', heal:{ dice:'2d4', mod:3 } }] };
+  assertEq(Crucible.inferRole(m), 'leader');
+});
+test('inferRole: all ranged attacks → artillery', () => {
+  const m = { parsedActions:[
+    { kind:'attack', range:[80,320], damage:[{ dice:'1d10', mod:3, type:'piercing' }] },
+    { kind:'attack', range:[60,180], damage:[{ dice:'1d8', mod:3, type:'piercing' }] },
+  ]};
+  assertEq(Crucible.inferRole(m), 'artillery');
+});
+test('inferRole: control save → controller', () => {
+  const m = { parsedActions:[
+    { kind:'save', saveAbility:'wis', saveDc:15, condition:'paralyzed',
+      damageOnFail:[], aoeTargets:1, halfOnSave:false },
+  ]};
+  assertEq(Crucible.inferRole(m), 'controller');
+});
+test('inferRole: high HP + multiattack → brute', () => {
+  const m = {
+    cr: 5,
+    hp: 200,  // well above CR 5 median
+    parsedActions:[
+      { kind:'multiattack', multiattackPlan:[{ actionName:'Slam', count:2 }] },
+      { kind:'attack', sourceActionName:'Slam', reach:5,
+        damage:[{ dice:'2d8', mod:5, type:'bludgeoning' }] },
+    ],
+  };
+  assertEq(Crucible.inferRole(m), 'brute');
+});
+test('inferRole: 1/Day finisher + small action list → ambusher', () => {
+  const m = {
+    cr: 3,
+    hp: 60,
+    parsedActions:[
+      { kind:'attack', reach:5, damage:[{ dice:'1d6', mod:3, type:'piercing' }] },
+      { kind:'attack', sourceActionName:'Assassinate', reach:5,
+        usesPerDay: 1, damage:[{ dice:'6d6', mod:3, type:'piercing' }] },
+    ],
+  };
+  assertEq(Crucible.inferRole(m), 'ambusher');
+});
+test('inferRole: default → soldier', () => {
+  const m = {
+    cr: 3, hp: 50,
+    parsedActions:[
+      { kind:'attack', reach:5, damage:[{ dice:'1d8', mod:3, type:'slashing' }] },
+    ],
+  };
+  assertEq(Crucible.inferRole(m), 'soldier');
+});
+test('inferRole: empty actions → soldier', () => {
+  assertEq(Crucible.inferRole({}), 'soldier');
+  assertEq(Crucible.inferRole({ parsedActions: [] }), 'soldier');
+});
+
+test('resolveRole: roleOverride wins', () => {
+  const m = { roleOverride:'brute', fmRole:'soldier', inferredRole:'leader',
+              parsedActions:[] };
+  assertEq(Crucible.resolveRole(m), 'brute');
+});
+test('resolveRole: fmRole wins over inferred', () => {
+  const m = { fmRole:'artillery', inferredRole:'leader', parsedActions:[] };
+  assertEq(Crucible.resolveRole(m), 'artillery');
+});
+test('resolveRole: inferred used when no fmRole/override', () => {
+  const m = { parsedActions:[{ kind:'heal', heal:{ dice:'1d8', mod:0 } }] };
+  assertEq(Crucible.resolveRole(m), 'leader');
+  // Also: inference is cached on the monster.
+  assertEq(m.inferredRole, 'leader');
+});
+test('resolveRole: unknown role normalizes to soldier', () => {
+  const m = { roleOverride:'made-up-role', parsedActions:[] };
+  assertEq(Crucible.resolveRole(m), 'soldier');
+});
 </script>
 </body>
 </html>

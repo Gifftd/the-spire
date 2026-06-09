@@ -226,6 +226,74 @@
     return bucket(rangedness(pm));
   }
 
+  // ─────────── Role inference ───────────
+  // Median HP per CR — sourced from the 2024 DMG monster table. Fractional
+  // CRs covered for low-tier creatures. Lookups beyond CR 20 cap at CR 20.
+  const CR_HP_MEDIAN = {
+    0:    2,    0.125: 7,   0.25: 13,   0.5: 22,
+    1:    33,   2:    52,   3:   78,    4:   97,
+    5:    115,  6:   135,   7:  152,    8:  168,
+    9:    188,  10:  205,   11: 222,    12: 240,
+    13:   258,  14:  275,   15: 292,    16: 310,
+    17:   327,  18:  345,   19: 362,    20: 380,
+  };
+  function crHpMedian(cr) {
+    const c = +cr;
+    if (!Number.isFinite(c)) return CR_HP_MEDIAN[1];
+    if (CR_HP_MEDIAN[c] != null) return CR_HP_MEDIAN[c];
+    // Find nearest defined CR.
+    const keys = Object.keys(CR_HP_MEDIAN).map(Number);
+    let best = keys[0];
+    for (const k of keys) {
+      if (Math.abs(k - c) < Math.abs(best - c)) best = k;
+    }
+    return CR_HP_MEDIAN[best];
+  }
+
+  const CONTROL_CONDITIONS = ['stunned','paralyzed','restrained','frightened','charmed'];
+
+  function inferRole(monster) {
+    const acts = (monster && monster.parsedActions) || [];
+    if (!acts.length) return 'soldier';
+
+    const hasHeal     = acts.some(a => a.kind === 'heal');
+    const attackActs  = acts.filter(a => a.kind === 'attack');
+    const allRanged   = attackActs.length > 0 && attackActs.every(a => actionIsRanged(a));
+    const hasControl  = acts.some(a => a.kind === 'save' && a.condition &&
+                                       CONTROL_CONDITIONS.includes(a.condition));
+    const hasMulti    = acts.some(a => a.kind === 'multiattack');
+    const highHp      = monster.hp >= crHpMedian(monster.cr) * 1.3;
+    const hasFinisher = acts.some(a => a.usesPerDay === 1 && a.kind !== 'heal');
+
+    if (hasHeal)                            return 'leader';
+    if (allRanged)                          return 'artillery';
+    if (hasControl)                         return 'controller';
+    if (highHp && hasMulti)                 return 'brute';
+    if (hasFinisher && acts.length <= 3)    return 'ambusher';
+    return 'soldier';
+  }
+
+  // ─────────── Role resolution (override > fmRole > inferred > soldier) ───────────
+  const KNOWN_ROLES = ['ambusher','artillery','brute','controller','leader',
+                       'skirmisher','soldier','solo','minion'];
+
+  function normalizeRole(s) {
+    if (!s) return null;
+    const k = String(s).toLowerCase().trim();
+    return KNOWN_ROLES.includes(k) ? k : null;
+  }
+
+  function resolveRole(monster) {
+    if (!monster) return 'soldier';
+    const ov  = normalizeRole(monster.roleOverride);
+    if (ov)  return ov;
+    const fm  = normalizeRole(monster.fmRole);
+    if (fm)  return fm;
+    if (monster.inferredRole) return monster.inferredRole;
+    monster.inferredRole = inferRole(monster);
+    return monster.inferredRole;
+  }
+
   // ─────────── Combatant materialization ───────────
   // Turns the PartyMember + monster-pick lists into a flat combatants[].
   // PCs are one-per-PartyMember; monsters expand to N independent copies.
@@ -977,6 +1045,7 @@
     clamp01, sumDice, actionIsMelee, actionIsRanged, targetSaveBonus, actionEv,
     tagActions, bestEvAction, lowestPick, targetsInBucket,
     rangedness, bucket, position, positionOf,
+    crHpMedian, inferRole, resolveRole, normalizeRole,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Crucible;
