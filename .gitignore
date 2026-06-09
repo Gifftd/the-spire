@@ -33,6 +33,7 @@ fm-*.json
 # Editor / IDE junk
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 
