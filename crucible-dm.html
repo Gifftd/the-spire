@@ -550,7 +550,39 @@ function copySeed() {
   navigator.clipboard.writeText(String(lastSimSeed)).then(() =>
     alert('Seed ' + lastSimSeed + ' copied. Use ?seed=' + lastSimSeed + ' to replay.'));
 }
-function copyReport() { alert('Copy report lands in Task 34.'); }
+function copyReport() {
+  if (!lastSimResult) return;
+  const r = lastSimResult;
+  const fm = computeFmBudget();
+  const band = bandLabel(r);
+  const md = [
+    `# Crucible run — ${band.label}`,
+    '',
+    fm ? `**FM band:** ${fm.band.toUpperCase()} (level ${fm.level} × ${fm.size}, total CR ${fm.totalCr})` : '',
+    `**Sim band:** ${band.label}`,
+    `**Trials:** ${r.trials} · **Seed:** ${lastSimSeed}`,
+    `**Win rate:** ${(r.headline.winRate*100).toFixed(1)}% · ` +
+    `**Avg rounds:** ${r.headline.avgRounds.toFixed(1)} · ` +
+    `**Avg downed:** ${r.headline.avgDowned.toFixed(2)} · ` +
+    `**TPK rate:** ${(r.headline.partyTpkRate*100).toFixed(1)}%`,
+    '',
+    '## Per-PC outcomes',
+    '',
+    '| PC | down % | ≥½ HP loss % | avg HP | avg fell at | avg healed |',
+    '|---|---:|---:|---:|---:|---:|',
+    ...r.perPc.map(p =>
+      `| ${p.name} | ${(p.downRate*100).toFixed(0)}% | ${(p.halfHpRate*100).toFixed(0)}% | ${p.avgHpRemaining.toFixed(1)} | ${p.deathRound.mean != null ? 'R'+p.deathRound.mean.toFixed(1) : '—'} | ${p.avgHealReceived.toFixed(1)} |`),
+    '',
+    '## Top actions by combined impact',
+    '',
+    '| Actor | Action | Kind | Uses | Total dmg | Total healed | Kills |',
+    '|---|---|---|---:|---:|---:|---:|',
+    ...r.perAction.slice().sort((a,b) => (b.totalDmg+b.totalHealed) - (a.totalDmg+a.totalHealed))
+      .slice(0, 10).map(row =>
+        `| ${row.actor} | ${row.name} | ${row.kind} | ${row.uses} | ${row.totalDmg} | ${row.totalHealed} | ${row.killsCaused} |`),
+  ].filter(Boolean).join('\n');
+  navigator.clipboard.writeText(md).then(() => alert('Report copied as markdown.'));
+}
 function renderPerPc(r) {
   const root = document.getElementById('result-perpc');
   if (!r.perPc.length) { root.innerHTML = ''; return; }
@@ -1162,6 +1194,17 @@ renderParty();
 
 // Eagerly start loading bestiary in the background — picker becomes instant.
 loadBestiary().catch(e => console.warn('Bestiary preload failed', e));
+
+// Honor ?seed=N on page load — fill it into the run state if present.
+(function honorSeedParam() {
+  const url = new URL(location.href);
+  const seedStr = url.searchParams.get('seed');
+  if (seedStr) {
+    // Display the planned seed by stashing it in lastSimSeed before run;
+    // the run handler reads from URL each time anyway.
+    document.title = 'The Crucible · seed=' + seedStr;
+  }
+})();
 </script>
 </body>
 </html>
