@@ -106,7 +106,7 @@ function defaultPC() {
     combat:   { hp:30, maxHp:30, ac:16, initBonus:2, speed:30 },
     actions:  [{ id:'a-' + Math.random().toString(36).slice(2,6),
                  name:'Longsword', source:'weapon', type:'attack',
-                 atkAbility:'str', atkBonusOverride:null,
+                 atkAbility:'str', atkBonusOverride:null, actionRange:'melee',
                  damage:{ dice:'1d8', mod:'+atkAbility', type:'slashing',
                           riderDice:null, riderType:null },
                  save:null, heal:null, aoeTargets:0,
@@ -261,10 +261,15 @@ function renderActionEditor(pm, act) {
       <label><input type="checkbox" ${h.reviveDowned?'checked':''}
         onchange="updateActionHeal('${pm.id}','${act.id}','reviveDowned', this.checked)"> revives downed</label>`;
   }
+  const rangeSel = ['melee','ranged','both'].map(t =>
+    `<option value="${t}" ${act.actionRange===t?'selected':''}>${t}</option>`).join('');
   return `
     <div style="padding:0.25rem 0.5rem; background:var(--c-surface);">
       <label>Name <input type="text" value="${escapeHtml(act.name)}"
         oninput="updateAction('${pm.id}','${act.id}','name', this.value)" class="pc-input"></label>
+      <label>Range
+        <select onchange="updateAction('${pm.id}','${act.id}','actionRange', this.value)">${rangeSel}</select>
+      </label>
       <label>Type <select onchange="changeActionType('${pm.id}','${act.id}', this.value)">${typeSel}</select></label>
       ${body}
       <label>Uses/day (blank=at-will) <input type="number" value="${act.usesPerDay ?? ''}"
@@ -361,7 +366,7 @@ function addAction(pmId) {
   const pm = party.find(p => p.id === pmId); if (!pm) return;
   const a = { id:'a-' + Math.random().toString(36).slice(2,6),
               name:'New action', source:'weapon', type:'attack',
-              atkAbility:'str', atkBonusOverride:null,
+              atkAbility:'str', atkBonusOverride:null, actionRange:'melee',
               damage:{ dice:'1d8', mod:'+atkAbility', type:'slashing',
                        riderDice:null, riderType:null },
               save:null, heal:null, aoeTargets:0,
