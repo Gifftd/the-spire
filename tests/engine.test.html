@@ -303,6 +303,75 @@ test('healTriage: no qualifying ally → returns null (sim falls through)', () =
   ally.slotsLeft = {}; ally.rechargeReady = {};
   assertEq(Crucible.healTriage(ally, [ally, peer], 1), null);
 });
+test('resolveAttack: nat 20 crits, doubles dice (not mod)', () => {
+  // d20 must roll 20. Use a controlled "rng" that returns 19.999.../20.
+  const fake = () => 19.999 / 20;  // → rollDie(20) = 1 + floor(19.999) = 20
+  const me = { side:'pc', name:'Aria' };
+  const target = { side:'monster', name:'Goblin', hp:10, ac:10, downed:false, dead:false };
+  const action = { sourceActionName:'Slash', kind:'attack', toHit:5,
+                   damage:[{ dice:'1d4', mod:0, type:'slashing' }] };
+  const events = [];
+  const result = Crucible.resolveAttackMonster(me, target, action, fake, events, 1);
+  assertEq(result.crit, true);
+  // 2 dice of d4 with fake rng → 2 * 4 (max) = 8
+  assertEq(result.damageDealt > 0, true);
+  assertTrue(result.damageByType.slashing >= 2, 'crit should deal ≥2');
+});
+test('resolveAttack: nat 1 misses', () => {
+  const fake = () => 0;            // rollDie(20) = 1
+  const target = { hp:10, ac:10, dead:false, downed:false, damageTypesReceivedThisTurn:new Set() };
+  const action = { sourceActionName:'X', kind:'attack', toHit:99,
+                   damage:[{ dice:'1d6', mod:0, type:'fire' }] };
+  const r = Crucible.resolveAttackMonster({}, target, action, fake, [], 1);
+  assertEq(r.hit, false);
+  assertEq(r.damageDealt, 0);
+});
+test('resolveAttack: damage by type recorded in target.damageTypesReceivedThisTurn', () => {
+  const fake = () => 0.5;          // mid-roll, hits
+  const target = { hp:30, ac:10, dead:false, downed:false,
+                   damageTypesReceivedThisTurn: new Set(), maxHp:30 };
+  const action = { sourceActionName:'BurnSlash', kind:'attack', toHit:10,
+                   damage:[{ dice:'1d4', mod:0, type:'fire' },
+                           { dice:'1d4', mod:0, type:'slashing' }] };
+  Crucible.resolveAttackMonster({}, target, action, fake, [], 1);
+  assertEq(target.damageTypesReceivedThisTurn.has('fire'), true);
+  assertEq(target.damageTypesReceivedThisTurn.has('slashing'), true);
+});
+test('resolveHeal: ally at 5 HP heals to min(maxHp, 5+roll)', () => {
+  const me = { name:'Cleric' };
+  const ally = { name:'Tank', hp:5, maxHp:30, downed:false };
+  const action = { sourceActionName:'CureWounds', kind:'heal',
+                   heal:{ dice:'1d8', mod:3, flat:0, target:'ally', reviveDowned:false } };
+  // fake rng always returns 0.99 → d8 = 8 → 8+3 = 11; cap at maxHp.
+  const fake = () => 0.99;
+  const evs = [];
+  const r = Crucible.resolveHeal(me, [ally], action, fake, evs, 1);
+  assertTrue(ally.hp >= 16 && ally.hp <= 30, 'ally hp after heal: ' + ally.hp);
+  assertEq(r.totalHealed > 0, true);
+});
+test('resolveHeal: revives downed ally with reviveDowned=true', () => {
+  const me = { name:'Pal' };
+  const ally = { name:'Fallen', hp:0, maxHp:30, downed:true };
+  const action = { sourceActionName:'Lay', kind:'heal',
+                   heal:{ dice:null, mod:0, flat:5, target:'ally', reviveDowned:true } };
+  Crucible.resolveHeal(me, [ally], action, () => 0.5, [], 1);
+  assertEq(ally.downed, false);
+  assertEq(ally.hp, 5);
+});
+test('resolveSave: target rolls under DC, takes full damage', () => {
+  const me = { name:'Mage' };
+  const target = { side:'pc', pm:{ identity:{ level:5 },
+                   abilities:{ str:10,dex:8,con:10,int:10,wis:10,cha:10 },
+                   profs:{ saves:{} } },
+                   hp:30, maxHp:30, ac:14, dead:false, downed:false,
+                   damageTypesReceivedThisTurn:new Set() };
+  const action = { sourceActionName:'Fireball', kind:'save', saveAbility:'dex', saveDc:99,
+                   damageOnFail:[{ dice:'8d6', mod:0, type:'fire' }],
+                   damageOnSave:[], halfOnSave:true, aoeTargets:4 };
+  // DC 99 → always fails. Fake rng = mid.
+  Crucible.resolveSave(me, [target], action, () => 0.5, [], 1);
+  assertTrue(target.hp < target.maxHp, 'expected damage on failed save');
+});
 </script>
 </body>
 </html>

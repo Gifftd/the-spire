@@ -292,6 +292,150 @@
     return null;
   }
 
+  // ─────────── Resistance / vulnerability ───────────
+  function damageMultiplier(target, type) {
+    const m = target.monster;
+    if (!m || !type) return 1;
+    if (Array.isArray(m.immunities)      && m.immunities.includes(type))      return 0;
+    if (Array.isArray(m.resistances)     && m.resistances.includes(type))     return 0.5;
+    if (Array.isArray(m.vulnerabilities) && m.vulnerabilities.includes(type)) return 2;
+    // Statblock JSON also has `immunitiesText` etc. — fall back to substring.
+    if (m.immunitiesText && m.immunitiesText.toLowerCase().includes(type)) return 0;
+    if (m.resistancesText && m.resistancesText.toLowerCase().includes(type)) return 0.5;
+    if (m.vulnerabilitiesText && m.vulnerabilitiesText.toLowerCase().includes(type)) return 2;
+    return 1;
+  }
+
+  // ─────────── Resolve a monster-side attack action ───────────
+  // For a PC-side attack, the engine uses resolveAttackPc (next task block).
+  function resolveAttackMonster(me, target, action, rng, events, round) {
+    const roll = rollDie(20, rng);
+    const isCrit = roll === 20;
+    const isFumble = roll === 1;
+    const hit = !isFumble && (isCrit || roll + (action.toHit || 0) >= (target.ac || 10));
+    let damageDealt = 0;
+    const damageByType = {};
+    if (hit) {
+      for (const dc of (action.damage || [])) {
+        let dmg = rollDice(dc.dice + (dc.mod ? (dc.mod >= 0 ? '+' : '') + dc.mod : ''), rng, isCrit);
+        const mult = damageMultiplier(target, dc.type);
+        dmg = Math.floor(dmg * mult);
+        if (dmg < 0) dmg = 0;
+        damageDealt += dmg;
+        damageByType[dc.type] = (damageByType[dc.type] || 0) + dmg;
+        if (target.damageTypesReceivedThisTurn) target.damageTypesReceivedThisTurn.add(dc.type);
+      }
+    }
+    events.push({ round, type:'attack', actor: me.name, target: target.name,
+                  action: action.sourceActionName, roll, crit:isCrit, hit,
+                  damageDealt });
+    return { roll, crit:isCrit, hit, damageDealt, damageByType };
+  }
+
+  // ─────────── Resolve a PC-side attack action ───────────
+  function resolveAttackPc(me, target, action, rng, events, round) {
+    // PC actions store inputs; derive to-hit + damage roll.
+    const th = toHit(me.pm, action);
+    const roll = rollDie(20, rng);
+    const isCrit = roll === 20;
+    const isFumble = roll === 1;
+    const hit = !isFumble && (isCrit || roll + th >= (target.ac || 10));
+    let damageDealt = 0;
+    const damageByType = {};
+    if (hit && action.damage) {
+      const dmod = pcDamageMod(me.pm, action);
+      const formula = action.damage.dice + (dmod >= 0 ? '+' + dmod : dmod);
+      let dmg = rollDice(formula, rng, isCrit);
+      const t = (action.damage.type || 'untyped').toLowerCase();
+      const mult = damageMultiplier(target, t);
+      dmg = Math.floor(dmg * mult);
+      if (dmg < 0) dmg = 0;
+      damageDealt += dmg;
+      damageByType[t] = dmg;
+      if (target.damageTypesReceivedThisTurn) target.damageTypesReceivedThisTurn.add(t);
+      // Rider damage (e.g. fire rider on a sword): no save, always applies on hit.
+      if (action.damage.riderDice) {
+        let rd = rollDice(action.damage.riderDice, rng, isCrit);
+        const rt = (action.damage.riderType || 'untyped').toLowerCase();
+        const rmult = damageMultiplier(target, rt);
+        rd = Math.floor(rd * rmult);
+        damageDealt += rd;
+        damageByType[rt] = (damageByType[rt] || 0) + rd;
+        if (target.damageTypesReceivedThisTurn) target.damageTypesReceivedThisTurn.add(rt);
+      }
+    }
+    events.push({ round, type:'attack', actor: me.name, target: target.name,
+                  action: action.name, roll, crit:isCrit, hit, damageDealt });
+    return { roll, crit:isCrit, hit, damageDealt, damageByType };
+  }
+
+  // ─────────── Resolve a save effect ───────────
+  function resolveSave(me, targets, action, rng, events, round) {
+    let totalDmg = 0;
+    for (const t of targets) {
+      if (t.dead || t.downed) continue;
+      // saveBonus uses PC math; for monster targets, fall back to monster.abilities.
+      let sb = 0;
+      if (t.side === 'pc' && t.pm) sb = saveBonus(t.pm, action.saveAbility);
+      else if (t.monster && t.monster.abilities) {
+        const ab = t.monster.abilities[action.saveAbility];
+        sb = ab ? (ab.save != null ? ab.save : ab.mod) : 0;
+      }
+      const roll = rollDie(20, rng);
+      const passed = roll + sb >= action.saveDc;
+      let dmgList;
+      if (passed && action.halfOnSave) dmgList = action.damageOnFail; // half later
+      else if (passed)                 dmgList = action.damageOnSave || [];
+      else                             dmgList = action.damageOnFail || [];
+      let dmg = 0;
+      for (const dc of dmgList) {
+        let raw = rollDice(dc.dice + (dc.mod ? (dc.mod >= 0 ? '+' : '') + dc.mod : ''), rng);
+        if (passed && action.halfOnSave) raw = Math.floor(raw / 2);
+        const mult = damageMultiplier(t, dc.type);
+        raw = Math.floor(raw * mult);
+        if (raw < 0) raw = 0;
+        dmg += raw;
+        if (t.damageTypesReceivedThisTurn) t.damageTypesReceivedThisTurn.add(dc.type);
+      }
+      // Apply condition on fail if specified.
+      if (!passed && action.condition) {
+        t.conditions.set(action.condition, 1);    // v1 fixed duration
+      }
+      // Apply damage to target.
+      if (dmg > 0) {
+        t.hp = Math.max(0, t.hp - dmg);
+        if (t.side === 'pc' && t.hp === 0 && !t.downed) t.downed = true;
+        if (t.side === 'monster' && t.hp === 0 && !t.dead) t.dead = true;
+        totalDmg += dmg;
+      }
+      events.push({ round, type:'save', actor: me.name, target: t.name,
+                    action: action.sourceActionName, roll, passed, damageDealt: dmg });
+    }
+    return { totalDmg };
+  }
+
+  // ─────────── Resolve a heal action ───────────
+  function resolveHeal(me, targets, action, rng, events, round) {
+    let totalHealed = 0, revives = 0;
+    for (const t of targets) {
+      const h = action.heal || {};
+      let amount = h.flat || 0;
+      if (h.dice) amount += rollDice(h.dice + (h.mod ? (h.mod >= 0 ? '+' : '') + h.mod : ''), rng);
+      if (t.downed && h.reviveDowned) {
+        t.downed = false;
+        t.hp = Math.min(t.maxHp, amount);
+        revives++;
+      } else if (!t.downed && !t.dead) {
+        t.hp = Math.min(t.maxHp, t.hp + amount);
+      }
+      totalHealed += amount;
+      events.push({ round, type:'heal', actor: me.name, target: t.name,
+                    action: action.sourceActionName || action.name,
+                    amount, revived: revives > 0 });
+    }
+    return { totalHealed, revives };
+  }
+
   // ─────────── Public exports ───────────
   const Crucible = {
     makeRng, rollDie, rollDice,
@@ -300,6 +444,8 @@
     tickConditions, rollRecharge, applyRegen, turnStart,
     pickEnemyTarget, isAvailable, consumeUse, healTriage,
     aliveEnemies, aliveAllies,
+    damageMultiplier, resolveAttackMonster, resolveAttackPc,
+    resolveSave, resolveHeal,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Crucible;
