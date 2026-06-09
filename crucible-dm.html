@@ -551,7 +551,37 @@ function copySeed() {
     alert('Seed ' + lastSimSeed + ' copied. Use ?seed=' + lastSimSeed + ' to replay.'));
 }
 function copyReport() { alert('Copy report lands in Task 34.'); }
-function renderPerPc(r)         { /* lands in Task 31 */ }
+function renderPerPc(r) {
+  const root = document.getElementById('result-perpc');
+  if (!r.perPc.length) { root.innerHTML = ''; return; }
+  root.innerHTML = `
+    <details open style="margin-top:0.5rem;">
+      <summary style="font-family:'Cinzel',serif; color:var(--c-accent); cursor:pointer;">Per-PC outcomes</summary>
+      <table style="width:100%; font-size:0.85rem; border-collapse:collapse; margin-top:0.5rem;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--c-border); color:var(--c-ink-faint); text-align:left;">
+            <th style="padding:0.25rem">PC</th>
+            <th style="padding:0.25rem; text-align:right">down %</th>
+            <th style="padding:0.25rem; text-align:right">≥½ HP loss %</th>
+            <th style="padding:0.25rem; text-align:right">avg HP</th>
+            <th style="padding:0.25rem; text-align:right">avg fell at</th>
+            <th style="padding:0.25rem; text-align:right">avg healed</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${r.perPc.map(p => `
+            <tr style="border-bottom:1px dashed var(--c-border)">
+              <td style="padding:0.25rem">${escapeHtml(p.name)}</td>
+              <td style="padding:0.25rem; text-align:right; color:${p.downRate >= 0.3 ? '#e77878' : 'inherit'}">${(p.downRate*100).toFixed(0)}%</td>
+              <td style="padding:0.25rem; text-align:right">${(p.halfHpRate*100).toFixed(0)}%</td>
+              <td style="padding:0.25rem; text-align:right">${p.avgHpRemaining.toFixed(1)}</td>
+              <td style="padding:0.25rem; text-align:right">${p.deathRound.mean != null ? 'R' + p.deathRound.mean.toFixed(1) : '—'}</td>
+              <td style="padding:0.25rem; text-align:right">${p.avgHealReceived.toFixed(1)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </details>`;
+}
 function renderDistribution(r)  { /* lands in Task 32 */ }
 function renderPerAction(r)     { /* lands in Task 32 */ }
 function renderReplays(r)       { /* lands in Task 33 */ }
