@@ -477,15 +477,84 @@ document.getElementById('btn-run').addEventListener('click', async () => {
   }
 });
 
+function bandLabel(r) {
+  const win = r.headline.winRate;
+  const tpk = r.headline.partyTpkRate;
+  const downed = r.headline.avgDowned;
+  if (tpk >= 0.15)  return { label: 'TPK-LIKELY', color: '#a3344b' };
+  if (win >= 0.9 && downed < 0.5)  return { label: 'EASY',      color: '#7fd49a' };
+  if (win >= 0.7 && downed < 1.5)  return { label: 'STANDARD',  color: '#dbb965' };
+  if (win >= 0.45)                  return { label: 'HARD',      color: '#e09a5a' };
+  return { label: 'DEADLY', color: '#e77878' };
+}
+
 function renderResults(r) {
   const root = document.getElementById('results-area');
+  const band = bandLabel(r);
+  const fm = computeFmBudget();
   root.innerHTML = `
     <div style="padding:1rem;">
-      <h3 style="font-family:'Cinzel',serif; color:var(--c-accent)">Run finished — ${r.trials} trials</h3>
-      <pre style="font-size:0.8em; max-height:60vh; overflow:auto">${escapeHtml(JSON.stringify(r.headline, null, 2))}</pre>
-      <div style="color:var(--c-ink-faint); font-size:0.8em">Seed: ${lastSimSeed}</div>
+      <div style="display:flex; gap:1rem; align-items:flex-start;">
+        <div>
+          <button class="btn" onclick="document.getElementById('btn-run').click()">↻ Rerun</button>
+          <button class="btn" onclick="copyReport()">📋 Copy report</button>
+        </div>
+        <div style="flex:1; text-align:right; color:var(--c-ink-faint); font-size:0.85em">
+          Seed: <span onclick="copySeed()" style="cursor:pointer; text-decoration:underline">${lastSimSeed}</span>
+          · ${r.trials} trials
+        </div>
+      </div>
+
+      <div style="margin:1rem 0; padding:1rem; background:var(--c-surface); border-left:5px solid ${band.color}; border-radius:4px;">
+        <div style="font-family:'Cinzel',serif; font-size:1.4rem; color:${band.color}; letter-spacing:0.05em">
+          ${band.label}
+        </div>
+        ${fm ? `<div style="margin-top:0.5rem; color:var(--c-ink-faint); font-size:0.9rem">
+          FM said <b>${fm.band.toUpperCase()}</b>; sim says <b style="color:${band.color}">${band.label}</b>.
+        </div>` : ''}
+        <div style="margin-top:0.75rem; display:flex; gap:1.5rem; flex-wrap:wrap;">
+          <div><div style="color:var(--c-ink-faint); font-size:0.75rem">WIN RATE</div>
+            <div style="font-size:1.25rem">${(r.headline.winRate*100).toFixed(1)}%</div></div>
+          <div><div style="color:var(--c-ink-faint); font-size:0.75rem">AVG ROUNDS</div>
+            <div style="font-size:1.25rem">${r.headline.avgRounds.toFixed(1)}</div></div>
+          <div><div style="color:var(--c-ink-faint); font-size:0.75rem">AVG DOWNED</div>
+            <div style="font-size:1.25rem">${r.headline.avgDowned.toFixed(2)}</div></div>
+          <div><div style="color:var(--c-ink-faint); font-size:0.75rem">TPK RATE</div>
+            <div style="font-size:1.25rem">${(r.headline.partyTpkRate*100).toFixed(1)}%</div></div>
+        </div>
+      </div>
+
+      <div id="result-perpc"></div>
+      <div id="result-dist"></div>
+      <div id="result-peraction"></div>
+      <div id="result-replays"></div>
+
+      ${r.warnings.length ? `
+      <details style="margin-top:1rem;"><summary style="color:#dbb965">⚠ ${r.warnings.length} warning(s)</summary>
+        <ul>${r.warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>
+      </details>` : ''}
+      ${r.errors.length ? `
+      <details style="margin-top:1rem;"><summary style="color:#e77878">✗ ${r.errors.length} error(s)</summary>
+        <ul>${r.errors.slice(0,5).map(e => `<li>Trial ${e.trial}: ${escapeHtml(e.message)}</li>`).join('')}</ul>
+      </details>` : ''}
     </div>`;
+
+  renderPerPc(r);
+  renderDistribution(r);
+  renderPerAction(r);
+  renderReplays(r);
 }
+
+function copySeed() {
+  if (lastSimSeed == null) return;
+  navigator.clipboard.writeText(String(lastSimSeed)).then(() =>
+    alert('Seed ' + lastSimSeed + ' copied. Use ?seed=' + lastSimSeed + ' to replay.'));
+}
+function copyReport() { alert('Copy report lands in Task 34.'); }
+function renderPerPc(r)         { /* lands in Task 31 */ }
+function renderDistribution(r)  { /* lands in Task 32 */ }
+function renderPerAction(r)     { /* lands in Task 32 */ }
+function renderReplays(r)       { /* lands in Task 33 */ }
 
 // ═══════════════════════════════════════════════════════════════════════
 //  Bestiary loader
