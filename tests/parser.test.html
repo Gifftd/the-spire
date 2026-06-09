@@ -70,6 +70,38 @@ test('Pass 4: empty body still produces ParsedAction shape', () => {
   assertEq(out.kind, 'unparsed');
   assertEq(out._raw, '');
 });
+test('Pass 1: actionName "Multiattack" → kind:multiattack', () => {
+  const body = 'The aarakocra makes two Wind Staff attacks, and it can use Spellcasting to cast Gust of Wind.';
+  const out = CrucibleParser.parseAction('Multiattack', body, null, 2);
+  assertEq(out.kind, 'multiattack');
+  assertEq(out.multiattackPlan, [{ actionName:'Wind Staff', count:2 }]);
+});
+test('Pass 1: "two Bite attacks and one Tail attack"', () => {
+  const body = 'The dragon makes two Bite attacks and one Tail attack.';
+  const out = CrucibleParser.parseAction('Multiattack', body, null, 2);
+  assertEq(out.multiattackPlan, [
+    { actionName:'Bite', count:2 },
+    { actionName:'Tail', count:1 },
+  ]);
+});
+test('Pass 1: "makes two attacks: one with Longsword and one with Shortbow"', () => {
+  const body = 'The fighter makes two attacks: one with its Longsword and one with its Shortbow.';
+  const out = CrucibleParser.parseAction('Multiattack', body, null, 2);
+  assertEq(out.multiattackPlan, [
+    { actionName:'Longsword', count:1 },
+    { actionName:'Shortbow',  count:1 },
+  ]);
+});
+test('Pass 1: body lead-in without "Multiattack" name still triggers', () => {
+  const body = 'The wolf makes three Bite attacks.';
+  const out = CrucibleParser.parseAction('Frenzy', body, null, 2);
+  assertEq(out.kind, 'multiattack');
+  assertEq(out.multiattackPlan, [{ actionName:'Bite', count:3 }]);
+});
+test('Pass 1: no multiattack language → falls through (NOT multiattack)', () => {
+  const out = CrucibleParser.parseAction('Bite', 'Melee Attack Roll: +5', null, 2);
+  assertTrue(out.kind !== 'multiattack', 'should not classify as multiattack');
+});
 </script>
 </body>
 </html>
