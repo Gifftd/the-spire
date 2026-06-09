@@ -20,8 +20,9 @@
     };
   }
 
-  // Roll an integer in [1, sides]. `rng` is a function returning [0,1).
+  // rollDie(sides, rng) — sides first; matches rollDice(formula, rng, crit) convention.
   function rollDie(sides, rng) {
+    if (!Number.isFinite(sides) || sides < 1) return 0;
     return 1 + Math.floor(rng() * sides);
   }
 
