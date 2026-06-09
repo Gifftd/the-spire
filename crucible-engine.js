@@ -501,6 +501,291 @@
     return { warnings };
   }
 
+  // ─────────── Pick action (nova resources strategy) ───────────
+  // Prefer multiattack > limited-use > at-will. If no usable action, returns null.
+  function pickAction(c) {
+    const list = c.side === 'pc'
+      ? ((c.pm && c.pm.actions) || []).map(a => ({ ...a,
+          sourceActionName: a.name, kind: a.type }))
+      : ((c.monster && c.monster.parsedActions) || []);
+    // Multiattack first.
+    const ma = list.find(a => a.kind === 'multiattack' && isAvailable(c, a));
+    if (ma) return ma;
+    // Limited-resource attacks/saves before at-will.
+    const limited = list.filter(a =>
+      (a.usesPerDay != null || a.recharge) && a.kind !== 'unparsed' && a.kind !== 'utility' &&
+      isAvailable(c, a));
+    if (limited.length) return limited[0];
+    // At-will attack/save/heal.
+    const atWill = list.find(a =>
+      ['attack','save','heal'].includes(a.kind) && isAvailable(c, a));
+    return atWill || null;
+  }
+
+  // ─────────── runTrial — one fight ───────────
+  // Returns { winner, rounds, partyHpRemaining, eventLog, perActionTally,
+  //          partyDowned, partyDeathRounds, warnings }.
+  function runTrial(party, monsterPicks, tactics, rng) {
+    const events = [];
+    const warnings = [];
+    const combatants = buildCombatants(party, monsterPicks, rng, false);
+    rollInitiative(combatants, rng);
+    const slots = initOrder(combatants);
+
+    const perAction = new Map();
+    function tally(actor, action, kind, dHit, dDmg, dHealed, dKills, dRevives) {
+      const key = actor + '|' + action;
+      let row = perAction.get(key);
+      if (!row) {
+        row = { actor: actor === 'pc' ? 'pc' : 'monster',
+                actorName: '', sourceId:'', name: action, kind,
+                uses:0, hits:0, totalDmg:0, totalHealed:0,
+                killsCaused:0, revivesCaused:0 };
+        perAction.set(key, row);
+      }
+      row.uses += 1;
+      row.hits += dHit ? 1 : 0;
+      row.totalDmg += dDmg || 0;
+      row.totalHealed += dHealed || 0;
+      row.killsCaused += dKills || 0;
+      row.revivesCaused += dRevives || 0;
+    }
+
+    let winner = null;
+    let round = 1;
+    while (round <= 25 && !winner) {
+      for (const slot of slots) {
+        const c = slot.c;
+        if (c.dead || c.downed) continue;
+        const skip = turnStart(c, round, rng, events);
+        if (skip) continue;
+        const myActions = c.side === 'pc' ? (c.pm.actions || [])
+                                          : ((c.monster.parsedActions) || []);
+        rollRecharge(c, myActions.map(a => ({
+          sourceActionName: a.sourceActionName || a.name, recharge: a.recharge })), rng);
+
+        // Heal triage first.
+        const all = combatants;
+        const heal = healTriage(c, all, round);
+        if (heal) {
+          consumeUse(c, heal.action);
+          c.lastHealRound = round;
+          const r = resolveHeal(c, heal.targets, heal.action, rng, events, round);
+          tally(c.side, heal.action.sourceActionName || heal.action.name,
+                'heal', false, 0, r.totalHealed, 0, r.revives);
+        } else {
+          const action = pickAction(c);
+          if (!action) continue;
+          if (action.kind === 'multiattack') {
+            consumeUse(c, action);
+            const r = resolveMultiattack(c, all, action, tactics, rng, events, round);
+            tally(c.side, action.sourceActionName, 'multi', false, 0, 0, 0, 0);
+            warnings.push(...(r.warnings || []));
+          } else if (action.kind === 'attack') {
+            const tgt = pickEnemyTarget(c, all, tactics, rng);
+            if (!tgt) continue;
+            consumeUse(c, action);
+            const r = c.side === 'pc'
+              ? resolveAttackPc(c, tgt, action, rng, events, round)
+              : resolveAttackMonster(c, tgt, action, rng, events, round);
+            for (const [type, dmg] of Object.entries(r.damageByType || {})) {
+              const wasAlive = !tgt.dead && !tgt.downed;
+              applyDamage(tgt, dmg, type, c, events, round, c.name,
+                          action.sourceActionName || action.name);
+              const killed = wasAlive && (tgt.dead || tgt.downed);
+              tally(c.side, action.sourceActionName || action.name, 'attack',
+                    r.hit, dmg, 0, killed ? 1 : 0, 0);
+            }
+            if (!r.hit) tally(c.side, action.sourceActionName || action.name,
+                              'attack', false, 0, 0, 0, 0);
+          } else if (action.kind === 'save') {
+            // For AoE, pick `aoeTargets` lowest-HP enemies.
+            const enemies = aliveEnemies(c, all)
+              .sort((a, b) => a.hp - b.hp);
+            const n = Math.max(1, action.aoeTargets || 1);
+            const targets = enemies.slice(0, n);
+            if (!targets.length) continue;
+            consumeUse(c, action);
+            const r = resolveSave(c, targets, action, rng, events, round);
+            tally(c.side, action.sourceActionName || action.name, 'save',
+                  false, r.totalDmg, 0, 0, 0);
+          } else if (action.kind === 'heal') {
+            // No qualifying target via triage but action available — self-heal.
+            if (action.heal && action.heal.target === 'self') {
+              consumeUse(c, action);
+              const r = resolveHeal(c, [c], action, rng, events, round);
+              tally(c.side, action.sourceActionName || action.name, 'heal',
+                    false, 0, r.totalHealed, 0, r.revives);
+            }
+          }
+        }
+
+        // End check after each turn.
+        const pcsAlive = combatants.some(x => x.side === 'pc' && !x.downed && !x.dead);
+        const monAlive = combatants.some(x => x.side === 'monster' && !x.dead);
+        if (!pcsAlive) { winner = 'monster'; break; }
+        if (!monAlive) { winner = 'pc';      break; }
+      }
+      if (!winner) round++;
+    }
+    if (!winner) {
+      // Round cap reached. Side with more remaining HP wins; else monster wins.
+      const pcHp  = combatants.filter(x => x.side === 'pc').reduce((s, x) => s + x.hp, 0);
+      const monHp = combatants.filter(x => x.side === 'monster').reduce((s, x) => s + x.hp, 0);
+      winner = pcHp > monHp ? 'pc' : 'monster';
+      warnings.push('Trial hit 25-round cap.');
+    }
+
+    // Per-PC outcomes.
+    const partyView = combatants.filter(c => c.side === 'pc').map(c => ({
+      pmId: c.id, name: c.name,
+      downed: !!c.downed, hp: c.hp, maxHp: c.maxHp,
+      deathRound: c.deathRound != null ? c.deathRound : null,
+      healReceived: 0,    // populated by event tally below
+      revivesReceived: 0,
+    }));
+    for (const ev of events) {
+      if (ev.type === 'heal') {
+        const r = partyView.find(p => p.name === ev.target);
+        if (r) { r.healReceived += ev.amount; if (ev.revived) r.revivesReceived++; }
+      }
+    }
+    const pcHpRemaining = partyView.reduce((s, p) => s + p.hp, 0);
+
+    return {
+      winner, rounds: round,
+      partyView, pcHpRemaining,
+      perAction: Array.from(perAction.values()),
+      events, warnings,
+    };
+  }
+
+  // ─────────── runSim aggregator (chunked + RAF yield) ───────────
+  async function runSim({ party, monsterPicks, trials, tactics, seed, onProgress }) {
+    const baseSeed = (seed >>> 0) || 1;
+    const trialResults = [];
+    const errors = [];
+    const chunkSize = 50;
+
+    for (let start = 0; start < trials; start += chunkSize) {
+      const end = Math.min(start + chunkSize, trials);
+      for (let i = start; i < end; i++) {
+        try {
+          const rng = makeRng(baseSeed + i);
+          trialResults.push(runTrial(party, monsterPicks, tactics, rng));
+        } catch (e) {
+          errors.push({ trial:i, message:e.message || String(e) });
+        }
+      }
+      if (typeof requestAnimationFrame !== 'undefined') {
+        await new Promise(r => requestAnimationFrame(r));
+      } else {
+        await new Promise(r => setTimeout(r, 0));
+      }
+      if (typeof onProgress === 'function') {
+        const winsSoFar = trialResults.filter(t => t.winner === 'pc').length;
+        onProgress({ completed: trialResults.length, winRate: winsSoFar / trialResults.length });
+      }
+    }
+
+    // Pick representative trials by pcHpRemaining at p10 / p50 / p90.
+    const sorted = trialResults.slice().sort((a, b) => a.pcHpRemaining - b.pcHpRemaining);
+    const pct = (p) => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))];
+    const lo  = pct(0.1), mid = pct(0.5), hi = pct(0.9);
+
+    // Aggregate.
+    const wins = trialResults.filter(t => t.winner === 'pc').length;
+    const avgRounds = trialResults.reduce((s, t) => s + t.rounds, 0) / Math.max(1, trialResults.length);
+    const totalDowned = trialResults.reduce((s, t) => s + t.partyView.filter(p => p.downed).length, 0);
+    const avgDowned = totalDowned / Math.max(1, trialResults.length);
+    const tpkCount = trialResults.filter(t => t.partyView.every(p => p.downed)).length;
+
+    // Per-PC.
+    const pcIds = (party || []).map(p => p.id);
+    const perPc = pcIds.map(pmId => {
+      const rows = trialResults.map(t => t.partyView.find(p => p.pmId === 'pc:' + pmId)).filter(Boolean);
+      const downedCount = rows.filter(p => p.downed).length;
+      const halfHpCount = rows.filter(p => p.hp <= p.maxHp / 2).length;
+      const avgHp = rows.reduce((s, p) => s + p.hp, 0) / Math.max(1, rows.length);
+      const dr = rows.filter(p => p.deathRound != null).map(p => p.deathRound).sort((a,b)=>a-b);
+      const mean = dr.length ? dr.reduce((s,v)=>s+v,0)/dr.length : null;
+      const p10  = dr.length ? dr[Math.floor(dr.length*0.1)] : null;
+      const p90  = dr.length ? dr[Math.floor(dr.length*0.9)] : null;
+      const avgHeal = rows.reduce((s, p) => s + (p.healReceived||0), 0) / Math.max(1, rows.length);
+      const avgRev  = rows.reduce((s, p) => s + (p.revivesReceived||0), 0) / Math.max(1, rows.length);
+      return { pmId, name: rows[0] ? rows[0].name : pmId,
+               downRate: downedCount / Math.max(1, rows.length),
+               halfHpRate: halfHpCount / Math.max(1, rows.length),
+               avgHpRemaining: avgHp,
+               deathRound: { mean, p10, p90 },
+               avgHealReceived: avgHeal, avgRevivesReceived: avgRev };
+    });
+
+    // Distribution histograms.
+    const partySize = (party || []).length;
+    const downedHist = new Array(partySize + 1).fill(0);
+    const roundsHist = new Array(26).fill(0);
+    for (const t of trialResults) {
+      const d = t.partyView.filter(p => p.downed).length;
+      downedHist[d] = (downedHist[d] || 0) + 1;
+      roundsHist[t.rounds] = (roundsHist[t.rounds] || 0) + 1;
+    }
+
+    // Per-action: merge across trials.
+    const acc = new Map();
+    for (const t of trialResults) {
+      for (const row of t.perAction) {
+        const key = row.actor + '|' + row.name;
+        let r = acc.get(key);
+        if (!r) {
+          r = { actor: row.actor, name: row.name, kind: row.kind,
+                uses:0, hits:0, totalDmg:0, totalHealed:0,
+                killsCaused:0, revivesCaused:0 };
+          acc.set(key, r);
+        }
+        r.uses += row.uses;
+        r.hits += row.hits;
+        r.totalDmg += row.totalDmg;
+        r.totalHealed += row.totalHealed;
+        r.killsCaused += row.killsCaused;
+        r.revivesCaused += row.revivesCaused;
+      }
+    }
+    const perActionAgg = Array.from(acc.values()).map(r => ({
+      ...r,
+      avgDmg: r.uses ? r.totalDmg / r.uses : 0,
+    }));
+
+    const warnings = [];
+    const sealCount = trialResults.filter(t => t.warnings.some(w => w.includes('round cap'))).length;
+    if (sealCount) warnings.push(`${sealCount} of ${trialResults.length} trials hit the 25-round cap.`);
+    // De-duplicate other per-trial warnings.
+    const seen = new Set(warnings);
+    for (const t of trialResults) {
+      for (const w of t.warnings) {
+        if (!seen.has(w) && !w.includes('round cap')) {
+          warnings.push(w); seen.add(w);
+        }
+      }
+    }
+
+    return {
+      trials: trialResults.length,
+      headline: {
+        winRate: wins / Math.max(1, trialResults.length),
+        avgRounds,
+        avgDowned,
+        partyTpkRate: tpkCount / Math.max(1, trialResults.length),
+      },
+      perPc,
+      distribution: { downedHist, roundsHist },
+      perAction: perActionAgg,
+      representative: { low: lo, median: mid, high: hi },
+      warnings,
+      errors,
+    };
+  }
+
   // ─────────── Public exports ───────────
   const Crucible = {
     makeRng, rollDie, rollDice,
@@ -511,7 +796,8 @@
     aliveEnemies, aliveAllies,
     damageMultiplier, resolveAttackMonster, resolveAttackPc,
     resolveSave, resolveHeal,
-    applyDamage, resolveMultiattack,
+    applyDamage, resolveMultiattack, pickAction,
+    runTrial, runSim,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Crucible;

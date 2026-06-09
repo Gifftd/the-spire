@@ -36,6 +36,10 @@ function assertBetween(v, lo, hi, label) {
   if (v < lo || v > hi) throw new Error((label || '') +
     `\n   expected: in [${lo}, ${hi}]\n     actual: ${v}`);
 }
+function assertHas(obj, key, label) {
+  if (!Object.prototype.hasOwnProperty.call(obj, key))
+    throw new Error((label || '') + `\n   expected key '${key}' on object`);
+}
 async function runAll() {
   const root = document.getElementById('results');
   root.innerHTML = '';
@@ -412,6 +416,55 @@ test('resolveMultiattack: looks up sub-actions by name, fires each count times',
   // Two attack events expected
   const atks = ev.filter(e => e.type === 'attack');
   assertEq(atks.length, 2);
+});
+test('runTrial: PC vs Goblin, seeded → deterministic outcome', () => {
+  const pm = { id:'pm1', identity:{ name:'Aria', level:5 },
+               abilities:{ str:14,dex:14,con:14,int:10,wis:10,cha:10 },
+               profs:{ saves:{} },
+               combat:{ hp:30, maxHp:30, ac:16, initBonus:2 },
+               actions:[{ id:'a1', name:'Longsword', source:'weapon', type:'attack',
+                          atkAbility:'str', atkBonusOverride:null,
+                          damage:{ dice:'1d8', mod:'+atkAbility', type:'slashing',
+                                   riderDice:null, riderType:null },
+                          save:null, heal:null, aoeTargets:0,
+                          usesPerDay:null, recharge:null, attacksPerAction:1 }],
+               tactics:{ aiHint:'focus', resources:'nova' } };
+  const monster = { name:'Goblin', hp:7, ac:15, initiative:2, isMinion:false, isSolo:false,
+                    parsedActions:[{ sourceActionName:'Scimitar', kind:'attack', toHit:4,
+                                      damage:[{ dice:'1d6', mod:2, type:'slashing' }],
+                                      recharge:null, usesPerDay:null }] };
+  const picks = [{ pickId:'p1', count:1, monster }];
+  const r1 = Crucible.runTrial([pm], picks, { aiHint:'focus', resources:'nova' }, Crucible.makeRng(42));
+  const r2 = Crucible.runTrial([pm], picks, { aiHint:'focus', resources:'nova' }, Crucible.makeRng(42));
+  assertEq(r1.winner, r2.winner);
+  assertEq(r1.rounds, r2.rounds);
+});
+test('runSim: 100 trials returns aggregated SimResult shape', async () => {
+  const pm = { id:'pm1', identity:{ name:'Aria', level:5 },
+               abilities:{ str:14,dex:14,con:14,int:10,wis:10,cha:10 },
+               profs:{ saves:{} },
+               combat:{ hp:30, maxHp:30, ac:16, initBonus:2 },
+               actions:[{ id:'a1', name:'Longsword', source:'weapon', type:'attack',
+                          atkAbility:'str', atkBonusOverride:null,
+                          damage:{ dice:'1d8', mod:'+atkAbility', type:'slashing',
+                                   riderDice:null, riderType:null },
+                          save:null, heal:null, aoeTargets:0,
+                          usesPerDay:null, recharge:null, attacksPerAction:1 }],
+               tactics:{ aiHint:'focus', resources:'nova' } };
+  const monster = { name:'Goblin', hp:7, ac:15, initiative:2, isMinion:false, isSolo:false,
+                    parsedActions:[{ sourceActionName:'Scimitar', kind:'attack', toHit:4,
+                                      damage:[{ dice:'1d6', mod:2, type:'slashing' }],
+                                      recharge:null, usesPerDay:null }] };
+  const result = await Crucible.runSim({
+    party:[pm], monsterPicks:[{ pickId:'p1', count:1, monster }],
+    trials:100, tactics:{ aiHint:'focus', resources:'nova' }, seed:99,
+  });
+  assertHas(result.headline, 'winRate');
+  assertHas(result.headline, 'avgRounds');
+  assertHas(result.distribution, 'downedHist');
+  assertEq(result.perPc.length, 1);
+  assertTrue(result.headline.winRate > 0.5,
+    `L5 PC vs single goblin should win majority, got ${result.headline.winRate}`);
 });
 </script>
 </body>
