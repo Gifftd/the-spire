@@ -113,11 +113,74 @@
     };
   }
 
+  // ─────────── Pass 3 — Save effect ───────────
+  const SAVE_RE_A = /DC\s+(\d+)\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+saving\s+throw/i;
+  const SAVE_RE_B = /(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+saving\s+throw[^.]*?DC\s+(\d+)/i;
+  const HALF_RE   = /half(?:\s+as\s+much)?\s+damage\s+on\s+a\s+success(?:ful\s+save)?/i;
+  const SHAPE_RE  = /(\d+)-foot[- ](sphere|cube|cone|line|radius)/i;
+  const CONDITIONS = ['prone','restrained','grappled','stunned','paralyzed',
+                      'frightened','incapacitated','unconscious','blinded',
+                      'deafened','poisoned','charmed'];
+  const ABILITY_3 = { strength:'str', dexterity:'dex', constitution:'con',
+                      intelligence:'int', wisdom:'wis', charisma:'cha' };
+
+  function aoeTargetsFromShape(body) {
+    const m = body.match(SHAPE_RE);
+    if (!m) return 1;
+    const shape = m[2].toLowerCase();
+    if (shape === 'sphere' || shape === 'cube')   return 4;
+    if (shape === 'cone'   || shape === 'line')   return 3;
+    if (shape === 'radius')                       return 2;
+    return 1;
+  }
+
+  function detectCondition(body) {
+    const low = body.toLowerCase();
+    for (const c of CONDITIONS) {
+      // word boundary to avoid matching "stunning" etc.
+      const re = new RegExp('\\b' + c + '\\b', 'i');
+      if (re.test(low)) return c;
+    }
+    return null;
+  }
+
+  function trySave(actionName, body) {
+    let ability = null, dc = null;
+    const a = body.match(SAVE_RE_A);
+    if (a) { dc = parseInt(a[1], 10); ability = ABILITY_3[a[2].toLowerCase()]; }
+    else {
+      const b = body.match(SAVE_RE_B);
+      if (b) { ability = ABILITY_3[b[1].toLowerCase()]; dc = parseInt(b[2], 10); }
+    }
+    if (!ability) return null;
+
+    const dmgFail = extractDamage(body);
+    const halfOnSave = HALF_RE.test(body);
+    const cond = detectCondition(body);
+    const hasDamage = dmgFail.length > 0;
+
+    return {
+      sourceActionName: actionName,
+      kind: 'save',
+      saveAbility: ability,
+      saveDc: dc,
+      aoeTargets: aoeTargetsFromShape(body),
+      effectOnFail: hasDamage ? 'damage' : (cond ? 'condition' : 'damage'),
+      damageOnFail: dmgFail,
+      damageOnSave: halfOnSave ? dmgFail.map(d => ({ ...d, half:true })) : [],
+      halfOnSave,
+      condition: cond,
+      parsedBy: 'auto',
+      parsedAt: today(),
+    };
+  }
+
   // Master entry point.
   function parseAction(actionName, actionBody, monsterAbilities, monsterPb) {
     const body = actionBody || '';
     const p1 = tryMultiattack(actionName, body); if (p1) return p1;
     const p2 = tryAttack(actionName, body);      if (p2) return p2;
+    const p3 = trySave(actionName, body);        if (p3) return p3;
     return unparsed(actionName, body);
   }
 

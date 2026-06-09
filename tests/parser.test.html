@@ -141,6 +141,42 @@ test('Pass 2: no parenthetical dice (flat) → empty damage list', () => {
   assertEq(out.toHit, 3);
   assertEq(out.damage, []);
 });
+test('Pass 3: DC X Ability saving throw with half-on-save', () => {
+  const body = 'Each creature in a 20-foot-radius sphere must make a DC 15 Dexterity saving throw, taking 24 (7d6) Fire damage on a failed save, or half as much damage on a successful one.';
+  const out = CrucibleParser.parseAction('Fireball', body, null, 3);
+  assertEq(out.kind, 'save');
+  assertEq(out.saveAbility, 'dex');
+  assertEq(out.saveDc, 15);
+  assertEq(out.halfOnSave, true);
+  assertEq(out.aoeTargets, 4);                // sphere → 4
+  assertEq(out.damageOnFail, [{ dice:'7d6', mod:0, type:'fire' }]);
+});
+test('Pass 3: cone → aoeTargets 3', () => {
+  const body = 'Each creature in a 30-foot cone must succeed on a DC 17 Constitution saving throw or take 56 (16d6) Fire damage.';
+  const out = CrucibleParser.parseAction('Breath', body, null, 4);
+  assertEq(out.kind, 'save');
+  assertEq(out.aoeTargets, 3);
+});
+test('Pass 3: condition-only save (prone) defaults to 1-round duration', () => {
+  const body = 'The target must succeed on a DC 13 Strength saving throw or fall Prone.';
+  const out = CrucibleParser.parseAction('Trip', body, null, 2);
+  assertEq(out.kind, 'save');
+  assertEq(out.saveAbility, 'str');
+  assertEq(out.saveDc, 13);
+  assertEq(out.effectOnFail, 'condition');
+  assertEq(out.condition, 'prone');
+});
+test('Pass 3: ambiguous area → aoeTargets 1 (flag for review)', () => {
+  const body = 'One creature must make a DC 14 Wisdom saving throw, taking 14 (4d6) Psychic damage on a failed save.';
+  const out = CrucibleParser.parseAction('Mind Blast', body, null, 3);
+  assertEq(out.kind, 'save');
+  assertEq(out.aoeTargets, 1);
+});
+test('Pass 3: line → aoeTargets 3', () => {
+  const body = 'Creatures in a 60-foot line must make a DC 16 Dexterity saving throw, taking 22 (4d10) Lightning damage on a failed save, or half on a success.';
+  const out = CrucibleParser.parseAction('Bolt', body, null, 4);
+  assertEq(out.aoeTargets, 3);
+});
 </script>
 </body>
 </html>
