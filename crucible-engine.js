@@ -146,11 +146,72 @@
     return slots;
   }
 
+  // ─────────── Turn start (round-loop steps 1-4) ───────────
+  function tickConditions(c) {
+    // Decrement every condition's remaining rounds; lift those at 0.
+    for (const [name, rem] of Array.from(c.conditions.entries())) {
+      const next = rem - 1;
+      if (next <= 0) c.conditions.delete(name);
+      else c.conditions.set(name, next);
+    }
+  }
+
+  function rollRecharge(c, actions, rng) {
+    for (const a of (actions || [])) {
+      if (!a.recharge || c.rechargeReady[a.sourceActionName]) continue;
+      const roll = rollDie(6, rng);
+      if (roll >= a.recharge.minRoll) c.rechargeReady[a.sourceActionName] = true;
+    }
+  }
+
+  // Apply regeneration: returns true if regen ticked.
+  function applyRegen(c, currentRound, events) {
+    if (!c.regeneration) return false;
+    if (c.dead || c.downed) return false;
+    if (c.hp < c.regeneration.minHpToRegen) return false;
+    const suppressed = (c.regeneration.suppressedBy || []).some(t =>
+      c.damageTypesReceivedLastTurn.has(t));
+    if (suppressed) return false;
+    const before = c.hp;
+    c.hp = Math.min(c.maxHp, c.hp + c.regeneration.amount);
+    if (c.hp > before) {
+      events.push({ round: currentRound, type:'regen', actor: c.name,
+                    amount: c.hp - before, hpAfter: c.hp });
+      return true;
+    }
+    return false;
+  }
+
+  // Combined turn-start handler. Returns true if the combatant should skip
+  // its turn (downed / dead / incapacitated).
+  function turnStart(c, currentRound, rng, events) {
+    if (c.dead || c.downed) return true;
+    tickConditions(c);
+    if (c.conditions.has('incapacitated') ||
+        c.conditions.has('paralyzed')     ||
+        c.conditions.has('stunned')       ||
+        c.conditions.has('unconscious')) {
+      // Still rotate damage tracking so the suppression window stays sane.
+      c.damageTypesReceivedLastTurn = c.damageTypesReceivedThisTurn;
+      c.damageTypesReceivedThisTurn = new Set();
+      return true;
+    }
+    // Recharge each action that has a recharge die. Caller passes the
+    // action list separately via rollRecharge — we don't do it here so
+    // turnStart stays usable for combatants without a known action list
+    // in unit tests. The full runTrial does both.
+    applyRegen(c, currentRound, events);
+    c.damageTypesReceivedLastTurn = c.damageTypesReceivedThisTurn;
+    c.damageTypesReceivedThisTurn = new Set();
+    return false;
+  }
+
   // ─────────── Public exports ───────────
   const Crucible = {
     makeRng, rollDie, rollDice,
     mod, pb, saveBonus, toHit, saveDc, pcDamageMod,
     buildCombatants, rollInitiative, initOrder,
+    tickConditions, rollRecharge, applyRegen, turnStart,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Crucible;

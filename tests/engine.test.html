@@ -195,6 +195,67 @@ test('initOrder: solos get an extra slot at init - 10', () => {
   assertEq(order.map(s => s.name + '@' + s.init),
            ['Solo@18','Mob1@12','Solo@8']);
 });
+test('turnStart: downed combatant has shouldSkip=true', () => {
+  const c = { downed:true, dead:false, conditions:new Map(),
+              regeneration:null, damageTypesReceivedThisTurn:new Set(),
+              damageTypesReceivedLastTurn:new Set() };
+  const ev = [];
+  const skip = Crucible.turnStart(c, 1, Crucible.makeRng(1), ev);
+  assertEq(skip, true);
+});
+test('turnStart: incapacitated condition skips turn but decrements', () => {
+  const c = { downed:false, dead:false,
+              conditions: new Map([['incapacitated', 2]]),
+              regeneration:null, damageTypesReceivedThisTurn:new Set(),
+              damageTypesReceivedLastTurn:new Set() };
+  const skip = Crucible.turnStart(c, 1, Crucible.makeRng(1), []);
+  assertEq(skip, true);
+  assertEq(c.conditions.get('incapacitated'), 1);
+});
+test('turnStart: regen ticks when no suppression damage received last turn', () => {
+  const c = { downed:false, dead:false, hp:10, maxHp:30,
+              conditions:new Map(),
+              regeneration:{ amount:10, suppressedBy:['acid','fire'], minHpToRegen:1 },
+              damageTypesReceivedThisTurn:new Set(),
+              damageTypesReceivedLastTurn:new Set(['slashing']) };
+  const ev = [];
+  Crucible.turnStart(c, 2, Crucible.makeRng(1), ev);
+  assertEq(c.hp, 20);
+  assertTrue(ev.some(e => e.type === 'regen'), 'expected regen event');
+});
+test('turnStart: regen suppressed when fire received last turn', () => {
+  const c = { downed:false, dead:false, hp:10, maxHp:30,
+              conditions:new Map(),
+              regeneration:{ amount:10, suppressedBy:['acid','fire'], minHpToRegen:1 },
+              damageTypesReceivedThisTurn:new Set(),
+              damageTypesReceivedLastTurn:new Set(['fire']) };
+  Crucible.turnStart(c, 2, Crucible.makeRng(1), []);
+  assertEq(c.hp, 10);
+});
+test('turnStart: regen tracks damage rotation last←this, then clears this', () => {
+  const c = { downed:false, dead:false, hp:5, maxHp:30,
+              conditions:new Map(),
+              regeneration:{ amount:5, suppressedBy:['fire'], minHpToRegen:1 },
+              damageTypesReceivedThisTurn:new Set(['cold']),
+              damageTypesReceivedLastTurn:new Set() };
+  Crucible.turnStart(c, 2, Crucible.makeRng(1), []);
+  assertEq(c.damageTypesReceivedLastTurn.has('cold'), true);
+  assertEq(c.damageTypesReceivedThisTurn.size, 0);
+});
+test('rechargeRoll: marks recharge ready when d6 ≥ minRoll', () => {
+  // With seed 99, we'll just verify the contract: after enough rolls,
+  // some recharges fire.
+  const c = { rechargeReady: { 'Breath': false } };
+  const action = { sourceActionName:'Breath', recharge:{ dice:'d6', minRoll:5 } };
+  const rng = Crucible.makeRng(99);
+  let fired = false;
+  for (let i = 0; i < 30; i++) {
+    c.rechargeReady['Breath'] = false;
+    Crucible.rollRecharge(c, [action], rng);
+    if (c.rechargeReady['Breath']) { fired = true; break; }
+  }
+  assertTrue(fired, 'recharge should fire in some of 30 attempts at 5-6/d6');
+});
 </script>
 </body>
 </html>
