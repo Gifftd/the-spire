@@ -1189,6 +1189,7 @@ async function saveOverride(pickId) {
       name: m.name, _source: m._source || m.source || '',
       parsedActions: m.parsedActions,
       regeneration: m.regeneration || null,
+      roleOverride: m.roleOverride || null,
       overriddenAt: new Date().toISOString(),
     };
     if (idx >= 0) list[idx] = { ...list[idx], ...overrideRecord };
