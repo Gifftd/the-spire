@@ -177,6 +177,41 @@ test('Pass 3: line → aoeTargets 3', () => {
   const out = CrucibleParser.parseAction('Bolt', body, null, 4);
   assertEq(out.aoeTargets, 3);
 });
+test('Pass 3.5: ally target with dice formula', () => {
+  const body = 'One creature the cleric can see within 60 feet regains 8 (2d4 + 3) hit points.';
+  const out = CrucibleParser.parseAction('Healing Word', body, null, 3);
+  assertEq(out.kind, 'heal');
+  assertEq(out.heal.dice, '2d4');
+  assertEq(out.heal.mod, 3);
+  assertEq(out.heal.target, 'ally');
+});
+test('Pass 3.5: self-heal', () => {
+  const body = 'The vampire regains 10 (3d6) hit points itself.';
+  const out = CrucibleParser.parseAction('Blood Drink', body, null, 3);
+  assertEq(out.kind, 'heal');
+  assertEq(out.heal.dice, '3d6');
+  assertEq(out.heal.target, 'self');
+});
+test('Pass 3.5: AoE heal with radius', () => {
+  const body = 'Each ally within a 30-foot radius regains 5 (1d4 + 3) hit points.';
+  const out = CrucibleParser.parseAction('Mass Heal', body, null, 3);
+  assertEq(out.kind, 'heal');
+  assertEq(out.heal.target, 'ally-aoe');
+  assertEq(out.heal.aoeTargets, 2);
+});
+test('Pass 3.5: downed-revive heal', () => {
+  const body = 'If the creature has 0 hit points, it regains 6 (1d8 + 2) hit points and stands up.';
+  const out = CrucibleParser.parseAction('Lay on Hands', body, null, 3);
+  assertEq(out.kind, 'heal');
+  assertEq(out.heal.reviveDowned, true);
+});
+test('Pass 3.5: flat heal with no dice', () => {
+  const body = 'The target regains 5 hit points.';
+  const out = CrucibleParser.parseAction('Touch', body, null, 2);
+  assertEq(out.kind, 'heal');
+  assertEq(out.heal.flat, 5);
+  assertEq(out.heal.dice, null);
+});
 </script>
 </body>
 </html>

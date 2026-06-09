@@ -175,12 +175,48 @@
     };
   }
 
+  // ─────────── Pass 3.5 — Heal effect ───────────
+  const HEAL_DICE_RE = /regains?\s+(\d+)\s*\((\d+d\d+)(?:\s*\+\s*(\d+))?\)\s+hit\s+points/i;
+  const HEAL_FLAT_RE = /regains?\s+(\d+)\s+hit\s+points/i;
+  const SELF_RE   = /\b(?:itself|himself|herself|themselves|the\s+\w+(?:\s+\w+)?\s+regains)\b/i;
+  const ALLY_RE   = /\b(?:one\s+creature|an?\s+ally|a\s+friendly\s+creature|its\s+ally)\b/i;
+  const AOE_HEAL_RE = /\b(?:each\s+ally|all\s+allies|creatures?\s+within\s+\d+\s*(?:ft|feet|'))\b/i;
+  const REVIVE_RE = /\b(?:0\s+hit\s+points|unconscious|dying)\b/i;
+
+  function tryHeal(actionName, body) {
+    const dice = body.match(HEAL_DICE_RE);
+    const flat = !dice && body.match(HEAL_FLAT_RE);
+    if (!dice && !flat) return null;
+
+    let target = 'ally';
+    if (AOE_HEAL_RE.test(body))   target = 'ally-aoe';
+    else if (SELF_RE.test(body))  target = 'self';
+    else if (ALLY_RE.test(body))  target = 'ally';
+
+    const heal = dice
+      ? { dice: dice[2], mod: dice[3] ? parseInt(dice[3], 10) : 0, flat: 0,
+          target, aoeTargets: target === 'ally-aoe' ? aoeTargetsFromShape(body) : 0,
+          reviveDowned: REVIVE_RE.test(body) }
+      : { dice: null, mod: 0, flat: parseInt(flat[1], 10),
+          target, aoeTargets: target === 'ally-aoe' ? aoeTargetsFromShape(body) : 0,
+          reviveDowned: REVIVE_RE.test(body) };
+
+    return {
+      sourceActionName: actionName,
+      kind: 'heal',
+      heal,
+      parsedBy: 'auto',
+      parsedAt: today(),
+    };
+  }
+
   // Master entry point.
   function parseAction(actionName, actionBody, monsterAbilities, monsterPb) {
     const body = actionBody || '';
     const p1 = tryMultiattack(actionName, body); if (p1) return p1;
     const p2 = tryAttack(actionName, body);      if (p2) return p2;
     const p3 = trySave(actionName, body);        if (p3) return p3;
+    const p35 = tryHeal(actionName, body);       if (p35) return p35;
     return unparsed(actionName, body);
   }
 
