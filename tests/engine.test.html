@@ -622,6 +622,65 @@ test('Scenario 5: troll regen + fire damage flips the fight', async () => {
   assertTrue(b.headline.winRate >= a.headline.winRate,
     `Fire-equipped party should not do worse vs troll. no-fire=${a.headline.winRate}, with-fire=${b.headline.winRate}`);
 });
+
+// ─────── Task 1: Foundation helpers ───────
+
+test('clamp01: clamps to [0.05, 0.95]', () => {
+  assertEq(Crucible.clamp01(-1),  0.05);
+  assertEq(Crucible.clamp01(0),   0.05);
+  assertEq(Crucible.clamp01(0.5), 0.5);
+  assertEq(Crucible.clamp01(1.5), 0.95);
+});
+test('sumDice: 1d8+3 → 7.5', () => {
+  const r = Crucible.sumDice([{ dice:'1d8', mod:3, type:'slashing' }]);
+  assertEq(r, 7.5);
+});
+test('sumDice: multiple components add', () => {
+  // 1d8+3 (mean 7.5) + 2d6+0 (mean 7) = 14.5
+  const r = Crucible.sumDice([
+    { dice:'1d8', mod:3, type:'slashing' },
+    { dice:'2d6', mod:0, type:'fire' },
+  ]);
+  assertEq(r, 14.5);
+});
+test('sumDice: empty / malformed → 0', () => {
+  assertEq(Crucible.sumDice([]), 0);
+  assertEq(Crucible.sumDice(null), 0);
+  assertEq(Crucible.sumDice([{ dice:'garbage', mod:0, type:'x' }]), 0);
+});
+test('actionIsMelee: monster reach attack → true', () => {
+  assertEq(Crucible.actionIsMelee({ reach:5, range:null }), true);
+});
+test('actionIsMelee: monster ranged attack → false', () => {
+  assertEq(Crucible.actionIsMelee({ reach:null, range:[80,320] }), false);
+});
+test('actionIsMelee: PC action with actionRange=melee → true', () => {
+  assertEq(Crucible.actionIsMelee({ actionRange:'melee' }), true);
+});
+test('actionIsRanged: monster range attack → true', () => {
+  assertEq(Crucible.actionIsRanged({ range:[80,320] }), true);
+});
+test('actionIsRanged: PC action with actionRange=ranged → true', () => {
+  assertEq(Crucible.actionIsRanged({ actionRange:'ranged' }), true);
+});
+test('targetSaveBonus: PC uses saveBonus()', () => {
+  const t = { side:'pc', pm:{
+    identity:{ level:5 },
+    abilities:{ str:10, dex:14, con:10, int:10, wis:10, cha:10 },
+    profs:{ saves:{ dex:true } }
+  }};
+  assertEq(Crucible.targetSaveBonus(t, 'dex'), 2 + 3);  // +2 DEX + PB 3
+});
+test('targetSaveBonus: monster uses statblock save or mod', () => {
+  const t = { side:'monster', monster:{
+    abilities:{ con:{ score:14, mod:2, save:5 } }
+  }};
+  assertEq(Crucible.targetSaveBonus(t, 'con'), 5);
+  const t2 = { side:'monster', monster:{
+    abilities:{ con:{ score:14, mod:2 } }
+  }};
+  assertEq(Crucible.targetSaveBonus(t2, 'con'), 2);
+});
 </script>
 </body>
 </html>

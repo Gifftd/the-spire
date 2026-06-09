@@ -74,6 +74,50 @@
     return Number.isFinite(n) ? n : 0;
   }
 
+  // ─────────── Role-policy helpers ───────────
+  function clamp01(x) {
+    if (!Number.isFinite(x)) return 0.05;
+    return Math.max(0.05, Math.min(0.95, x));
+  }
+
+  function sumDice(dmgList) {
+    let total = 0;
+    for (const d of (dmgList || [])) {
+      const m = String(d && d.dice || '').match(/^(\d+)d(\d+)$/i);
+      if (!m) continue;
+      const n = parseInt(m[1], 10), s = parseInt(m[2], 10);
+      total += n * (s + 1) / 2 + (Number(d.mod) || 0);
+    }
+    return total;
+  }
+
+  function actionIsMelee(action) {
+    if (!action) return false;
+    // PC actions carry an explicit tag.
+    if (action.actionRange === 'melee') return true;
+    if (action.actionRange === 'ranged') return false;
+    if (action.actionRange === 'both')  return true;       // count as melee for picker purposes
+    // Monster ParsedAction: has reach but no range.
+    if (action.reach != null && !action.range) return true;
+    return false;
+  }
+
+  function actionIsRanged(action) {
+    if (!action) return false;
+    if (action.actionRange === 'ranged') return true;
+    if (action.actionRange === 'both')   return true;
+    if (action.range) return true;
+    return false;
+  }
+
+  function targetSaveBonus(target, ability) {
+    if (!target || !ability) return 0;
+    if (target.side === 'pc' && target.pm) return saveBonus(target.pm, ability);
+    const ab = target.monster && target.monster.abilities && target.monster.abilities[ability];
+    if (!ab) return 0;
+    return ab.save != null ? ab.save : (ab.mod || 0);
+  }
+
   // ─────────── Combatant materialization ───────────
   // Turns the PartyMember + monster-pick lists into a flat combatants[].
   // PCs are one-per-PartyMember; monsters expand to N independent copies.
@@ -821,6 +865,8 @@
     resolveSave, resolveHeal,
     applyDamage, resolveMultiattack, pickAction,
     runTrial, runSim,
+    // Role-policy helpers (Task 1)
+    clamp01, sumDice, actionIsMelee, actionIsRanged, targetSaveBonus,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Crucible;
