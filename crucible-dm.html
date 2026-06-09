@@ -80,19 +80,184 @@
 // ─────────── DM auth gate ───────────
 Auth.requireRole('dm', { redirect: 'home.html?notice=dm-only' });
 
-// ─────────── Wire-up stubs (filled in as tasks land) ───────────
-document.getElementById('btn-add-pc').addEventListener('click', () => {
-  alert('Add PC: implemented in Task 22.');
-});
-document.getElementById('btn-add-monster').addEventListener('click', () => {
-  alert('Add monster: implemented in Task 26.');
-});
-document.getElementById('btn-import-war-table').addEventListener('click', () => {
-  alert('Import party: implemented in Task 24.');
-});
-document.getElementById('btn-run').addEventListener('click', () => {
-  alert('Run: implemented in Task 31.');
-});
+// ═══════════════════════════════════════════════════════════════════════
+//  Party state — persisted to localStorage['crucible-party']
+// ═══════════════════════════════════════════════════════════════════════
+let party = loadParty();
+
+function loadParty() {
+  try {
+    const raw = localStorage.getItem('crucible-party');
+    if (raw) return JSON.parse(raw);
+  } catch (e) { console.warn('crucible-party load failed', e); }
+  return [];
+}
+function saveParty() {
+  localStorage.setItem('crucible-party', JSON.stringify(party));
+}
+function uid() { return 'pm-' + Math.random().toString(36).slice(2, 8); }
+
+function defaultPC() {
+  return {
+    id: uid(),
+    identity: { name:'New PC', player:'', class:'', subclass:'', level:5, race:'' },
+    abilities: { str:14, dex:14, con:14, int:10, wis:12, cha:10 },
+    profs:    { saves: { str:false, dex:false, con:false, int:false, wis:false, cha:false } },
+    combat:   { hp:30, maxHp:30, ac:16, initBonus:2, speed:30 },
+    actions:  [{ id:'a-' + Math.random().toString(36).slice(2,6),
+                 name:'Longsword', source:'weapon', type:'attack',
+                 atkAbility:'str', atkBonusOverride:null,
+                 damage:{ dice:'1d8', mod:'+atkAbility', type:'slashing',
+                          riderDice:null, riderType:null },
+                 save:null, heal:null, aoeTargets:0,
+                 usesPerDay:null, recharge:null, attacksPerAction:1 }],
+    tactics:  { aiHint:'focus', resources:'nova' },
+    _expanded: true,
+  };
+}
+
+const expandedPC = new Set();    // pmIds currently expanded
+function renderParty() {
+  const root = document.getElementById('party-list');
+  document.getElementById('party-count').textContent = '(' + party.length + ')';
+  if (!party.length) {
+    root.className = 'empty-state';
+    root.textContent = 'No PCs yet. Click "+ Add PC" or "Import from War Table."';
+    refreshGate();
+    return;
+  }
+  root.className = '';
+  root.innerHTML = party.map(pm => renderPCCard(pm)).join('');
+  refreshGate();
+}
+
+function renderPCCard(pm) {
+  const expanded = expandedPC.has(pm.id);
+  const summary = `${pm.identity.name} · L${pm.identity.level} · ${pm.combat.hp}HP · AC${pm.combat.ac}`;
+  return `
+    <div class="pc-card" style="border:1px solid var(--c-border); border-radius:4px; margin-bottom:0.5rem; padding:0.5rem;">
+      <div onclick="togglePC('${pm.id}')" style="cursor:pointer; display:flex; justify-content:space-between;">
+        <b>${escapeHtml(summary)}</b>
+        <span style="color:var(--c-ink-faint)">${expanded ? '▾' : '▸'}</span>
+      </div>
+      ${expanded ? renderPCEditor(pm) : ''}
+    </div>`;
+}
+
+function renderPCEditor(pm) {
+  const a = pm.abilities;
+  const p = pm.profs.saves;
+  return `
+    <div style="padding:0.5rem 0; border-top:1px solid var(--c-border); margin-top:0.5rem;">
+      <div style="font-family:'Cinzel',serif; font-size:0.8rem; color:var(--c-accent); margin-bottom:0.25rem">IDENTITY</div>
+      <input type="text" value="${escapeHtml(pm.identity.name)}" placeholder="Name"
+        oninput="updatePC('${pm.id}', 'identity.name', this.value)" class="pc-input">
+      <input type="number" value="${pm.identity.level}" placeholder="Level" min="1" max="20"
+        oninput="updatePC('${pm.id}', 'identity.level', parseInt(this.value)||1)" class="pc-input">
+      <input type="text" value="${escapeHtml(pm.identity.class||'')}" placeholder="Class"
+        oninput="updatePC('${pm.id}', 'identity.class', this.value)" class="pc-input">
+
+      <div style="font-family:'Cinzel',serif; font-size:0.8rem; color:var(--c-accent); margin:0.5rem 0 0.25rem">STATS</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.25rem">
+        <label>HP <input type="number" value="${pm.combat.maxHp}" min="1"
+          oninput="updatePC('${pm.id}', 'combat.maxHp', parseInt(this.value)||1); updatePC('${pm.id}', 'combat.hp', parseInt(this.value)||1)" class="pc-input"></label>
+        <label>AC <input type="number" value="${pm.combat.ac}" min="5" max="30"
+          oninput="updatePC('${pm.id}', 'combat.ac', parseInt(this.value)||10)" class="pc-input"></label>
+        <label>Init <input type="number" value="${pm.combat.initBonus}" min="-5" max="15"
+          oninput="updatePC('${pm.id}', 'combat.initBonus', parseInt(this.value)||0)" class="pc-input"></label>
+      </div>
+
+      <div style="font-family:'Cinzel',serif; font-size:0.8rem; color:var(--c-accent); margin:0.5rem 0 0.25rem">ABILITY SCORES</div>
+      <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:0.25rem">
+        ${['str','dex','con','int','wis','cha'].map(k => `
+          <label style="font-size:0.75rem">${k.toUpperCase()}
+            <input type="number" value="${a[k]}" min="1" max="30"
+              oninput="updatePC('${pm.id}', 'abilities.${k}', parseInt(this.value)||10)" class="pc-input">
+            <span style="font-size:0.7rem; color:var(--c-ink-faint)">save:
+              <input type="checkbox" ${p[k] ? 'checked':''}
+                onchange="updatePC('${pm.id}', 'profs.saves.${k}', this.checked)"></span>
+          </label>`).join('')}
+      </div>
+
+      <div style="font-family:'Cinzel',serif; font-size:0.8rem; color:var(--c-accent); margin:0.5rem 0 0.25rem">ACTIONS</div>
+      <div id="actions-${pm.id}">${(pm.actions || []).map(act => renderActionRow(pm, act)).join('')}</div>
+      <button class="btn" style="font-size:0.8rem; margin-top:0.25rem"
+        onclick="addAction('${pm.id}')">+ Add action</button>
+
+      <div style="margin-top:0.5rem; display:flex; gap:0.5rem;">
+        <button class="btn" style="font-size:0.8rem" onclick="removePC('${pm.id}')">✕ Remove PC</button>
+      </div>
+    </div>`;
+}
+
+function renderActionRow(pm, act) {
+  // Placeholder — full editor lands in Task 23.
+  return `<div style="padding:0.25rem; border-bottom:1px dashed var(--c-border); font-size:0.85rem">
+    ${escapeHtml(act.name)} <span style="color:var(--c-ink-faint)">(${act.type})</span>
+  </div>`;
+}
+
+function togglePC(id) {
+  if (expandedPC.has(id)) expandedPC.delete(id); else expandedPC.add(id);
+  renderParty();
+}
+function updatePC(id, path, value) {
+  const pm = party.find(x => x.id === id);
+  if (!pm) return;
+  const parts = path.split('.');
+  let o = pm;
+  for (let i = 0; i < parts.length - 1; i++) o = o[parts[i]];
+  o[parts[parts.length-1]] = value;
+  saveParty();
+}
+function addPC() {
+  const pm = defaultPC();
+  party.push(pm);
+  expandedPC.add(pm.id);
+  saveParty();
+  renderParty();
+}
+function removePC(id) {
+  party = party.filter(p => p.id !== id);
+  expandedPC.delete(id);
+  saveParty();
+  renderParty();
+}
+function addAction(pmId) {
+  alert('Action editor lands in Task 23.');
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, ch =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
+// ─────────── Style for inputs ───────────
+const STYLE = document.createElement('style');
+STYLE.textContent = `
+  .pc-input { width:100%; padding:0.2rem 0.4rem; font-family:inherit;
+              background:var(--c-bg); color:var(--c-ink);
+              border:1px solid var(--c-border); border-radius:3px; }
+  .pc-input:focus { outline:1px solid var(--c-accent); }
+`;
+document.head.appendChild(STYLE);
+
+// ─────────── Validation gate placeholder ───────────
+function refreshGate() {
+  document.getElementById('btn-run').disabled = party.length === 0 ||
+    !document.getElementById('encounter-list').dataset.hasPicks;
+}
+
+// ─────────── Event wiring ───────────
+document.getElementById('btn-add-pc').addEventListener('click', addPC);
+document.getElementById('btn-add-monster').addEventListener('click',
+  () => alert('Encounter picker lands in Task 26.'));
+document.getElementById('btn-import-war-table').addEventListener('click',
+  () => alert('Import party lands in Task 24.'));
+document.getElementById('btn-run').addEventListener('click',
+  () => alert('Run lands in Task 31.'));
+
+renderParty();
 </script>
 </body>
 </html>
