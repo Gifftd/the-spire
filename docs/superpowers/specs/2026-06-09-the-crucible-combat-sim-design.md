@@ -21,6 +21,9 @@ monster ability is doing all the work?"
 - PC party authoring with a quick-form, persisted to `localStorage`.
 - Encounter authoring via the existing bestiary picker (MM 2024 + FM + custom).
 - Round-by-round simulation with real to-hit, damage, and save rolls.
+- Active healing (single-target and AoE) for both PCs and monsters.
+- Passive regeneration on monsters (e.g. trolls), with suppression by trigger
+  damage types.
 - Monster action parser that turns text bodies into structured `parsedActions[]`,
   caching corrected results in `bestiary_custom`.
 - Results report covering: headline trio, per-PC outcomes, distribution
@@ -37,6 +40,8 @@ monster ability is doing all the work?"
 - Tunable AI knobs in the UI (data layer carries them; UI hides them in v1).
 - Spell parsing from `Spellcasting` action bodies; affected monsters require
   manual fill-in via the override panel.
+- Temporary HP. Heals and absorb effects skip the temp-HP pool entirely; the
+  pool is not modelled.
 - Condition duration parsing; all conditions default to 1 round in v1.
 - Saved encounters or saved results history.
 - Player-side view.
@@ -107,14 +112,22 @@ only tool card on `home.html`.
   combat:   { hp:30, maxHp:30, ac:16, initBonus:2, speed:30 },
   actions: [
     { id, name:'Longsword',
-      source:'weapon', type:'attack',
+      source:'weapon', type:'attack',     // 'attack' | 'save' | 'heal' | 'utility'
       atkAbility:'str', atkBonusOverride:null,
       damage: { dice:'1d8', mod:'+atkAbility', type:'slashing',
                 riderDice:null, riderType:null },
       save: null, aoeTargets: 0,
+      heal: null,                          // populated when type === 'heal'
       usesPerDay: null, recharge: null,
       attacksPerAction: 1
     }
+    // Example heal action shape:
+    // { id, name:'Healing Word', source:'spell', type:'heal',
+    //   atkAbility:'wis',
+    //   heal: { dice:'1d4', mod:'+atkAbility', flat:0,
+    //           target:'ally', aoeTargets:0, reviveDowned:true },
+    //   damage:null, save:null,
+    //   usesPerDay:3, recharge:null, attacksPerAction:1 }
   ],
   tactics: { aiHint:'focus', resources:'nova' }  // hidden in v1, used by sim
 }
@@ -139,7 +152,7 @@ only tool card on `home.html`.
 ```js
 {
   sourceActionName: 'Wind Staff',
-  kind: 'multiattack' | 'attack' | 'save' | 'utility' | 'unparsed',
+  kind: 'multiattack' | 'attack' | 'save' | 'heal' | 'utility' | 'unparsed',
 
   // kind: 'multiattack'
   multiattackPlan: [{ actionName:'Wind Staff', count:2 }, ...],
@@ -155,6 +168,12 @@ only tool card on `home.html`.
   damageOnFail: [...], damageOnSave: [...],
   halfOnSave: true, condition: null,
 
+  // kind: 'heal'
+  heal: { dice:'2d8', mod:3, flat:0,
+          target:'self' | 'ally' | 'ally-aoe',
+          aoeTargets: 0,
+          reviveDowned: true },
+
   // resource gating (any kind)
   recharge: null | { dice: 'd6', minRoll: 5 },
   usesPerDay: null | 1,
@@ -168,6 +187,20 @@ only tool card on `home.html`.
 `kind:'unparsed'` is the explicit failure marker — sim treats unparsed actions
 as skip-and-flag.
 
+### `Monster.regeneration` — parsed from a trait body, cached alongside `parsedActions[]`
+
+```js
+{
+  amount: 10,
+  suppressedBy: ['acid', 'fire'],   // damage types that block next turn's tick
+  minHpToRegen: 1                    // 5e default: must be above 0
+}
+```
+
+Absent on most monsters (`undefined` ⇒ no regen). The parser walks `traits[]`
+looking for a `Regeneration` trait and writes this field; corrected forms can
+be saved into `bestiary_custom` via the override panel.
+
 ### `SimRun` — in-memory only, not persisted in v1
 
 ```js
@@ -178,10 +211,13 @@ as skip-and-flag.
   results: {
     headline:    { winRate, avgRounds, avgDowned, partyTpkRate },
     perPc:       [{ pmId, name, downRate, halfHpRate,
-                    avgHpRemaining, deathRound: {mean, p10, p90} }],
+                    avgHpRemaining, deathRound: {mean, p10, p90},
+                    avgHealReceived, avgRevivesReceived }],
     distribution:{ downedHist: [0..n], roundsHist: [1..25] },
     perAction:   [{ actor:'pc'|'monster', sourceId, name,
-                    uses, hits, totalDmg, avgDmg, killsCaused }],
+                    kind:'attack'|'save'|'heal'|'multi',
+                    uses, hits, totalDmg, avgDmg, killsCaused,
+                    totalHealed, revivesCaused }],
     representative: { low, median, high }  // each = full event log
   },
   warnings: [],
@@ -207,7 +243,8 @@ the representative-replay feature.
    second slot at `initiative − 10` (FM "Solo extra turn").
 3. Mark all `usesPerDay` and `recharge` actions available.
 4. State per combatant: `{ id, side, hp, maxHp, ac, conditions:Set, downed,
-   dead, slotsLeft, rechargeReady }`.
+   dead, slotsLeft, rechargeReady, damageTypesReceivedLastTurn:Set,
+   damageTypesReceivedThisTurn:Set, lastHealRound }`.
 
 ### Round loop (max 25 rounds)
 
@@ -216,18 +253,35 @@ For each combatant in initiative order:
 1. Skip if downed/dead.
 2. Tick conditions (decrement; lift expired; if `incapacitated`, skip turn).
 3. Recharge roll for each `recharge` action; mark ready on success.
-4. Pick target(s) per `tactics.aiHint`:
+4. **Regeneration tick.** If this combatant has a `regeneration` block and is
+   above `minHpToRegen` and is not dead, check whether any damage type in
+   `damageTypesReceivedLastTurn` is in `regeneration.suppressedBy`. If not,
+   add `regeneration.amount` to `hp` capped at `maxHp`. Emit a regen event.
+   After this step, rotate the damage-type tracking:
+   `damageTypesReceivedLastTurn = damageTypesReceivedThisTurn;
+   damageTypesReceivedThisTurn = ∅`.
+5. Pick target(s) per `tactics.aiHint`:
    - `focus` (v1 default): living enemy with lowest current HP; ties by lowest
      AC, then random.
    - `random`: random living enemy.
    - `priority` (v1.5): monsters target lowest-HP PC weighted by inverse AC;
      PCs target solos first, standards next, minions last.
-5. Pick action per `tactics.resources`:
+6. **Heal triage (preempts steps 5 and 7).** Check first, before picking an
+   enemy or an attack action. If this combatant has at least one available
+   action with `type:'heal'` AND
+   (a) any ally is `downed` (use a heal with `reviveDowned:true`), OR
+   (b) any ally is below 50% maxHp AND this combatant's `lastHealRound` is
+       at least 1 round in the past,
+   then short-circuit: pick the heal action; target the lowest-HP qualifying
+   ally (or all qualifying allies for `target:'ally-aoe'`); jump to step 8
+   (resolve) with no enemy target. Update `lastHealRound = currentRound`.
+   If no trigger fires, fall through to steps 5 and 7.
+7. Pick action per `tactics.resources`:
    - `nova` (v1 default): highest-expected-output available action that fits
      the situation; prefer limited-resource over at-will until exhausted;
      multiattack counts as one action containing sub-attacks.
    - `paced` / `conservative` (v1.5): hold one limited-use ability in reserve.
-6. Resolve action:
+8. Resolve action:
    - **Attack roll:** `d20 + toHit` vs AC. Nat 20 → crit (damage dice doubled,
      modifier not). Nat 1 → miss. Apply damage by component, respecting
      resistances / immunities / vulnerabilities from the statblock.
@@ -235,12 +289,20 @@ For each combatant in initiative order:
      over `aoeTargets` lowest-HP enemies. On fail, apply `damageOnFail` and/or
      `condition` for 1 round (v1 fixed duration). On success, apply
      `damageOnSave` if `halfOnSave`, else nothing.
+   - **Heal:** roll `heal.dice + heal.mod + heal.flat` once per target. For
+     `target:'self'`, target self; for `'ally'`, the chosen low-HP ally; for
+     `'ally-aoe'`, all allies in scope (loop). If the target is `downed` and
+     `heal.reviveDowned`, clear `downed`, set `hp = heal_amount` (5e: 0 HP +
+     heal = `heal_amount`). Otherwise add heal amount to current HP, capped at
+     `maxHp`. Track total healed in `perAction`.
    - **Multiattack:** resolve sub-attacks in order, each repicking a target.
-7. Apply damage. **FM minion rule:** any non-zero damage to a minion drops it
-   to 0 immediately. Standards and solos use normal HP subtraction.
-8. 0 HP handling: PCs → downed (no death saves in v1); monsters → dead. Record
-   `deathRound` and the action that delivered the killing blow.
-9. Emit event log entry. Retained only for the three representative trials.
+9. Apply damage. **FM minion rule:** any non-zero damage to a minion drops it
+   to 0 immediately. Standards and solos use normal HP subtraction. **Record
+   each damage type dealt into the target's `damageTypesReceivedThisTurn`** —
+   this is what suppresses next-turn regeneration.
+10. 0 HP handling: PCs → downed (no death saves in v1); monsters → dead.
+    Record `deathRound` and the action that delivered the killing blow.
+11. Emit event log entry. Retained only for the three representative trials.
 
 ### End conditions (checked after each turn)
 
@@ -316,7 +378,29 @@ Conditions matched against a whitelist (`prone`, `restrained`, `grappled`,
 
 Set `kind:'save'`.
 
-### Recharge / uses (always runs, attached to whatever Pass 1–3 produced)
+### Pass 3.5 — Heal effect
+
+Match `/regains (\d+) ?(?:\(([^)]+)\))? hit points/i` or `/restores (\d+) hit
+points/i` or `/heal(?:s|ed)? .*? for (\d+) ?\((\d+d\d+)(?:\s*\+\s*(\d+))?\)/i`.
+Extract `heal.dice` + `heal.mod` from the parenthetical formula, or `heal.flat`
+if no dice are stated.
+
+Determine `target`:
+- Body mentions `itself` / `the <monstername>` / first-person reflexive →
+  `target:'self'`.
+- Mentions `one creature it can see` / `an ally` / `a friendly creature` →
+  `target:'ally'`.
+- AoE language (`each ally`, `all allies`, `creatures within N feet`) →
+  `target:'ally-aoe'` with `aoeTargets` from the radius heuristic in Pass 3.
+- Default when ambiguous → `target:'ally'`.
+
+`reviveDowned: true` if body mentions `unconscious`, `dying`, `0 hit points`,
+or matches the canonical "if the creature has 0 hit points, it regains…"
+phrasing. Default `false`.
+
+Set `kind:'heal'`.
+
+### Recharge / uses (always runs, attached to whatever Pass 1–3.5 produced)
 
 Parse from `actionName` parenthetical regardless of action kind. Attaches
 `recharge` and `usesPerDay` to the `ParsedAction` produced by Passes 1–3:
@@ -325,8 +409,22 @@ Parse from `actionName` parenthetical regardless of action kind. Attaches
 
 ### Pass 4 — Unparsed fallback
 
-If none of Passes 1–3 matched, emit `{ kind:'unparsed', sourceActionName,
+If none of Passes 1–3.5 matched, emit `{ kind:'unparsed', sourceActionName,
 _raw: actionBody }`. Sim skip-and-flag.
+
+### Regeneration trait parse (separate function, called once per monster)
+
+A standalone helper `parseRegeneration(traits) → RegenerationBlock | null`
+walks `monster.traits[]` for a trait whose name matches `/^regeneration/i`.
+On the trait body, extract:
+
+- `amount` from `/regains (\d+) hit points/i`.
+- `suppressedBy` from `/take(?:n)? (.+?) damage/i` — split on `or` / `,` /
+  `and` and lowercase each, e.g. `"acid or fire"` → `['acid','fire']`.
+- `minHpToRegen: 1` (hardcoded; 5e default).
+
+Returns `null` if no `Regeneration` trait or the amount doesn't parse.
+Written into `monster.regeneration`. Override panel can edit this same field.
 
 ### Caching & overrides
 
@@ -349,10 +447,16 @@ to the override panel.
 ### Known parser limitations (documented in v1)
 
 - Spellcasting actions (the body lists spells the monster *can* cast) are not
-  parsed; flagged as `unparsed` for manual fill-in.
+  parsed; flagged as `unparsed` for manual fill-in. **This includes healing
+  spells listed inside `Spellcasting`** — e.g. a cleric monster whose
+  `Spellcasting` lists Cure Wounds will need the DM to add a `kind:'heal'`
+  action manually via the override panel.
 - Condition durations not parsed; default to 1 round.
 - Multiattack sub-action lookup is by exact name match; misses fail to
   `unparsed`.
+- Regeneration triggered by something other than damage type (e.g. "unless
+  damaged by a critical hit") not parsed; defaults to amount + empty
+  `suppressedBy`, surfacing as a soft warning.
 
 ## UI layout & flow
 
@@ -395,11 +499,14 @@ progress bar + Cancel + live `winRate`. Post-sim: five collapsible sub-sections:
    derived from PC win-rate and avg-downed. Below: "FM said STANDARD; sim says
    HARD. Δ = +1 band." Headline trio shown here.
 2. **Per-PC outcomes** — table: name, down-rate %, ≥50%-HP-loss %, avg HP
-   remaining, avg death round (if applicable).
+   remaining, avg death round (if applicable), avg HP healed (sum of heals
+   received across trials, divided by trials).
 3. **Distribution** — two SVG bar charts: "PCs downed" histogram, "rounds to
    resolution" histogram. No chart library.
-4. **Action effectiveness** — sortable table: actor, action, uses, hits, total
-   damage, avg per use, killing blows. Default sort by total damage desc.
+4. **Action effectiveness** — sortable table: actor, action, kind
+   (`attack/save/heal/multi`), uses, hits, total damage, total healing, avg
+   per use, killing blows. Healing actions show zero for damage columns and
+   vice versa. Default sort by combined-impact (damage + healing) desc.
 5. **Representative fights** — three tabs (Low / Median / High); each shows the
    full event log for that trial.
 
@@ -438,6 +545,8 @@ collapse aggressively.
 - `aoeTargets` defaulted → "AoE size defaulted to 1 target — review for
   accuracy."
 - Condition duration estimated → "Duration defaulted to 1 round."
+- Regeneration parsed without suppression types → "Troll regenerates with no
+  damage-type suppression — fight may run long; review trait."
 - Trial hit 25-round cap → "N of 500 trials hit the round cap (stalemate)."
 
 ### Runtime errors
@@ -467,6 +576,18 @@ same party + encounter.
   showing nova-dependence.
 - Hopelessly mismatched encounter (CR-20 dragon vs L1 PCs) → reports
   `winRate: 0%, partyTpkRate: 100%`. No error; verdict is the answer.
+- **Healer with no offensive action** is allowed (a pure support PC). They use
+  heals when triggered; on turns with no qualifying ally to heal, they skip
+  (no action). Surfaced as a soft note rather than a validation failure.
+- **Healer downed before they can heal** is just a normal outcome — they don't
+  self-revive unless they have a self-heal with `reviveDowned:true` AND aren't
+  yet at 0 (5e: a downed creature can't take actions). v1 simplification: no
+  self-revive from `downed` state.
+- **Troll-style regeneration loop avoidance:** if a troll heals back to full,
+  is never hit by acid/fire, and the party can't out-DPR the regen, the trial
+  hits the 25-round cap. Counted as a loss for the side with more remaining
+  HP (which will be the troll). Working as intended; the verdict is
+  "this fight grinds — bring fire."
 
 ## Testing
 
@@ -475,20 +596,29 @@ same party + encounter.
 `tests/parser.test.html` — vanilla HTML page with assert statements and a "Run
 tests" button. No test runner (consistent with no-build-step rule).
 
-Fixture: 30 hand-crafted action bodies covering each pass and several
-pathological cases. Each test asserts the parsed shape matches a hand-written
-expected value. Manual run; pass/fail counts in the page.
+Fixture: 35 hand-crafted action bodies covering each pass and several
+pathological cases — 30 attack/save/multiattack/recharge cases plus 5 healing
+cases (single-target ally heal, AoE heal, self-heal, downed-revive heal, and
+a Regeneration trait body). Each test asserts the parsed shape matches a
+hand-written expected value. Manual run; pass/fail counts in the page.
 
 Goal: 100% of fixtures pass. Regressions add fixtures.
 
 ### Engine
 
-`tests/engine.test.html` with three deterministic scenarios:
+`tests/engine.test.html` with five deterministic scenarios:
 
 1. One-PC vs one-monster, identical stats, seeded → known event log.
 2. 4-PC party vs FM "standard" encounter → win-rate at 1,000 trials lands in
    70–90%.
 3. 4-PC party vs FM "extreme" encounter → win-rate ≤ 30%, downed ≥ 2 avg.
+4. 4-PC party including one healer (1d8+3 Healing Word, 3 uses/day) vs the
+   same FM "standard" encounter as (2) → win-rate strictly higher than (2)'s
+   and `avgHealReceived > 0`. Confirms healing affects outcomes.
+5. 4-PC party vs a single troll (regen 10, suppressed by acid/fire) where the
+   party has no acid/fire damage → most trials hit the round cap and the
+   troll wins. Add one PC with fire damage and rerun → win-rate flips.
+   Confirms regeneration + suppression both work.
 
 Bounds, not exact equality — variance is the point.
 
