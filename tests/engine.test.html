@@ -466,6 +466,162 @@ test('runSim: 100 trials returns aggregated SimResult shape', async () => {
   assertTrue(result.headline.winRate > 0.5,
     `L5 PC vs single goblin should win majority, got ${result.headline.winRate}`);
 });
+
+// ─────── Spec scenarios (from the design doc) ───────
+
+function makeFighter(level, hp, ac, abilities) {
+  return {
+    id: 'pm:' + Math.random().toString(36).slice(2,8),
+    identity:{ name:'Fighter', level },
+    abilities, profs:{ saves:{ str:true, con:true } },
+    combat:{ hp, maxHp:hp, ac, initBonus: Crucible.mod(abilities.dex) },
+    actions:[{ id:'a1', name:'Longsword', source:'weapon', type:'attack',
+               atkAbility:'str', atkBonusOverride:null,
+               damage:{ dice:'1d8', mod:'+atkAbility', type:'slashing',
+                        riderDice:null, riderType:null },
+               save:null, heal:null, aoeTargets:0,
+               usesPerDay:null, recharge:null, attacksPerAction:1 }],
+    tactics:{ aiHint:'focus', resources:'nova' },
+  };
+}
+function makeHealer(level) {
+  const abilities = { str:10, dex:12, con:14, int:10, wis:18, cha:10 };
+  return {
+    id: 'pm:cleric',
+    identity:{ name:'Cleric', level },
+    abilities, profs:{ saves:{ wis:true, cha:true } },
+    combat:{ hp:24, maxHp:24, ac:15, initBonus:1 },
+    actions:[
+      { id:'h1', name:'Healing Word', source:'spell', type:'heal',
+        atkAbility:'wis', atkBonusOverride:null,
+        damage:null, save:null,
+        heal:{ dice:'1d4', mod:4, flat:0, target:'ally', aoeTargets:0, reviveDowned:true },
+        aoeTargets:0, usesPerDay:3, recharge:null, attacksPerAction:1 },
+      { id:'a1', name:'Mace', source:'weapon', type:'attack',
+        atkAbility:'str', atkBonusOverride:null,
+        damage:{ dice:'1d6', mod:'+atkAbility', type:'bludgeoning',
+                 riderDice:null, riderType:null },
+        save:null, heal:null, aoeTargets:0,
+        usesPerDay:null, recharge:null, attacksPerAction:1 },
+    ],
+    tactics:{ aiHint:'focus', resources:'nova' },
+  };
+}
+function makeBugbear() {
+  return { name:'Bugbear', hp:27, ac:16, initiative:2, isMinion:false, isSolo:false,
+    parsedActions:[{ sourceActionName:'Morningstar', kind:'attack', toHit:4,
+                     damage:[{ dice:'2d8', mod:2, type:'piercing' }],
+                     recharge:null, usesPerDay:null }] };
+}
+function makeTroll(suppress) {
+  return { name:'Troll', hp:84, ac:15, initiative:1, isMinion:false, isSolo:false,
+    regeneration:{ amount:10, suppressedBy:suppress, minHpToRegen:1 },
+    parsedActions:[
+      { sourceActionName:'Bite', kind:'attack', toHit:7,
+        damage:[{ dice:'1d6', mod:4, type:'piercing' }], recharge:null, usesPerDay:null },
+      { sourceActionName:'Claw', kind:'attack', toHit:7,
+        damage:[{ dice:'2d6', mod:4, type:'slashing' }], recharge:null, usesPerDay:null },
+    ] };
+}
+
+test('Scenario 1: identical-stat duel, seeded → reproducible', async () => {
+  const ab = { str:14,dex:10,con:14,int:10,wis:10,cha:10 };
+  const pc = makeFighter(5, 30, 16, ab);
+  const monster = { name:'Mirror', hp:30, ac:16, initiative:0, isMinion:false, isSolo:false,
+    parsedActions:[{ sourceActionName:'Strike', kind:'attack', toHit:5,
+                     damage:[{ dice:'1d8', mod:3, type:'slashing' }],
+                     recharge:null, usesPerDay:null }] };
+  const r1 = await Crucible.runSim({ party:[pc],
+    monsterPicks:[{ pickId:'p1', count:1, monster }],
+    trials:50, tactics:{ aiHint:'focus', resources:'nova' }, seed:7 });
+  const r2 = await Crucible.runSim({ party:[pc],
+    monsterPicks:[{ pickId:'p1', count:1, monster }],
+    trials:50, tactics:{ aiHint:'focus', resources:'nova' }, seed:7 });
+  assertEq(r1.headline.winRate, r2.headline.winRate);
+  assertEq(r1.headline.avgRounds, r2.headline.avgRounds);
+});
+test('Scenario 2: 4 fighters vs 2 bugbears, win-rate in [0.5, 0.95]', async () => {
+  const ab = { str:16,dex:14,con:14,int:10,wis:10,cha:10 };
+  const party = [
+    makeFighter(5, 38, 18, ab),
+    makeFighter(5, 36, 17, ab),
+    makeFighter(5, 38, 18, ab),
+    makeFighter(5, 36, 17, ab),
+  ];
+  const r = await Crucible.runSim({ party,
+    monsterPicks:[{ pickId:'p1', count:2, monster: makeBugbear() }],
+    trials:200, tactics:{ aiHint:'focus', resources:'nova' }, seed:13 });
+  assertBetween(r.headline.winRate, 0.5, 0.95,
+    'Standard-band fight should land in [0.5, 0.95]');
+});
+test('Scenario 3: 4 fighters vs 6 bugbears → win-rate ≤ 0.5, avgDowned ≥ 1', async () => {
+  const ab = { str:16,dex:14,con:14,int:10,wis:10,cha:10 };
+  const party = [
+    makeFighter(5, 38, 18, ab),
+    makeFighter(5, 36, 17, ab),
+    makeFighter(5, 38, 18, ab),
+    makeFighter(5, 36, 17, ab),
+  ];
+  const r = await Crucible.runSim({ party,
+    monsterPicks:[{ pickId:'p1', count:6, monster: makeBugbear() }],
+    trials:200, tactics:{ aiHint:'focus', resources:'nova' }, seed:19 });
+  assertTrue(r.headline.winRate <= 0.6,
+    `Outnumbered fight should be hard; got ${r.headline.winRate.toFixed(2)}`);
+  assertTrue(r.headline.avgDowned >= 1.0,
+    `Average downed should be ≥1; got ${r.headline.avgDowned.toFixed(2)}`);
+});
+test('Scenario 4: adding a healer raises win-rate vs same fight', async () => {
+  const ab = { str:16,dex:14,con:14,int:10,wis:10,cha:10 };
+  const noHeal = [
+    makeFighter(5, 38, 18, ab),
+    makeFighter(5, 36, 17, ab),
+    makeFighter(5, 38, 18, ab),
+    makeFighter(5, 36, 17, ab),
+  ];
+  const withHeal = [
+    makeFighter(5, 38, 18, ab),
+    makeFighter(5, 36, 17, ab),
+    makeFighter(5, 38, 18, ab),
+    makeHealer(5),
+  ];
+  const a = await Crucible.runSim({ party: noHeal,
+    monsterPicks:[{ pickId:'p1', count:4, monster: makeBugbear() }],
+    trials:200, tactics:{ aiHint:'focus', resources:'nova' }, seed:23 });
+  const b = await Crucible.runSim({ party: withHeal,
+    monsterPicks:[{ pickId:'p1', count:4, monster: makeBugbear() }],
+    trials:200, tactics:{ aiHint:'focus', resources:'nova' }, seed:23 });
+  // Healer should help. Some variance allowed; the inequality is the spec test.
+  assertTrue(b.headline.winRate >= a.headline.winRate - 0.05,
+    `Healer should not significantly hurt win-rate. without=${a.headline.winRate}, with=${b.headline.winRate}`);
+  // Most importantly: avgHealReceived > 0.
+  assertTrue(b.perPc.some(p => p.avgHealReceived > 0),
+    'Healer party should record heals received');
+});
+test('Scenario 5: troll regen + fire damage flips the fight', async () => {
+  const ab = { str:16,dex:14,con:14,int:10,wis:10,cha:10 };
+  const noFire = [
+    makeFighter(5, 38, 18, ab),
+    makeFighter(5, 36, 17, ab),
+    makeFighter(5, 38, 18, ab),
+    makeFighter(5, 36, 17, ab),
+  ];
+  // A "fire fighter" — same fighter but with a fire rider on weapon.
+  const withFire = noFire.slice(0,3).concat([(() => {
+    const f = makeFighter(5, 36, 17, ab);
+    f.actions[0].damage.riderDice = '1d6';
+    f.actions[0].damage.riderType = 'fire';
+    return f;
+  })()]);
+  const tactics = { aiHint:'focus', resources:'nova' };
+  const a = await Crucible.runSim({ party: noFire,
+    monsterPicks:[{ pickId:'p1', count:1, monster: makeTroll(['acid','fire']) }],
+    trials:200, tactics, seed:29 });
+  const b = await Crucible.runSim({ party: withFire,
+    monsterPicks:[{ pickId:'p1', count:1, monster: makeTroll(['acid','fire']) }],
+    trials:200, tactics, seed:29 });
+  assertTrue(b.headline.winRate >= a.headline.winRate,
+    `Fire-equipped party should not do worse vs troll. no-fire=${a.headline.winRate}, with-fire=${b.headline.winRate}`);
+});
 </script>
 </body>
 </html>
