@@ -505,8 +505,30 @@
   // Prefer multiattack > limited-use > at-will. If no usable action, returns null.
   function pickAction(c) {
     const list = c.side === 'pc'
-      ? ((c.pm && c.pm.actions) || []).map(a => ({ ...a,
-          sourceActionName: a.name, kind: a.type }))
+      ? ((c.pm && c.pm.actions) || []).map(a => {
+          const base = { ...a, sourceActionName: a.name, kind: a.type };
+          if (a.type === 'save') {
+            // Flatten PC save action into engine's expected top-level shape.
+            // DC: explicit override wins; else derive 8 + atkAbilityMod + PB.
+            const dc = (a.save && a.save.dcOverride != null)
+              ? a.save.dcOverride
+              : 8 + mod(c.pm.abilities[a.atkAbility] || 10) + pb(c.pm.identity.level || 1);
+            // Damage from the PC's flat damage block (dice + mod + type).
+            const dmgEntry = a.damage
+              ? [{ dice: a.damage.dice,
+                    mod: pcDamageMod(c.pm, a),
+                    type: (a.damage.type || 'untyped').toLowerCase() }]
+              : [];
+            base.saveAbility   = (a.save && a.save.ability) || a.atkAbility || 'dex';
+            base.saveDc        = dc;
+            base.aoeTargets    = a.aoeTargets || 1;
+            base.halfOnSave    = !!(a.save && a.save.halfOnSave);
+            base.damageOnFail  = dmgEntry;
+            base.damageOnSave  = base.halfOnSave ? dmgEntry.map(d => ({ ...d, half:true })) : [];
+            base.condition     = (a.save && a.save.condition) || null;
+          }
+          return base;
+        })
       : ((c.monster && c.monster.parsedActions) || []);
     // Multiattack first.
     const ma = list.find(a => a.kind === 'multiattack' && isAvailable(c, a));
@@ -588,16 +610,17 @@
             const r = c.side === 'pc'
               ? resolveAttackPc(c, tgt, action, rng, events, round)
               : resolveAttackMonster(c, tgt, action, rng, events, round);
+            const wasAlive = !tgt.dead && !tgt.downed;
+            let totalDmgThisAttack = 0;
             for (const [type, dmg] of Object.entries(r.damageByType || {})) {
-              const wasAlive = !tgt.dead && !tgt.downed;
               applyDamage(tgt, dmg, type, c, events, round, c.name,
                           action.sourceActionName || action.name);
-              const killed = wasAlive && (tgt.dead || tgt.downed);
-              tally(c.side, action.sourceActionName || action.name, 'attack',
-                    r.hit, dmg, 0, killed ? 1 : 0, 0);
+              totalDmgThisAttack += dmg;
             }
-            if (!r.hit) tally(c.side, action.sourceActionName || action.name,
-                              'attack', false, 0, 0, 0, 0);
+            const killed = wasAlive && (tgt.dead || tgt.downed);
+            // Tally once per attack, summing damage across all damage types.
+            tally(c.side, action.sourceActionName || action.name, 'attack',
+                  r.hit, totalDmgThisAttack, 0, killed ? 1 : 0, 0);
           } else if (action.kind === 'save') {
             // For AoE, pick `aoeTargets` lowest-HP enemies.
             const enemies = aliveEnemies(c, all)
