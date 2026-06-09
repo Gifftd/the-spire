@@ -236,9 +236,62 @@
     return unparsed(actionName, body);
   }
 
+  // ─────────── parseRegeneration (trait body → block | null) ───────────
+  const REGEN_NAME_RE   = /^regeneration\b/i;
+  const REGEN_AMOUNT_RE = /regains\s+(\d+)\s+hit\s+points/i;
+  const REGEN_SUPPRESS_RE = /take(?:n)?\s+([\w,\s]+?)\s+damage\b/i;
+  const KNOWN_DAMAGE_TYPES = ['acid','fire','cold','lightning','thunder','poison',
+    'necrotic','radiant','psychic','force','bludgeoning','piercing','slashing'];
+
+  function parseRegeneration(traits) {
+    if (!Array.isArray(traits)) return null;
+    const t = traits.find(x => x && REGEN_NAME_RE.test(x.name || ''));
+    if (!t) return null;
+    const am = (t.body || '').match(REGEN_AMOUNT_RE);
+    if (!am) return null;
+    const supp = [];
+    const sm = (t.body || '').match(REGEN_SUPPRESS_RE);
+    if (sm) {
+      const parts = sm[1].toLowerCase().split(/\s*(?:,|\bor\b|\band\b)\s*/);
+      for (const p of parts) {
+        const cleaned = p.trim();
+        if (KNOWN_DAMAGE_TYPES.includes(cleaned)) supp.push(cleaned);
+      }
+    }
+    return { amount: parseInt(am[1], 10), suppressedBy: supp, minHpToRegen: 1 };
+  }
+
+  // ─────────── parseAllMonsterActions (memoized) ───────────
+  // Walks actions[] / bonusActions[] / reactions[], parses each, populates
+  // monster.parsedActions[]. If an entry already exists for a given
+  // sourceActionName (e.g. from a bestiary_custom override), keep it.
+  // Also writes monster.regeneration if a Regeneration trait is present
+  // and not already set.
+  function parseAllMonsterActions(monster) {
+    if (!monster) return;
+    monster.parsedActions = Array.isArray(monster.parsedActions) ? monster.parsedActions : [];
+    const existing = new Set(monster.parsedActions.map(p => p.sourceActionName));
+    const buckets = [monster.actions, monster.bonusActions, monster.reactions];
+    for (const arr of buckets) {
+      if (!Array.isArray(arr)) continue;
+      for (const a of arr) {
+        if (!a || !a.name || existing.has(a.name)) continue;
+        const p = parseAction(a.name, a.body, monster.abilities, monster.pb);
+        monster.parsedActions.push(p);
+        existing.add(a.name);
+      }
+    }
+    if (!monster.regeneration) {
+      const r = parseRegeneration(monster.traits);
+      if (r) monster.regeneration = r;
+    }
+  }
+
   // ─────────── Public exports ───────────
   const CrucibleParser = {
     parseAction,
+    parseRegeneration,
+    parseAllMonsterActions,
     _today: today,
   };
 

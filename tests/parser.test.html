@@ -230,6 +230,55 @@ test('Recharge + UsesPerDay on the same action', () => {
   assertEq(out.recharge, { dice:'d6', minRoll:6 });
   assertEq(out.usesPerDay, 3);
 });
+test('parseRegeneration: troll regen + acid/fire suppression', () => {
+  const traits = [{
+    name: 'Regeneration',
+    body: 'The troll regains 10 hit points at the start of its turn if it has at least 1 hit point and hasn\'t taken acid or fire damage since the end of its last turn.',
+  }];
+  const r = CrucibleParser.parseRegeneration(traits);
+  assertEq(r, { amount: 10, suppressedBy: ['acid', 'fire'], minHpToRegen: 1 });
+});
+test('parseRegeneration: amount only, no suppression', () => {
+  const traits = [{ name:'Regeneration', body:'The creature regains 5 hit points each turn.' }];
+  const r = CrucibleParser.parseRegeneration(traits);
+  assertEq(r.amount, 5);
+  assertEq(r.suppressedBy, []);
+});
+test('parseRegeneration: no regeneration trait → null', () => {
+  const traits = [{ name:'Keen Smell', body:'The hound has advantage on Perception checks.' }];
+  assertEq(CrucibleParser.parseRegeneration(traits), null);
+});
+test('parseAllMonsterActions: writes parsedActions[] keyed by source name', () => {
+  const monster = {
+    name: 'Goblin',
+    actions: [
+      { name:'Scimitar', body:'Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Slashing damage.' },
+    ],
+    bonusActions: [
+      { name:'Nimble Escape', body:'The goblin Disengages.' },
+    ],
+    reactions: [],
+    traits: [],
+  };
+  CrucibleParser.parseAllMonsterActions(monster);
+  assertEq(monster.parsedActions.length, 2);
+  assertEq(monster.parsedActions[0].sourceActionName, 'Scimitar');
+  assertEq(monster.parsedActions[0].kind, 'attack');
+  assertEq(monster.parsedActions[1].kind, 'unparsed');     // disengage isn't a parse target
+});
+test('parseAllMonsterActions: respects pre-existing parsedActions (override)', () => {
+  const monster = {
+    name: 'Goblin',
+    actions: [{ name:'Scimitar', body:'Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Slashing damage.' }],
+    bonusActions: [], reactions: [], traits: [],
+    parsedActions: [{ sourceActionName:'Scimitar', kind:'attack', toHit:99,
+                      damage:[], parsedBy:'manual', parsedAt:'override' }],
+  };
+  CrucibleParser.parseAllMonsterActions(monster);
+  // Pre-existing override preserved.
+  assertEq(monster.parsedActions[0].toHit, 99);
+  assertEq(monster.parsedActions[0].parsedBy, 'manual');
+});
 </script>
 </body>
 </html>
