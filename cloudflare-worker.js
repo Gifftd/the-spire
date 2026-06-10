@@ -687,6 +687,49 @@ export default {
       return json({ ok: true, character: { id: me.id, name: me.name, player: me.player || '' } });
     }
 
+    // ── Add a note on a combatant (player-only authoring) ──────────
+    // Auth: body.characterId + body.code.
+    // Worker re-resolves authorName from the looked-up character to prevent
+    // spoofing. Per-character cap of MAX_NOTES_PER_CHARACTER per encounter.
+    // Body length capped at MAX_NOTE_LENGTH chars.
+    if (body?.type === 'initiative_note') {
+      const auth = await verifyCharacterAuth(body, env);
+      if (!auth.ok) return json({ error: auth.error }, 401);
+
+      const combatantId = (body.combatantId || '').toString();
+      if (!combatantId) return json({ error: 'combatantId required' }, 400);
+
+      const v = INITIATIVE_NOTES.validateNote({ body: body.body, visibility: body.visibility });
+      if (!v.ok) return json({ error: v.error }, 400);
+
+      const state = await kvGet(env, 'initiative_state', { combatants: [] });
+      const combatants = Array.isArray(state.combatants) ? state.combatants : [];
+      const idx = combatants.findIndex(c => c && c.id === combatantId);
+      if (idx < 0) return json({ error: 'combatant not found' }, 404);
+
+      const target = combatants[idx];
+      const existing = Array.isArray(target.playerNotes) ? target.playerNotes : [];
+      const authoredByMe = existing.filter(n => n && n.authorCharId === auth.character.id).length;
+      if (authoredByMe >= INITIATIVE_NOTES.MAX_NOTES_PER_CHARACTER) {
+        return json({ error: 'note limit reached for this encounter' }, 400);
+      }
+
+      const note = {
+        id: 'n_' + Math.random().toString(36).slice(2, 10),
+        combatantId,
+        authorCharId: auth.character.id,
+        authorName: auth.character.name || '',
+        body: body.body.toString(),
+        visibility: body.visibility,
+        createdAt: Date.now(),
+      };
+      target.playerNotes = existing.concat([note]);
+      combatants[idx] = target;
+      state.combatants = combatants;
+      await kvPut(env, 'initiative_state', state);
+      return json({ ok: true, note });
+    }
+
     // ── Brew a potion (player or DM) ──────────────────────────
     // Auth: player (characterId + code) OR DM headers (test-brew, no consume).
     // Resolution + ingredient consumption happen server-side so the potion
