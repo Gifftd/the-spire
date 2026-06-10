@@ -7,6 +7,19 @@ Dates are YYYY-MM-DD.
 
 ---
 
+## [Unreleased] — 2026-06-10
+
+### Bestiary-merge module (scaffold)
+
+- Added `bestiary-merge.js`: pure-function module with `isOverrideRecord`,
+  `recordKey`, and `arrayOf` helpers. No DOM access; usable in browser and
+  Node. `mergeBestiaries` (Task 2) will be added in the next commit.
+- Added `tests/bestiary-merge.test.html`: inline vanilla-JS test harness
+  (same pattern as `tests/parser.test.html`) with 5 assertions covering
+  all three helpers.
+
+---
+
 ## [Unreleased] — 2026-06-02
 
 ### The Crucible — monster role policies (v1.5)
