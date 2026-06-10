@@ -9,6 +9,25 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### Crucible: PC editor no longer drops the cursor on every keystroke
+
+- The four action-edit handlers (`updateAction`, `updateActionDamage`,
+  `updateActionSave`, `updateActionHeal`) used to call `renderParty()`
+  on every `oninput` event, which did `root.innerHTML = ...` and
+  destroyed the `<input>` the DM was typing in — losing focus and
+  cursor position with each character.
+- Replaced the keystroke-level full re-render with surgical updates:
+  - PC card summary line and action row summary line both get stable
+    ids (`pc-summary-<pmId>`, `act-summary-<aId>`).
+  - New `refreshPCSummary` / `refreshActionSummary` helpers update
+    those spans' `textContent` in place. Inputs are never recreated.
+  - `refreshGate()` and `renderFmBudget()` still fire on PC field
+    edits so the run gate and FM-budget pill stay current.
+- Structural changes (collapse/expand, add/remove PC, add/remove
+  action, change action type, cycle position override, import from
+  War Table) still call `renderParty()` — they need a real DOM
+  rebuild because the visible field set changes.
+
 ### Bestiary: override records overlay imported monsters at load (no more duplicate Goblins)
 
 - New `bestiary-merge.js` shared module exporting
