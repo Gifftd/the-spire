@@ -96,6 +96,95 @@ async function verifyDMAuth(request, env) {
   return { ok: false };
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// BEGIN initiative-notes.js (inlined — keep in sync with /initiative-notes.js)
+// Any change to MAX_NOTE_LENGTH, MAX_NOTES_PER_CHARACTER, filterInitiativeState,
+// mergeDMWritePreservingNotes, validateNote, or canDeleteNote MUST be mirrored
+// in both files. Tests at /tests/initiative-notes.test.html cover the source.
+// ═══════════════════════════════════════════════════════════════════════
+const INITIATIVE_NOTES = (function () {
+  const MAX_NOTE_LENGTH = 500;
+  const MAX_NOTES_PER_CHARACTER = 50;
+  const VISIBILITIES = ['private', 'party'];
+
+  function filterInitiativeState(state, viewer) {
+    if (!state || typeof state !== 'object') return { combatants: [] };
+    const isDM = !!(viewer && viewer.role === 'dm');
+    const myId = (viewer && viewer.role === 'player' && viewer.characterId) || null;
+    const combatants = Array.isArray(state.combatants) ? state.combatants : [];
+    const filtered = [];
+    for (const c of combatants) {
+      if (!c) continue;
+      if (!isDM && c.hidden) continue;
+      const clone = Object.assign({}, c);
+      if (!isDM) delete clone.notes;
+      const allNotes = Array.isArray(c.playerNotes) ? c.playerNotes : [];
+      if (isDM) {
+        clone.playerNotes = allNotes.slice();
+      } else {
+        clone.playerNotes = allNotes.filter(n => {
+          if (!n) return false;
+          if (n.visibility === 'party') return true;
+          if (myId && n.authorCharId === myId) return true;
+          return false;
+        });
+      }
+      filtered.push(clone);
+    }
+    const out = Object.assign({}, state);
+    out.combatants = filtered;
+    return out;
+  }
+
+  function mergeDMWritePreservingNotes(prev, incoming) {
+    const prevCombatants = (prev && Array.isArray(prev.combatants)) ? prev.combatants : [];
+    const prevNotesById = new Map();
+    for (const c of prevCombatants) {
+      if (c && c.id) prevNotesById.set(c.id, Array.isArray(c.playerNotes) ? c.playerNotes.slice() : []);
+    }
+    const incCombatants = (incoming && Array.isArray(incoming.combatants)) ? incoming.combatants : [];
+    const mergedCombatants = incCombatants.map(c => {
+      if (!c) return c;
+      const clone = Object.assign({}, c);
+      clone.playerNotes = prevNotesById.has(c.id) ? prevNotesById.get(c.id) : [];
+      return clone;
+    });
+    const out = Object.assign({}, incoming || {});
+    out.combatants = mergedCombatants;
+    return out;
+  }
+
+  function validateNote(input) {
+    if (!input || typeof input !== 'object') {
+      return { ok: false, error: 'note must be an object' };
+    }
+    const body = typeof input.body === 'string' ? input.body : '';
+    const trimmed = body.trim();
+    if (!trimmed) return { ok: false, error: 'body is required' };
+    if (body.length > MAX_NOTE_LENGTH) {
+      return { ok: false, error: 'body too long (max ' + MAX_NOTE_LENGTH + ' chars)' };
+    }
+    if (!VISIBILITIES.includes(input.visibility)) {
+      return { ok: false, error: 'visibility must be private or party' };
+    }
+    return { ok: true };
+  }
+
+  function canDeleteNote(note, viewer) {
+    if (!note || !viewer) return false;
+    if (viewer.role === 'dm') return true;
+    if (viewer.role === 'player' && viewer.characterId
+        && note.authorCharId === viewer.characterId) return true;
+    return false;
+  }
+
+  return {
+    MAX_NOTE_LENGTH, MAX_NOTES_PER_CHARACTER, VISIBILITIES,
+    filterInitiativeState, mergeDMWritePreservingNotes, validateNote, canDeleteNote,
+  };
+})();
+// END initiative-notes.js (inlined)
+
 function sanitizeCharacters(chars) {
   return (chars || []).map(c => ({ id: c.id, name: c.name, player: c.player || '' }));
 }
