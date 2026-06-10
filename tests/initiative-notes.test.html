@@ -65,5 +65,126 @@ test('module loads + exposes constants', () => {
 });
 </script>
 
+<script>
+// ─────── filterInitiativeState ───────
+
+// Test fixture: an initiative_state with one of each interesting combatant shape.
+function fixture() {
+  return {
+    mode: 'combat',
+    round: 2,
+    activeIndex: 0,
+    combatants: [
+      {
+        id: 'c1', name: 'Lyra', type: 'pc', init: 18,
+        hp: 22, maxHp: 30, ac: 14,
+        conditions: [], dead: false, hidden: false,
+        notes: 'DM-only scratch on Lyra',
+        playerNotes: [
+          { id: 'n1', combatantId: 'c1', authorCharId: 'char_lyra',
+            authorName: 'Lyra', body: 'My HP is fine', visibility: 'private',
+            createdAt: 1000 },
+          { id: 'n2', combatantId: 'c1', authorCharId: 'char_garruk',
+            authorName: 'Garruk', body: 'Lyra is concentrating', visibility: 'party',
+            createdAt: 2000 }
+        ]
+      },
+      {
+        id: 'c2', name: 'Goblin Captain', type: 'enemy', init: 15,
+        hp: 18, maxHp: 25, ac: 13,
+        conditions: ['poisoned'], dead: false, hidden: false,
+        notes: 'Has the key',
+        playerNotes: [
+          { id: 'n3', combatantId: 'c2', authorCharId: 'char_lyra',
+            authorName: 'Lyra', body: 'Fire resistant', visibility: 'party',
+            createdAt: 3000 },
+          { id: 'n4', combatantId: 'c2', authorCharId: 'char_lyra',
+            authorName: 'Lyra', body: 'Owes me 20gp', visibility: 'private',
+            createdAt: 4000 }
+        ]
+      },
+      {
+        id: 'c3', name: 'Hidden Cultist', type: 'enemy', init: 12,
+        hp: 10, maxHp: 10, ac: 12,
+        conditions: [], dead: false, hidden: true,
+        notes: 'Strikes from shadow on round 3',
+        playerNotes: [
+          { id: 'n5', combatantId: 'c3', authorCharId: 'char_lyra',
+            authorName: 'Lyra', body: 'Should never see this', visibility: 'party',
+            createdAt: 5000 }
+        ]
+      }
+    ]
+  };
+}
+
+test('filter: DM sees everything (notes string, hidden combatant, all playerNotes)', () => {
+  const state = fixture();
+  const out = InitiativeNotes.filterInitiativeState(state, { role: 'dm' });
+  assertEq(out.combatants.length, 3, 'DM sees all 3 combatants');
+  assertEq(out.combatants[0].notes, 'DM-only scratch on Lyra', 'DM sees notes string');
+  assertEq(out.combatants[0].playerNotes.length, 2, 'DM sees both notes on Lyra');
+  assertEq(out.combatants[2].name, 'Hidden Cultist', 'DM sees hidden combatant');
+});
+
+test('filter: logged-in player drops hidden, strips notes, filters playerNotes', () => {
+  const state = fixture();
+  const out = InitiativeNotes.filterInitiativeState(state, {
+    role: 'player', characterId: 'char_lyra'
+  });
+  assertEq(out.combatants.length, 2, 'hidden combatant dropped (2 not 3)');
+  out.combatants.forEach(c => assertEq(c.notes, undefined, 'DM notes string stripped'));
+  // Lyra: sees her own private + everyone's party = 2 notes
+  assertEq(out.combatants[0].playerNotes.length, 2);
+  // Goblin: sees party-visible "Fire resistant" + her own private "Owes me 20gp" = 2
+  assertEq(out.combatants[1].playerNotes.length, 2);
+});
+
+test('filter: anonymous viewer sees only party-visible notes', () => {
+  const state = fixture();
+  const out = InitiativeNotes.filterInitiativeState(state, null);
+  assertEq(out.combatants.length, 2, 'hidden combatant dropped for anonymous');
+  out.combatants.forEach(c => assertEq(c.notes, undefined, 'DM notes string stripped'));
+  // Lyra: only "Lyra is concentrating" (party) = 1 note
+  assertEq(out.combatants[0].playerNotes.length, 1);
+  assertEq(out.combatants[0].playerNotes[0].body, 'Lyra is concentrating');
+  // Goblin: only "Fire resistant" (party) = 1 note
+  assertEq(out.combatants[1].playerNotes.length, 1);
+  assertEq(out.combatants[1].playerNotes[0].body, 'Fire resistant');
+});
+
+test('filter: does not mutate input state', () => {
+  const state = fixture();
+  const before = JSON.stringify(state);
+  InitiativeNotes.filterInitiativeState(state, null);
+  assertEq(JSON.parse(JSON.stringify(state)), JSON.parse(before),
+    'input unchanged after filter');
+});
+
+test('filter: tolerates missing playerNotes / missing combatants array', () => {
+  // missing playerNotes per combatant
+  const s1 = { mode: 'combat', combatants: [{ id: 'c1', name: 'A', hidden: false }] };
+  const o1 = InitiativeNotes.filterInitiativeState(s1, null);
+  assertEq(o1.combatants[0].playerNotes, [], 'missing playerNotes → []');
+
+  // missing combatants entirely
+  const s2 = { mode: 'lobby' };
+  const o2 = InitiativeNotes.filterInitiativeState(s2, null);
+  assertEq(o2.combatants, [], 'missing combatants → []');
+
+  // null state
+  const o3 = InitiativeNotes.filterInitiativeState(null, null);
+  assertEq(o3, { combatants: [] }, 'null state → empty combatants');
+});
+
+test('filter: viewer with role:player but no characterId acts like anonymous', () => {
+  const state = fixture();
+  const out = InitiativeNotes.filterInitiativeState(state, { role: 'player' });
+  // No characterId → no "own private" path matches → only party
+  assertEq(out.combatants[0].playerNotes.length, 1, 'only party-visible on Lyra');
+  assertEq(out.combatants[1].playerNotes.length, 1, 'only party-visible on Goblin');
+});
+</script>
+
 </body>
 </html>

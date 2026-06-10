@@ -20,12 +20,55 @@
   const MAX_NOTES_PER_CHARACTER = 50;      // per author, per encounter
   const VISIBILITIES = ['private', 'party'];
 
+  // ─── filterInitiativeState(state, viewer) ──────────────────────────
+  // Returns a NEW state with hidden combatants dropped (non-DM), the
+  // DM-only `notes` string stripped (non-DM), and `playerNotes` filtered
+  // per viewer.
+  //   viewer = { role: 'dm' }                              → see everything
+  //   viewer = { role: 'player', characterId: 'char_x' }   → own private + party
+  //   viewer = null | { role: 'player' /* no id */ }       → party only
+  function filterInitiativeState(state, viewer) {
+    if (!state || typeof state !== 'object') return { combatants: [] };
+    const isDM = !!(viewer && viewer.role === 'dm');
+    const myId = (viewer && viewer.role === 'player' && viewer.characterId) || null;
+
+    const combatants = Array.isArray(state.combatants) ? state.combatants : [];
+    const filtered = [];
+    for (const c of combatants) {
+      if (!c) continue;
+      if (!isDM && c.hidden) continue;          // drop hidden for non-DM
+
+      // Shallow clone so we don't mutate input
+      const clone = Object.assign({}, c);
+      if (!isDM) delete clone.notes;            // strip DM secret string
+
+      // Filter playerNotes
+      const allNotes = Array.isArray(c.playerNotes) ? c.playerNotes : [];
+      if (isDM) {
+        clone.playerNotes = allNotes.slice();    // copy, keep all
+      } else {
+        clone.playerNotes = allNotes.filter(n => {
+          if (!n) return false;
+          if (n.visibility === 'party') return true;
+          if (myId && n.authorCharId === myId) return true;
+          return false;
+        });
+      }
+      filtered.push(clone);
+    }
+
+    // Shallow-clone the outer state so other fields (mode, round, etc.) pass through
+    const out = Object.assign({}, state);
+    out.combatants = filtered;
+    return out;
+  }
+
   // Public exports populated by Tasks 2–5.
   const InitiativeNotes = {
     MAX_NOTE_LENGTH,
     MAX_NOTES_PER_CHARACTER,
     VISIBILITIES,
-    // filterInitiativeState        — Task 2
+    filterInitiativeState,
     // mergeDMWritePreservingNotes  — Task 3
     // validateNote                 — Task 4
     // canDeleteNote                — Task 5
