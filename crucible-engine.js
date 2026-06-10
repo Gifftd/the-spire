@@ -393,6 +393,10 @@
     const ranged = bestEvAction(actions, target, ctx,
                                 a => a._isRanged && a.kind === 'attack');
     if (ranged) return ranged;
+    // No ranged attack available — fall back. Hand multiattack the
+    // _ownerActions ref before scoring so its EV reflects sub-attack output.
+    const ma = actions.find(a => a.kind === 'multiattack');
+    if (ma) ma._ownerActions = actions;
     return bestEvAction(actions, target, ctx,
                         a => ['attack','save','multiattack'].includes(a.kind));
   }
@@ -412,6 +416,9 @@
                                          a.kind !== 'utility');
       if (finisher) return finisher;
     }
+    // Set _ownerActions on multiattack so its EV is scored against sub-attacks.
+    const ma = actions.find(a => a.kind === 'multiattack');
+    if (ma) ma._ownerActions = actions;
     return bestEvAction(actions, target, ctx,
                         a => ['attack','save','multiattack'].includes(a.kind));
   }
