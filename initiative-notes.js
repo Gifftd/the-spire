@@ -109,7 +109,19 @@
     return { ok: true };
   }
 
-  // Public exports populated by Tasks 2–5.
+  // ─── canDeleteNote(note, viewer) ───────────────────────────────────
+  // Authorization rule for note deletion. The note's author can delete
+  // their own; the DM can delete any; everyone else (other players,
+  // anonymous) cannot.
+  function canDeleteNote(note, viewer) {
+    if (!note || !viewer) return false;
+    if (viewer.role === 'dm') return true;
+    if (viewer.role === 'player' && viewer.characterId
+        && note.authorCharId === viewer.characterId) return true;
+    return false;
+  }
+
+  // Public exports.
   const InitiativeNotes = {
     MAX_NOTE_LENGTH,
     MAX_NOTES_PER_CHARACTER,
@@ -117,7 +129,7 @@
     filterInitiativeState,
     mergeDMWritePreservingNotes,
     validateNote,
-    // canDeleteNote                — Task 5
+    canDeleteNote,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = InitiativeNotes;

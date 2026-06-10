@@ -329,5 +329,32 @@ test('validate: rejects missing/null/non-object input', () => {
 });
 </script>
 
+<script>
+// ─────── canDeleteNote ───────
+
+const sampleNote = { id: 'n1', authorCharId: 'char_lyra', body: 'x', visibility: 'private' };
+
+test('canDelete: author can delete own note', () => {
+  assertEq(InitiativeNotes.canDeleteNote(sampleNote, { role: 'player', characterId: 'char_lyra' }), true);
+});
+
+test('canDelete: other player cannot delete', () => {
+  assertEq(InitiativeNotes.canDeleteNote(sampleNote, { role: 'player', characterId: 'char_garruk' }), false);
+});
+
+test('canDelete: DM can delete any note', () => {
+  assertEq(InitiativeNotes.canDeleteNote(sampleNote, { role: 'dm' }), true);
+});
+
+test('canDelete: anonymous viewer cannot delete', () => {
+  assertEq(InitiativeNotes.canDeleteNote(sampleNote, null), false);
+  assertEq(InitiativeNotes.canDeleteNote(sampleNote, { role: 'player' }), false);
+});
+
+test('canDelete: missing note → false (safe default)', () => {
+  assertEq(InitiativeNotes.canDeleteNote(null, { role: 'dm' }), false);
+});
+</script>
+
 </body>
 </html>
