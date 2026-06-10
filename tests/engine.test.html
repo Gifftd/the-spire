@@ -622,6 +622,807 @@ test('Scenario 5: troll regen + fire damage flips the fight', async () => {
   assertTrue(b.headline.winRate >= a.headline.winRate,
     `Fire-equipped party should not do worse vs troll. no-fire=${a.headline.winRate}, with-fire=${b.headline.winRate}`);
 });
+
+// ─────── Task 1: Foundation helpers ───────
+
+test('clamp01: clamps to [0.05, 0.95]', () => {
+  assertEq(Crucible.clamp01(-1),  0.05);
+  assertEq(Crucible.clamp01(0),   0.05);
+  assertEq(Crucible.clamp01(0.5), 0.5);
+  assertEq(Crucible.clamp01(1.5), 0.95);
+});
+test('sumDice: 1d8+3 → 7.5', () => {
+  const r = Crucible.sumDice([{ dice:'1d8', mod:3, type:'slashing' }]);
+  assertEq(r, 7.5);
+});
+test('sumDice: multiple components add', () => {
+  // 1d8+3 (mean 7.5) + 2d6+0 (mean 7) = 14.5
+  const r = Crucible.sumDice([
+    { dice:'1d8', mod:3, type:'slashing' },
+    { dice:'2d6', mod:0, type:'fire' },
+  ]);
+  assertEq(r, 14.5);
+});
+test('sumDice: empty / malformed → 0', () => {
+  assertEq(Crucible.sumDice([]), 0);
+  assertEq(Crucible.sumDice(null), 0);
+  assertEq(Crucible.sumDice([{ dice:'garbage', mod:0, type:'x' }]), 0);
+});
+test('actionIsMelee: monster reach attack → true', () => {
+  assertEq(Crucible.actionIsMelee({ reach:5, range:null }), true);
+});
+test('actionIsMelee: monster ranged attack → false', () => {
+  assertEq(Crucible.actionIsMelee({ reach:null, range:[80,320] }), false);
+});
+test('actionIsMelee: PC action with actionRange=melee → true', () => {
+  assertEq(Crucible.actionIsMelee({ actionRange:'melee' }), true);
+});
+test('actionIsRanged: monster range attack → true', () => {
+  assertEq(Crucible.actionIsRanged({ range:[80,320] }), true);
+});
+test('actionIsRanged: PC action with actionRange=ranged → true', () => {
+  assertEq(Crucible.actionIsRanged({ actionRange:'ranged' }), true);
+});
+test('targetSaveBonus: PC uses saveBonus()', () => {
+  const t = { side:'pc', pm:{
+    identity:{ level:5 },
+    abilities:{ str:10, dex:14, con:10, int:10, wis:10, cha:10 },
+    profs:{ saves:{ dex:true } }
+  }};
+  assertEq(Crucible.targetSaveBonus(t, 'dex'), 2 + 3);  // +2 DEX + PB 3
+});
+test('targetSaveBonus: monster uses statblock save or mod', () => {
+  const t = { side:'monster', monster:{
+    abilities:{ con:{ score:14, mod:2, save:5 } }
+  }};
+  assertEq(Crucible.targetSaveBonus(t, 'con'), 5);
+  const t2 = { side:'monster', monster:{
+    abilities:{ con:{ score:14, mod:2 } }
+  }};
+  assertEq(Crucible.targetSaveBonus(t2, 'con'), 2);
+});
+
+// ─────── Task 2: actionEv — expected-damage scorer ───────
+
+test('actionEv: attack EV decreases as target AC rises', () => {
+  const action = { kind:'attack', toHit:5, damage:[{ dice:'1d8', mod:3, type:'slashing' }] };
+  const ctx = { livingEnemyCount: 1 };
+  const ev10 = Crucible.actionEv(action, { ac:10, side:'monster' }, ctx);
+  const ev18 = Crucible.actionEv(action, { ac:18, side:'monster' }, ctx);
+  const ev25 = Crucible.actionEv(action, { ac:25, side:'monster' }, ctx);
+  assertTrue(ev10 > ev18, `ev10=${ev10} > ev18=${ev18}`);
+  assertTrue(ev18 > ev25, `ev18=${ev18} > ev25=${ev25}`);
+});
+test('actionEv: save EV is positive when halfOnSave is true', () => {
+  const action = {
+    kind:'save', saveAbility:'dex', saveDc:15, aoeTargets:1, halfOnSave:true,
+    damageOnFail:[{ dice:'8d6', mod:0, type:'fire' }]
+  };
+  const t = { side:'pc', pm:{
+    identity:{ level:5 },
+    abilities:{ str:10, dex:10, con:10, int:10, wis:10, cha:10 },
+    profs:{ saves:{} }
+  }};
+  const ev = Crucible.actionEv(action, t, { livingEnemyCount: 1 });
+  // 8d6 mean = 28; even at full save, half = 14, so EV must be positive and >0.
+  assertTrue(ev > 5, `expected EV > 5, got ${ev}`);
+});
+test('actionEv: save EV scales with aoeTargets', () => {
+  const action = {
+    kind:'save', saveAbility:'dex', saveDc:15, aoeTargets:4, halfOnSave:true,
+    damageOnFail:[{ dice:'8d6', mod:0, type:'fire' }]
+  };
+  const t = { side:'pc', pm:{
+    identity:{ level:5 },
+    abilities:{ str:10, dex:10, con:10, int:10, wis:10, cha:10 },
+    profs:{ saves:{} }
+  }};
+  const evOne  = Crucible.actionEv(action, t, { livingEnemyCount: 1 });
+  const evFour = Crucible.actionEv(action, t, { livingEnemyCount: 4 });
+  assertTrue(evFour > evOne * 3.5, `expected 4× targets ~4×EV, got ${evFour} vs ${evOne}`);
+});
+test('actionEv: multiattack sums sub-EVs', () => {
+  const subBite = { sourceActionName:'Bite', kind:'attack', toHit:5,
+                    damage:[{ dice:'1d8', mod:3, type:'piercing' }] };
+  const subClaw = { sourceActionName:'Claw', kind:'attack', toHit:5,
+                    damage:[{ dice:'1d6', mod:3, type:'slashing' }] };
+  const multi = {
+    sourceActionName:'Multiattack', kind:'multiattack',
+    multiattackPlan:[{ actionName:'Bite', count:1 }, { actionName:'Claw', count:2 }],
+    _ownerActions: [subBite, subClaw],
+  };
+  const t = { ac:13, side:'monster' };
+  const ctx = { livingEnemyCount: 1 };
+  const ev = Crucible.actionEv(multi, t, ctx);
+  const expected = Crucible.actionEv(subBite, t, ctx) + 2 * Crucible.actionEv(subClaw, t, ctx);
+  // Floating point: allow tiny tolerance.
+  assertTrue(Math.abs(ev - expected) < 0.001, `ev=${ev} expected≈${expected}`);
+});
+test('actionEv: unknown kind → 0', () => {
+  assertEq(Crucible.actionEv({ kind:'utility' }, { ac:10 }, { livingEnemyCount:1 }), 0);
+  assertEq(Crucible.actionEv({ kind:'unparsed' }, { ac:10 }, { livingEnemyCount:1 }), 0);
+});
+test('lowestPick: returns lowest by key', () => {
+  const arr = [{ n:'a', hp:10 }, { n:'b', hp:5 }, { n:'c', hp:15 }];
+  const r = Crucible.lowestPick(arr, x => x.hp, null, () => 0);
+  assertEq(r.n, 'b');
+});
+test('lowestPick: ties broken by tiebreak key', () => {
+  const arr = [{ n:'a', hp:5, ac:18 }, { n:'b', hp:5, ac:12 }, { n:'c', hp:15, ac:10 }];
+  const r = Crucible.lowestPick(arr, x => x.hp, x => x.ac, () => 0);
+  assertEq(r.n, 'b');
+});
+test('tagActions: sets _isMelee/_isRanged on each action', () => {
+  const acts = [
+    { reach:5, range:null },
+    { reach:null, range:[80,320] },
+    { actionRange:'both' },
+  ];
+  Crucible.tagActions(acts);
+  assertEq(acts[0]._isMelee, true);
+  assertEq(acts[0]._isRanged, false);
+  assertEq(acts[1]._isMelee, false);
+  assertEq(acts[1]._isRanged, true);
+  assertEq(acts[2]._isMelee, true);
+  assertEq(acts[2]._isRanged, true);
+});
+test('bestEvAction: returns highest-EV action passing filter', () => {
+  const tgt = { ac:13, side:'monster' };
+  const ctx = { livingEnemyCount: 1 };
+  const a1 = { kind:'attack', toHit:5, damage:[{ dice:'1d6', mod:0, type:'fire' }] };   // low EV
+  const a2 = { kind:'attack', toHit:5, damage:[{ dice:'2d8', mod:4, type:'slashing' }] }; // high EV
+  const a3 = { kind:'attack', toHit:0, damage:[{ dice:'1d4', mod:0, type:'piercing' }] }; // lowest
+  const r = Crucible.bestEvAction([a1, a2, a3], tgt, ctx, a => a.kind === 'attack');
+  assertEq(r, a2);
+});
+test('bestEvAction: returns null when filter excludes everything', () => {
+  const r = Crucible.bestEvAction([{ kind:'utility' }], { ac:13 }, { livingEnemyCount:1 },
+                                  a => a.kind === 'attack');
+  assertEq(r, null);
+});
+test('targetsInBucket: returns enemies in preferred bucket', () => {
+  // Set up combatants with PC pm carrying actionRange data so position(pm) works.
+  const front = { side:'pc', pm:{ actions:[{ actionRange:'melee' }, { actionRange:'melee' }] },
+                  downed:false, dead:false, hp:30 };
+  const mid   = { side:'pc', pm:{ actions:[{ actionRange:'melee' }, { actionRange:'ranged' }] },
+                  downed:false, dead:false, hp:20 };
+  const back  = { side:'pc', pm:{ actions:[{ actionRange:'ranged' }, { actionRange:'ranged' }] },
+                  downed:false, dead:false, hp:10 };
+  const me = { side:'monster' };
+  const all = [me, front, mid, back];
+  const frontPick = Crucible.targetsInBucket(all, me, 'frontline', ['midline', 'backline']);
+  assertEq(frontPick.length, 1);
+  assertEq(frontPick[0], front);
+  const backPick = Crucible.targetsInBucket(all, me, 'backline', ['midline', 'frontline']);
+  assertEq(backPick.length, 1);
+  assertEq(backPick[0], back);
+});
+test('targetsInBucket: falls back when bucket is empty', () => {
+  const back = { side:'pc', pm:{ actions:[{ actionRange:'ranged' }, { actionRange:'ranged' }] },
+                 downed:false, dead:false, hp:10 };
+  const me = { side:'monster' };
+  const all = [me, back];
+  const r = Crucible.targetsInBucket(all, me, 'frontline', ['midline', 'backline']);
+  // No frontline or midline; falls back to backline.
+  assertEq(r.length, 1);
+  assertEq(r[0], back);
+});
+test('rangedness: all melee → 0', () => {
+  const pm = { actions:[{ actionRange:'melee' }, { actionRange:'melee' }] };
+  assertEq(Crucible.rangedness(pm), 0);
+});
+test('rangedness: all ranged → 1', () => {
+  const pm = { actions:[{ actionRange:'ranged' }, { actionRange:'ranged' }] };
+  assertEq(Crucible.rangedness(pm), 1);
+});
+test('rangedness: half-and-half → 0.5', () => {
+  const pm = { actions:[{ actionRange:'melee' }, { actionRange:'ranged' }] };
+  assertEq(Crucible.rangedness(pm), 0.5);
+});
+test('rangedness: "both" counts as 0.5', () => {
+  const pm = { actions:[{ actionRange:'both' }, { actionRange:'both' }] };
+  assertEq(Crucible.rangedness(pm), 0.5);
+});
+test('rangedness: empty actions → 0', () => {
+  assertEq(Crucible.rangedness({ actions: [] }), 0);
+  assertEq(Crucible.rangedness({}), 0);
+});
+test('bucket: thresholds 0.3 and 0.7', () => {
+  assertEq(Crucible.bucket(0),    'frontline');
+  assertEq(Crucible.bucket(0.29), 'frontline');
+  assertEq(Crucible.bucket(0.3),  'midline');
+  assertEq(Crucible.bucket(0.5),  'midline');
+  assertEq(Crucible.bucket(0.7),  'midline');
+  assertEq(Crucible.bucket(0.71), 'backline');
+  assertEq(Crucible.bucket(1),    'backline');
+});
+test('position: uses override when set', () => {
+  const pm = {
+    actions:[{ actionRange:'melee' }, { actionRange:'melee' }],
+    positionOverride: 'backline',
+  };
+  assertEq(Crucible.position(pm), 'backline');
+});
+test('position: derives from actions when override is null', () => {
+  const pm = {
+    actions:[{ actionRange:'ranged' }, { actionRange:'ranged' }, { actionRange:'ranged' }],
+    positionOverride: null,
+  };
+  assertEq(Crucible.position(pm), 'backline');
+});
+
+// ─────── Task 5: crHpMedian + inferRole + resolveRole ───────
+
+test('crHpMedian: lookup returns plausible numbers', () => {
+  // CR 1 should be ~33, CR 5 should be ~100, CR 10 should be ~205.
+  // We assert a range; the exact 2024 DMG values are in the table.
+  const cr1  = Crucible.crHpMedian(1);
+  const cr5  = Crucible.crHpMedian(5);
+  const cr10 = Crucible.crHpMedian(10);
+  assertTrue(cr1 > 0 && cr1 < 50, `cr1=${cr1}`);
+  assertTrue(cr5 > 50 && cr5 < 200, `cr5=${cr5}`);
+  assertTrue(cr10 > 150 && cr10 < 350, `cr10=${cr10}`);
+  // Fractional CRs work.
+  assertTrue(Crucible.crHpMedian(0.5) > 0, 'cr 1/2');
+  assertTrue(Crucible.crHpMedian(0.25) > 0, 'cr 1/4');
+});
+
+test('inferRole: heal action → leader', () => {
+  const m = { parsedActions:[{ kind:'heal', heal:{ dice:'2d4', mod:3 } }] };
+  assertEq(Crucible.inferRole(m), 'leader');
+});
+test('inferRole: all ranged attacks → artillery', () => {
+  const m = { parsedActions:[
+    { kind:'attack', range:[80,320], damage:[{ dice:'1d10', mod:3, type:'piercing' }] },
+    { kind:'attack', range:[60,180], damage:[{ dice:'1d8', mod:3, type:'piercing' }] },
+  ]};
+  assertEq(Crucible.inferRole(m), 'artillery');
+});
+test('inferRole: control save → controller', () => {
+  const m = { parsedActions:[
+    { kind:'save', saveAbility:'wis', saveDc:15, condition:'paralyzed',
+      damageOnFail:[], aoeTargets:1, halfOnSave:false },
+  ]};
+  assertEq(Crucible.inferRole(m), 'controller');
+});
+test('inferRole: high HP + multiattack → brute', () => {
+  const m = {
+    cr: 5,
+    hp: 200,  // well above CR 5 median
+    parsedActions:[
+      { kind:'multiattack', multiattackPlan:[{ actionName:'Slam', count:2 }] },
+      { kind:'attack', sourceActionName:'Slam', reach:5,
+        damage:[{ dice:'2d8', mod:5, type:'bludgeoning' }] },
+    ],
+  };
+  assertEq(Crucible.inferRole(m), 'brute');
+});
+test('inferRole: 1/Day finisher + small action list → ambusher', () => {
+  const m = {
+    cr: 3,
+    hp: 60,
+    parsedActions:[
+      { kind:'attack', reach:5, damage:[{ dice:'1d6', mod:3, type:'piercing' }] },
+      { kind:'attack', sourceActionName:'Assassinate', reach:5,
+        usesPerDay: 1, damage:[{ dice:'6d6', mod:3, type:'piercing' }] },
+    ],
+  };
+  assertEq(Crucible.inferRole(m), 'ambusher');
+});
+test('inferRole: default → soldier', () => {
+  const m = {
+    cr: 3, hp: 50,
+    parsedActions:[
+      { kind:'attack', reach:5, damage:[{ dice:'1d8', mod:3, type:'slashing' }] },
+    ],
+  };
+  assertEq(Crucible.inferRole(m), 'soldier');
+});
+test('inferRole: empty actions → soldier', () => {
+  assertEq(Crucible.inferRole({}), 'soldier');
+  assertEq(Crucible.inferRole({ parsedActions: [] }), 'soldier');
+});
+
+test('resolveRole: roleOverride wins', () => {
+  const m = { roleOverride:'brute', fmRole:'soldier', inferredRole:'leader',
+              parsedActions:[] };
+  assertEq(Crucible.resolveRole(m), 'brute');
+});
+test('resolveRole: fmRole wins over inferred', () => {
+  const m = { fmRole:'artillery', inferredRole:'leader', parsedActions:[] };
+  assertEq(Crucible.resolveRole(m), 'artillery');
+});
+test('resolveRole: inferred used when no fmRole/override', () => {
+  const m = { parsedActions:[{ kind:'heal', heal:{ dice:'1d8', mod:0 } }] };
+  assertEq(Crucible.resolveRole(m), 'leader');
+  // Also: inference is cached on the monster.
+  assertEq(m.inferredRole, 'leader');
+});
+test('resolveRole: unknown role normalizes to soldier', () => {
+  const m = { roleOverride:'made-up-role', parsedActions:[] };
+  assertEq(Crucible.resolveRole(m), 'soldier');
+});
+
+// ─────── Task 6: ROLE_POLICIES registry + Soldier policy ───────
+
+test('ROLE_POLICIES: registry exposes soldier with pickTarget/pickAction', () => {
+  const p = Crucible.ROLE_POLICIES.soldier;
+  assertTrue(typeof p.pickTarget === 'function', 'pickTarget is function');
+  assertTrue(typeof p.pickAction === 'function', 'pickAction is function');
+});
+test('Soldier pickTarget: lowest HP wins', () => {
+  const me = { side:'monster', name:'Mob' };
+  const enemies = [
+    { side:'pc', name:'A', hp:30, ac:18, downed:false, dead:false, pm:{ actions:[{ actionRange:'melee' }] } },
+    { side:'pc', name:'B', hp:5,  ac:14, downed:false, dead:false, pm:{ actions:[{ actionRange:'melee' }] } },
+    { side:'pc', name:'C', hp:20, ac:12, downed:false, dead:false, pm:{ actions:[{ actionRange:'melee' }] } },
+  ];
+  const ctx = { round:1, rng:() => 0, tactics:{} };
+  const t = Crucible.ROLE_POLICIES.soldier.pickTarget(me, [me, ...enemies], ctx);
+  assertEq(t.name, 'B');
+});
+test('Soldier pickAction: multiattack wins when available', () => {
+  const subAtk = { sourceActionName:'Bite', kind:'attack', toHit:5,
+                   damage:[{ dice:'1d8', mod:3, type:'piercing' }] };
+  const multi = {
+    sourceActionName:'Multiattack', kind:'multiattack',
+    multiattackPlan:[{ actionName:'Bite', count:2 }],
+  };
+  const me = { side:'monster',
+               monster:{ parsedActions:[multi, subAtk] },
+               slotsLeft:{}, rechargeReady:{} };
+  const target = { ac:15 };
+  const ctx = { round:1, rng:() => 0, tactics:{}, livingEnemyCount:1 };
+  const a = Crucible.ROLE_POLICIES.soldier.pickAction(me, target, ctx);
+  assertEq(a.sourceActionName, 'Multiattack');
+});
+
+// ─────── Task 7: Brute and Minion policies ───────
+
+test('Brute pickTarget: prefers frontline, ties by lowest AC', () => {
+  const front1 = { side:'pc', name:'Tank',     hp:40, ac:18,
+                   pm:{ actions:[{ actionRange:'melee' }] }, downed:false, dead:false };
+  const front2 = { side:'pc', name:'Fighter',  hp:35, ac:15,
+                   pm:{ actions:[{ actionRange:'melee' }] }, downed:false, dead:false };
+  const back   = { side:'pc', name:'Wizard',   hp:15, ac:12,
+                   pm:{ actions:[{ actionRange:'ranged' }] }, downed:false, dead:false };
+  const me = { side:'monster' };
+  const all = [me, front1, front2, back];
+  const ctx = { round:1, rng:() => 0, tactics:{} };
+  const t = Crucible.ROLE_POLICIES.brute.pickTarget(me, all, ctx);
+  // Both Tank and Fighter are frontline; ties by lowest AC → Fighter (AC15).
+  assertEq(t.name, 'Fighter');
+});
+test('Brute pickAction: melee wins over higher-EV ranged', () => {
+  const melee  = { kind:'attack', sourceActionName:'Slam', toHit:5, reach:5,
+                   damage:[{ dice:'1d6', mod:3, type:'bludgeoning' }] };
+  const ranged = { kind:'attack', sourceActionName:'Boulder', toHit:5, range:[20,60],
+                   damage:[{ dice:'2d10', mod:3, type:'bludgeoning' }] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[ranged, melee] },
+               slotsLeft:{}, rechargeReady:{} };
+  const target = { ac:15 };
+  const ctx = { round:1, rng:()=>0, tactics:{}, livingEnemyCount:1 };
+  const a = Crucible.ROLE_POLICIES.brute.pickAction(me, target, ctx);
+  assertEq(a.sourceActionName, 'Slam');
+});
+test('Brute pickAction: falls back to ranged if no melee', () => {
+  const ranged = { kind:'attack', sourceActionName:'Boulder', toHit:5, range:[20,60],
+                   damage:[{ dice:'2d10', mod:3, type:'bludgeoning' }] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[ranged] },
+               slotsLeft:{}, rechargeReady:{} };
+  const target = { ac:15 };
+  const ctx = { round:1, rng:()=>0, tactics:{}, livingEnemyCount:1 };
+  const a = Crucible.ROLE_POLICIES.brute.pickAction(me, target, ctx);
+  assertEq(a.sourceActionName, 'Boulder');
+});
+
+test('Minion pickTarget: picks the first frontline enemy', () => {
+  const front = { side:'pc', name:'Tank', hp:40, ac:18,
+                  pm:{ actions:[{ actionRange:'melee' }] }, downed:false, dead:false };
+  const back  = { side:'pc', name:'Wizard', hp:15, ac:12,
+                  pm:{ actions:[{ actionRange:'ranged' }] }, downed:false, dead:false };
+  const me = { side:'monster' };
+  const all = [me, front, back];
+  const ctx = { round:1, rng:()=>0, tactics:{} };
+  const t = Crucible.ROLE_POLICIES.minion.pickTarget(me, all, ctx);
+  assertEq(t.name, 'Tank');
+});
+test('Minion pickAction: first available at-will attack', () => {
+  const a1 = { kind:'attack', sourceActionName:'Shortsword', toHit:3,
+               damage:[{ dice:'1d6', mod:1, type:'piercing' }] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[a1] },
+               slotsLeft:{}, rechargeReady:{} };
+  const ctx = { round:1, rng:()=>0, tactics:{}, livingEnemyCount:1 };
+  const a = Crucible.ROLE_POLICIES.minion.pickAction(me, { ac:15 }, ctx);
+  assertEq(a.sourceActionName, 'Shortsword');
+});
+
+// ─────── Task 8: Artillery, Skirmisher, Ambusher policies ───────
+
+test('Artillery pickTarget: prefers backline, ties by lowest HP', () => {
+  const front = { side:'pc', name:'Tank', hp:40, ac:18,
+                  pm:{ actions:[{ actionRange:'melee' }] }, downed:false, dead:false };
+  const back1 = { side:'pc', name:'Wizard', hp:18, ac:12,
+                  pm:{ actions:[{ actionRange:'ranged' }] }, downed:false, dead:false };
+  const back2 = { side:'pc', name:'Bard',   hp:25, ac:13,
+                  pm:{ actions:[{ actionRange:'ranged' }] }, downed:false, dead:false };
+  const me = { side:'monster' };
+  const all = [me, front, back1, back2];
+  const ctx = { round:1, rng:()=>0, tactics:{} };
+  const t = Crucible.ROLE_POLICIES.artillery.pickTarget(me, all, ctx);
+  assertEq(t.name, 'Wizard');   // backline tie → lowest HP
+});
+test('Artillery pickAction: ranged wins over higher-EV melee', () => {
+  const melee  = { kind:'attack', sourceActionName:'Bite',  toHit:5, reach:5,
+                   damage:[{ dice:'2d10', mod:5, type:'piercing' }] };
+  const ranged = { kind:'attack', sourceActionName:'Bolt', toHit:5, range:[80,320],
+                   damage:[{ dice:'1d8', mod:3, type:'force' }] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[melee, ranged] },
+               slotsLeft:{}, rechargeReady:{} };
+  const ctx = { round:1, rng:()=>0, tactics:{}, livingEnemyCount:1 };
+  const a = Crucible.ROLE_POLICIES.artillery.pickAction(me, { ac:13 }, ctx);
+  assertEq(a.sourceActionName, 'Bolt');
+});
+
+test('Skirmisher pickTarget with ranged actions: highest-rangedness, lowest HP tiebreak', () => {
+  const front = { side:'pc', name:'Tank', hp:10, ac:18,
+                  pm:{ actions:[{ actionRange:'melee' }, { actionRange:'melee' }] },
+                  downed:false, dead:false };
+  const back1 = { side:'pc', name:'Wizard', hp:18, ac:12,
+                  pm:{ actions:[{ actionRange:'ranged' }, { actionRange:'ranged' }] },
+                  downed:false, dead:false };
+  const back2 = { side:'pc', name:'Sorcerer', hp:14, ac:13,
+                  pm:{ actions:[{ actionRange:'ranged' }, { actionRange:'ranged' }] },
+                  downed:false, dead:false };
+  const me = { side:'monster',
+               monster:{ parsedActions:[
+                 { kind:'attack', sourceActionName:'Bow', toHit:5, range:[80,320],
+                   damage:[{ dice:'1d8', mod:3, type:'piercing' }] }
+               ]},
+               slotsLeft:{}, rechargeReady:{} };
+  const all = [me, front, back1, back2];
+  const ctx = { round:1, rng:()=>0, tactics:{} };
+  const t = Crucible.ROLE_POLICIES.skirmisher.pickTarget(me, all, ctx);
+  // Both back1 and back2 are highest-rangedness (1.0); tie → lowest HP → Sorcerer (14 < 18).
+  assertEq(t.name, 'Sorcerer');
+});
+test('Skirmisher pickAction: prefers ranged attack', () => {
+  const melee  = { kind:'attack', sourceActionName:'Dagger', toHit:5, reach:5,
+                   damage:[{ dice:'1d4', mod:3, type:'piercing' }] };
+  const ranged = { kind:'attack', sourceActionName:'Bow', toHit:5, range:[80,320],
+                   damage:[{ dice:'1d8', mod:3, type:'piercing' }] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[melee, ranged] },
+               slotsLeft:{}, rechargeReady:{} };
+  const ctx = { round:1, rng:()=>0, tactics:{}, livingEnemyCount:1 };
+  const a = Crucible.ROLE_POLICIES.skirmisher.pickAction(me, { ac:13 }, ctx);
+  assertEq(a.sourceActionName, 'Bow');
+});
+
+test('Ambusher pickTarget: lowest HP, ties by lowest AC', () => {
+  const a = { side:'pc', name:'A', hp:5, ac:18,
+              pm:{ actions:[{ actionRange:'melee' }] }, downed:false, dead:false };
+  const b = { side:'pc', name:'B', hp:5, ac:12,
+              pm:{ actions:[{ actionRange:'melee' }] }, downed:false, dead:false };
+  const c = { side:'pc', name:'C', hp:20, ac:10,
+              pm:{ actions:[{ actionRange:'melee' }] }, downed:false, dead:false };
+  const me = { side:'monster' };
+  const all = [me, a, b, c];
+  const ctx = { round:1, rng:()=>0, tactics:{} };
+  const t = Crucible.ROLE_POLICIES.ambusher.pickTarget(me, all, ctx);
+  assertEq(t.name, 'B');
+});
+test('Ambusher pickAction round 1: prefers (1/Day) finisher', () => {
+  const atWill   = { kind:'attack', sourceActionName:'Stab', toHit:5, reach:5,
+                     damage:[{ dice:'1d6', mod:3, type:'piercing' }] };
+  const finisher = { kind:'attack', sourceActionName:'Assassinate', toHit:7, reach:5,
+                     usesPerDay: 1,
+                     damage:[{ dice:'6d6', mod:5, type:'piercing' }] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[atWill, finisher] },
+               slotsLeft:{}, rechargeReady:{} };
+  const ctx = { round:1, rng:()=>0, tactics:{}, livingEnemyCount:1 };
+  const a = Crucible.ROLE_POLICIES.ambusher.pickAction(me, { ac:14 }, ctx);
+  assertEq(a.sourceActionName, 'Assassinate');
+});
+test('Ambusher pickAction round 2+: falls back to best EV', () => {
+  const atWill   = { kind:'attack', sourceActionName:'Stab', toHit:5, reach:5,
+                     damage:[{ dice:'1d6', mod:3, type:'piercing' }] };
+  // After round 1, finisher's usesPerDay is exhausted; only atWill remains.
+  const finisher = { kind:'attack', sourceActionName:'Assassinate', toHit:7, reach:5,
+                     usesPerDay: 1,
+                     damage:[{ dice:'6d6', mod:5, type:'piercing' }] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[atWill, finisher] },
+               slotsLeft:{ 'Assassinate': 0 }, rechargeReady:{} };
+  const ctx = { round:2, rng:()=>0, tactics:{}, livingEnemyCount:1 };
+  const a = Crucible.ROLE_POLICIES.ambusher.pickAction(me, { ac:14 }, ctx);
+  assertEq(a.sourceActionName, 'Stab');
+});
+
+test('Controller pickTarget: returns array for AoE save when ≥2 enemies', () => {
+  const aoeSave = { kind:'save', saveAbility:'dex', saveDc:15, aoeTargets:4,
+                    halfOnSave:true, damageOnFail:[{ dice:'8d6', mod:0, type:'fire' }] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[aoeSave] },
+               slotsLeft:{}, rechargeReady:{} };
+  const e1 = { side:'pc', name:'A', hp:30, ac:14,
+               pm:{ actions:[{ actionRange:'melee' }] }, downed:false, dead:false };
+  const e2 = { side:'pc', name:'B', hp:20, ac:13,
+               pm:{ actions:[{ actionRange:'ranged' }] }, downed:false, dead:false };
+  const ctx = { round:1, rng:()=>0, tactics:{} };
+  const t = Crucible.ROLE_POLICIES.controller.pickTarget(me, [me, e1, e2], ctx);
+  assertTrue(Array.isArray(t), 'controller returns array for AoE');
+  assertEq(t.length, 2);
+});
+test('Controller pickTarget: single-save picks lowest save bonus', () => {
+  const singleSave = { kind:'save', saveAbility:'wis', saveDc:15, aoeTargets:1,
+                       condition:'paralyzed', damageOnFail:[], halfOnSave:false };
+  const me = { side:'monster',
+               monster:{ parsedActions:[singleSave] },
+               slotsLeft:{}, rechargeReady:{} };
+  const lowWis = { side:'pc', name:'Brawler', hp:30, ac:14,
+                   pm:{ identity:{ level:5 },
+                        abilities:{ str:14, dex:10, con:12, int:8, wis:8, cha:8 },
+                        profs:{ saves:{} },
+                        actions:[{ actionRange:'melee' }] },
+                   downed:false, dead:false };
+  const highWis = { side:'pc', name:'Cleric', hp:30, ac:15,
+                    pm:{ identity:{ level:5 },
+                         abilities:{ str:10, dex:10, con:12, int:10, wis:16, cha:10 },
+                         profs:{ saves:{ wis:true } },
+                         actions:[{ actionRange:'melee' }] },
+                    downed:false, dead:false };
+  const ctx = { round:1, rng:()=>0, tactics:{} };
+  const t = Crucible.ROLE_POLICIES.controller.pickTarget(me, [me, lowWis, highWis], ctx);
+  assertEq(t.name, 'Brawler');
+});
+test('Controller pickAction: prefers save-with-condition over save-with-damage', () => {
+  const saveDmg  = { kind:'save', sourceActionName:'Fireball', saveAbility:'dex', saveDc:15,
+                     aoeTargets:4, halfOnSave:true,
+                     damageOnFail:[{ dice:'8d6', mod:0, type:'fire' }] };
+  const lockdown = { kind:'save', sourceActionName:'Hold Person', saveAbility:'wis', saveDc:15,
+                     aoeTargets:1, condition:'paralyzed', halfOnSave:false,
+                     damageOnFail:[] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[saveDmg, lockdown] },
+               slotsLeft:{}, rechargeReady:{} };
+  const target = { side:'pc',
+                   pm:{ identity:{ level:5 },
+                        abilities:{ str:10, dex:10, con:10, int:10, wis:10, cha:10 },
+                        profs:{ saves:{} } } };
+  const ctx = { round:1, rng:()=>0, tactics:{}, livingEnemyCount:2 };
+  const a = Crucible.ROLE_POLICIES.controller.pickAction(me, target, ctx);
+  assertEq(a.sourceActionName, 'Hold Person');
+});
+
+test('Leader pickTarget: lowest-HP enemy when no heal trigger', () => {
+  const me = { side:'monster' };
+  const e1 = { side:'pc', name:'A', hp:30, ac:14,
+               pm:{ actions:[{ actionRange:'melee' }] }, downed:false, dead:false };
+  const e2 = { side:'pc', name:'B', hp:10, ac:13,
+               pm:{ actions:[{ actionRange:'melee' }] }, downed:false, dead:false };
+  const ctx = { round:1, rng:()=>0, tactics:{} };
+  const t = Crucible.ROLE_POLICIES.leader.pickTarget(me, [me, e1, e2], ctx);
+  assertEq(t.name, 'B');
+});
+test('Leader pickAction: prefers save-effect over attack', () => {
+  const atk  = { kind:'attack', sourceActionName:'Mace', toHit:5, reach:5,
+                 damage:[{ dice:'1d6', mod:3, type:'bludgeoning' }] };
+  const save = { kind:'save', sourceActionName:'Command', saveAbility:'wis', saveDc:14,
+                 aoeTargets:1, condition:'frightened', halfOnSave:false,
+                 damageOnFail:[] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[atk, save] },
+               slotsLeft:{}, rechargeReady:{} };
+  const target = { side:'pc', ac:13,
+                   pm:{ identity:{ level:5 },
+                        abilities:{ str:10, dex:10, con:10, int:10, wis:10, cha:10 },
+                        profs:{ saves:{} } } };
+  const ctx = { round:1, rng:()=>0, tactics:{}, livingEnemyCount:1 };
+  const a = Crucible.ROLE_POLICIES.leader.pickAction(me, target, ctx);
+  assertEq(a.sourceActionName, 'Command');
+});
+
+test('Solo pickAction round 1: conserves (1/Day) when no ally downed', () => {
+  const atk1     = { kind:'attack', sourceActionName:'Slam', toHit:8, reach:10,
+                     damage:[{ dice:'2d10', mod:6, type:'bludgeoning' }] };
+  const finisher = { kind:'attack', sourceActionName:'Devastate', toHit:8, reach:10,
+                     usesPerDay: 1,
+                     damage:[{ dice:'10d10', mod:10, type:'bludgeoning' }] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[atk1, finisher] },
+               slotsLeft:{}, rechargeReady:{} };
+  const ctx = { round:1, rng:()=>0, tactics:{}, livingEnemyCount:4 };
+  const a = Crucible.ROLE_POLICIES.solo.pickAction(me, { ac:18 }, ctx);
+  assertEq(a.sourceActionName, 'Slam');
+});
+test('Solo pickAction round 3: uses (1/Day) when available', () => {
+  const atk1     = { kind:'attack', sourceActionName:'Slam', toHit:8, reach:10,
+                     damage:[{ dice:'2d10', mod:6, type:'bludgeoning' }] };
+  const finisher = { kind:'attack', sourceActionName:'Devastate', toHit:8, reach:10,
+                     usesPerDay: 1,
+                     damage:[{ dice:'10d10', mod:10, type:'bludgeoning' }] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[atk1, finisher] },
+               slotsLeft:{}, rechargeReady:{} };
+  const ctx = { round:3, rng:()=>0, tactics:{}, livingEnemyCount:4 };
+  const a = Crucible.ROLE_POLICIES.solo.pickAction(me, { ac:18 }, ctx);
+  assertEq(a.sourceActionName, 'Devastate');
+});
+test('Solo pickAction: novas immediately if an ally is downed', () => {
+  const atk1     = { kind:'attack', sourceActionName:'Slam', toHit:8, reach:10,
+                     damage:[{ dice:'2d10', mod:6, type:'bludgeoning' }] };
+  const finisher = { kind:'attack', sourceActionName:'Devastate', toHit:8, reach:10,
+                     usesPerDay: 1,
+                     damage:[{ dice:'10d10', mod:10, type:'bludgeoning' }] };
+  const me = { side:'monster',
+               monster:{ parsedActions:[atk1, finisher] },
+               slotsLeft:{}, rechargeReady:{} };
+  // An ally is downed → break conservation even in round 1.
+  const downedAlly = { side:'monster', downed:true, dead:false };
+  const ctx = { round:1, rng:()=>0, tactics:{}, livingEnemyCount:4 };
+  // pickActionSolo signature uses `all` to detect downed allies; pass via test helper.
+  const a = Crucible.ROLE_POLICIES.solo.pickAction(me, { ac:18 },
+              Object.assign({}, ctx, { all: [me, downedAlly] }));
+  assertEq(a.sourceActionName, 'Devastate');
+});
+
+// ─────── Role-policy integration scenarios ───────
+
+function makePcMelee(level, hp, ac, name) {
+  return {
+    id: 'pm:' + Math.random().toString(36).slice(2,8),
+    identity:{ name, level },
+    abilities:{ str:16, dex:12, con:14, int:10, wis:10, cha:10 },
+    profs:{ saves:{ str:true, con:true } },
+    combat:{ hp, maxHp:hp, ac, initBonus:1 },
+    actions:[
+      { id:'a1', name:'Longsword', source:'weapon', type:'attack',
+        atkAbility:'str', atkBonusOverride:null, actionRange:'melee',
+        damage:{ dice:'1d8', mod:'+atkAbility', type:'slashing',
+                 riderDice:null, riderType:null },
+        save:null, heal:null, aoeTargets:0,
+        usesPerDay:null, recharge:null, attacksPerAction:1 },
+      { id:'a2', name:'Shortsword', source:'weapon', type:'attack',
+        atkAbility:'str', atkBonusOverride:null, actionRange:'melee',
+        damage:{ dice:'1d6', mod:'+atkAbility', type:'piercing',
+                 riderDice:null, riderType:null },
+        save:null, heal:null, aoeTargets:0,
+        usesPerDay:null, recharge:null, attacksPerAction:1 },
+    ],
+    tactics:{ aiHint:'focus', resources:'nova' },
+  };
+}
+function makePcRanged(level, hp, ac, name) {
+  return {
+    id: 'pm:' + Math.random().toString(36).slice(2,8),
+    identity:{ name, level },
+    abilities:{ str:8, dex:14, con:12, int:16, wis:12, cha:10 },
+    profs:{ saves:{ int:true, wis:true } },
+    combat:{ hp, maxHp:hp, ac, initBonus:2 },
+    actions:[
+      { id:'r1', name:'Firebolt', source:'spell', type:'attack',
+        atkAbility:'int', atkBonusOverride:null, actionRange:'ranged',
+        damage:{ dice:'1d10', mod:'+atkAbility', type:'fire',
+                 riderDice:null, riderType:null },
+        save:null, heal:null, aoeTargets:0,
+        usesPerDay:null, recharge:null, attacksPerAction:1 },
+      { id:'r2', name:'Magic Missile', source:'spell', type:'attack',
+        atkAbility:'int', atkBonusOverride:99, actionRange:'ranged',
+        damage:{ dice:'3d4', mod:3, type:'force',
+                 riderDice:null, riderType:null },
+        save:null, heal:null, aoeTargets:0,
+        usesPerDay:null, recharge:null, attacksPerAction:1 },
+    ],
+    tactics:{ aiHint:'focus', resources:'nova' },
+  };
+}
+function makeBrute(name, cr, hp, ac) {
+  return { name, cr, hp, ac, initiative:1, isMinion:false, isSolo:false,
+    fmRole: 'brute',
+    parsedActions:[
+      { sourceActionName:'Slam', kind:'attack', toHit:6, reach:5,
+        damage:[{ dice:'2d8', mod:4, type:'bludgeoning' }],
+        recharge:null, usesPerDay:null },
+    ] };
+}
+function makeArtillery(name, cr, hp, ac) {
+  return { name, cr, hp, ac, initiative:2, isMinion:false, isSolo:false,
+    fmRole: 'artillery',
+    parsedActions:[
+      { sourceActionName:'Bolt', kind:'attack', toHit:5, range:[80,320],
+        damage:[{ dice:'1d10', mod:3, type:'piercing' }],
+        recharge:null, usesPerDay:null },
+    ] };
+}
+
+test('Scenario 6: Brute prefers frontline target', async () => {
+  const party = [
+    makePcMelee (5, 38, 18, 'Tank'),       // pure melee → frontline
+    makePcMelee (5, 36, 17, 'Fighter'),    // pure melee → frontline
+    makePcRanged(5, 24, 13, 'Wizard'),     // pure ranged → backline
+    makePcRanged(5, 24, 12, 'Sorcerer'),   // pure ranged → backline
+  ];
+  const r = await Crucible.runSim({ party,
+    monsterPicks:[{ pickId:'p1', count:2, monster: makeBrute('Ogre', 2, 60, 14) }],
+    trials:200, tactics:{ aiHint:'focus', resources:'nova' }, seed:101 });
+  // Brutes should focus the frontline. Sum down-rate of frontline vs backline
+  // and assert frontline is hit harder.
+  const front = r.perPc.filter(p => p.name === 'Tank' || p.name === 'Fighter');
+  const back  = r.perPc.filter(p => p.name === 'Wizard' || p.name === 'Sorcerer');
+  const frontDmg = front.reduce((s, p) => s + (p.maxHp - p.avgHpRemaining), 0);
+  const backDmg  = back.reduce ((s, p) => s + (p.maxHp - p.avgHpRemaining), 0);
+  assertTrue(frontDmg > backDmg * 1.3,
+    `Brute should focus frontline; front=${frontDmg.toFixed(1)} back=${backDmg.toFixed(1)}`);
+});
+
+test('Scenario 7: Artillery prefers backline target', async () => {
+  const party = [
+    makePcMelee (5, 38, 18, 'Tank'),
+    makePcMelee (5, 36, 17, 'Fighter'),
+    makePcRanged(5, 24, 13, 'Wizard'),
+    makePcRanged(5, 24, 12, 'Sorcerer'),
+  ];
+  const r = await Crucible.runSim({ party,
+    monsterPicks:[{ pickId:'p1', count:2, monster: makeArtillery('Sniper', 2, 30, 13) }],
+    trials:200, tactics:{ aiHint:'focus', resources:'nova' }, seed:103 });
+  const front = r.perPc.filter(p => p.name === 'Tank' || p.name === 'Fighter');
+  const back  = r.perPc.filter(p => p.name === 'Wizard' || p.name === 'Sorcerer');
+  const frontDmg = front.reduce((s, p) => s + (p.maxHp - p.avgHpRemaining), 0);
+  const backDmg  = back.reduce ((s, p) => s + (p.maxHp - p.avgHpRemaining), 0);
+  assertTrue(backDmg > frontDmg * 1.3,
+    `Artillery should focus backline; front=${frontDmg.toFixed(1)} back=${backDmg.toFixed(1)}`);
+});
+
+test('Scenario 8: Role override flips Brute → Artillery target distribution', async () => {
+  const party = [
+    makePcMelee (5, 38, 18, 'Tank'),
+    makePcMelee (5, 36, 17, 'Fighter'),
+    makePcRanged(5, 24, 13, 'Wizard'),
+    makePcRanged(5, 24, 12, 'Sorcerer'),
+  ];
+  // Take a Brute-tagged monster, override to artillery, re-run.
+  const overridden = makeBrute('OverriddenBrute', 2, 60, 14);
+  overridden.roleOverride = 'artillery';
+  // Give it a ranged attack so the artillery policy has something to pick.
+  overridden.parsedActions.push({
+    sourceActionName:'Hurl Boulder', kind:'attack', toHit:6, range:[40,120],
+    damage:[{ dice:'2d8', mod:4, type:'bludgeoning' }],
+    recharge:null, usesPerDay:null,
+  });
+  const r = await Crucible.runSim({ party,
+    monsterPicks:[{ pickId:'p1', count:2, monster: overridden }],
+    trials:200, tactics:{ aiHint:'focus', resources:'nova' }, seed:107 });
+  const front = r.perPc.filter(p => p.name === 'Tank' || p.name === 'Fighter');
+  const back  = r.perPc.filter(p => p.name === 'Wizard' || p.name === 'Sorcerer');
+  const frontDmg = front.reduce((s, p) => s + (p.maxHp - p.avgHpRemaining), 0);
+  const backDmg  = back.reduce ((s, p) => s + (p.maxHp - p.avgHpRemaining), 0);
+  // After override, behavior should flip — backline should now be hit harder.
+  assertTrue(backDmg > frontDmg,
+    `Override-to-Artillery should focus backline; front=${frontDmg.toFixed(1)} back=${backDmg.toFixed(1)}`);
+});
+
+test('Scenario 9: v1 spec scenario 2 still passes (backward compat)', async () => {
+  // Re-runs the original FM-standard scenario from Task 18 with Soldier-default monsters.
+  // Behavior must match v1 because Soldier policy delegates to existing target/action logic.
+  const ab = { str:16,dex:14,con:14,int:10,wis:10,cha:10 };
+  const party = [
+    makeFighter(5, 38, 18, ab),
+    makeFighter(5, 36, 17, ab),
+    makeFighter(5, 38, 18, ab),
+    makeFighter(5, 36, 17, ab),
+  ];
+  const r = await Crucible.runSim({ party,
+    monsterPicks:[{ pickId:'p1', count:2, monster: makeBugbear() }],
+    trials:200, tactics:{ aiHint:'focus', resources:'nova' }, seed:13 });
+  assertBetween(r.headline.winRate, 0.5, 0.95,
+    'v1 standard-band scenario must still land in [0.5, 0.95] post-upgrade');
+});
 </script>
 </body>
 </html>

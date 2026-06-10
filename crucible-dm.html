@@ -106,7 +106,7 @@ function defaultPC() {
     combat:   { hp:30, maxHp:30, ac:16, initBonus:2, speed:30 },
     actions:  [{ id:'a-' + Math.random().toString(36).slice(2,6),
                  name:'Longsword', source:'weapon', type:'attack',
-                 atkAbility:'str', atkBonusOverride:null,
+                 atkAbility:'str', atkBonusOverride:null, actionRange:'melee',
                  damage:{ dice:'1d8', mod:'+atkAbility', type:'slashing',
                           riderDice:null, riderType:null },
                  save:null, heal:null, aoeTargets:0,
@@ -136,11 +136,23 @@ function renderParty() {
 function renderPCCard(pm) {
   const expanded = expandedPC.has(pm.id);
   const summary = `${pm.identity.name} · L${pm.identity.level} · ${pm.combat.hp}HP · AC${pm.combat.ac}`;
+  const posLabel = pcPositionLabel(pm);
+  const pillColor = pm.positionOverride ? 'var(--c-accent)' : 'var(--c-ink-faint)';
   return `
     <div class="pc-card" style="border:1px solid var(--c-border); border-radius:4px; margin-bottom:0.5rem; padding:0.5rem;">
-      <div onclick="togglePC('${pm.id}')" style="cursor:pointer; display:flex; justify-content:space-between;">
-        <b>${escapeHtml(summary)}</b>
-        <span style="color:var(--c-ink-faint)">${expanded ? '▾' : '▸'}</span>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div onclick="togglePC('${pm.id}')" style="cursor:pointer; flex:1;">
+          <b>${escapeHtml(summary)}</b>
+        </div>
+        <span onclick="cyclePositionOverride('${pm.id}'); event.stopPropagation();"
+              title="Click to cycle override"
+              style="cursor:pointer; font-size:0.7rem; padding:0.15rem 0.5rem;
+                     border:1px solid ${pillColor}; color:${pillColor};
+                     border-radius:9999px; margin-left:0.5rem; white-space:nowrap;">
+          ${escapeHtml(posLabel)}
+        </span>
+        <span style="color:var(--c-ink-faint); margin-left:0.5rem; cursor:pointer;"
+              onclick="togglePC('${pm.id}')">${expanded ? '▾' : '▸'}</span>
       </div>
       ${expanded ? renderPCEditor(pm) : ''}
     </div>`;
@@ -261,10 +273,15 @@ function renderActionEditor(pm, act) {
       <label><input type="checkbox" ${h.reviveDowned?'checked':''}
         onchange="updateActionHeal('${pm.id}','${act.id}','reviveDowned', this.checked)"> revives downed</label>`;
   }
+  const rangeSel = ['melee','ranged','both'].map(t =>
+    `<option value="${t}" ${act.actionRange===t?'selected':''}>${t}</option>`).join('');
   return `
     <div style="padding:0.25rem 0.5rem; background:var(--c-surface);">
       <label>Name <input type="text" value="${escapeHtml(act.name)}"
         oninput="updateAction('${pm.id}','${act.id}','name', this.value)" class="pc-input"></label>
+      <label>Range
+        <select onchange="updateAction('${pm.id}','${act.id}','actionRange', this.value)">${rangeSel}</select>
+      </label>
       <label>Type <select onchange="changeActionType('${pm.id}','${act.id}', this.value)">${typeSel}</select></label>
       ${body}
       <label>Uses/day (blank=at-will) <input type="number" value="${act.usesPerDay ?? ''}"
@@ -293,6 +310,26 @@ function updatePC(id, path, value) {
   for (let i = 0; i < parts.length - 1; i++) o = o[parts[i]];
   o[parts[parts.length-1]] = value;
   saveParty();
+}
+
+// Compute a PC's active position bucket using engine helpers.
+function pcPositionLabel(pm) {
+  if (!pm) return 'frontline';
+  const active = (typeof Crucible !== 'undefined' && Crucible.position)
+                  ? Crucible.position(pm)
+                  : 'frontline';
+  const overridden = !!pm.positionOverride;
+  return overridden ? `${active} (override)` : active;
+}
+
+// Cycle the override state machine: derived → frontline → midline → backline → derived (clear).
+function cyclePositionOverride(pmId) {
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  const order = [null, 'frontline', 'midline', 'backline'];
+  const cur = pm.positionOverride || null;
+  const idx = order.indexOf(cur);
+  pm.positionOverride = order[(idx + 1) % order.length];
+  saveParty(); renderParty();
 }
 function addPC() {
   const pm = defaultPC();
@@ -361,7 +398,7 @@ function addAction(pmId) {
   const pm = party.find(p => p.id === pmId); if (!pm) return;
   const a = { id:'a-' + Math.random().toString(36).slice(2,6),
               name:'New action', source:'weapon', type:'attack',
-              atkAbility:'str', atkBonusOverride:null,
+              atkAbility:'str', atkBonusOverride:null, actionRange:'melee',
               damage:{ dice:'1d8', mod:'+atkAbility', type:'slashing',
                        riderDice:null, riderType:null },
               save:null, heal:null, aoeTargets:0,
@@ -807,6 +844,26 @@ function showWarn(msg) {
   console.warn('[Crucible]', msg);
 }
 
+// ─────────── Role helpers ───────────
+// Returns { role, source } where source is 'override' | 'fm' | 'inferred'.
+function monsterActiveRole(m) {
+  if (!m) return { role: 'soldier', source: 'inferred' };
+  if (m.roleOverride) return { role: String(m.roleOverride).toLowerCase(), source: 'override' };
+  if (m.fmRole)       return { role: String(m.fmRole).toLowerCase(),       source: 'fm' };
+  // Use the engine's resolveRole to populate inferredRole the same way the sim will.
+  if (typeof Crucible !== 'undefined' && Crucible.resolveRole) {
+    const r = Crucible.resolveRole(m);
+    return { role: r, source: m.roleOverride ? 'override' : (m.fmRole ? 'fm' : 'inferred') };
+  }
+  return { role: 'soldier', source: 'inferred' };
+}
+
+function roleBadgeColor(source) {
+  if (source === 'override') return 'var(--c-accent)';   // teal
+  if (source === 'fm')       return '#b88a5a';            // gold
+  return 'var(--c-ink-faint)';                            // slate
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  Encounter picker
 // ═══════════════════════════════════════════════════════════════════════
@@ -907,7 +964,15 @@ function renderEncounter() {
         <span><b>${escapeHtml(p.monster.name)}</b>
           <span style="color:var(--c-ink-faint); font-size:0.85em">
             CR ${escapeHtml(String(p.monster.crText || p.monster.cr || '?'))} · HP ${p.monster.hp ?? '?'} · AC ${p.monster.ac ?? '?'}
-          </span></span>
+          </span>
+          ${(() => {
+            const info = monsterActiveRole(p.monster);
+            const color = roleBadgeColor(info.source);
+            return `<span style="margin-left:0.4rem; font-size:0.75em; padding:0.1rem 0.4rem;
+                                  border:1px solid ${color}; color:${color}; border-radius:9999px;
+                                  text-transform:capitalize;">${escapeHtml(info.role)}</span>`;
+          })()}
+        </span>
         <span>
           ×<input type="number" min="1" max="20" value="${p.count}" style="width:3rem"
                   onchange="setPickCount('${p.pickId}', this.value)" class="pc-input">
@@ -942,6 +1007,19 @@ function openOverridePanel(pickId) {
         <button class="btn" onclick="document.body.removeChild(this.closest('[data-modal]').parentElement)">✕</button>
       </div>
       <div style="flex:1; overflow-y:auto; padding:1rem;">
+        ${(() => {
+          const info = monsterActiveRole(m);
+          const opts = ['ambusher','artillery','brute','controller','leader',
+                        'skirmisher','soldier','solo','minion']
+            .map(r => `<option value="${r}" ${info.role===r?'selected':''}>${r}</option>`).join('');
+          return `<div style="margin-bottom:1rem; padding:0.5rem; border:1px solid var(--c-border); border-radius:4px;">
+            <b>Role:</b>
+            <select onchange="updateRoleOverride('${pickId}', this.value)">${opts}</select>
+            <span style="color:var(--c-ink-faint); font-size:0.85em">
+              (currently: ${info.source})
+            </span>
+          </div>`;
+        })()}
         <div id="override-list"></div>
         ${m.regeneration ? `
           <div style="margin-top:1rem; padding:0.5rem; border:1px solid var(--c-border); border-radius:4px;">
@@ -1040,6 +1118,12 @@ function overrideField(pickId, idx, field, value) {
   pa[field] = value;
   pa.parsedBy = 'manual';
 }
+function updateRoleOverride(pickId, role) {
+  const pick = picks.find(p => p.pickId === pickId); if (!pick) return;
+  pick.monster.roleOverride = role;
+  // Re-render encounter so the badge updates.
+  renderEncounter();
+}
 function overrideHealField(pickId, idx, field, value) {
   const pick = picks.find(p => p.pickId === pickId); if (!pick) return;
   const pa = pick.monster.parsedActions[idx]; if (!pa) return;
@@ -1105,6 +1189,7 @@ async function saveOverride(pickId) {
       name: m.name, _source: m._source || m.source || '',
       parsedActions: m.parsedActions,
       regeneration: m.regeneration || null,
+      roleOverride: m.roleOverride || null,
       overriddenAt: new Date().toISOString(),
     };
     if (idx >= 0) list[idx] = { ...list[idx], ...overrideRecord };

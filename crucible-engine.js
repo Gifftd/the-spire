@@ -74,6 +74,442 @@
     return Number.isFinite(n) ? n : 0;
   }
 
+  // ─────────── Role-policy helpers ───────────
+  function clamp01(x) {
+    if (!Number.isFinite(x)) return 0.05;
+    return Math.max(0.05, Math.min(0.95, x));
+  }
+
+  function sumDice(dmgList) {
+    let total = 0;
+    for (const d of (dmgList || [])) {
+      const m = String(d && d.dice || '').match(/^(\d+)d(\d+)$/i);
+      if (!m) continue;
+      const n = parseInt(m[1], 10), s = parseInt(m[2], 10);
+      total += n * (s + 1) / 2 + (Number(d.mod) || 0);
+    }
+    return total;
+  }
+
+  function actionIsMelee(action) {
+    if (!action) return false;
+    // PC actions carry an explicit tag.
+    if (action.actionRange === 'melee') return true;
+    if (action.actionRange === 'ranged') return false;
+    if (action.actionRange === 'both')  return true;       // count as melee for picker purposes
+    // Monster ParsedAction: has reach but no range.
+    if (action.reach != null && !action.range) return true;
+    return false;
+  }
+
+  function actionIsRanged(action) {
+    if (!action) return false;
+    if (action.actionRange === 'ranged') return true;
+    if (action.actionRange === 'both')   return true;
+    if (action.range) return true;
+    return false;
+  }
+
+  function targetSaveBonus(target, ability) {
+    if (!target || !ability) return 0;
+    if (target.side === 'pc' && target.pm) return saveBonus(target.pm, ability);
+    const ab = target.monster && target.monster.abilities && target.monster.abilities[ability];
+    if (!ab) return 0;
+    return ab.save != null ? ab.save : (ab.mod || 0);
+  }
+
+  // Expected damage of an action against a specific target.
+  // For multiattack, sub-actions are resolved via the multiAction's
+  // `_ownerActions` reference (set by the caller before scoring).
+  function actionEv(action, target, ctx) {
+    if (!action || !target) return 0;
+    if (action.kind === 'attack') {
+      const p = clamp01((21 + (action.toHit || 0) - (target.ac || 10)) / 20);
+      const dmg = sumDice(action.damage);
+      return p * dmg * 1.05;     // +5% nominal crit tail
+    }
+    if (action.kind === 'save') {
+      const sb = targetSaveBonus(target, action.saveAbility);
+      const failP = clamp01((action.saveDc - sb - 1) / 20);
+      const dmgFail = sumDice(action.damageOnFail);
+      const dmgSave = action.halfOnSave ? dmgFail / 2 : 0;
+      const live = (ctx && ctx.livingEnemyCount) || 1;
+      const targets = Math.min(action.aoeTargets || 1, live);
+      return targets * (failP * dmgFail + (1 - failP) * dmgSave);
+    }
+    if (action.kind === 'multiattack') {
+      const subs = action._ownerActions || [];
+      let sum = 0;
+      for (const step of (action.multiattackPlan || [])) {
+        const sub = subs.find(a => (a.sourceActionName || a.name) === step.actionName);
+        if (sub) sum += (step.count || 1) * actionEv(sub, target, ctx);
+      }
+      return sum;
+    }
+    return 0;
+  }
+
+  function tagActions(actions) {
+    for (const a of (actions || [])) {
+      a._isMelee  = actionIsMelee(a);
+      a._isRanged = actionIsRanged(a);
+    }
+  }
+
+  function bestEvAction(actions, target, ctx, filter) {
+    const candidates = filter ? (actions || []).filter(filter) : (actions || []).slice();
+    if (!candidates.length) return null;
+    for (const a of candidates) a._ev = actionEv(a, target, ctx);
+    candidates.sort((a, b) => (b._ev || 0) - (a._ev || 0));
+    return candidates[0];
+  }
+
+  function lowestPick(arr, keyFn, tieKeyFn, rng) {
+    if (!arr || !arr.length) return null;
+    const minK = Math.min(...arr.map(keyFn));
+    let ties = arr.filter(x => keyFn(x) === minK);
+    if (tieKeyFn && ties.length > 1) {
+      const minT = Math.min(...ties.map(tieKeyFn));
+      ties = ties.filter(x => tieKeyFn(x) === minT);
+    }
+    if (ties.length === 1) return ties[0];
+    const r = rng ? rng() : 0;
+    return ties[Math.floor(r * ties.length)];
+  }
+
+  function targetsInBucket(all, me, prefBucket, fallbackOrder) {
+    const enemies = aliveEnemies(me, all);
+    const inBucket = enemies.filter(e => positionOf(e) === prefBucket);
+    if (inBucket.length) return inBucket;
+    for (const b of (fallbackOrder || [])) {
+      const f = enemies.filter(e => positionOf(e) === b);
+      if (f.length) return f;
+    }
+    return enemies;
+  }
+
+  // Position lookup for a combatant — only PCs have a position bucket.
+  // Monster targets default to 'frontline' so they sort first when a
+  // bucket-aware policy ever scores a mixed-side scenario (shouldn't happen
+  // in v1.5 — monster-side roles always target PCs).
+  function positionOf(combatant) {
+    if (!combatant || combatant.side !== 'pc' || !combatant.pm) return 'frontline';
+    return position(combatant.pm);
+  }
+
+  // ─────────── Rangedness + position ───────────
+  // PC's rangedness score in [0, 1]: derived from how many of their actions
+  // are ranged. `both`-tagged actions count as 0.5. Empty actions → 0
+  // (validation gate already blocks runs without actions).
+  function rangedness(pm) {
+    if (!pm || !Array.isArray(pm.actions) || !pm.actions.length) return 0;
+    let ranged = 0, both = 0;
+    for (const a of pm.actions) {
+      if (a.actionRange === 'ranged') ranged++;
+      else if (a.actionRange === 'both') both++;
+    }
+    return (ranged + 0.5 * both) / pm.actions.length;
+  }
+
+  // Bucket a rangedness score into a position label.
+  // Thresholds match the spec: < 0.3 frontline, 0.3..0.7 midline, > 0.7 backline.
+  function bucket(score) {
+    if (!Number.isFinite(score)) return 'frontline';
+    if (score < 0.3) return 'frontline';
+    if (score > 0.7) return 'backline';
+    return 'midline';
+  }
+
+  // Active position: explicit override wins over derived bucket.
+  function position(pm) {
+    if (pm && pm.positionOverride) return pm.positionOverride;
+    return bucket(rangedness(pm));
+  }
+
+  // ─────────── Role inference ───────────
+  // Median HP per CR — sourced from the 2024 DMG monster table. Fractional
+  // CRs covered for low-tier creatures. Lookups beyond CR 20 cap at CR 20.
+  const CR_HP_MEDIAN = {
+    0:    2,    0.125: 7,   0.25: 13,   0.5: 22,
+    1:    33,   2:    52,   3:   78,    4:   97,
+    5:    115,  6:   135,   7:  152,    8:  168,
+    9:    188,  10:  205,   11: 222,    12: 240,
+    13:   258,  14:  275,   15: 292,    16: 310,
+    17:   327,  18:  345,   19: 362,    20: 380,
+  };
+  function crHpMedian(cr) {
+    const c = +cr;
+    if (!Number.isFinite(c)) return CR_HP_MEDIAN[1];
+    if (CR_HP_MEDIAN[c] != null) return CR_HP_MEDIAN[c];
+    // Find nearest defined CR.
+    const keys = Object.keys(CR_HP_MEDIAN).map(Number);
+    let best = keys[0];
+    for (const k of keys) {
+      if (Math.abs(k - c) < Math.abs(best - c)) best = k;
+    }
+    return CR_HP_MEDIAN[best];
+  }
+
+  const CONTROL_CONDITIONS = ['stunned','paralyzed','restrained','frightened','charmed'];
+
+  function inferRole(monster) {
+    const acts = (monster && monster.parsedActions) || [];
+    if (!acts.length) return 'soldier';
+
+    const hasHeal     = acts.some(a => a.kind === 'heal');
+    const attackActs  = acts.filter(a => a.kind === 'attack');
+    const allRanged   = attackActs.length > 0 && attackActs.every(a => actionIsRanged(a));
+    const hasControl  = acts.some(a => a.kind === 'save' && a.condition &&
+                                       CONTROL_CONDITIONS.includes(a.condition));
+    const hasMulti    = acts.some(a => a.kind === 'multiattack');
+    const highHp      = monster.hp >= crHpMedian(monster.cr) * 1.3;
+    const hasFinisher = acts.some(a => a.usesPerDay === 1 && a.kind !== 'heal');
+
+    if (hasHeal)                            return 'leader';
+    if (allRanged)                          return 'artillery';
+    if (hasControl)                         return 'controller';
+    if (highHp && hasMulti)                 return 'brute';
+    if (hasFinisher && acts.length <= 3)    return 'ambusher';
+    return 'soldier';
+  }
+
+  // ─────────── Role resolution (override > fmRole > inferred > soldier) ───────────
+  const KNOWN_ROLES = ['ambusher','artillery','brute','controller','leader',
+                       'skirmisher','soldier','solo','minion'];
+
+  function normalizeRole(s) {
+    if (!s) return null;
+    const k = String(s).toLowerCase().trim();
+    return KNOWN_ROLES.includes(k) ? k : null;
+  }
+
+  function resolveRole(monster) {
+    if (!monster) return 'soldier';
+    const ov  = normalizeRole(monster.roleOverride);
+    if (ov)  return ov;
+    const fm  = normalizeRole(monster.fmRole);
+    if (fm)  return fm;
+    if (monster.inferredRole) return monster.inferredRole;
+    monster.inferredRole = inferRole(monster);
+    return monster.inferredRole;
+  }
+
+  // ─────────── Role policies ───────────
+  // Return the actor's available actions (own parsedActions).
+  // Monster-side here; PC-side keeps its own dispatch path.
+  function availableMonsterActions(me) {
+    const list = (me.monster && me.monster.parsedActions) || [];
+    return list.filter(a => isAvailable(me, a));
+  }
+
+  // ── Soldier ──
+  function pickTargetSoldier(me, all, ctx) {
+    return lowestPick(aliveEnemies(me, all), c => c.hp, c => c.ac, ctx.rng);
+  }
+  function pickActionSoldier(me, target, ctx) {
+    const actions = availableMonsterActions(me);
+    tagActions(actions);
+    // Multiattack first.
+    const ma = actions.find(a => a.kind === 'multiattack');
+    if (ma) { ma._ownerActions = actions; return ma; }
+    // Limited-resource (usesPerDay/recharge) before at-will, scored by EV.
+    const limited = bestEvAction(actions, target, ctx,
+                                 a => (a.usesPerDay != null || a.recharge) &&
+                                      ['attack','save'].includes(a.kind));
+    if (limited) return limited;
+    // At-will.
+    return bestEvAction(actions, target, ctx,
+                        a => ['attack','save'].includes(a.kind));
+  }
+
+  // ── Brute ──
+  function pickTargetBrute(me, all, ctx) {
+    const candidates = targetsInBucket(all, me, 'frontline', ['midline', 'backline']);
+    return lowestPick(candidates, c => c.ac, c => c.hp, ctx.rng);
+  }
+  function pickActionBrute(me, target, ctx) {
+    const actions = availableMonsterActions(me);
+    tagActions(actions);
+    // Multiattack wins if available — Brutes love to multiattack.
+    const ma = actions.find(a => a.kind === 'multiattack');
+    if (ma) { ma._ownerActions = actions; return ma; }
+    const melee = bestEvAction(actions, target, ctx,
+                               a => a._isMelee && ['attack','save'].includes(a.kind));
+    if (melee) return melee;
+    return bestEvAction(actions, target, ctx,
+                        a => ['attack','save'].includes(a.kind));
+  }
+
+  // ── Minion ──
+  function pickTargetMinion(me, all, ctx) {
+    const candidates = targetsInBucket(all, me, 'frontline', ['midline', 'backline']);
+    return candidates[0] || null;
+  }
+  function pickActionMinion(me, target, ctx) {
+    const actions = availableMonsterActions(me);
+    // First available at-will attack/save — no DPR thinking.
+    return actions.find(a => ['attack','save'].includes(a.kind) &&
+                             a.usesPerDay == null && !a.recharge) ||
+           actions.find(a => ['attack','save'].includes(a.kind)) || null;
+  }
+
+  // ── Artillery ──
+  function pickTargetArtillery(me, all, ctx) {
+    const candidates = targetsInBucket(all, me, 'backline', ['midline', 'frontline']);
+    return lowestPick(candidates, c => c.hp, c => c.ac, ctx.rng);
+  }
+  function pickActionArtillery(me, target, ctx) {
+    const actions = availableMonsterActions(me);
+    tagActions(actions);
+    const ma = actions.find(a => a.kind === 'multiattack');
+    if (ma) { ma._ownerActions = actions; return ma; }
+    const ranged = bestEvAction(actions, target, ctx,
+                                a => a._isRanged && ['attack','save'].includes(a.kind));
+    if (ranged) return ranged;
+    return bestEvAction(actions, target, ctx,
+                        a => ['attack','save'].includes(a.kind));
+  }
+
+  // ── Skirmisher ──
+  function pickTargetSkirmisher(me, all, ctx) {
+    const enemies = aliveEnemies(me, all);
+    const actions = availableMonsterActions(me);
+    const hasRanged = actions.some(a => actionIsRanged(a));
+    if (hasRanged && enemies.length) {
+      // Pick exposed squishies: highest rangedness, then lowest HP.
+      const sorted = enemies.slice().sort((a, b) => {
+        const ra = a.side === 'pc' && a.pm ? rangedness(a.pm) : 0;
+        const rb = b.side === 'pc' && b.pm ? rangedness(b.pm) : 0;
+        if (rb !== ra) return rb - ra;
+        return a.hp - b.hp;
+      });
+      return sorted[0];
+    }
+    return lowestPick(enemies, c => c.hp, c => c.ac, ctx.rng);
+  }
+  function pickActionSkirmisher(me, target, ctx) {
+    const actions = availableMonsterActions(me);
+    tagActions(actions);
+    const ranged = bestEvAction(actions, target, ctx,
+                                a => a._isRanged && a.kind === 'attack');
+    if (ranged) return ranged;
+    // No ranged attack available — fall back. Hand multiattack the
+    // _ownerActions ref before scoring so its EV reflects sub-attack output.
+    const ma = actions.find(a => a.kind === 'multiattack');
+    if (ma) ma._ownerActions = actions;
+    return bestEvAction(actions, target, ctx,
+                        a => ['attack','save','multiattack'].includes(a.kind));
+  }
+
+  // ── Ambusher ──
+  function pickTargetAmbusher(me, all, ctx) {
+    return lowestPick(aliveEnemies(me, all), c => c.hp, c => c.ac, ctx.rng);
+  }
+  function pickActionAmbusher(me, target, ctx) {
+    const actions = availableMonsterActions(me);
+    tagActions(actions);
+    // Round 1: prefer (1/Day) finishers if any available.
+    if (ctx.round === 1) {
+      const finisher = bestEvAction(actions, target, ctx,
+                                    a => a.usesPerDay === 1 &&
+                                         a.kind !== 'heal' &&
+                                         a.kind !== 'utility');
+      if (finisher) return finisher;
+    }
+    // Set _ownerActions on multiattack so its EV is scored against sub-attacks.
+    const ma = actions.find(a => a.kind === 'multiattack');
+    if (ma) ma._ownerActions = actions;
+    return bestEvAction(actions, target, ctx,
+                        a => ['attack','save','multiattack'].includes(a.kind));
+  }
+
+  // ── Controller ──
+  function pickTargetController(me, all, ctx) {
+    const enemies = aliveEnemies(me, all);
+    if (!enemies.length) return null;
+    const actions = availableMonsterActions(me);
+    const aoeSave = actions.find(a => a.kind === 'save' && (a.aoeTargets || 0) >= 2);
+    if (aoeSave && enemies.length >= 2) return enemies;   // resolver handles multi-target
+    // Single-target save: pick the weakest save bonus vs that ability.
+    const bestSave = actions.find(a => a.kind === 'save');
+    if (bestSave) {
+      let lowest = enemies[0];
+      let lowestBonus = targetSaveBonus(lowest, bestSave.saveAbility);
+      for (const e of enemies) {
+        const b = targetSaveBonus(e, bestSave.saveAbility);
+        if (b < lowestBonus) { lowest = e; lowestBonus = b; }
+      }
+      return lowest;
+    }
+    return lowestPick(enemies, c => c.hp, c => c.ac, ctx.rng);
+  }
+  function pickActionController(me, target, ctx) {
+    const actions = availableMonsterActions(me);
+    tagActions(actions);
+    const scoreTarget = Array.isArray(target) ? target[0] : target;
+    const lockdown = bestEvAction(actions, scoreTarget, ctx,
+                                  a => a.kind === 'save' && a.condition);
+    if (lockdown) return lockdown;
+    const saveDmg  = bestEvAction(actions, scoreTarget, ctx,
+                                  a => a.kind === 'save');
+    if (saveDmg) return saveDmg;
+    const ma = actions.find(a => a.kind === 'multiattack');
+    if (ma) { ma._ownerActions = actions; return ma; }
+    return bestEvAction(actions, scoreTarget, ctx,
+                        a => a.kind === 'attack');
+  }
+
+  // ── Leader ──
+  // Note: healTriage already ran and returned null (no ally to heal).
+  function pickTargetLeader(me, all, ctx) {
+    return lowestPick(aliveEnemies(me, all), c => c.hp, c => c.ac, ctx.rng);
+  }
+  function pickActionLeader(me, target, ctx) {
+    const actions = availableMonsterActions(me);
+    tagActions(actions);
+    const saveEffect = bestEvAction(actions, target, ctx, a => a.kind === 'save');
+    if (saveEffect) return saveEffect;
+    const ma = actions.find(a => a.kind === 'multiattack');
+    if (ma) { ma._ownerActions = actions; return ma; }
+    return bestEvAction(actions, target, ctx, a => a.kind === 'attack');
+  }
+
+  // ── Solo ──
+  function pickTargetSolo(me, all, ctx) {
+    return lowestPick(aliveEnemies(me, all), c => c.hp, c => c.ac, ctx.rng);
+  }
+  function pickActionSolo(me, target, ctx) {
+    const actions = availableMonsterActions(me);
+    tagActions(actions);
+    const ma = actions.find(a => a.kind === 'multiattack');
+    if (ma) { ma._ownerActions = actions; return ma; }
+    // Conservation: in rounds 1-2 with no ally downed, skip (1/Day) actions.
+    const allyDowned = ctx.all
+      ? ctx.all.some(c => c && c.side === me.side && c !== me && c.downed)
+      : false;
+    const conserve = ctx.round < 3 && !allyDowned;
+    const filter = conserve
+      ? (a => a.usesPerDay !== 1 && ['attack','save'].includes(a.kind))
+      : (a => ['attack','save'].includes(a.kind));
+    const choice = bestEvAction(actions, target, ctx, filter);
+    if (choice) return choice;
+    // Conservation drained the candidate pool — fall back to any available action.
+    return bestEvAction(actions, target, ctx,
+                        a => ['attack','save'].includes(a.kind));
+  }
+
+  const ROLE_POLICIES = {
+    soldier:    { pickTarget: pickTargetSoldier,    pickAction: pickActionSoldier },
+    brute:      { pickTarget: pickTargetBrute,      pickAction: pickActionBrute },
+    minion:     { pickTarget: pickTargetMinion,     pickAction: pickActionMinion },
+    artillery:  { pickTarget: pickTargetArtillery,  pickAction: pickActionArtillery },
+    skirmisher: { pickTarget: pickTargetSkirmisher, pickAction: pickActionSkirmisher },
+    ambusher:   { pickTarget: pickTargetAmbusher,   pickAction: pickActionAmbusher },
+    controller: { pickTarget: pickTargetController, pickAction: pickActionController },
+    leader:     { pickTarget: pickTargetLeader,     pickAction: pickActionLeader },
+    solo:       { pickTarget: pickTargetSolo,       pickAction: pickActionSolo },
+  };
+
   // ─────────── Combatant materialization ───────────
   // Turns the PartyMember + monster-pick lists into a flat combatants[].
   // PCs are one-per-PartyMember; monsters expand to N independent copies.
@@ -596,15 +1032,35 @@
           tally(c.side, heal.action.sourceActionName || heal.action.name,
                 'heal', false, 0, r.totalHealed, 0, r.revives);
         } else {
-          const action = pickAction(c);
-          if (!action) continue;
+          let action = null;
+          let targets = null;
+          if (c.side === 'monster') {
+            const role = resolveRole(c.monster);
+            const policy = ROLE_POLICIES[role] || ROLE_POLICIES.soldier;
+            const policyCtx = {
+              round, rng, tactics,
+              livingEnemyCount: aliveEnemies(c, all).length,
+              all,
+            };
+            const tgt = policy.pickTarget(c, all, policyCtx);
+            if (!tgt) continue;
+            targets = Array.isArray(tgt) ? tgt : [tgt];
+            action = policy.pickAction(c, targets[0], policyCtx);
+            if (!action) continue;
+          } else {
+            // PC branch — unchanged from v1.
+            action = pickAction(c);
+            if (!action) continue;
+          }
           if (action.kind === 'multiattack') {
             consumeUse(c, action);
             const r = resolveMultiattack(c, all, action, tactics, rng, events, round);
             tally(c.side, action.sourceActionName, 'multi', false, 0, 0, 0, 0);
             warnings.push(...(r.warnings || []));
           } else if (action.kind === 'attack') {
-            const tgt = pickEnemyTarget(c, all, tactics, rng);
+            const tgt = (c.side === 'monster' && targets && targets[0])
+                          ? targets[0]
+                          : pickEnemyTarget(c, all, tactics, rng);
             if (!tgt) continue;
             consumeUse(c, action);
             const r = c.side === 'pc'
@@ -622,14 +1078,17 @@
             tally(c.side, action.sourceActionName || action.name, 'attack',
                   r.hit, totalDmgThisAttack, 0, killed ? 1 : 0, 0);
           } else if (action.kind === 'save') {
-            // For AoE, pick `aoeTargets` lowest-HP enemies.
-            const enemies = aliveEnemies(c, all)
-              .sort((a, b) => a.hp - b.hp);
-            const n = Math.max(1, action.aoeTargets || 1);
-            const targets = enemies.slice(0, n);
-            if (!targets.length) continue;
+            let saveTargets;
+            if (c.side === 'monster' && targets && targets.length) {
+              saveTargets = targets;
+            } else {
+              const enemies = aliveEnemies(c, all).sort((a, b) => a.hp - b.hp);
+              const n = Math.max(1, action.aoeTargets || 1);
+              saveTargets = enemies.slice(0, n);
+            }
+            if (!saveTargets.length) continue;
             consumeUse(c, action);
-            const r = resolveSave(c, targets, action, rng, events, round);
+            const r = resolveSave(c, saveTargets, action, rng, events, round);
             tally(c.side, action.sourceActionName || action.name, 'save',
                   false, r.totalDmg, 0, 0, 0);
           } else if (action.kind === 'heal') {
@@ -821,6 +1280,12 @@
     resolveSave, resolveHeal,
     applyDamage, resolveMultiattack, pickAction,
     runTrial, runSim,
+    // Role-policy helpers
+    clamp01, sumDice, actionIsMelee, actionIsRanged, targetSaveBonus, actionEv,
+    tagActions, bestEvAction, lowestPick, targetsInBucket,
+    rangedness, bucket, position, positionOf,
+    crHpMedian, inferRole, resolveRole, normalizeRole,
+    ROLE_POLICIES,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Crucible;
