@@ -431,10 +431,33 @@ export default {
         return json(value);
       }
 
-      // Initiative state — readable by everyone (players need it to see turn order)
+      // Initiative state — filtered per viewer (see initiative-notes.js).
+      //   DM creds (X-DM-* headers)            → full unfiltered state
+      //   Player creds (?characterId=…&code=…) → hidden combatants dropped,
+      //                                          DM `notes` string stripped,
+      //                                          playerNotes = own private + party
+      //   No creds                             → same as player, but party-only notes
       if (type === 'initiative_state') {
         const value = await kvGet(env, type, {});
-        return json(value);
+        // Try DM first
+        const dmAuth = await verifyDMAuth(request, env);
+        if (dmAuth.ok) {
+          return json(INITIATIVE_NOTES.filterInitiativeState(value, { role: 'dm' }));
+        }
+        // Try player query creds (?characterId=…&code=…)
+        const qCharacterId = url.searchParams.get('characterId') || '';
+        const qCode        = url.searchParams.get('code') || '';
+        if (qCharacterId || qCode) {
+          if (!qCharacterId || !qCode) return json({ error: 'characterId and code required' }, 400);
+          const chars = await kvGet(env, 'characters', []);
+          const me = chars.find(c => c.id === qCharacterId);
+          if (!me || me.code !== qCode) return json({ error: 'invalid character or code' }, 401);
+          return json(INITIATIVE_NOTES.filterInitiativeState(value, {
+            role: 'player', characterId: me.id
+          }));
+        }
+        // Anonymous
+        return json(INITIATIVE_NOTES.filterInitiativeState(value, null));
       }
 
       // Anonymous map view — server-side filter strips visibleTo-gated items
