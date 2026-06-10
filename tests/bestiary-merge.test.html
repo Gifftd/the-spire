@@ -129,6 +129,92 @@ test('mergeBestiaries: override matches imported → overlaid', () => {
   assertEq(r[0].parsedActions[0].toHit, 99);   // override parsedActions wins
   assertEq(r[0]._overriddenAt, '2026-06-10T12:00:00Z');
 });
+
+// ─────── Task 3: edge cases ───────
+test('mergeBestiaries: orphan override → appended with _orphanOverride flag', () => {
+  const imp = [
+    { name:'Goblin', source:'mm-2024', hp:7, ac:15 },
+  ];
+  const cust = [
+    { name:'Doesnotexist', _source:'mm-2024',
+      roleOverride:'brute',
+      overriddenAt:'2026-06-10T12:00:00Z' },
+  ];
+  const r = BestiaryMerge.mergeBestiaries(imp, cust);
+  assertEq(r.length, 2);                                // goblin + orphan
+  const orphan = r.find(x => x.name === 'Doesnotexist');
+  assertEq(orphan._orphanOverride, true);
+  assertEq(orphan._custom, true);
+  assertEq(orphan.roleOverride, 'brute');
+});
+test('mergeBestiaries: partial override (roleOverride only) → other fields fall through', () => {
+  const imp = [
+    { name:'Owlbear', source:'mm-2024', hp:59, ac:13,
+      parsedActions:[ { sourceActionName:'Beak', toHit:6 } ],
+      regeneration:{ amount:5, suppressedBy:[], minHpToRegen:1 } },
+  ];
+  const cust = [
+    { name:'Owlbear', _source:'mm-2024',
+      roleOverride:'brute',
+      // no parsedActions, no regeneration
+      overriddenAt:'2026-06-10T12:00:00Z' },
+  ];
+  const r = BestiaryMerge.mergeBestiaries(imp, cust);
+  assertEq(r[0].roleOverride, 'brute');                          // applied
+  assertEq(r[0].parsedActions[0].toHit, 6);                       // base survives
+  assertEq(r[0].regeneration.amount, 5);                          // base survives
+});
+test('mergeBestiaries: explicit null override field → base survives', () => {
+  const imp = [
+    { name:'Owlbear', source:'mm-2024', hp:59,
+      parsedActions:[ { sourceActionName:'Beak', toHit:6 } ] },
+  ];
+  const cust = [
+    { name:'Owlbear', _source:'mm-2024',
+      parsedActions: null,                                          // explicit null
+      roleOverride: 'brute',
+      overriddenAt:'2026-06-10T12:00:00Z' },
+  ];
+  const r = BestiaryMerge.mergeBestiaries(imp, cust);
+  assertEq(r[0].roleOverride, 'brute');                            // applied
+  assertEq(r[0].parsedActions[0].toHit, 6);                        // base survives — null didn't clobber
+});
+test('mergeBestiaries: same name across sources → distinct entries, no cross-leak', () => {
+  const imp = [
+    { name:'Goblin', source:'mm-2024', hp:7, ac:15 },
+    { name:'Goblin', source:'fm-v1',   hp:9, ac:14 },
+  ];
+  const cust = [
+    { name:'Goblin', _source:'mm-2024',
+      roleOverride:'brute',
+      overriddenAt:'2026-06-10T12:00:00Z' },
+  ];
+  const r = BestiaryMerge.mergeBestiaries(imp, cust);
+  assertEq(r.length, 2);
+  const mm = r.find(x => x._source === 'mm-2024');
+  const fm = r.find(x => x._source === 'fm-v1');
+  assertEq(mm.roleOverride, 'brute');                              // override hit MM
+  assertTrue(!fm.roleOverride, 'FM Goblin should NOT have brute override');
+});
+test('mergeBestiaries: mixed everything — record counts add up', () => {
+  const imp = Array.from({length:10}, (_, i) => ({
+    name:'M'+i, source:'mm-2024', hp:10+i, ac:13 }));
+  const homebrew = Array.from({length:3}, (_, i) => ({
+    name:'H'+i, _source:'custom', hp:20, ac:15, actions:[] }));
+  const overrides = [0,1,2,3].map(i => ({
+    name:'M'+i, _source:'mm-2024',
+    roleOverride:'brute',
+    overriddenAt:'2026-06-10T12:00:00Z' }));
+  const orphan = { name:'Ghost', _source:'mm-2024',
+                   roleOverride:'brute',
+                   overriddenAt:'2026-06-10T12:00:00Z' };
+  const r = BestiaryMerge.mergeBestiaries(imp, [...overrides, ...homebrew, orphan]);
+  assertEq(r.length, 10 + 1 + 3);                                  // imported + 1 orphan + 3 homebrew
+  const overridden = r.filter(x => x._overriddenAt);
+  assertEq(overridden.length, 4);
+  const orphans = r.filter(x => x._orphanOverride);
+  assertEq(orphans.length, 1);
+});
 </script>
 </body>
 </html>

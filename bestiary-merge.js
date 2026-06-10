@@ -39,7 +39,8 @@
   // - Override records (overriddenAt set) overlay their imported base by
   //   name+source. Non-null override fields win; nulls/undefined fall through.
   // - Homebrew records (no overriddenAt) pass through tagged `_custom:true`.
-  // - Orphan overrides (no matching imported base) are appended in Task 3.
+  // - Orphan overrides (no matching imported base) are appended tagged
+  //   `_orphanOverride:true` so the DM can spot/clean them in the picker.
   function mergeBestiaries(imported, custom) {
     const importedArr = arrayOf(imported);
     const customArr   = arrayOf(custom);
@@ -57,11 +58,13 @@
 
     // Walk imported, overlaying overrides where the key matches.
     const out = [];
+    const matchedKeys = new Set();
     for (const m of importedArr) {
       const key = recordKey(m);
       const ov  = overrideIdx.get(key);
       const merged = { ...m, _source: m._source || m.source || '' };
       if (ov) {
+        matchedKeys.add(key);
         for (const field of OVERRIDE_FIELDS) {
           if (ov[field] !== undefined && ov[field] !== null) merged[field] = ov[field];
         }
@@ -70,7 +73,20 @@
       out.push(merged);
     }
 
-    // Homebrew appended last. Orphan overrides handled in Task 3.
+    // Orphan overrides: any override record that didn't match an imported base.
+    // Keep them visible so the DM can spot/clean them in the picker.
+    for (const [key, ov] of overrideIdx) {
+      if (!matchedKeys.has(key)) {
+        out.push({
+          ...ov,
+          _source: ov._source || ov.source || '',
+          _custom: true,
+          _orphanOverride: true,
+        });
+      }
+    }
+
+    // Homebrew last.
     out.push(...homebrew);
     return out;
   }
