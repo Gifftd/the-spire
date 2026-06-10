@@ -114,11 +114,60 @@ the same, only the filter changes.
 
 ### 4.4 Concurrency
 
-Notes live in the same KV key the DM updates for HP/conditions/init. Last-write
-wins. The worker does a tight read-modify-write server-side (~10ms window), so
-the realistic collision rate at table scale (4–5 players, occasional posts) is
-negligible. Accepted risk, documented here. If it ever becomes a real problem,
-the migration path is a separate `initiative_notes` KV key.
+Notes live in the same KV key the DM continuously rewrites for HP, conditions,
+and initiative. KV has no compare-and-swap, so naïve read-modify-write is racy.
+Two distinct races exist; the spec mitigates one and accepts the other.
+
+**Race A — Player vs. Player on the same combatant.** Two players POST notes
+within ~100ms of each other. Both worker invocations read the same state, each
+appends locally, each writes back; the later write silently overwrites the
+earlier. **Mitigation: none — accepted risk.** At realistic table scale (4–5
+players, ~25 notes/combat) collision odds are low and the contention window is
+narrow. If this ever becomes a real problem, the migration path is a dedicated
+`initiative_notes` KV key (no DM contention, only player writers, the
+rate-vs-window math stays favorable). Not worth doing pre-emptively.
+
+**Race B — Player vs. DM (the dominant risk if unmitigated).** The DM tracker
+POSTs the full `initiative_state` blob on every HP tick, condition toggle, init
+change, etc. The DM's local state has no knowledge of `playerNotes`. Without
+mitigation: if a player posts a note and then the DM clicks anything before
+refreshing, the DM's POST silently wipes the note. The DM tracker does not
+poll the server, so this would be the default behavior in active combat, not a
+rare race. **Mitigation: server-side notes-preservation merge on the DM
+`initiative_state` POST handler** (see §4.5).
+
+### 4.5 Notes-preservation merge on DM writes
+
+The existing handler for POST `initiative_state` (under `DM_WRITE_TYPES`) gets
+a read-merge-write step. Because the DM tracker never authors or edits
+`playerNotes`, KV is authoritative for that field. The worker copies notes
+forward from the existing KV value into the incoming DM blob before writing:
+
+```
+on POST initiative_state (DM auth):
+  const prev = await kvGet('initiative_state', { combatants: [] })
+  const prevNotesById = new Map(
+    (prev.combatants || []).map(c => [c.id, c.playerNotes || []])
+  )
+  for (const c of (body.combatants || [])) {
+    if (prevNotesById.has(c.id)) c.playerNotes = prevNotesById.get(c.id)
+    // else: new combatant — leave whatever the DM sent (typically [] or absent)
+  }
+  await kvPut('initiative_state', body)
+```
+
+Semantics:
+- Combatants the DM removed don't appear in `body.combatants` → their notes are
+  dropped (correct: the combatant is gone).
+- New combatants the DM adds inherit no prior notes → start with `[]`.
+- The DM cannot accidentally wipe notes by editing HP, conditions, init, etc.
+- Combat resets (DM clears state, `mode: 'lobby'` with empty combatants) drop
+  all notes — also correct, that's the combat-scoped lifetime.
+
+The race window between an `initiative_note` POST and a DM `initiative_state`
+POST still exists (~10ms), but the worst case is now a single near-simultaneous
+collision rather than every note being at risk during every DM click. That
+collapses into Race A's profile and is acceptable.
 
 ## 5. Player UI (`initiative-player.html`)
 
@@ -243,7 +292,8 @@ below the existing "Secret notes" textarea:
 | Body > 500 chars | Client: Save button disabled, counter red. Server: 400 as defense in depth. |
 | Per-character cap (50 notes) reached | Worker → 400 with specific error. UI shows "Note limit reached for this encounter." |
 | Combat reset (DM clears, mode → lobby) | All notes vanish with the encounter. Player view shows lobby screen as today. Working as designed. |
-| Player posts during DM HP edit | Last-write-wins. Accepted risk per §4.4. |
+| Player posts during DM HP edit | Mitigated by the notes-preservation merge in §4.5 — the DM's `initiative_state` POST handler reads existing notes from KV and merges them into the incoming blob, so DM HP/condition writes can no longer clobber notes. The ~10ms in-handler race window remains; collapses to the Race A profile in §4.4. |
+| Two players post on the same combatant within ~100ms | Last-write-wins (Race A in §4.4). The later writer's note survives; the earlier one is silently dropped. **Accepted residual risk.** Failure is silent — there is no client-side detection or retry for this case. If this becomes a real problem at the table, the documented mitigation path is moving notes to a dedicated `initiative_notes` KV key. |
 | Hidden enemies | Per §4.3, `filterInitiativeState` drops hidden combatants from non-DM payloads. Notes attached to them are therefore also never sent. (This is new behavior — today hidden enemies leak; see §4.3.) |
 | Author character deleted after writing note | `authorName` is denormalized in the note; the note still displays correctly with the original name. |
 | XSS via note body | All bodies rendered via `textContent`. No HTML in notes. |
@@ -266,7 +316,7 @@ The following are deliberately deferred:
 
 | File | Change |
 |---|---|
-| `cloudflare-worker.js` | New `verifyCharacterAuth`; new `PLAYER_WRITE_TYPES` list; handlers for `initiative_note` + `initiative_note_delete`; new `filterInitiativeState`; rewrite GET `initiative_state` to use it. **Requires manual redeploy.** |
+| `cloudflare-worker.js` | New `verifyCharacterAuth`; new `PLAYER_WRITE_TYPES` list; handlers for `initiative_note` + `initiative_note_delete`; new `filterInitiativeState`; rewrite GET `initiative_state` to use it; **add notes-preservation merge step to the existing DM `initiative_state` POST handler** (§4.5). **Requires manual redeploy.** |
 | `initiative-player.html` | Wire up `Auth` module use; render preview line on collapsed rows; render expanded notes panel with add/delete; login banner for anonymous; optimistic update + retry logic. Bulk of the UI work lives here. |
 | `initiative-dm.html` | Add read-only "Player notes" section to existing combatant-card expanded panel. Small change in a large file — keep it localized. |
 | `CHANGELOG.md` | New entry under Unreleased. Per repo conventions. |
