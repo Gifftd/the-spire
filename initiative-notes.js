@@ -90,6 +90,25 @@
     return out;
   }
 
+  // ─── validateNote(input) ───────────────────────────────────────────
+  // Validates a candidate note's body + visibility. Returns
+  // { ok: true } or { ok: false, error: '<reason>' }. Pure.
+  function validateNote(input) {
+    if (!input || typeof input !== 'object') {
+      return { ok: false, error: 'note must be an object' };
+    }
+    const body = typeof input.body === 'string' ? input.body : '';
+    const trimmed = body.trim();
+    if (!trimmed) return { ok: false, error: 'body is required' };
+    if (body.length > MAX_NOTE_LENGTH) {
+      return { ok: false, error: 'body too long (max ' + MAX_NOTE_LENGTH + ' chars)' };
+    }
+    if (!VISIBILITIES.includes(input.visibility)) {
+      return { ok: false, error: 'visibility must be private or party' };
+    }
+    return { ok: true };
+  }
+
   // Public exports populated by Tasks 2–5.
   const InitiativeNotes = {
     MAX_NOTE_LENGTH,
@@ -97,7 +116,7 @@
     VISIBILITIES,
     filterInitiativeState,
     mergeDMWritePreservingNotes,
-    // validateNote                 — Task 4
+    validateNote,
     // canDeleteNote                — Task 5
   };
 

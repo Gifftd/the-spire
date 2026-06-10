@@ -279,5 +279,55 @@ test('merge: does not mutate inputs', () => {
 });
 </script>
 
+<script>
+// ─────── validateNote ───────
+
+test('validate: accepts a normal note', () => {
+  const r = InitiativeNotes.validateNote({ body: 'Resistant to fire', visibility: 'party' });
+  assertEq(r, { ok: true });
+});
+
+test('validate: rejects empty body', () => {
+  const r = InitiativeNotes.validateNote({ body: '', visibility: 'party' });
+  assertEq(r.ok, false);
+  assertTrue(/empty|required/i.test(r.error), 'mentions empty/required');
+});
+
+test('validate: rejects whitespace-only body', () => {
+  const r = InitiativeNotes.validateNote({ body: '   \n  ', visibility: 'party' });
+  assertEq(r.ok, false);
+});
+
+test('validate: rejects body > MAX_NOTE_LENGTH chars', () => {
+  const tooLong = 'x'.repeat(InitiativeNotes.MAX_NOTE_LENGTH + 1);
+  const r = InitiativeNotes.validateNote({ body: tooLong, visibility: 'party' });
+  assertEq(r.ok, false);
+  assertTrue(/long|length|500/i.test(r.error));
+});
+
+test('validate: accepts body == MAX_NOTE_LENGTH chars', () => {
+  const exact = 'x'.repeat(InitiativeNotes.MAX_NOTE_LENGTH);
+  const r = InitiativeNotes.validateNote({ body: exact, visibility: 'party' });
+  assertEq(r.ok, true);
+});
+
+test('validate: rejects invalid visibility', () => {
+  const r = InitiativeNotes.validateNote({ body: 'ok', visibility: 'secret' });
+  assertEq(r.ok, false);
+  assertTrue(/visibility/i.test(r.error));
+});
+
+test('validate: accepts both legal visibilities', () => {
+  assertEq(InitiativeNotes.validateNote({ body:'a', visibility:'private' }).ok, true);
+  assertEq(InitiativeNotes.validateNote({ body:'a', visibility:'party'   }).ok, true);
+});
+
+test('validate: rejects missing/null/non-object input', () => {
+  assertEq(InitiativeNotes.validateNote(null).ok, false);
+  assertEq(InitiativeNotes.validateNote(undefined).ok, false);
+  assertEq(InitiativeNotes.validateNote('a string').ok, false);
+});
+</script>
+
 </body>
 </html>
