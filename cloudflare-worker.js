@@ -730,6 +730,44 @@ export default {
       return json({ ok: true, note });
     }
 
+    // ── Delete a note on a combatant ────────────────────────────────
+    // Auth: player creds (body.characterId + body.code) OR DM headers.
+    // Only the note's author can delete their own; DM can delete any.
+    if (body?.type === 'initiative_note_delete') {
+      // Determine viewer (player vs DM). Try player creds first.
+      let viewer = null;
+      if (body.characterId && body.code) {
+        const a = await verifyCharacterAuth(body, env);
+        if (!a.ok) return json({ error: a.error }, 401);
+        viewer = { role: 'player', characterId: a.character.id };
+      } else {
+        const dm = await verifyDMAuth(request, env);
+        if (!dm.ok) return json({ error: 'player or DM auth required' }, 401);
+        viewer = { role: 'dm' };
+      }
+
+      const combatantId = (body.combatantId || '').toString();
+      const noteId      = (body.noteId      || '').toString();
+      if (!combatantId || !noteId) return json({ error: 'combatantId and noteId required' }, 400);
+
+      const state = await kvGet(env, 'initiative_state', { combatants: [] });
+      const combatants = Array.isArray(state.combatants) ? state.combatants : [];
+      const idx = combatants.findIndex(c => c && c.id === combatantId);
+      if (idx < 0) return json({ error: 'combatant not found' }, 404);
+
+      const existing = Array.isArray(combatants[idx].playerNotes) ? combatants[idx].playerNotes : [];
+      const note = existing.find(n => n && n.id === noteId);
+      if (!note) return json({ error: 'note not found' }, 404);
+      if (!INITIATIVE_NOTES.canDeleteNote(note, viewer)) {
+        return json({ error: 'not allowed to delete that note' }, 403);
+      }
+
+      combatants[idx].playerNotes = existing.filter(n => n && n.id !== noteId);
+      state.combatants = combatants;
+      await kvPut(env, 'initiative_state', state);
+      return json({ ok: true });
+    }
+
     // ── Brew a potion (player or DM) ──────────────────────────
     // Auth: player (characterId + code) OR DM headers (test-brew, no consume).
     // Resolution + ingredient consumption happen server-side so the potion
