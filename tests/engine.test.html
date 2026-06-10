@@ -1423,6 +1423,45 @@ test('Scenario 9: v1 spec scenario 2 still passes (backward compat)', async () =
   assertBetween(r.headline.winRate, 0.5, 0.95,
     'v1 standard-band scenario must still land in [0.5, 0.95] post-upgrade');
 });
+
+test('Scenario 10: Brute multiattack honors frontline preference (regression)', async () => {
+  // Owlbear-style Brute with multiattack. Both sub-attacks should stay on
+  // the frontline; the backline wizards must NOT take the majority of damage
+  // even though they have the lowest HP.
+  const party = [
+    makePcMelee (5, 38, 18, 'Tank'),       // frontline, AC 18
+    makePcMelee (5, 36, 17, 'Fighter'),    // frontline, AC 17
+    makePcMelee (5, 34, 16, 'Ranger'),     // frontline, AC 16
+    makePcRanged(5, 10, 12, 'Wizard'),     // backline, AC 12, low HP — the bait
+    makePcRanged(5, 10, 13, 'Sorcerer'),   // backline, AC 13, low HP — the bait
+  ];
+  // Owlbear-shape Brute with a multiattack of Beak + Claws.
+  const owlbear = {
+    name: 'Owlbear', cr: 3, hp: 59, ac: 13, initiative: 1,
+    isMinion: false, isSolo: false, fmRole: 'brute',
+    parsedActions: [
+      { sourceActionName:'Multiattack', kind:'multiattack',
+        multiattackPlan:[{ actionName:'Beak', count:1 },
+                         { actionName:'Claws', count:1 }],
+        recharge:null, usesPerDay:null },
+      { sourceActionName:'Beak', kind:'attack', toHit:6, reach:5,
+        damage:[{ dice:'1d10', mod:5, type:'piercing' }],
+        recharge:null, usesPerDay:null },
+      { sourceActionName:'Claws', kind:'attack', toHit:6, reach:5,
+        damage:[{ dice:'2d8', mod:5, type:'slashing' }],
+        recharge:null, usesPerDay:null },
+    ],
+  };
+  const r = await Crucible.runSim({ party,
+    monsterPicks:[{ pickId:'p1', count:2, monster: owlbear }],
+    trials:200, tactics:{ aiHint:'focus', resources:'nova' }, seed:211 });
+  const front = r.perPc.filter(p => ['Tank','Fighter','Ranger'].includes(p.name));
+  const back  = r.perPc.filter(p => ['Wizard','Sorcerer'].includes(p.name));
+  const frontDmg = front.reduce((s, p) => s + (p.maxHp - p.avgHpRemaining), 0);
+  const backDmg  = back.reduce ((s, p) => s + (p.maxHp - p.avgHpRemaining), 0);
+  assertTrue(frontDmg > backDmg * 1.2,
+    `Brute multiattack must honor frontline; front=${frontDmg.toFixed(1)} back=${backDmg.toFixed(1)}`);
+});
 </script>
 </body>
 </html>
