@@ -186,5 +186,98 @@ test('filter: viewer with role:player but no characterId acts like anonymous', (
 });
 </script>
 
+<script>
+// ─────── mergeDMWritePreservingNotes ───────
+
+test('merge: copies prev playerNotes onto matching incoming combatants', () => {
+  const prev = {
+    combatants: [
+      { id: 'c1', name: 'Old name', hp: 5,
+        playerNotes: [{ id: 'n1', body: 'keep me' }] },
+      { id: 'c2', name: 'Goblin', hp: 10,
+        playerNotes: [{ id: 'n2', body: 'also keep' }] }
+    ]
+  };
+  const incoming = {
+    combatants: [
+      { id: 'c1', name: 'New name', hp: 3 },        // DM renamed + damaged
+      { id: 'c2', name: 'Goblin', hp: 0, dead: true } // DM killed
+    ]
+  };
+  const out = InitiativeNotes.mergeDMWritePreservingNotes(prev, incoming);
+  assertEq(out.combatants[0].name, 'New name', 'DM name change preserved');
+  assertEq(out.combatants[0].hp, 3, 'DM HP change preserved');
+  assertEq(out.combatants[0].playerNotes, [{ id: 'n1', body: 'keep me' }],
+    'prev notes copied to c1');
+  assertEq(out.combatants[1].playerNotes, [{ id: 'n2', body: 'also keep' }],
+    'prev notes copied to c2');
+});
+
+test('merge: combatants the DM removed are gone (notes dropped)', () => {
+  const prev = {
+    combatants: [
+      { id: 'c1', playerNotes: [{ id: 'n1' }] },
+      { id: 'c2', playerNotes: [{ id: 'n2' }] }
+    ]
+  };
+  const incoming = { combatants: [{ id: 'c1' }] };  // c2 removed
+  const out = InitiativeNotes.mergeDMWritePreservingNotes(prev, incoming);
+  assertEq(out.combatants.length, 1);
+  assertEq(out.combatants[0].id, 'c1');
+});
+
+test('merge: new combatants the DM added start with empty playerNotes', () => {
+  const prev = { combatants: [{ id: 'c1', playerNotes: [{ id: 'n1' }] }] };
+  const incoming = { combatants: [
+    { id: 'c1' },
+    { id: 'c2', name: 'New goblin' }  // newly added by DM
+  ]};
+  const out = InitiativeNotes.mergeDMWritePreservingNotes(prev, incoming);
+  assertEq(out.combatants[1].playerNotes, [], 'new combatant → empty notes');
+});
+
+test('merge: DM-supplied playerNotes on a new combatant are discarded', () => {
+  // Defense in depth: the DM tracker doesn't author notes, but if a malicious
+  // client tried to inject them, we drop them. New combatants always start [].
+  const prev = { combatants: [] };
+  const incoming = { combatants: [
+    { id: 'c1', playerNotes: [{ id: 'evil', body: 'injected' }] }
+  ]};
+  const out = InitiativeNotes.mergeDMWritePreservingNotes(prev, incoming);
+  assertEq(out.combatants[0].playerNotes, [], 'injected notes discarded');
+});
+
+test('merge: lobby reset (empty incoming combatants) clears all notes', () => {
+  const prev = { combatants: [
+    { id: 'c1', playerNotes: [{ id: 'n1' }] }
+  ]};
+  const incoming = { mode: 'lobby', combatants: [] };
+  const out = InitiativeNotes.mergeDMWritePreservingNotes(prev, incoming);
+  assertEq(out.combatants, [], 'lobby reset → no combatants');
+  assertEq(out.mode, 'lobby', 'other incoming fields preserved');
+});
+
+test('merge: tolerates missing prev / missing combatants arrays', () => {
+  const o1 = InitiativeNotes.mergeDMWritePreservingNotes(null, { combatants: [{id:'c1'}] });
+  assertEq(o1.combatants[0].playerNotes, [], 'null prev → empty notes');
+
+  const o2 = InitiativeNotes.mergeDMWritePreservingNotes({}, { combatants: [{id:'c1'}] });
+  assertEq(o2.combatants[0].playerNotes, [], 'empty prev → empty notes');
+
+  const o3 = InitiativeNotes.mergeDMWritePreservingNotes({ combatants: [] }, {});
+  assertEq(o3.combatants, [], 'incoming with no combatants → empty array');
+});
+
+test('merge: does not mutate inputs', () => {
+  const prev = { combatants: [{ id: 'c1', playerNotes: [{ id: 'n1' }] }] };
+  const incoming = { combatants: [{ id: 'c1', hp: 5 }] };
+  const prevSnap = JSON.stringify(prev);
+  const incSnap  = JSON.stringify(incoming);
+  InitiativeNotes.mergeDMWritePreservingNotes(prev, incoming);
+  assertEq(JSON.parse(JSON.stringify(prev)),     JSON.parse(prevSnap), 'prev unchanged');
+  assertEq(JSON.parse(JSON.stringify(incoming)), JSON.parse(incSnap),  'incoming unchanged');
+});
+</script>
+
 </body>
 </html>

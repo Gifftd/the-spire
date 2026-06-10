@@ -63,13 +63,40 @@
     return out;
   }
 
+  // ─── mergeDMWritePreservingNotes(prev, incoming) ───────────────────
+  // Server-side merge for the DM `initiative_state` POST handler.
+  // The DM tracker never authors playerNotes, so KV is authoritative.
+  // We copy prev.combatants[i].playerNotes (keyed by id) onto matching
+  // incoming combatants. New combatants the DM added start with [].
+  // DM-supplied playerNotes on new combatants are discarded as defense
+  // in depth. Returns a new state; does not mutate inputs.
+  function mergeDMWritePreservingNotes(prev, incoming) {
+    const prevCombatants = (prev && Array.isArray(prev.combatants)) ? prev.combatants : [];
+    const prevNotesById = new Map();
+    for (const c of prevCombatants) {
+      if (c && c.id) prevNotesById.set(c.id, Array.isArray(c.playerNotes) ? c.playerNotes.slice() : []);
+    }
+
+    const incCombatants = (incoming && Array.isArray(incoming.combatants)) ? incoming.combatants : [];
+    const mergedCombatants = incCombatants.map(c => {
+      if (!c) return c;
+      const clone = Object.assign({}, c);
+      clone.playerNotes = prevNotesById.has(c.id) ? prevNotesById.get(c.id) : [];
+      return clone;
+    });
+
+    const out = Object.assign({}, incoming || {});
+    out.combatants = mergedCombatants;
+    return out;
+  }
+
   // Public exports populated by Tasks 2–5.
   const InitiativeNotes = {
     MAX_NOTE_LENGTH,
     MAX_NOTES_PER_CHARACTER,
     VISIBILITIES,
     filterInitiativeState,
-    // mergeDMWritePreservingNotes  — Task 3
+    mergeDMWritePreservingNotes,
     // validateNote                 — Task 4
     // canDeleteNote                — Task 5
   };
