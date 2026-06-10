@@ -882,7 +882,18 @@ export default {
     if (DM_WRITE_TYPES.includes(body?.type)) {
       const auth = await verifyDMAuth(request, env);
       if (!auth.ok) return json({ error: 'DM auth required' }, 401);
-      const ok = await kvPut(env, body.type, body.payload);
+
+      // Notes-preservation merge for initiative_state: the DM tracker never
+      // authors playerNotes, so KV is authoritative for that field. Copy prev
+      // notes forward by combatant.id so DM HP/condition writes don't clobber
+      // player-authored notes (spec §4.5).
+      let payload = body.payload;
+      if (body.type === 'initiative_state') {
+        const prev = await kvGet(env, 'initiative_state', { combatants: [] });
+        payload = INITIATIVE_NOTES.mergeDMWritePreservingNotes(prev, body.payload || { combatants: [] });
+      }
+
+      const ok = await kvPut(env, body.type, payload);
       if (!ok) return json({ error: 'KV not bound' }, 500);
       return json({ ok: true, ...(auth.warning ? { warning: auth.warning } : {}) });
     }
