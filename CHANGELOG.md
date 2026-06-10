@@ -9,6 +9,44 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### Bestiary: override records overlay imported monsters at load (no more duplicate Goblins)
+
+- New `bestiary-merge.js` shared module exporting
+  `BestiaryMerge.mergeBestiaries(imported, custom)`. Override records
+  (written by Crucible's `saveOverride`, identifiable by an
+  `overriddenAt` stamp) now overlay their imported base by
+  name+source. Homebrew records (no `overriddenAt`) pass through as
+  before. Orphan overrides (no matching imported base) appear with a
+  `_orphanOverride` flag so the DM can clean them up.
+- The Crucible's `loadBestiary`, the War Table's `loadBestiary`, and
+  the Menagerie's `allMonsters()` now all route through the same
+  helper. Saved fixes propagate across tools — the DM sees one
+  Owlbear with their override applied, not two.
+- Worker is untouched. KV schema unchanged. Backward-compatible with
+  every existing override record (no migration needed).
+- 14 new test assertions in `tests/bestiary-merge.test.html` covering
+  empty inputs, imported-only / homebrew-only / override-match
+  paths, orphan handling, partial overrides, null-protection,
+  cross-source distinctness, and a mixed-everything record-count
+  scenario.
+
+**Manual UI checklist (post-deploy):**
+- [ ] Crucible: save a role override on an imported monster (set
+      Owlbear to Brute). Refresh. Picker shows **one** Owlbear with
+      `(currently: override)` in the Review panel — not two.
+- [ ] War Table: open the bestiary picker. The same Owlbear appears
+      exactly once with the override applied.
+- [ ] Menagerie: browse the bestiary. The same Owlbear appears once
+      with overrides visible. Edit it via the editor; the
+      write-back-to-`bestiary` path still works.
+- [ ] Orphan check: manually add an override record to
+      `bestiary_custom` for a name that doesn't exist in `bestiary`.
+      It appears in the Crucible picker with an orphan indicator.
+- [ ] Backward compatibility: existing pre-merge `bestiary_custom`
+      records (saved before this change) work without manual
+      intervention — they have `overriddenAt`, name, _source, so they
+      merge correctly.
+
 ### The Crucible — monster role policies (v1.5)
 
 - Replaced the single "focus-fire lowest-HP" monster heuristic with a

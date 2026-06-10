@@ -945,6 +945,7 @@
   <div class="toast" id="toast"></div>
 
   <script src="auth.js"></script>
+  <script src="bestiary-merge.js"></script>
   <script>
     const WORKER_URL = (window.Auth && window.Auth.WORKER_URL) || 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
     function esc(s){return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -986,9 +987,10 @@
       if (d && Array.isArray(d.monsters)) return d.monsters;
       return [];
     }
-    // The view across Browse / Analysis / lookups: imported bestiary + custom.
+    // The view across Browse / Analysis / lookups: imported bestiary + custom,
+    // with Crucible-written override records overlaid onto their imported base.
     function allMonsters(){
-      return asMonsters(bestiary).concat(customMonsters.map(m => ({ ...m, _custom: true })));
+      return BestiaryMerge.mergeBestiaries(asMonsters(bestiary), customMonsters);
     }
     function isCustomId(id){
       return typeof id === 'string' && id.startsWith('custom-');

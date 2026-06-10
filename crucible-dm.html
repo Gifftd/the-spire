@@ -74,6 +74,7 @@
   </section>
 </div>
 
+<script src="bestiary-merge.js"></script>
 <script src="crucible-parser.js"></script>
 <script src="crucible-engine.js"></script>
 <script>
@@ -802,16 +803,11 @@ async function loadBestiary() {
     } else {
       const imported = r.ok  ? await r.json() : { monsters: [] };
       const custom   = rc.ok ? await rc.json() : [];
-      // Both endpoints tolerate envelope-or-bare-array shapes.
-      const arr  = Array.isArray(imported) ? imported
-                  : (Array.isArray(imported && imported.monsters) ? imported.monsters : []);
-      const cust = Array.isArray(custom)   ? custom
-                  : (Array.isArray(custom   && custom.monsters)   ? custom.monsters   : []);
-      // Tag every monster with `_source` so the picker disambiguates duplicates
-      // by name between MM-2024 and FM-v1 sources.
-      for (const m of arr)  out.push({ ...m, _source: m.source || m._source || '' });
-      for (const m of cust) out.push({ ...m, _source: m.source || m._source || 'custom', _custom: true });
-      _bestiaryLoadStatus = out.length ? 'ok' : 'empty';
+      // BestiaryMerge handles envelope-or-bare-array tolerance and overlays
+      // override records onto their imported base by name+source.
+      const merged = BestiaryMerge.mergeBestiaries(imported, custom);
+      out.push(...merged);
+      _bestiaryLoadStatus = merged.length ? 'ok' : 'empty';
     }
   } catch (e) {
     console.warn('Bestiary fetch failed; trying cache.', e);

@@ -761,6 +761,7 @@ body {
 </div>
 
 <script src="auth.js"></script>
+<script src="bestiary-merge.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════
 //  CONFIG
@@ -1207,7 +1208,7 @@ async function loadBestiary(){
     const encs     = re.ok ? await re.json() : [];
     const arr = Array.isArray(imported) ? imported : (Array.isArray(imported?.monsters) ? imported.monsters : []);
     const cust = Array.isArray(custom) ? custom : (Array.isArray(custom?.monsters) ? custom.monsters : []);
-    _BP.monsters = arr.concat(cust.map(m => ({ ...m, _custom: true })));
+    _BP.monsters = BestiaryMerge.mergeBestiaries(imported, custom);
     _BP.encounters = Array.isArray(encs) ? encs : [];
     _BP.loaded = true;
   } catch(e){
