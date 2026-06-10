@@ -903,12 +903,39 @@
 
   // ─────────── Resolve a multiattack ───────────
   // For each sub-action in the plan, fire it `count` times. Each sub-attack
-  // picks its own target via the same focus rule.
+  // re-picks its target — for monsters, via the role policy's pickTarget so
+  // Brute multiattacks honor frontline preference, Artillery favors backline,
+  // etc. If the policy's chosen target drops mid-multiattack, the next swing
+  // re-picks fresh (still in the policy's preferred bucket).
   function resolveMultiattack(me, all, multiAction, tactics, rng, events, round) {
     const myActions = me.side === 'monster'
       ? (me.monster && me.monster.parsedActions) || []
       : (me.pm && me.pm.actions) || [];
     let warnings = [];
+
+    // Build the per-sub-attack target picker. For monsters with a known role,
+    // use that policy's pickTarget. For PCs (and as a safety fallback for
+    // monsters without role data), use the v1 focus-fire helper.
+    let pickSubTarget;
+    if (me.side === 'monster' && me.monster) {
+      const role = resolveRole(me.monster);
+      const policy = ROLE_POLICIES[role] || ROLE_POLICIES.soldier;
+      const policyCtx = {
+        round, rng, tactics,
+        livingEnemyCount: aliveEnemies(me, all).length,
+        all,
+      };
+      pickSubTarget = () => {
+        const t = policy.pickTarget(me, all, policyCtx);
+        if (!t) return null;
+        // Controller AoE picks return an array; multiattack sub-attacks are
+        // single-target by their nature — take the first.
+        return Array.isArray(t) ? t[0] : t;
+      };
+    } else {
+      pickSubTarget = () => pickEnemyTarget(me, all, tactics, rng);
+    }
+
     for (const step of (multiAction.multiattackPlan || [])) {
       const sub = myActions.find(a =>
         (a.sourceActionName || a.name) === step.actionName);
@@ -917,7 +944,7 @@
         continue;
       }
       for (let i = 0; i < (step.count || 1); i++) {
-        const tgt = pickEnemyTarget(me, all, tactics, rng);
+        const tgt = pickSubTarget();
         if (!tgt) break;
         if (sub.kind === 'attack') {
           const r = me.side === 'monster'
