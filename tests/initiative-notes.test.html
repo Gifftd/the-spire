@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>initiative-notes tests</title>
+  <style>
+    body { font: 14px monospace; background:#0e1418; color:#dde7e9; padding:1rem; }
+    h1 { color:#7ec5c5; }
+    button { padding:0.5rem 1rem; background:#1d3a4a; color:#dde7e9;
+             border:1px solid #2c5566; cursor:pointer; }
+    .ok   { color:#7fd49a; }
+    .fail { color:#e77878; }
+    .case { padding:0.25rem 0; border-bottom:1px solid #1c2429; }
+    pre   { white-space:pre-wrap; color:#a0adb2; margin:0.25rem 0 0 1rem; }
+    #summary { padding:0.75rem; margin-top:1rem; background:#152028;
+               border-left:3px solid #7ec5c5; }
+  </style>
+</head>
+<body>
+<h1>initiative-notes tests</h1>
+<button onclick="runAll()">Run tests</button>
+<div id="results"></div>
+<div id="summary"></div>
+
+<script src="../initiative-notes.js"></script>
+<script>
+const TESTS = [];
+function test(name, fn) { TESTS.push({ name, fn }); }
+function assertEq(actual, expected, label) {
+  const a = JSON.stringify(actual), e = JSON.stringify(expected);
+  if (a !== e) throw new Error((label || '') +
+    '\n   expected: ' + e + '\n     actual: ' + a);
+}
+function assertTrue(cond, label) { if (!cond) throw new Error(label || 'expected true'); }
+function assertFalse(cond, label) { if (cond) throw new Error(label || 'expected false'); }
+async function runAll() {
+  const root = document.getElementById('results');
+  root.innerHTML = '';
+  let pass = 0, fail = 0;
+  for (const t of TESTS) {
+    const div = document.createElement('div');
+    div.className = 'case';
+    try {
+      await t.fn();
+      div.innerHTML = '<span class="ok">✓</span> ' + t.name;
+      pass++;
+    } catch (e) {
+      div.innerHTML = '<span class="fail">✗</span> ' + t.name +
+        '<pre>' + (e.message || String(e)) + '</pre>';
+      fail++;
+    }
+    root.appendChild(div);
+  }
+  document.getElementById('summary').innerHTML =
+    `<b>${pass} passed</b>, <b class="${fail?'fail':'ok'}">${fail} failed</b>, ${TESTS.length} total.`;
+}
+</script>
+
+<script>
+// ─────── Smoke test: module loaded ───────
+test('module loads + exposes constants', () => {
+  assertEq(InitiativeNotes.MAX_NOTE_LENGTH, 500);
+  assertEq(InitiativeNotes.MAX_NOTES_PER_CHARACTER, 50);
+  assertEq(InitiativeNotes.VISIBILITIES, ['private', 'party']);
+});
+</script>
+
+</body>
+</html>
