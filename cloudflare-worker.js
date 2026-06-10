@@ -96,6 +96,20 @@ async function verifyDMAuth(request, env) {
   return { ok: false };
 }
 
+// ─── Player auth ───────────────────────────────────────────────────
+// Mirrors the inline validation used in character_login + brew handlers.
+// Returns { ok: true, character } or { ok: false, error: '<reason>' }.
+// Uses the SAME shape as DM auth so handlers can branch uniformly.
+async function verifyCharacterAuth(body, env) {
+  const characterId = (body && body.characterId || '').toString();
+  const code        = (body && body.code        || '').toString();
+  if (!characterId || !code) return { ok: false, error: 'characterId and code required' };
+  const chars = await kvGet(env, 'characters', []);
+  const me = chars.find(c => c.id === characterId);
+  if (!me || me.code !== code) return { ok: false, error: 'invalid character or code' };
+  return { ok: true, character: me };
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // BEGIN initiative-notes.js (inlined — keep in sync with /initiative-notes.js)
 // Any change to MAX_NOTE_LENGTH, MAX_NOTES_PER_CHARACTER, filterInitiativeState,
