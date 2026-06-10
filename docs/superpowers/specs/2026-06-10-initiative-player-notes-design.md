@@ -94,23 +94,35 @@ Implement as a sibling helper `filterInitiativeState(state, viewer)` modeled on
 the existing `filterForCharacter`. The `viewer` argument is `{role: 'dm'}`,
 `{role: 'player', characterId}`, or `null`.
 
-### 4.3 Existing data leaks fixed as part of this change
+### 4.3 Defense-in-depth on the player payload
 
-The new filter incidentally closes two pre-existing leaks in the player payload.
-**Do not skip them** — they're trivial additions to a filter we're already
-building, and without them the new feature ships alongside the same bugs.
+The new filter enforces two correctness rules server-side. **Today, the DM
+tracker already enforces both rules client-side**, so KV's `initiative_state`
+value has never actually contained the offending fields in practice. The
+filter is defense-in-depth — it guarantees correctness regardless of what
+ends up in KV.
 
-1. **`combatant.notes` string** ("Secret notes…", intended DM-only). Today it
-   is shipped to every player browser as raw JSON. The new filter strips it
-   from all non-DM viewers.
+1. **`combatant.notes` string** ("Secret notes…", intended DM-only). The DM
+   tracker's `pushState` in `initiative-dm.html` (around line 2060) maps each
+   combatant to a sanitized shape that explicitly *omits* the `notes` field
+   before POSTing. KV's `initiative_state.combatants[i]` therefore has no
+   `notes`. The new filter still strips `notes` server-side for non-DM viewers
+   so a future client bug or malicious DM-credentialed client can't change
+   that contract.
 2. **`combatant.hidden` enemies** (the DM tracker has an "Add as hidden"
-   checkbox at line 543 of `initiative-dm.html`, and combatants get a `hidden:
-   true` flag at line 974). Today these are returned to players and rendered
-   in their initiative list. The new filter drops them entirely from non-DM
-   payloads. Notes attached to hidden combatants are therefore also never sent.
+   checkbox at line 543 of `initiative-dm.html`). `pushState` filters
+   `state.combatants.filter(c => !c.hidden)` before POSTing, so hidden
+   combatants never reach KV. The new filter still drops `hidden: true`
+   combatants from non-DM payloads for the same defense-in-depth reason.
 
-Neither leak is "fixed" in a way that requires migration — the data shape stays
-the same, only the filter changes.
+**Edge case worth calling out:** if a combatant has existing player notes and
+the DM then marks it hidden mid-combat, the DM's next `pushState` drops the
+combatant from the POST body. The notes-preservation merge in §4.5 keys notes
+by combatant `id`, so a combatant absent from the incoming payload gets its
+notes dropped (per the "DM removed this combatant" semantics). This means
+hiding a combatant mid-combat *does* drop its notes. That is correct: if no
+player can see the combatant, they shouldn't have access to notes on it
+either. Re-revealing the combatant later starts it with empty notes.
 
 ### 4.4 Concurrency
 
@@ -294,7 +306,7 @@ below the existing "Secret notes" textarea:
 | Combat reset (DM clears, mode → lobby) | All notes vanish with the encounter. Player view shows lobby screen as today. Working as designed. |
 | Player posts during DM HP edit | Mitigated by the notes-preservation merge in §4.5 — the DM's `initiative_state` POST handler reads existing notes from KV and merges them into the incoming blob, so DM HP/condition writes can no longer clobber notes. The ~10ms in-handler race window remains; collapses to the Race A profile in §4.4. |
 | Two players post on the same combatant within ~100ms | Last-write-wins (Race A in §4.4). The later writer's note survives; the earlier one is silently dropped. **Accepted residual risk.** Failure is silent — there is no client-side detection or retry for this case. If this becomes a real problem at the table, the documented mitigation path is moving notes to a dedicated `initiative_notes` KV key. |
-| Hidden enemies | Per §4.3, `filterInitiativeState` drops hidden combatants from non-DM payloads. Notes attached to them are therefore also never sent. (This is new behavior — today hidden enemies leak; see §4.3.) |
+| Hidden enemies | The DM tracker filters `c => !c.hidden` before POSTing, so hidden combatants never reach KV. `filterInitiativeState` also drops them defensively on the GET path (§4.3). If the DM marks a combatant hidden *mid-combat*, the next DM push drops the combatant from KV entirely; the merge in §4.5 keys by combatant id, so the notes are dropped too — by design (see §4.3 edge case). |
 | Author character deleted after writing note | `authorName` is denormalized in the note; the note still displays correctly with the original name. |
 | XSS via note body | All bodies rendered via `textContent`. No HTML in notes. |
 
