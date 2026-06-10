@@ -35,13 +35,53 @@
     return [];
   }
 
+  // Merge imported + custom into a unified monster list.
+  // - Override records (overriddenAt set) overlay their imported base by
+  //   name+source. Non-null override fields win; nulls/undefined fall through.
+  // - Homebrew records (no overriddenAt) pass through tagged `_custom:true`.
+  // - Orphan overrides (no matching imported base) are appended in Task 3.
+  function mergeBestiaries(imported, custom) {
+    const importedArr = arrayOf(imported);
+    const customArr   = arrayOf(custom);
+
+    // Index override records by match key; collect homebrew separately.
+    const overrideIdx = new Map();
+    const homebrew = [];
+    for (const m of customArr) {
+      if (isOverrideRecord(m)) {
+        overrideIdx.set(recordKey(m), m);
+      } else {
+        homebrew.push({ ...m, _source: m._source || m.source || 'custom', _custom: true });
+      }
+    }
+
+    // Walk imported, overlaying overrides where the key matches.
+    const out = [];
+    for (const m of importedArr) {
+      const key = recordKey(m);
+      const ov  = overrideIdx.get(key);
+      const merged = { ...m, _source: m._source || m.source || '' };
+      if (ov) {
+        for (const field of OVERRIDE_FIELDS) {
+          if (ov[field] !== undefined && ov[field] !== null) merged[field] = ov[field];
+        }
+        merged._overriddenAt = ov.overriddenAt;
+      }
+      out.push(merged);
+    }
+
+    // Homebrew appended last. Orphan overrides handled in Task 3.
+    out.push(...homebrew);
+    return out;
+  }
+
   // ─────────── Public exports ───────────
   const BestiaryMerge = {
     OVERRIDE_FIELDS,
     isOverrideRecord,
     recordKey,
     arrayOf,
-    // mergeBestiaries is added in Task 2.
+    mergeBestiaries,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = BestiaryMerge;

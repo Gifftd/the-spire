@@ -80,6 +80,55 @@ test('arrayOf: tolerates bare array, envelope, null', () => {
   assertEq(BestiaryMerge.arrayOf({}), []);
   assertEq(BestiaryMerge.arrayOf(undefined), []);
 });
+
+// ─────── Task 2: main merge paths ───────
+test('mergeBestiaries: empty inputs → []', () => {
+  assertEq(BestiaryMerge.mergeBestiaries([], []), []);
+  assertEq(BestiaryMerge.mergeBestiaries(null, null), []);
+  assertEq(BestiaryMerge.mergeBestiaries(undefined, undefined), []);
+});
+test('mergeBestiaries: imported only → passes through, _source normalized', () => {
+  const imp = [
+    { name:'Goblin', source:'mm-2024', hp:7, ac:15 },
+    { name:'Orc',    source:'mm-2024', hp:15, ac:13 },
+  ];
+  const r = BestiaryMerge.mergeBestiaries(imp, []);
+  assertEq(r.length, 2);
+  assertEq(r[0].name, 'Goblin');
+  assertEq(r[0]._source, 'mm-2024');
+  assertEq(r[0].hp, 7);                       // imported fields pass through
+  assertEq(r[1]._source, 'mm-2024');
+});
+test('mergeBestiaries: homebrew only → tagged _custom', () => {
+  const cust = [
+    { name:'Hag Lord', _source:'custom', hp:120, ac:17, actions:[] },
+  ];
+  const r = BestiaryMerge.mergeBestiaries([], cust);
+  assertEq(r.length, 1);
+  assertEq(r[0].name, 'Hag Lord');
+  assertEq(r[0]._custom, true);
+  assertEq(r[0].hp, 120);
+});
+test('mergeBestiaries: override matches imported → overlaid', () => {
+  const imp = [
+    { name:'Owlbear', source:'mm-2024', hp:59, ac:13,
+      parsedActions:[ { sourceActionName:'Beak', kind:'attack', toHit:6 } ] },
+  ];
+  const cust = [
+    { name:'Owlbear', _source:'mm-2024',
+      roleOverride:'brute',
+      parsedActions:[ { sourceActionName:'Beak', kind:'attack', toHit:99 } ],
+      overriddenAt:'2026-06-10T12:00:00Z' },
+  ];
+  const r = BestiaryMerge.mergeBestiaries(imp, cust);
+  assertEq(r.length, 1);                       // one merged entry, not two
+  assertEq(r[0].name, 'Owlbear');
+  assertEq(r[0].hp, 59);                       // imported field survives
+  assertEq(r[0].ac, 13);                       // imported field survives
+  assertEq(r[0].roleOverride, 'brute');        // override field applied
+  assertEq(r[0].parsedActions[0].toHit, 99);   // override parsedActions wins
+  assertEq(r[0]._overriddenAt, '2026-06-10T12:00:00Z');
+});
 </script>
 </body>
 </html>
