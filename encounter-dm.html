@@ -123,8 +123,69 @@
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    // Stub — implemented in Task 3.3.
-    async function saveEncounters() { /* implemented in Task 3.3 */ }
+    let saveTimer = null;
+    function scheduleSave() {
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(saveEncounters, 600);
+    }
+
+    async function saveEncounters() {
+      const headers = Auth.dmHeaders();
+      // Re-fetch to reduce two-tab clobber risk.
+      let serverArr = [];
+      try {
+        const r = await fetch(WORKER_URL + '?type=encounters', { headers });
+        serverArr = await r.json();
+        if (!Array.isArray(serverArr)) serverArr = [];
+        serverArr = serverArr.map(EncounterSchema.migrateInMemory);
+      } catch (e) {
+        showBanner('Could not load latest encounters before save — retrying in 10s', 'warn');
+        setTimeout(saveEncounters, 10000);
+        return;
+      }
+      // Splice local edits in by id.
+      const byId = new Map(serverArr.map(x => [x.id, x]));
+      state.encounters.forEach(local => byId.set(local.id, local));
+      const merged = Array.from(byId.values());
+
+      // Validate before POST — fail loud locally.
+      const errs = merged.flatMap(e => {
+        const r = EncounterSchema.validateEncounter(e);
+        return r.ok ? [] : r.errors.map(x => ({ id: e.id, ...x }));
+      });
+      if (errs.length) {
+        console.warn('Local validation errors, refusing save:', errs);
+        showBanner('Validation errors — see console', 'warn');
+        return;
+      }
+
+      const r = await fetch(WORKER_URL, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'encounters', payload: merged }),
+      });
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        console.warn('Save failed', r.status, body);
+        showBanner('Save failed (' + r.status + '). Retrying in 10s.', 'warn');
+        setTimeout(saveEncounters, 10000);
+        return;
+      }
+      state.encounters = merged;
+      render();
+    }
+
+    function showBanner(msg, kind) {
+      let bar = document.getElementById('error-banner');
+      if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'error-banner';
+        bar.style.cssText = 'position:fixed;top:0;left:0;right:0;padding:8px 14px;background:#5a4030;color:#e8e6df;font-family:Crimson Text,serif;z-index:1000;';
+        document.body.prepend(bar);
+      }
+      bar.textContent = msg;
+      bar.style.background = kind === 'warn' ? '#5a4030' : '#3a4030';
+    }
     function renderEditor() {
       document.getElementById('editor-empty').style.display = state.selectedId ? 'none' : '';
       document.getElementById('editor-form').style.display = state.selectedId ? '' : 'none';
