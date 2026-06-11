@@ -701,6 +701,15 @@ function showCombat(s) {
     banner.classList.add('show');
   }
 
+  // Preserve in-progress textarea content across poll re-renders.
+  // Without this, every 2.5s poll destroys the user's typed text.
+  const draftsByCombatantId = new Map();
+  document.querySelectorAll('.row-expanded[data-combatant-id]').forEach(re => {
+    const id = re.dataset.combatantId;
+    const ta = re.querySelector('.add-note-form textarea');
+    if (ta && ta.value) draftsByCombatantId.set(id, ta.value);
+  });
+
   list.innerHTML = '';
   s.combatants.forEach((c, idx) => {
     const isActive = idx === s.activeIndex;
@@ -782,6 +791,20 @@ function showCombat(s) {
     const viewer = { role: 'player', characterId: me ? me.characterId : null };
     renderNotesList(c.id, c.playerNotes || [], viewer);
   });
+
+  // Restore drafts captured before the rebuild
+  if (draftsByCombatantId.size > 0) {
+    draftsByCombatantId.forEach((draft, combatantId) => {
+      const ta = document.querySelector(
+        `.row-expanded[data-combatant-id="${CSS.escape(combatantId)}"] .add-note-form textarea`
+      );
+      if (ta) {
+        ta.value = draft;
+        // Fire input event so the char counter + Save button enable state recompute
+        ta.dispatchEvent(new Event('input'));
+      }
+    });
+  }
 
   renderExpandedState();
 }
