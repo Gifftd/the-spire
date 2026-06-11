@@ -409,6 +409,116 @@ function attrSums(ingredients, ids) {
   };
 }
 
+// ── Encounter payload validation ────────────────────────────────
+// Mirror of encounter-schema.js#validateEncounter. Worker-side defense — the
+// front-end already validates, but this is the authoritative gate. Keep these
+// enum arrays and rules in sync with encounter-schema.js.
+const ENC_STATUSES = ['draft','ready','scheduled','live','completed','archived'];
+const ENC_LIGHTING = ['bright','dim','dark','varied'];
+const ENC_SURPRISE = ['none','party','monsters','both'];
+const ENC_NPC_ROLES = ['ally','enemy','hostage','witness'];
+const ENC_LOC_KINDS = ['world','submap'];
+const ENC_OUTCOMES = ['won','tpk','fled','skipped'];
+const ENC_CAPS = { picks: 50, waves: 20, loot: 50, npcRoles: 30, waveRound: 50 };
+
+function validateEncountersPayload(payload) {
+  const errors = [];
+  if (!Array.isArray(payload)) {
+    errors.push({ field: '', message: 'payload must be an array' });
+    return errors;
+  }
+  payload.forEach((e, i) => {
+    if (!e || typeof e !== 'object') {
+      errors.push({ field: `[${i}]`, message: 'must be an object' });
+      return;
+    }
+    if (!ENC_STATUSES.includes(e.status)) {
+      errors.push({ field: `[${i}].status`, message: `unknown status: ${e.status}` });
+    }
+    if (e.tactical) {
+      if (!ENC_LIGHTING.includes(e.tactical.lighting)) {
+        errors.push({ field: `[${i}].tactical.lighting`, message: `unknown lighting: ${e.tactical.lighting}` });
+      }
+      if (!ENC_SURPRISE.includes(e.tactical.surprise)) {
+        errors.push({ field: `[${i}].tactical.surprise`, message: `unknown surprise: ${e.tactical.surprise}` });
+      }
+    }
+    // Picks loop builds the `keyed` set used by wave referential check below.
+    let keyed = null;
+    if (Array.isArray(e.picks)) {
+      if (e.picks.length > ENC_CAPS.picks) {
+        errors.push({ field: `[${i}].picks`, message: `too many picks (max ${ENC_CAPS.picks})` });
+      }
+      const seen = new Set();
+      keyed = new Set();
+      e.picks.forEach((p, pi) => {
+        if (p && typeof p.pickKey === 'string' && p.pickKey) {
+          if (seen.has(p.pickKey)) {
+            errors.push({ field: `[${i}].picks`, message: `duplicate pickKey "${p.pickKey}" at index ${pi}` });
+          }
+          seen.add(p.pickKey);
+          keyed.add(p.pickKey);
+        }
+      });
+    }
+    // Waves: cap + round + pickKey ref. Hoisted out of the picks guard so cap/round
+    // fire even when picks is missing or malformed.
+    if (e.tactical && Array.isArray(e.tactical.waves)) {
+      if (e.tactical.waves.length > ENC_CAPS.waves) {
+        errors.push({ field: `[${i}].tactical.waves`, message: `too many waves (max ${ENC_CAPS.waves})` });
+      }
+      e.tactical.waves.forEach((w, wi) => {
+        if (!w || typeof w !== 'object') {
+          errors.push({ field: `[${i}].tactical.waves[${wi}]`, message: 'must be an object' });
+          return;
+        }
+        if (typeof w.round !== 'number' || w.round < 1 || w.round > ENC_CAPS.waveRound) {
+          errors.push({ field: `[${i}].tactical.waves[${wi}].round`, message: `round must be 1..${ENC_CAPS.waveRound}` });
+        }
+        if (keyed !== null && w.pickKey && !keyed.has(w.pickKey)) {
+          errors.push({ field: `[${i}].tactical.waves[${wi}].pickKey`, message: `references missing pickKey "${w.pickKey}"` });
+        }
+      });
+    }
+    if (Array.isArray(e.loot) && e.loot.length > ENC_CAPS.loot) {
+      errors.push({ field: `[${i}].loot`, message: `too many loot rows (max ${ENC_CAPS.loot})` });
+    }
+    if (Array.isArray(e.npcRoles)) {
+      if (e.npcRoles.length > ENC_CAPS.npcRoles) {
+        errors.push({ field: `[${i}].npcRoles`, message: `too many npc roles (max ${ENC_CAPS.npcRoles})` });
+      }
+      e.npcRoles.forEach((r, ri) => {
+        if (!r || typeof r !== 'object') {
+          errors.push({ field: `[${i}].npcRoles[${ri}]`, message: 'must be an object' });
+          return;
+        }
+        if (!ENC_NPC_ROLES.includes(r.role)) {
+          errors.push({ field: `[${i}].npcRoles[${ri}].role`, message: `unknown role: ${r.role}` });
+        }
+      });
+    }
+    if (e.locationRef != null) {
+      if (typeof e.locationRef !== 'object') {
+        errors.push({ field: `[${i}].locationRef`, message: 'must be null or an object' });
+      } else {
+        if (!ENC_LOC_KINDS.includes(e.locationRef.kind)) {
+          errors.push({ field: `[${i}].locationRef.kind`, message: `unknown kind: ${e.locationRef.kind}` });
+        }
+        if (typeof e.locationRef.locationId !== 'string' || !e.locationRef.locationId) {
+          errors.push({ field: `[${i}].locationRef.locationId`, message: 'required' });
+        }
+        if (e.locationRef.kind === 'submap' && (typeof e.locationRef.parentLocationId !== 'string' || !e.locationRef.parentLocationId)) {
+          errors.push({ field: `[${i}].locationRef.parentLocationId`, message: 'required for kind=submap' });
+        }
+      }
+    }
+    if (e.lastOutcome != null && !ENC_OUTCOMES.includes(e.lastOutcome)) {
+      errors.push({ field: `[${i}].lastOutcome`, message: `unknown outcome: ${e.lastOutcome}` });
+    }
+  });
+  return errors;
+}
+
 // ═══════════════════════════════════════════════════════════════
 export default {
   async fetch(request, env) {
@@ -912,6 +1022,16 @@ export default {
       if (body.type === 'initiative_state') {
         const prev = await kvGet(env, 'initiative_state', { combatants: [] });
         payload = INITIATIVE_NOTES.mergeDMWritePreservingNotes(prev, body.payload || { combatants: [] });
+      }
+
+      // Encounter-specific validation + server-stamped updatedAt.
+      if (body.type === 'encounters') {
+        const errs = validateEncountersPayload(body.payload);
+        if (errs.length) return json({ error: 'validation failed', details: errs }, 400);
+        if (Array.isArray(body.payload)) {
+          const reqDate = new Date(request.headers.get('date') || Date.now()).toISOString();
+          payload = body.payload.map(e => (e && typeof e === 'object') ? { ...e, updatedAt: reqDate } : e);
+        }
       }
 
       const ok = await kvPut(env, body.type, payload);
