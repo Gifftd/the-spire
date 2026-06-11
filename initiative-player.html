@@ -701,6 +701,14 @@ function showLobby() {
   document.getElementById('round-num').textContent = '—';
 }
 
+// ── Surgical row rendering ────────────────────────────────────────
+// Rather than `list.innerHTML = ''` + rebuild on every poll, we diff
+// the incoming combatants against existing rows by combatant.id and
+// update fields in place. The interactive form inside each row's
+// .row-expanded is never destroyed, so the textarea value, cursor
+// position, focus, and radio choice all survive poll cycles naturally
+// — no capture/restore machinery needed.
+
 function showCombat(s) {
   document.getElementById('lobby-screen').classList.remove('show');
   document.getElementById('combat-view').classList.add('show');
@@ -721,156 +729,142 @@ function showCombat(s) {
     banner.classList.add('show');
   }
 
-  // Preserve in-progress textarea content + cursor + focus + radio choice
-  // across poll re-renders. Without this, every 2.5s poll destroys the
-  // user's typed text, clobbers their cursor position, and resets the
-  // private/party radio back to localStorage's last-saved value.
-  const draftsByCombatantId = new Map();
-  const radioByCombatantId  = new Map();
-  const activeEl = document.activeElement;
-  let focusedDraft = null;  // { combatantId, selStart, selEnd } or null
-  document.querySelectorAll('.row-expanded[data-combatant-id]').forEach(re => {
-    const id = re.dataset.combatantId;
-    const ta = re.querySelector('.add-note-form textarea');
-    if (ta && ta.value) draftsByCombatantId.set(id, ta.value);
-    if (ta && ta === activeEl) {
-      focusedDraft = {
-        combatantId: id,
-        selStart: ta.selectionStart,
-        selEnd:   ta.selectionEnd,
-      };
-    }
-    const checked = re.querySelector('.add-note-form input[type=radio]:checked');
-    if (checked) radioByCombatantId.set(id, checked.value);
+  // Build a map of existing rows by combatant id (stringified).
+  const existingRows = new Map();
+  list.querySelectorAll(':scope > .row').forEach(r => {
+    existingRows.set(r.dataset.combatantId, r);
   });
 
-  list.innerHTML = '';
+  const me = (window.Auth && Auth.playerCreds && Auth.playerCreds()) || null;
+  const viewer = { role: 'player', characterId: me ? me.characterId : null };
+
+  // Upsert in initiative order. appendChild on an existing node moves
+  // it to the end, so the final DOM order matches s.combatants order.
   s.combatants.forEach((c, idx) => {
+    const cid = String(c.id);
     const isActive = idx === s.activeIndex;
-    const isPC     = c.type === 'pc';
-    const hpPct    = c.hpPct ?? 100;
-
-    const row = document.createElement('div');
-    row.className = `row is-${c.type}${isActive ? ' is-active' : ''}${c.dead ? ' is-dead' : ''}`;
-
-    const condsHtml = c.conditions && c.conditions.length > 0
-      ? `<div class="conds">${c.conditions.map(cond => `<span class="cond-tag">${cond}</span>`).join('')}</div>`
-      : '';
-
-    // AC: only shown for PCs (enemies have ac:null in payload)
-    const acHtml = (isPC && c.ac)
-      ? `<div class="ac-chip"><small>AC</small>${c.ac}</div>`
-      : '';
-
-    row.innerHTML = `
-      <div class="row-main">
-        <div class="init-num">${c.init}</div>
-        <div>
-          <div class="name-text">
-            <span class="type-pip ${c.type}"></span>
-            ${isActive ? '<span class="active-marker">▶</span>' : ''}
-            ${c.name}
-          </div>
-          ${condsHtml}
-        </div>
-        <div class="right-col">
-          <div class="hp-block">
-            <div class="hp-label">${isPC ? 'HP' : 'CONDITION'}</div>
-            <div class="hp-bar-wrap">
-              <div class="hp-bar" style="width:${hpPct}%;background:${hpColor(hpPct)}"></div>
-            </div>
-            <div class="hp-num">${hpLabel(hpPct, c.type, c.hp, c.maxHp)}</div>
-          </div>
-          ${acHtml}
-        </div>
-      </div>
-      <div class="row-expanded" data-combatant-id="${c.id}">
-        <div class="notes-list"></div>
-      </div>
-    `;
-
-    // ── Notes preview (one-line, newest visible note) ─────────────
-    const notes = Array.isArray(c.playerNotes) ? c.playerNotes : [];
-    if (notes.length > 0) {
-      // Newest first by createdAt
-      const sorted = notes.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      const top = sorted[0];
-      const previewEl = document.createElement('div');
-      previewEl.className = 'notes-preview';
-      // Build the preview using textContent so note bodies can't inject HTML
-      const icon = document.createElement('span'); icon.className = 'pn-icon'; icon.textContent = '📝';
-      const count = document.createElement('span'); count.className = 'pn-count';
-      count.textContent = '×' + notes.length;
-      const body = document.createElement('span');
-      const truncated = top.body.length > 60 ? top.body.slice(0, 57) + '…' : top.body;
-      body.textContent = '"' + truncated + '"';
-      const author = document.createElement('span');
-      author.className = 'pn-author';
-      author.textContent = '— ' + (top.authorName || '?');
-      previewEl.appendChild(icon);
-      previewEl.appendChild(count);
-      previewEl.appendChild(body);
-      previewEl.appendChild(author);
-      // Append into the row-main's middle column (the name area)
-      const middleCol = row.querySelector('.row-main > div:nth-child(2)');
-      if (middleCol) middleCol.appendChild(previewEl);
+    let row = existingRows.get(cid);
+    if (row) {
+      existingRows.delete(cid);   // mark as used
+      list.appendChild(row);      // moves the node to the end
+    } else {
+      row = buildEmptyRow(c);
+      list.appendChild(row);
+      bindRowClick(row, c.id);
     }
-
-    list.appendChild(row);
-
-    row.dataset.combatantId = c.id;
-    bindRowClick(row, c.id);
-
-    const me = (window.Auth && Auth.playerCreds && Auth.playerCreds()) || null;
-    const viewer = { role: 'player', characterId: me ? me.characterId : null };
+    updateRowContent(row, c, isActive);
     renderNotesList(c.id, c.playerNotes || [], viewer);
   });
 
-  // Restore drafts captured before the rebuild
-  if (draftsByCombatantId.size > 0) {
-    draftsByCombatantId.forEach((draft, combatantId) => {
-      const ta = document.querySelector(
-        `.row-expanded[data-combatant-id="${CSS.escape(combatantId)}"] .add-note-form textarea`
-      );
-      if (ta) {
-        ta.value = draft;
-        // Fire input event so the char counter + Save button enable state recompute
-        ta.dispatchEvent(new Event('input'));
-      }
-    });
-  }
+  // Remove rows for combatants no longer present in the state.
+  existingRows.forEach(r => r.remove());
 
-  // Restore radio state (private vs party) captured before the rebuild.
-  if (radioByCombatantId.size > 0) {
-    radioByCombatantId.forEach((vis, combatantId) => {
-      const radio = document.querySelector(
-        `.row-expanded[data-combatant-id="${CSS.escape(combatantId)}"] .add-note-form input[type=radio][value="${vis}"]`
-      );
-      if (radio) radio.checked = true;
-    });
-  }
-
-  // IMPORTANT: apply the .expanded class BEFORE attempting to restore focus.
-  // The new .row-expanded panels are display:none until they get .expanded,
-  // and you cannot focus a display:none element — calling .focus() on a
-  // hidden textarea silently fails, which is the entire reason typing
-  // appeared to be "impossible" earlier.
   renderExpandedState();
+}
 
-  // Restore focus + cursor position to whichever textarea the user was
-  // typing in before the poll rebuilt the row. Must run AFTER
-  // renderExpandedState so the textarea's row is display:block.
-  if (focusedDraft) {
-    const ta = document.querySelector(
-      `.row-expanded[data-combatant-id="${CSS.escape(focusedDraft.combatantId)}"] .add-note-form textarea`
-    );
-    if (ta) {
-      ta.focus();
-      // setSelectionRange clamps out-of-range indices, but guard anyway
-      try { ta.setSelectionRange(focusedDraft.selStart, focusedDraft.selEnd); }
-      catch { /* ignore — selection isn't critical */ }
-    }
+// Build a fresh row with placeholder elements that updateRowContent fills in.
+// The structure here MUST stay in sync with the selectors used by
+// updateRowContent / updateNotesPreview / renderNotesList.
+function buildEmptyRow(c) {
+  const row = document.createElement('div');
+  row.dataset.combatantId = String(c.id);
+  // row.className is set by updateRowContent
+  row.innerHTML = `
+    <div class="row-main">
+      <div class="init-num"></div>
+      <div>
+        <div class="name-text">
+          <span class="type-pip"></span>
+          <span class="active-marker" style="display:none">▶</span>
+          <span class="name-content"></span>
+        </div>
+        <div class="conds" style="display:none"></div>
+        <div class="notes-preview" style="display:none"></div>
+      </div>
+      <div class="right-col">
+        <div class="hp-block">
+          <div class="hp-label"></div>
+          <div class="hp-bar-wrap"><div class="hp-bar"></div></div>
+          <div class="hp-num"></div>
+        </div>
+        <div class="ac-chip" style="display:none"></div>
+      </div>
+    </div>
+    <div class="row-expanded" data-combatant-id="${escapeAttr(c.id)}">
+      <div class="notes-list"></div>
+    </div>
+  `;
+  return row;
+}
+
+// Update the dynamic fields on an existing row. Does NOT touch
+// .row-expanded's form/banner — those persist across poll cycles.
+function updateRowContent(row, c, isActive) {
+  const isPC = c.type === 'pc';
+  const hpPct = c.hpPct ?? 100;
+
+  row.className = `row is-${c.type}${isActive ? ' is-active' : ''}${c.dead ? ' is-dead' : ''}`;
+  row.querySelector('.init-num').textContent = c.init;
+  row.querySelector('.type-pip').className = `type-pip ${c.type}`;
+  row.querySelector('.active-marker').style.display = isActive ? '' : 'none';
+  row.querySelector('.name-content').textContent = c.name;
+
+  const condsEl = row.querySelector('.conds');
+  const conditions = Array.isArray(c.conditions) ? c.conditions : [];
+  if (conditions.length > 0) {
+    condsEl.innerHTML = conditions
+      .map(cond => `<span class="cond-tag">${escapeAttr(cond)}</span>`)
+      .join('');
+    condsEl.style.display = '';
+  } else {
+    condsEl.innerHTML = '';
+    condsEl.style.display = 'none';
   }
+
+  row.querySelector('.hp-label').textContent = isPC ? 'HP' : 'CONDITION';
+  const hpBar = row.querySelector('.hp-bar');
+  hpBar.style.width = hpPct + '%';
+  hpBar.style.background = hpColor(hpPct);
+  row.querySelector('.hp-num').textContent = hpLabel(hpPct, c.type, c.hp, c.maxHp);
+
+  const acChip = row.querySelector('.ac-chip');
+  if (isPC && c.ac) {
+    acChip.innerHTML = `<small>AC</small>${escapeAttr(c.ac)}`;
+    acChip.style.display = '';
+  } else {
+    acChip.innerHTML = '';
+    acChip.style.display = 'none';
+  }
+
+  updateNotesPreview(row, c);
+}
+
+// Update the one-line preview chip on a collapsed row.
+function updateNotesPreview(row, c) {
+  const previewEl = row.querySelector('.notes-preview');
+  if (!previewEl) return;
+  const notes = Array.isArray(c.playerNotes) ? c.playerNotes : [];
+  if (notes.length === 0) {
+    previewEl.innerHTML = '';
+    previewEl.style.display = 'none';
+    return;
+  }
+  const sorted = notes.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const top = sorted[0];
+  previewEl.innerHTML = '';
+  const icon = document.createElement('span'); icon.className = 'pn-icon'; icon.textContent = '📝';
+  const count = document.createElement('span'); count.className = 'pn-count';
+  count.textContent = '×' + notes.length;
+  const body = document.createElement('span');
+  const truncated = (top.body || '').length > 60 ? top.body.slice(0, 57) + '…' : (top.body || '');
+  body.textContent = '"' + truncated + '"';
+  const author = document.createElement('span'); author.className = 'pn-author';
+  author.textContent = '— ' + (top.authorName || '?');
+  previewEl.appendChild(icon);
+  previewEl.appendChild(count);
+  previewEl.appendChild(body);
+  previewEl.appendChild(author);
+  previewEl.style.display = '';
 }
 
 function buildStateUrl() {
