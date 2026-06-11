@@ -2161,6 +2161,56 @@ async function pushState() {
 }
 
 // ═══════════════════════════════════════════════════════
+//  PLAYER NOTES POLL (read-only)
+// ═══════════════════════════════════════════════════════
+// The DM tracker is the source of truth for HP / conditions / init —
+// it pushes state, it doesn't read state back. But playerNotes are
+// authored by players via the worker, so the DM needs to *read* them
+// to display them on combatant cards. We poll the worker with DM auth
+// and merge only the playerNotes field into local state.combatants,
+// leaving every other field (HP, conditions, etc.) untouched so we
+// don't clobber the DM's local edits.
+const NOTES_POLL_MS = 3000;
+
+async function pollPlayerNotes() {
+  try {
+    const res = await fetch(WORKER_URL + '?type=initiative_state', {
+      cache: 'no-store',
+      headers: Auth.dmHeaders(),
+    });
+    if (res.ok) {
+      const kv = await res.json();
+      const kvCombatants = Array.isArray(kv.combatants) ? kv.combatants : [];
+      const notesById = new Map();
+      kvCombatants.forEach(c => {
+        if (c && c.id != null) notesById.set(c.id, Array.isArray(c.playerNotes) ? c.playerNotes : []);
+      });
+      let changed = false;
+      state.combatants.forEach(c => {
+        if (notesById.has(c.id)) {
+          const incoming = notesById.get(c.id);
+          const prev = Array.isArray(c.playerNotes) ? c.playerNotes : [];
+          // Cheap change detection: compare length + ids of the newest
+          // entries. Avoids re-rendering when nothing changed.
+          const changedHere = prev.length !== incoming.length
+            || prev.some((n, i) => !incoming[i] || incoming[i].id !== n.id);
+          if (changedHere) {
+            c.playerNotes = incoming;
+            changed = true;
+          }
+        }
+      });
+      if (changed) render();
+    }
+  } catch { /* silent — next tick retries */ }
+  setTimeout(pollPlayerNotes, NOTES_POLL_MS);
+}
+
+// Kick off polling on page load. Wrapped in setTimeout so it doesn't
+// run before the DM's initial state is loaded from localStorage.
+setTimeout(pollPlayerNotes, 500);
+
+// ═══════════════════════════════════════════════════════
 //  EXPORT
 // ═══════════════════════════════════════════════════════
 function openExport() {
