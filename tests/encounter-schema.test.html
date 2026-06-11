@@ -132,6 +132,75 @@
       assertEq(out.picks, []);
       assertEq(out.status, 'ready');
     });
+
+    test('validateEncounter passes a freshly-created encounter', () => {
+      const e = EncounterSchema.newEncounter('OK');
+      const r = EncounterSchema.validateEncounter(e);
+      assertEq(r.ok, true);
+      assertEq(r.errors, []);
+    });
+
+    test('validateEncounter rejects unknown status', () => {
+      const e = EncounterSchema.newEncounter('Bad');
+      e.status = 'in-progress';
+      const r = EncounterSchema.validateEncounter(e);
+      assertEq(r.ok, false);
+      assert(r.errors.some(x => x.field === 'status'), 'status error present');
+    });
+
+    test('validateEncounter rejects unknown lighting / surprise / role', () => {
+      const e = EncounterSchema.newEncounter('Bad');
+      e.tactical.lighting = 'glow';
+      e.tactical.surprise = 'sometimes';
+      e.npcRoles = [{ npcId: 'n1', role: 'sidekick' }];
+      const r = EncounterSchema.validateEncounter(e);
+      assertEq(r.ok, false);
+      ['tactical.lighting','tactical.surprise','npcRoles[0].role']
+        .forEach(f => assert(r.errors.some(x => x.field === f), 'missing error for ' + f));
+    });
+
+    test('validateEncounter rejects duplicate pickKeys', () => {
+      const e = EncounterSchema.newEncounter('Dupes');
+      e.picks = [
+        { id: 'g', qty: 1, pickKey: 'p1' },
+        { id: 'o', qty: 1, pickKey: 'p1' },
+      ];
+      const r = EncounterSchema.validateEncounter(e);
+      assertEq(r.ok, false);
+      assert(r.errors.some(x => x.field === 'picks' && /duplicate/.test(x.message)), 'duplicate-key error');
+    });
+
+    test('validateEncounter rejects wave referencing missing pickKey', () => {
+      const e = EncounterSchema.newEncounter('Orphan');
+      e.picks = [{ id: 'g', qty: 1, pickKey: 'p1' }];
+      e.tactical.waves = [{ round: 2, pickKey: 'p99', count: 1 }];
+      const r = EncounterSchema.validateEncounter(e);
+      assertEq(r.ok, false);
+      assert(r.errors.some(x => x.field === 'tactical.waves[0].pickKey'), 'orphan-wave error');
+    });
+
+    test('validateEncounter rejects locationRef of wrong shape', () => {
+      const e = EncounterSchema.newEncounter('BadRef');
+      e.locationRef = { kind: 'galaxy', locationId: 'andromeda' };
+      const r = EncounterSchema.validateEncounter(e);
+      assertEq(r.ok, false);
+      assert(r.errors.some(x => x.field === 'locationRef.kind'), 'kind enum');
+    });
+
+    test('validateEncounter enforces soft caps', () => {
+      const e = EncounterSchema.newEncounter('TooMany');
+      for (let i = 0; i < 60; i++) e.picks.push({ id: 'g', qty: 1, pickKey: 'q' + i });
+      const r = EncounterSchema.validateEncounter(e);
+      assertEq(r.ok, false);
+      assert(r.errors.some(x => x.field === 'picks' && /50/.test(x.message)), 'cap error');
+    });
+
+    test('validateEncounter tolerates v1 picks without pickKey', () => {
+      const e = EncounterSchema.newEncounter('v1');
+      e.picks = [{ id: 'g', qty: 1 }];  // no pickKey
+      const r = EncounterSchema.validateEncounter(e);
+      assertEq(r.ok, true);
+    });
   </script>
 </body>
 </html>

@@ -133,8 +133,77 @@
     return out;
   }
 
+  function validateEncounter(e) {
+    const errors = [];
+    const push = (field, message) => errors.push({ field, message });
+
+    if (!e || typeof e !== 'object') {
+      push('', 'encounter must be an object');
+      return { ok: false, errors };
+    }
+
+    if (!STATUSES.includes(e.status)) push('status', `unknown status: ${e.status}`);
+
+    // Tactical enums
+    if (e.tactical) {
+      if (!LIGHTING.includes(e.tactical.lighting)) push('tactical.lighting', `unknown lighting: ${e.tactical.lighting}`);
+      if (!SURPRISE.includes(e.tactical.surprise)) push('tactical.surprise', `unknown surprise: ${e.tactical.surprise}`);
+    }
+
+    // Picks: cap + pickKey uniqueness (when present)
+    if (Array.isArray(e.picks)) {
+      if (e.picks.length > CAPS.picks) push('picks', `too many picks (max ${CAPS.picks})`);
+      const seen = new Set();
+      const keyed = new Set();
+      e.picks.forEach((p, i) => {
+        if (p && typeof p.pickKey === 'string' && p.pickKey) {
+          if (seen.has(p.pickKey)) push('picks', `duplicate pickKey "${p.pickKey}" at index ${i}`);
+          seen.add(p.pickKey);
+          keyed.add(p.pickKey);
+        }
+      });
+      if (e.tactical && Array.isArray(e.tactical.waves)) {
+        if (e.tactical.waves.length > CAPS.waves) push('tactical.waves', `too many waves (max ${CAPS.waves})`);
+        e.tactical.waves.forEach((w, i) => {
+          if (typeof w.round !== 'number' || w.round < 1 || w.round > CAPS.waveRound) {
+            push(`tactical.waves[${i}].round`, `round must be 1..${CAPS.waveRound}`);
+          }
+          if (w.pickKey && !keyed.has(w.pickKey)) {
+            push(`tactical.waves[${i}].pickKey`, `references missing pickKey "${w.pickKey}"`);
+          }
+        });
+      }
+    }
+
+    if (Array.isArray(e.loot) && e.loot.length > CAPS.loot) push('loot', `too many loot rows (max ${CAPS.loot})`);
+    if (Array.isArray(e.npcRoles)) {
+      if (e.npcRoles.length > CAPS.npcRoles) push('npcRoles', `too many npc roles (max ${CAPS.npcRoles})`);
+      e.npcRoles.forEach((r, i) => {
+        if (!NPC_ROLES.includes(r.role)) push(`npcRoles[${i}].role`, `unknown role: ${r.role}`);
+      });
+    }
+
+    if (e.locationRef !== null && e.locationRef !== undefined) {
+      const ref = e.locationRef;
+      if (typeof ref !== 'object') push('locationRef', 'must be null or an object');
+      else {
+        if (!LOCATION_REF_KINDS.includes(ref.kind)) push('locationRef.kind', `unknown kind: ${ref.kind}`);
+        if (typeof ref.locationId !== 'string' || !ref.locationId) push('locationRef.locationId', 'required');
+        if (ref.kind === 'submap' && (typeof ref.parentLocationId !== 'string' || !ref.parentLocationId)) {
+          push('locationRef.parentLocationId', 'required for kind=submap');
+        }
+      }
+    }
+
+    if (e.lastOutcome != null && !OUTCOMES.includes(e.lastOutcome)) {
+      push('lastOutcome', `unknown outcome: ${e.lastOutcome}`);
+    }
+
+    return { ok: errors.length === 0, errors };
+  }
+
   global.EncounterSchema = {
     STATUSES, LIGHTING, SURPRISE, NPC_ROLES, LOCATION_REF_KINDS, OUTCOMES, CAPS,
-    newEncounter, genId, genPickKeys, migrateInMemory,
+    newEncounter, genId, genPickKeys, migrateInMemory, validateEncounter,
   };
 })(typeof window !== 'undefined' ? window : globalThis);
