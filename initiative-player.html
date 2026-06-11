@@ -738,18 +738,32 @@ function showCombat(s) {
   const me = (window.Auth && Auth.playerCreds && Auth.playerCreds()) || null;
   const viewer = { role: 'player', characterId: me ? me.characterId : null };
 
-  // Upsert in initiative order. appendChild on an existing node moves
-  // it to the end, so the final DOM order matches s.combatants order.
+  // Upsert in initiative order. CRITICAL: calling appendChild/insertBefore
+  // on a node that's already a child first removes it from the DOM, which
+  // in some browsers drops focus on descendants (the textarea). Only move
+  // a row if it's NOT already in the right slot — otherwise leave it
+  // untouched so the user's typing isn't disturbed.
   s.combatants.forEach((c, idx) => {
     const cid = String(c.id);
     const isActive = idx === s.activeIndex;
     let row = existingRows.get(cid);
+    const nodeAtTarget = list.children[idx];
+
     if (row) {
       existingRows.delete(cid);   // mark as used
-      list.appendChild(row);      // moves the node to the end
+      if (row !== nodeAtTarget) {
+        // Row is in the wrong slot — move it. May lose textarea focus
+        // when initiative is re-rolled, but that's a rare DM action.
+        list.insertBefore(row, nodeAtTarget || null);
+      }
+      // else: already in position — DO NOT touch, preserves focus.
     } else {
       row = buildEmptyRow(c);
-      list.appendChild(row);
+      if (nodeAtTarget) {
+        list.insertBefore(row, nodeAtTarget);
+      } else {
+        list.appendChild(row);
+      }
       bindRowClick(row, c.id);
     }
     updateRowContent(row, c, isActive);
