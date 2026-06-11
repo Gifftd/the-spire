@@ -991,6 +991,7 @@ function snapshotCombatant(c) {
 function startCombat() {
   mode = 'combat';
   initCombatLog();
+  currentDraftId = mintDraftId();
   updateModeUI();
   pushState();
 }
@@ -2210,6 +2211,18 @@ async function pushState() {
         conditions: c.conditions, dead: c.dead
       }))
     };
+
+    // Build the draft snapshot if there's an active combat. Drafts are
+    // saved in parallel with the player state; a failure here does not
+    // affect the main sync indicator.
+    let draftPromise = Promise.resolve(true);
+    if (currentDraftId) {
+      const prev = allDrafts.find(d => d.id === currentDraftId);
+      const draft = currentDraftSnapshot(prev);
+      upsertDraft(draft);
+      draftPromise = saveDrafts();
+    }
+
     try {
       const res = await fetch(WORKER_URL, {
         method:'POST', headers: Auth.dmHeaders(),
@@ -2220,6 +2233,7 @@ async function pushState() {
         window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.'));
         return;
       }
+      await draftPromise;
       setSyncStatus(res.ok?'ok':'fail', res.ok?'✦ Synced':'⚠ Sync failed');
     } catch { setSyncStatus('fail','⚠ Offline'); }
   }, 600);
