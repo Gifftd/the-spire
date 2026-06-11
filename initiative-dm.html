@@ -2637,7 +2637,7 @@ async function exportToChronicle() {
 // ═══════════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════════
-function init() {
+async function init() {
   state.customConditions = loadCustomConds();
   const pcs = loadPCs();
   if (pcs.length > 0) { state.combatants = pcs; _id = Math.max(...pcs.map(c=>c.id), 0); }
@@ -2649,6 +2649,14 @@ function init() {
   ['add-name','add-init','add-hp','add-ac'].forEach(id => {
     document.getElementById(id).addEventListener('keydown', e => { if(e.key==='Enter') addCombatant(); });
   });
+
+  // Load drafts from KV, auto-promote stale in-progress drafts, render banner.
+  // Requires DM auth; if it fails (e.g., worker not redeployed), degrade silently.
+  allDrafts = await loadDrafts();
+  if (promoteStaleDrafts(allDrafts)) {
+    await saveDrafts();
+  }
+  renderDraftBanner();
 }
 init();
 </script>
