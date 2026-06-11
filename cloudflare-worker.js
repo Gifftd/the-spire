@@ -727,7 +727,10 @@ export default {
 
       const state = await kvGet(env, 'initiative_state', { combatants: [] });
       const combatants = Array.isArray(state.combatants) ? state.combatants : [];
-      const idx = combatants.findIndex(c => c && c.id === combatantId);
+      // Combatant ids are numbers in KV (DM tracker uid is ++_id) but the
+      // incoming combatantId is coerced to a string above. Stringify the
+      // KV-side id for the comparison so 4 ("4") matches.
+      const idx = combatants.findIndex(c => c && String(c.id) === combatantId);
       if (idx < 0) return json({ error: 'combatant not found' }, 404);
 
       const target = combatants[idx];
@@ -775,7 +778,10 @@ export default {
 
       const state = await kvGet(env, 'initiative_state', { combatants: [] });
       const combatants = Array.isArray(state.combatants) ? state.combatants : [];
-      const idx = combatants.findIndex(c => c && c.id === combatantId);
+      // Combatant ids are numbers in KV (DM tracker uid is ++_id) but the
+      // incoming combatantId is coerced to a string above. Stringify the
+      // KV-side id for the comparison so 4 ("4") matches.
+      const idx = combatants.findIndex(c => c && String(c.id) === combatantId);
       if (idx < 0) return json({ error: 'combatant not found' }, 404);
 
       const existing = Array.isArray(combatants[idx].playerNotes) ? combatants[idx].playerNotes : [];
