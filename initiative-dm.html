@@ -159,6 +159,41 @@ body {
 .lobby-banner.hidden { display: none; }
 .lobby-banner-icon { font-size: 1.1rem; }
 
+/* ── Draft recovery banner ── */
+.draft-banner {
+  background: rgba(192, 130, 50, 0.08);
+  border: 1px solid #c08232;
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-bottom: 1rem;
+  font-family: 'Cinzel', serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: #d4a060;
+}
+.draft-banner.hidden { display: none; }
+.draft-banner-title {
+  font-size: 0.78rem;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.draft-banner-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-top: 1px solid rgba(192, 130, 50, 0.2);
+  font-family: 'Crimson Text', serif;
+  font-size: 0.85rem;
+  letter-spacing: 0;
+}
+.draft-banner-meta { color: var(--ink); }
+.draft-banner-meta .draft-date { color: var(--ink-faint); font-size: 0.78rem; }
+.draft-banner-actions { display: flex; gap: 6px; }
+
 /* ── Combatant cards ── */
 .combatant-card {
   background: var(--surface);
@@ -516,6 +551,7 @@ body {
 
 <main class="main" id="main">
   <div class="combatant-col">
+    <div class="draft-banner hidden" id="draft-banner"></div>
     <div class="lobby-banner" id="lobby-banner">
       <span class="lobby-banner-icon">🔒</span>
       <span>You are in <strong>Lobby</strong> mode — players see "Combat incoming…" until you press Start Combat. Add enemies and set initiative freely.</span>
@@ -964,9 +1000,83 @@ function removeDraft(id) {
   if (idx >= 0) allDrafts.splice(idx, 1);
 }
 
-// Placeholder — wired up in the banner task. Kept as a no-op so callers
-// (e.g. exportToChronicle) work before the banner module lands.
-function renderDraftBanner() { /* replaced in Task 8 */ }
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function formatDraftDate(iso) {
+  if (!iso) return '';
+  // Show local date only — YYYY-MM-DD is enough context for the DM.
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return d.toISOString().slice(0, 10);
+  } catch { return ''; }
+}
+
+function renderDraftBanner() {
+  const el = document.getElementById('draft-banner');
+  if (!el) return;
+  if (mode === 'combat') { el.classList.add('hidden'); return; }
+  const pending = allDrafts.filter(d => d.status === 'pending-export');
+  if (pending.length === 0) {
+    el.classList.add('hidden');
+    el.innerHTML = '';
+    return;
+  }
+  // Newest first.
+  pending.sort((a, b) => (b.endedAt || b.savedAt || '').localeCompare(a.endedAt || a.savedAt || ''));
+  const rows = pending.map(d => {
+    const date  = formatDraftDate(d.endedAt || d.savedAt);
+    const title = escapeHtml(d.title || 'Combat');
+    const rounds = d.round || 0;
+    const pcs    = d.pcCount || 0;
+    const enem   = d.enemyCount || 0;
+    return `
+      <div class="draft-banner-row" data-draft-id="${escapeHtml(d.id)}">
+        <div class="draft-banner-meta">
+          <div>${title} <span class="draft-date">— ${date}</span></div>
+          <div class="draft-date">${rounds} round${rounds === 1 ? '' : 's'}, ${pcs} PC${pcs === 1 ? '' : 's'} / ${enem} enem${enem === 1 ? 'y' : 'ies'}</div>
+        </div>
+        <div class="draft-banner-actions">
+          <button class="btn btn-gold btn-sm" onclick="handleBannerExport('${escapeHtml(d.id)}')">Export</button>
+          <button class="btn btn-ghost btn-sm" onclick="handleBannerDiscard('${escapeHtml(d.id)}')">Discard</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  const titleLine = pending.length === 1
+    ? '⚠ You have 1 un-exported combat from a previous session.'
+    : `⚠ You have ${pending.length} un-exported combats from previous sessions.`;
+  el.innerHTML = `<div class="draft-banner-title">${titleLine}</div>${rows}`;
+  el.classList.remove('hidden');
+}
+
+function handleBannerExport(draftId) {
+  const d = allDrafts.find(x => x.id === draftId);
+  if (!d) { renderDraftBanner(); return; }
+  // Stash the live combatLog so closeExport() can restore it.
+  savedCombatLog = combatLog;
+  combatLog = deserializeCombatLog(d.combatLog);
+  // Bind the modal to the recovered draft BEFORE opening, and tell
+  // openExport() to skip its live-combatant snapshot (which would
+  // pollute the recovered combatLog).
+  exportingDraftId = draftId;
+  openExport({ fromDraft: true });
+  if (d.title) {
+    const titleEl = document.getElementById('exp-title');
+    if (titleEl) { titleEl.value = d.title; updatePreview(); }
+  }
+}
+
+async function handleBannerDiscard(draftId) {
+  if (!confirm('Discard this combat log? This cannot be undone.')) return;
+  removeDraft(draftId);
+  await saveDrafts();
+  renderDraftBanner();
+}
 
 // ═══════════════════════════════════════════════════════
 //  COMBAT LOG
@@ -1032,6 +1142,12 @@ function updateModeUI() {
   document.getElementById('btn-end').style.display       = inCombat ? '' : 'none';
   document.getElementById('btn-export').style.display    = inCombat ? '' : 'none';
   document.getElementById('lobby-banner').classList.toggle('hidden', inCombat);
+  if (inCombat) {
+    document.getElementById('draft-banner').classList.add('hidden');
+  } else {
+    // Returning to lobby — re-render so any pending-export drafts surface.
+    renderDraftBanner();
+  }
   document.getElementById('lobby-pc-section').style.display = inCombat ? 'none' : '';
 }
 
