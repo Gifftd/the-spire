@@ -264,6 +264,11 @@
         fetch(WORKER_URL + '?type=timeline_dm', { headers, cache: 'no-store' }).then(r => r.json()),
       ]);
       state.encounters = (Array.isArray(encs) ? encs : []).map(EncounterSchema.migrateInMemory);
+      // If a selection was set (e.g., from URL param in future tasks), make sure
+      // the picker state mirrors that encounter's picks on first render.
+      if (state.selectedId && typeof syncPicksFromEncounter === 'function') {
+        syncPicksFromEncounter();
+      }
       state.worldData = world && world.map_data ? world.map_data : world;
       state.npcs = Array.isArray(npcs) ? npcs : (npcs?.npcs || []);
       state.timeline = Array.isArray(tl) ? tl : (tl?.entries || []);
@@ -821,6 +826,8 @@
     }
 
     function encTogglePickExpanded(id) {
+      // expanded is a transient UI flag — intentionally NOT persisted to currentEncounter.picks.
+      // Only rerender locally; no sync, no save.
       const p = _BP.picks.find(x => x.id === id);
       if (!p) return;
       p.expanded = !p.expanded;
@@ -835,10 +842,6 @@
         total += xp * p.qty;
       }
       return total;
-    }
-
-    function encTotalPickedCount() {
-      return _BP.picks.reduce((a, p) => a + p.qty, 0);
     }
 
     function encRenderPicks() {
