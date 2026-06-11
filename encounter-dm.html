@@ -509,6 +509,7 @@
       document.getElementById('enc-tactical-section').outerHTML = renderTactical(enc);
       document.getElementById('enc-playbook-section').outerHTML = renderPlaybook(enc);
       document.getElementById('enc-loot-section').outerHTML = renderLoot(enc);
+      document.getElementById('enc-linkages-section').outerHTML = renderLinkages(enc);
 
       // Sync party inputs only when not focused (avoid disrupting typing).
       const szEl = document.getElementById('enc-bp-party-size');
@@ -703,6 +704,88 @@
     }
     function removeLoot(i) {
       currentEncounter().loot.splice(i, 1);
+      scheduleSave();
+      renderEditor();
+    }
+
+    // ── Linkages section ──
+
+    function renderLinkages(e) {
+      const ref = e.locationRef;
+      const allLocs = [];
+      (state.worldData?.locations || []).forEach(loc => {
+        allLocs.push({ kind: 'world', locationId: loc.id, label: loc.name + ' (world)' });
+        (loc.subMap?.locations || []).forEach(sub =>
+          allLocs.push({ kind: 'submap', parentLocationId: loc.id, locationId: sub.id, label: loc.name + ' › ' + sub.name }));
+      });
+      const refKey = ref ? `${ref.kind}|${ref.parentLocationId || ''}|${ref.locationId}` : '';
+
+      const sessions = state.timeline.filter(t => t.kind === 'planned' || t.kind === 'session');
+
+      return `
+        <details class="enc-section" id="enc-linkages-section"><summary>Linkages</summary>
+          <div class="field"><label>Location</label>
+            <select onchange="setLocationRef(this.value)">
+              <option value="">(unlocated)</option>
+              ${allLocs.map(l => {
+                const k = `${l.kind}|${l.parentLocationId || ''}|${l.locationId}`;
+                return `<option value="${k}" ${k === refKey ? 'selected' : ''}>${escapeHtml(l.label)}</option>`;
+              }).join('')}
+            </select>
+          </div>
+          <div class="field"><label>Planned session</label>
+            <select onchange="updateField('sessionId', this.value || null)">
+              <option value="">(none)</option>
+              ${sessions.map(s => `<option value="${s.id}" ${e.sessionId === s.id ? 'selected' : ''}>${escapeHtml(s.title || s.id)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label>NPC roles</label>
+            ${e.npcRoles.map((r, i) => {
+              const npc = state.npcs.find(n => n.id === r.npcId);
+              return `
+                <div style="display:flex;gap:6px;margin-bottom:4px">
+                  <span style="flex:1">${escapeHtml(npc ? npc.name : '(deleted) ' + r.npcId)}</span>
+                  <select onchange="updateNpcRole(${i}, this.value)">
+                    ${EncounterSchema.NPC_ROLES.map(role => `<option value="${role}" ${r.role === role ? 'selected' : ''}>${role}</option>`).join('')}
+                  </select>
+                  <button onclick="removeNpcRole(${i})">×</button>
+                </div>
+              `;
+            }).join('')}
+            <select onchange="addNpcRole(this.value); this.value=''">
+              <option value="">+ Add NPC…</option>
+              ${state.npcs.filter(n => !e.npcRoles.some(r => r.npcId === n.id))
+                .map(n => `<option value="${n.id}">${escapeHtml(n.name)}</option>`).join('')}
+            </select>
+          </div>
+        </details>
+      `;
+    }
+
+    function setLocationRef(key) {
+      const e = currentEncounter();
+      if (!key) { e.locationRef = null; }
+      else {
+        const [kind, parent, loc] = key.split('|');
+        e.locationRef = kind === 'world'
+          ? { kind: 'world', locationId: loc }
+          : { kind: 'submap', parentLocationId: parent, locationId: loc };
+      }
+      scheduleSave();
+      renderEditor();
+    }
+    function addNpcRole(npcId) {
+      if (!npcId) return;
+      currentEncounter().npcRoles.push({ npcId, role: 'enemy' });
+      scheduleSave();
+      renderEditor();
+    }
+    function updateNpcRole(i, role) {
+      currentEncounter().npcRoles[i].role = role;
+      scheduleSave();
+    }
+    function removeNpcRole(i) {
+      currentEncounter().npcRoles.splice(i, 1);
       scheduleSave();
       renderEditor();
     }
