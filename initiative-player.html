@@ -705,13 +705,23 @@ function showCombat(s) {
     banner.classList.add('show');
   }
 
-  // Preserve in-progress textarea content across poll re-renders.
-  // Without this, every 2.5s poll destroys the user's typed text.
+  // Preserve in-progress textarea content + cursor + focus across poll
+  // re-renders. Without this, every 2.5s poll destroys the user's typed text
+  // and clobbers their cursor position.
   const draftsByCombatantId = new Map();
+  const activeEl = document.activeElement;
+  let focusedDraft = null;  // { combatantId, selStart, selEnd } or null
   document.querySelectorAll('.row-expanded[data-combatant-id]').forEach(re => {
     const id = re.dataset.combatantId;
     const ta = re.querySelector('.add-note-form textarea');
     if (ta && ta.value) draftsByCombatantId.set(id, ta.value);
+    if (ta && ta === activeEl) {
+      focusedDraft = {
+        combatantId: id,
+        selStart: ta.selectionStart,
+        selEnd:   ta.selectionEnd,
+      };
+    }
   });
 
   list.innerHTML = '';
@@ -808,6 +818,20 @@ function showCombat(s) {
         ta.dispatchEvent(new Event('input'));
       }
     });
+  }
+
+  // Restore focus + cursor position to whichever textarea the user was
+  // typing in before the poll rebuilt the row.
+  if (focusedDraft) {
+    const ta = document.querySelector(
+      `.row-expanded[data-combatant-id="${CSS.escape(focusedDraft.combatantId)}"] .add-note-form textarea`
+    );
+    if (ta) {
+      ta.focus();
+      // setSelectionRange clamps out-of-range indices, but guard anyway
+      try { ta.setSelectionRange(focusedDraft.selStart, focusedDraft.selEnd); }
+      catch { /* ignore — selection isn't critical */ }
+    }
   }
 
   renderExpandedState();
