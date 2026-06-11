@@ -405,11 +405,15 @@ let failCount = 0;
 let expandedId = null;   // combatant.id currently expanded, or null
 
 // Bind click to expand/collapse. Called from row creation in renderRow().
+// Note: combatant ids from the worker can be numbers (DM tracker uid is ++_id).
+// We coerce to string so the comparison with dataset.combatantId (always a
+// string) works under strict equality.
 function bindRowClick(rowEl, combatantId) {
+  const id = String(combatantId);
   rowEl.addEventListener('click', (e) => {
     // Ignore clicks inside the expanded area (form inputs, delete buttons)
     if (e.target.closest('.row-expanded')) return;
-    expandedId = (expandedId === combatantId) ? null : combatantId;
+    expandedId = (expandedId === id) ? null : id;
     renderExpandedState();
   });
 }
@@ -431,10 +435,9 @@ function renderNotesList(combatantId, notes, viewer) {
     empty.className = 'notes-empty';
     empty.textContent = 'No notes yet.';
     root.appendChild(empty);
-    return;
-  }
-  const sorted = notes.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  sorted.forEach(n => {
+  } else {
+    const sorted = notes.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    sorted.forEach(n => {
     const card = document.createElement('div');
     card.className = 'note-card' + (viewer.characterId && n.authorCharId === viewer.characterId ? ' is-mine' : '');
     if (n._pending) card.classList.add('is-pending');
@@ -468,56 +471,73 @@ function renderNotesList(combatantId, notes, viewer) {
     card.appendChild(meta);
     root.appendChild(card);
   });
+  }
 
-  // Add-note form (only for logged-in players)
+  // Form/banner are siblings of .notes-list inside .row-expanded.
+  // We only re-create them when the appropriate one doesn't already exist
+  // — this preserves the user's in-progress textarea + radio state across
+  // re-renders triggered by optimistic insert/delete (submitNote /
+  // deleteNote call renderNotesList without destroying the row).
+  // showCombat's poll-cycle rebuild always destroys the row first, so on
+  // that path no existing form is found and a fresh one is created.
+  const expanded = root.parentElement;
   if (viewer.characterId) {
-    const form = document.createElement('div');
-    form.className = 'add-note-form';
-    const lastVis = localStorage.getItem('spire-initiative-note-vis') || 'party';
-    form.innerHTML = `
-      <textarea placeholder="Add a note about ${escapeAttr(getCombatantName(combatantId))}…"
-                maxlength="${InitiativeNotes.MAX_NOTE_LENGTH + 50 /* allow overflow for counter */}"></textarea>
-      <div class="row-actions">
-        <div class="vis-toggle">
-          <label><input type="radio" name="vis-${CSS.escape(combatantId)}" value="private" ${lastVis === 'private' ? 'checked' : ''}>JUST ME</label>
-          <label><input type="radio" name="vis-${CSS.escape(combatantId)}" value="party"   ${lastVis === 'party'   ? 'checked' : ''}>PARTY</label>
+    // Logged-in: ensure a form exists, drop any stale banner.
+    const oldBanner = expanded.querySelector(':scope > .login-banner');
+    if (oldBanner) oldBanner.remove();
+    if (!expanded.querySelector(':scope > .add-note-form')) {
+      const form = document.createElement('div');
+      form.className = 'add-note-form';
+      const lastVis = localStorage.getItem('spire-initiative-note-vis') || 'party';
+      form.innerHTML = `
+        <textarea placeholder="Add a note about ${escapeAttr(getCombatantName(combatantId))}…"
+                  maxlength="${InitiativeNotes.MAX_NOTE_LENGTH + 50 /* allow overflow for counter */}"></textarea>
+        <div class="row-actions">
+          <div class="vis-toggle">
+            <label><input type="radio" name="vis-${CSS.escape(combatantId)}" value="private" ${lastVis === 'private' ? 'checked' : ''}>JUST ME</label>
+            <label><input type="radio" name="vis-${CSS.escape(combatantId)}" value="party"   ${lastVis === 'party'   ? 'checked' : ''}>PARTY</label>
+          </div>
+          <span class="char-counter">0/${InitiativeNotes.MAX_NOTE_LENGTH}</span>
+          <button class="save-btn" disabled>Save</button>
         </div>
-        <span class="char-counter">0/${InitiativeNotes.MAX_NOTE_LENGTH}</span>
-        <button class="save-btn" disabled>Save</button>
-      </div>
-      <div class="form-error" style="display:none"></div>
-    `;
-    const textarea = form.querySelector('textarea');
-    const counter  = form.querySelector('.char-counter');
-    const saveBtn  = form.querySelector('.save-btn');
-    const errEl    = form.querySelector('.form-error');
+        <div class="form-error" style="display:none"></div>
+      `;
+      const textarea = form.querySelector('textarea');
+      const counter  = form.querySelector('.char-counter');
+      const saveBtn  = form.querySelector('.save-btn');
+      const errEl    = form.querySelector('.form-error');
 
-    textarea.addEventListener('input', () => {
-      const len = textarea.value.length;
-      counter.textContent = len + '/' + InitiativeNotes.MAX_NOTE_LENGTH;
-      counter.classList.toggle('warn', len > 400 && len <= InitiativeNotes.MAX_NOTE_LENGTH);
-      counter.classList.toggle('over', len > InitiativeNotes.MAX_NOTE_LENGTH);
-      saveBtn.disabled = (textarea.value.trim().length === 0) || len > InitiativeNotes.MAX_NOTE_LENGTH;
-    });
+      textarea.addEventListener('input', () => {
+        const len = textarea.value.length;
+        counter.textContent = len + '/' + InitiativeNotes.MAX_NOTE_LENGTH;
+        counter.classList.toggle('warn', len > 400 && len <= InitiativeNotes.MAX_NOTE_LENGTH);
+        counter.classList.toggle('over', len > InitiativeNotes.MAX_NOTE_LENGTH);
+        saveBtn.disabled = (textarea.value.trim().length === 0) || len > InitiativeNotes.MAX_NOTE_LENGTH;
+      });
 
-    saveBtn.addEventListener('click', () => {
-      const vis = form.querySelector('input[type=radio]:checked').value;
-      localStorage.setItem('spire-initiative-note-vis', vis);
-      submitNote(combatantId, textarea.value, vis, { textarea, errEl, saveBtn });
-    });
+      saveBtn.addEventListener('click', () => {
+        const vis = form.querySelector('input[type=radio]:checked').value;
+        localStorage.setItem('spire-initiative-note-vis', vis);
+        submitNote(combatantId, textarea.value, vis, { textarea, errEl, saveBtn });
+      });
 
-    root.parentElement.appendChild(form);  // appended outside .notes-list (sibling)
+      expanded.appendChild(form);
+    }
   } else {
-    // Anonymous: show login banner. Two-state: trigger button → inline form.
-    const banner = document.createElement('div');
-    banner.className = 'login-banner';
-    banner.innerHTML = `
-      <span>Log in as your character to add notes.</span>
-      <button class="login-trigger" type="button">Log in</button>
-    `;
-    banner.querySelector('.login-trigger').addEventListener('click',
-      (e) => { e.stopPropagation(); openInlineLogin(banner); });
-    root.parentElement.appendChild(banner);
+    // Anonymous: ensure a banner exists, drop any stale form.
+    const oldForm = expanded.querySelector(':scope > .add-note-form');
+    if (oldForm) oldForm.remove();
+    if (!expanded.querySelector(':scope > .login-banner')) {
+      const banner = document.createElement('div');
+      banner.className = 'login-banner';
+      banner.innerHTML = `
+        <span>Log in as your character to add notes.</span>
+        <button class="login-trigger" type="button">Log in</button>
+      `;
+      banner.querySelector('.login-trigger').addEventListener('click',
+        (e) => { e.stopPropagation(); openInlineLogin(banner); });
+      expanded.appendChild(banner);
+    }
   }
 }
 
@@ -681,6 +701,14 @@ function showLobby() {
   document.getElementById('round-num').textContent = '—';
 }
 
+// ── Surgical row rendering ────────────────────────────────────────
+// Rather than `list.innerHTML = ''` + rebuild on every poll, we diff
+// the incoming combatants against existing rows by combatant.id and
+// update fields in place. The interactive form inside each row's
+// .row-expanded is never destroyed, so the textarea value, cursor
+// position, focus, and radio choice all survive poll cycles naturally
+// — no capture/restore machinery needed.
+
 function showCombat(s) {
   document.getElementById('lobby-screen').classList.remove('show');
   document.getElementById('combat-view').classList.add('show');
@@ -701,89 +729,156 @@ function showCombat(s) {
     banner.classList.add('show');
   }
 
-  list.innerHTML = '';
+  // Build a map of existing rows by combatant id (stringified).
+  const existingRows = new Map();
+  list.querySelectorAll(':scope > .row').forEach(r => {
+    existingRows.set(r.dataset.combatantId, r);
+  });
+
+  const me = (window.Auth && Auth.playerCreds && Auth.playerCreds()) || null;
+  const viewer = { role: 'player', characterId: me ? me.characterId : null };
+
+  // Upsert in initiative order. CRITICAL: calling appendChild/insertBefore
+  // on a node that's already a child first removes it from the DOM, which
+  // in some browsers drops focus on descendants (the textarea). Only move
+  // a row if it's NOT already in the right slot — otherwise leave it
+  // untouched so the user's typing isn't disturbed.
   s.combatants.forEach((c, idx) => {
+    const cid = String(c.id);
     const isActive = idx === s.activeIndex;
-    const isPC     = c.type === 'pc';
-    const hpPct    = c.hpPct ?? 100;
+    let row = existingRows.get(cid);
+    const nodeAtTarget = list.children[idx];
 
-    const row = document.createElement('div');
-    row.className = `row is-${c.type}${isActive ? ' is-active' : ''}${c.dead ? ' is-dead' : ''}`;
-
-    const condsHtml = c.conditions && c.conditions.length > 0
-      ? `<div class="conds">${c.conditions.map(cond => `<span class="cond-tag">${cond}</span>`).join('')}</div>`
-      : '';
-
-    // AC: only shown for PCs (enemies have ac:null in payload)
-    const acHtml = (isPC && c.ac)
-      ? `<div class="ac-chip"><small>AC</small>${c.ac}</div>`
-      : '';
-
-    row.innerHTML = `
-      <div class="row-main">
-        <div class="init-num">${c.init}</div>
-        <div>
-          <div class="name-text">
-            <span class="type-pip ${c.type}"></span>
-            ${isActive ? '<span class="active-marker">▶</span>' : ''}
-            ${c.name}
-          </div>
-          ${condsHtml}
-        </div>
-        <div class="right-col">
-          <div class="hp-block">
-            <div class="hp-label">${isPC ? 'HP' : 'CONDITION'}</div>
-            <div class="hp-bar-wrap">
-              <div class="hp-bar" style="width:${hpPct}%;background:${hpColor(hpPct)}"></div>
-            </div>
-            <div class="hp-num">${hpLabel(hpPct, c.type, c.hp, c.maxHp)}</div>
-          </div>
-          ${acHtml}
-        </div>
-      </div>
-      <div class="row-expanded" data-combatant-id="${c.id}">
-        <div class="notes-list"></div>
-      </div>
-    `;
-
-    // ── Notes preview (one-line, newest visible note) ─────────────
-    const notes = Array.isArray(c.playerNotes) ? c.playerNotes : [];
-    if (notes.length > 0) {
-      // Newest first by createdAt
-      const sorted = notes.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      const top = sorted[0];
-      const previewEl = document.createElement('div');
-      previewEl.className = 'notes-preview';
-      // Build the preview using textContent so note bodies can't inject HTML
-      const icon = document.createElement('span'); icon.className = 'pn-icon'; icon.textContent = '📝';
-      const count = document.createElement('span'); count.className = 'pn-count';
-      count.textContent = '×' + notes.length;
-      const body = document.createElement('span');
-      const truncated = top.body.length > 60 ? top.body.slice(0, 57) + '…' : top.body;
-      body.textContent = '"' + truncated + '"';
-      const author = document.createElement('span');
-      author.className = 'pn-author';
-      author.textContent = '— ' + (top.authorName || '?');
-      previewEl.appendChild(icon);
-      previewEl.appendChild(count);
-      previewEl.appendChild(body);
-      previewEl.appendChild(author);
-      // Append into the row-main's middle column (the name area)
-      const middleCol = row.querySelector('.row-main > div:nth-child(2)');
-      if (middleCol) middleCol.appendChild(previewEl);
+    if (row) {
+      existingRows.delete(cid);   // mark as used
+      if (row !== nodeAtTarget) {
+        // Row is in the wrong slot — move it. May lose textarea focus
+        // when initiative is re-rolled, but that's a rare DM action.
+        list.insertBefore(row, nodeAtTarget || null);
+      }
+      // else: already in position — DO NOT touch, preserves focus.
+    } else {
+      row = buildEmptyRow(c);
+      if (nodeAtTarget) {
+        list.insertBefore(row, nodeAtTarget);
+      } else {
+        list.appendChild(row);
+      }
+      bindRowClick(row, c.id);
     }
-
-    list.appendChild(row);
-
-    row.dataset.combatantId = c.id;
-    bindRowClick(row, c.id);
-
-    const me = (window.Auth && Auth.playerCreds && Auth.playerCreds()) || null;
-    const viewer = { role: 'player', characterId: me ? me.characterId : null };
+    updateRowContent(row, c, isActive);
     renderNotesList(c.id, c.playerNotes || [], viewer);
   });
 
+  // Remove rows for combatants no longer present in the state.
+  existingRows.forEach(r => r.remove());
+
   renderExpandedState();
+}
+
+// Build a fresh row with placeholder elements that updateRowContent fills in.
+// The structure here MUST stay in sync with the selectors used by
+// updateRowContent / updateNotesPreview / renderNotesList.
+function buildEmptyRow(c) {
+  const row = document.createElement('div');
+  row.dataset.combatantId = String(c.id);
+  // row.className is set by updateRowContent
+  row.innerHTML = `
+    <div class="row-main">
+      <div class="init-num"></div>
+      <div>
+        <div class="name-text">
+          <span class="type-pip"></span>
+          <span class="active-marker" style="display:none">▶</span>
+          <span class="name-content"></span>
+        </div>
+        <div class="conds" style="display:none"></div>
+        <div class="notes-preview" style="display:none"></div>
+      </div>
+      <div class="right-col">
+        <div class="hp-block">
+          <div class="hp-label"></div>
+          <div class="hp-bar-wrap"><div class="hp-bar"></div></div>
+          <div class="hp-num"></div>
+        </div>
+        <div class="ac-chip" style="display:none"></div>
+      </div>
+    </div>
+    <div class="row-expanded" data-combatant-id="${escapeAttr(c.id)}">
+      <div class="notes-list"></div>
+    </div>
+  `;
+  return row;
+}
+
+// Update the dynamic fields on an existing row. Does NOT touch
+// .row-expanded's form/banner — those persist across poll cycles.
+function updateRowContent(row, c, isActive) {
+  const isPC = c.type === 'pc';
+  const hpPct = c.hpPct ?? 100;
+
+  row.className = `row is-${c.type}${isActive ? ' is-active' : ''}${c.dead ? ' is-dead' : ''}`;
+  row.querySelector('.init-num').textContent = c.init;
+  row.querySelector('.type-pip').className = `type-pip ${c.type}`;
+  row.querySelector('.active-marker').style.display = isActive ? '' : 'none';
+  row.querySelector('.name-content').textContent = c.name;
+
+  const condsEl = row.querySelector('.conds');
+  const conditions = Array.isArray(c.conditions) ? c.conditions : [];
+  if (conditions.length > 0) {
+    condsEl.innerHTML = conditions
+      .map(cond => `<span class="cond-tag">${escapeAttr(cond)}</span>`)
+      .join('');
+    condsEl.style.display = '';
+  } else {
+    condsEl.innerHTML = '';
+    condsEl.style.display = 'none';
+  }
+
+  row.querySelector('.hp-label').textContent = isPC ? 'HP' : 'CONDITION';
+  const hpBar = row.querySelector('.hp-bar');
+  hpBar.style.width = hpPct + '%';
+  hpBar.style.background = hpColor(hpPct);
+  row.querySelector('.hp-num').textContent = hpLabel(hpPct, c.type, c.hp, c.maxHp);
+
+  const acChip = row.querySelector('.ac-chip');
+  if (isPC && c.ac) {
+    acChip.innerHTML = `<small>AC</small>${escapeAttr(c.ac)}`;
+    acChip.style.display = '';
+  } else {
+    acChip.innerHTML = '';
+    acChip.style.display = 'none';
+  }
+
+  updateNotesPreview(row, c);
+}
+
+// Update the one-line preview chip on a collapsed row.
+function updateNotesPreview(row, c) {
+  const previewEl = row.querySelector('.notes-preview');
+  if (!previewEl) return;
+  const notes = Array.isArray(c.playerNotes) ? c.playerNotes : [];
+  if (notes.length === 0) {
+    previewEl.innerHTML = '';
+    previewEl.style.display = 'none';
+    return;
+  }
+  const sorted = notes.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const top = sorted[0];
+  previewEl.innerHTML = '';
+  const icon = document.createElement('span'); icon.className = 'pn-icon'; icon.textContent = '📝';
+  const count = document.createElement('span'); count.className = 'pn-count';
+  count.textContent = '×' + notes.length;
+  const body = document.createElement('span');
+  const truncated = (top.body || '').length > 60 ? top.body.slice(0, 57) + '…' : (top.body || '');
+  body.textContent = '"' + truncated + '"';
+  const author = document.createElement('span'); author.className = 'pn-author';
+  author.textContent = '— ' + (top.authorName || '?');
+  previewEl.appendChild(icon);
+  previewEl.appendChild(count);
+  previewEl.appendChild(body);
+  previewEl.appendChild(author);
+  previewEl.style.display = '';
 }
 
 function buildStateUrl() {
