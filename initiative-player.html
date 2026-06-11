@@ -505,7 +505,78 @@ function deleteNote(combatantId, noteId) {
   console.log('TODO delete', combatantId, noteId);
 }
 
-function submitNote(/* impl in Task 17 */) {}
+async function submitNote(combatantId, rawBody, visibility, els) {
+  const body = (rawBody || '').toString();
+  const v = InitiativeNotes.validateNote({ body, visibility });
+  if (!v.ok) {
+    els.errEl.style.display = 'block';
+    els.errEl.textContent = v.error;
+    return;
+  }
+  els.errEl.style.display = 'none';
+
+  const me = (window.Auth && Auth.playerCreds && Auth.playerCreds()) || null;
+  if (!me || !me.characterId || !me.code) {
+    els.errEl.style.display = 'block';
+    els.errEl.textContent = 'You are not logged in.';
+    return;
+  }
+
+  // Optimistic local insert
+  const tempNote = {
+    id: 'temp_' + Math.random().toString(36).slice(2, 8),
+    combatantId,
+    authorCharId: me.characterId,
+    authorName: me.name || '?',
+    body, visibility,
+    createdAt: Date.now(),
+    _pending: true,
+  };
+  if (lastSnapshot && Array.isArray(lastSnapshot.combatants)) {
+    const c = lastSnapshot.combatants.find(x => x.id === combatantId);
+    if (c) {
+      c.playerNotes = (c.playerNotes || []).concat([tempNote]);
+      renderNotesList(combatantId, c.playerNotes, { role: 'player', characterId: me.characterId });
+    }
+  }
+  els.saveBtn.disabled = true;
+  const originalText = els.textarea.value;
+  els.textarea.value = '';
+
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'initiative_note',
+        characterId: me.characterId,
+        code: me.code,
+        combatantId,
+        body,
+        visibility,
+      }),
+    });
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody.error || ('HTTP ' + res.status));
+    }
+    // Success: the next poll tick will replace the pending temp note
+    // with the server-issued one. No further action needed here.
+  } catch (e) {
+    // Roll back optimistic insert
+    if (lastSnapshot && Array.isArray(lastSnapshot.combatants)) {
+      const c = lastSnapshot.combatants.find(x => x.id === combatantId);
+      if (c && Array.isArray(c.playerNotes)) {
+        c.playerNotes = c.playerNotes.filter(n => n.id !== tempNote.id);
+        renderNotesList(combatantId, c.playerNotes, { role: 'player', characterId: me.characterId });
+      }
+    }
+    els.errEl.style.display = 'block';
+    els.errEl.textContent = 'Couldn\'t save — ' + (e.message || 'try again') + '.';
+    els.textarea.value = originalText;  // restore the user's text
+    els.saveBtn.disabled = false;
+  }
+}
 
 function hpColor(pct) {
   return pct > 60 ? '#2d6a3f' : pct > 30 ? '#c87800' : '#c0392b';
