@@ -159,20 +159,26 @@
         return;
       }
 
-      const r = await fetch(WORKER_URL, {
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'encounters', payload: merged }),
-      });
-      if (!r.ok) {
-        const body = await r.json().catch(() => ({}));
-        console.warn('Save failed', r.status, body);
-        showBanner('Save failed (' + r.status + '). Retrying in 10s.', 'warn');
+      try {
+        const r = await fetch(WORKER_URL, {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'encounters', payload: merged }),
+        });
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          console.warn('Save failed', r.status, body);
+          showBanner('Save failed (' + r.status + '). Retrying in 10s.', 'warn');
+          setTimeout(saveEncounters, 10000);
+          return;
+        }
+        state.encounters = merged;
+        render();
+      } catch (e) {
+        console.warn('Save network error', e);
+        showBanner('Network error during save — retrying in 10s', 'warn');
         setTimeout(saveEncounters, 10000);
-        return;
       }
-      state.encounters = merged;
-      render();
     }
 
     function showBanner(msg, kind) {
