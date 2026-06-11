@@ -258,6 +258,77 @@ body {
   color: var(--ink-faint); font-style: italic; font-size: 0.8rem;
   padding: 4px 0;
 }
+
+.add-note-form {
+  display: flex; flex-direction: column; gap: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-light);
+}
+.add-note-form textarea {
+  width: 100%;
+  min-height: 50px;
+  resize: vertical;
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--border-light);
+  border-radius: 3px;
+  font-family: 'Crimson Text', Georgia, serif;
+  font-size: 0.88rem;
+  padding: 6px 8px;
+}
+.add-note-form textarea:focus { outline: none; border-color: var(--gold); }
+.add-note-form .row-actions {
+  display: flex; align-items: center; gap: 12px;
+  font-family: 'Cinzel', serif; font-size: 0.7rem; letter-spacing: 0.06em;
+  color: var(--ink-dim);
+}
+.add-note-form .vis-toggle { display: flex; gap: 10px; }
+.add-note-form label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+.add-note-form input[type=radio] { accent-color: var(--gold); }
+.add-note-form button {
+  margin-left: auto;
+  padding: 5px 14px;
+  background: var(--gold-faint);
+  color: var(--ink);
+  border: 1px solid var(--gold);
+  border-radius: 3px;
+  font-family: 'Cinzel', serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.add-note-form button:hover { background: var(--gold); color: #1a1408; }
+.add-note-form button:disabled { opacity: 0.4; cursor: not-allowed; }
+.add-note-form .char-counter {
+  font-size: 0.65rem; color: var(--ink-faint);
+}
+.add-note-form .char-counter.warn { color: var(--amber); }
+.add-note-form .char-counter.over { color: var(--red); }
+.add-note-form .form-error {
+  color: var(--red); font-size: 0.78rem; font-style: italic;
+  font-family: 'Crimson Text', serif;
+}
+.login-banner {
+  padding: 8px 10px;
+  background: rgba(58,96,96,0.18);
+  border: 1px solid var(--lobby-accent);
+  border-radius: 3px;
+  color: var(--ink-dim);
+  font-size: 0.82rem;
+  font-style: italic;
+  display: flex; align-items: center; gap: 10px;
+}
+.login-banner a {
+  color: var(--gold-light);
+  text-decoration: none;
+  font-family: 'Cinzel', serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  padding: 3px 10px;
+  border: 1px solid var(--gold-faint);
+  border-radius: 3px;
+}
+.login-banner a:hover { background: var(--gold-faint); color: var(--ink); }
 </style>
 </head>
 <body>
@@ -363,7 +434,61 @@ function renderNotesList(combatantId, notes, viewer) {
     card.appendChild(meta);
     root.appendChild(card);
   });
+
+  // Add-note form (only for logged-in players)
+  if (viewer.characterId) {
+    const form = document.createElement('div');
+    form.className = 'add-note-form';
+    const lastVis = localStorage.getItem('spire-initiative-note-vis') || 'party';
+    form.innerHTML = `
+      <textarea placeholder="Add a note about ${escapeAttr(getCombatantName(combatantId))}…"
+                maxlength="${InitiativeNotes.MAX_NOTE_LENGTH + 50 /* allow overflow for counter */}"></textarea>
+      <div class="row-actions">
+        <div class="vis-toggle">
+          <label><input type="radio" name="vis-${CSS.escape(combatantId)}" value="private" ${lastVis === 'private' ? 'checked' : ''}>JUST ME</label>
+          <label><input type="radio" name="vis-${CSS.escape(combatantId)}" value="party"   ${lastVis === 'party'   ? 'checked' : ''}>PARTY</label>
+        </div>
+        <span class="char-counter">0/${InitiativeNotes.MAX_NOTE_LENGTH}</span>
+        <button class="save-btn" disabled>Save</button>
+      </div>
+      <div class="form-error" style="display:none"></div>
+    `;
+    const textarea = form.querySelector('textarea');
+    const counter  = form.querySelector('.char-counter');
+    const saveBtn  = form.querySelector('.save-btn');
+    const errEl    = form.querySelector('.form-error');
+
+    textarea.addEventListener('input', () => {
+      const len = textarea.value.length;
+      counter.textContent = len + '/' + InitiativeNotes.MAX_NOTE_LENGTH;
+      counter.classList.toggle('warn', len > 400 && len <= InitiativeNotes.MAX_NOTE_LENGTH);
+      counter.classList.toggle('over', len > InitiativeNotes.MAX_NOTE_LENGTH);
+      saveBtn.disabled = (textarea.value.trim().length === 0) || len > InitiativeNotes.MAX_NOTE_LENGTH;
+    });
+
+    saveBtn.addEventListener('click', () => {
+      const vis = form.querySelector('input[type=radio]:checked').value;
+      localStorage.setItem('spire-initiative-note-vis', vis);
+      submitNote(combatantId, textarea.value, vis, { textarea, errEl, saveBtn });
+    });
+
+    root.parentElement.appendChild(form);  // appended outside .notes-list (sibling)
+  }
 }
+
+function escapeAttr(s) {
+  return String(s || '').replace(/[&<>"']/g, ch => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[ch]));
+}
+
+function getCombatantName(id) {
+  // Look up the latest snapshot's combatants. lastSnapshot stored in poll().
+  const c = (lastSnapshot && lastSnapshot.combatants || []).find(x => x.id === id);
+  return c ? c.name : 'this combatant';
+}
+
+let lastSnapshot = null;
 
 function relTime(ms) {
   if (!ms) return '';
@@ -379,6 +504,8 @@ function deleteNote(combatantId, noteId) {
   // Implemented in Task 18.
   console.log('TODO delete', combatantId, noteId);
 }
+
+function submitNote(/* impl in Task 17 */) {}
 
 function hpColor(pct) {
   return pct > 60 ? '#2d6a3f' : pct > 30 ? '#c87800' : '#c0392b';
@@ -536,6 +663,7 @@ async function poll() {
     bar.textContent = '✦ Live — updates every few seconds';
 
     if (data && typeof data.mode !== 'undefined') {
+      lastSnapshot = data;
       if (data.mode === 'lobby') {
         showLobby();
       } else {
