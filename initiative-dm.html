@@ -996,9 +996,24 @@ function startCombat() {
   pushState();
 }
 
-function endCombat() {
+async function endCombat() {
   // Snapshot everything before opening modal
   state.combatants.forEach(snapshotCombatant);
+  if (currentDraftId) {
+    const prev = allDrafts.find(d => d.id === currentDraftId);
+    const draft = currentDraftSnapshot(prev);
+    draft.status = 'pending-export';
+    draft.endedAt = nowIso();
+    upsertDraft(draft);
+    // Immediate (non-debounced) save: this is the user-visible safety
+    // milestone. If it fails, the carry-over modal still opens — the
+    // next pushState will retry. We KEEP currentDraftId set so that if
+    // the user picks "Export & Carry Over", openExport() binds the modal
+    // to this draft via exportingDraftId = currentDraftId. The id is
+    // cleared on the next startCombat() (which overwrites it) or on
+    // successful exportToChronicle().
+    await saveDrafts();
+  }
   openCarryover();
 }
 
