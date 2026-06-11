@@ -207,6 +207,7 @@ body {
 </main>
 
 <script src="auth.js"></script>
+<script src="initiative-notes.js"></script>
 <script>
 const WORKER_URL = (window.Auth && window.Auth.WORKER_URL) || 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
 const POLL_MS    = 2500;
@@ -299,10 +300,29 @@ function showCombat(s) {
   });
 }
 
+function buildStateUrl() {
+  // Auth.playerCreds() returns { characterId, code, name } for logged-in players,
+  // or null if anonymous/DM. (Defined in auth.js around line 138.)
+  const me = (window.Auth && Auth.playerCreds && Auth.playerCreds()) || null;
+  let url = WORKER_URL + '?type=initiative_state';
+  if (me && me.characterId && me.code) {
+    url += '&characterId=' + encodeURIComponent(me.characterId)
+        +  '&code='        + encodeURIComponent(me.code);
+  }
+  return url;
+}
+
 async function poll() {
   try {
-    const res  = await fetch(WORKER_URL + '?type=initiative_state', { cache: 'no-store' });
-    if (!res.ok) throw new Error(res.status);
+    const res  = await fetch(buildStateUrl(), { cache: 'no-store' });
+    if (!res.ok) {
+      // 401 means our player creds were rotated — fall back to anonymous next tick.
+      // Auth.logout() clears the whole spire-auth blob; since localStorage holds
+      // one role at a time, this is equivalent to clearing player creds when
+      // role === 'player'.
+      if (res.status === 401 && window.Auth && Auth.logout) Auth.logout();
+      throw new Error(res.status);
+    }
     const data = await res.json();
     failCount  = 0;
 
