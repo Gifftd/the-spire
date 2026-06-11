@@ -1000,6 +1000,17 @@ function removeDraft(id) {
   if (idx >= 0) allDrafts.splice(idx, 1);
 }
 
+// When exporting a recovered draft (not the live combat), report the
+// draft's stored round count instead of state.round, which has been
+// reset to 1 in lobby mode.
+function recoveredDraftRoundFallback() {
+  if (exportingDraftId && exportingDraftId !== currentDraftId) {
+    const d = allDrafts.find(x => x.id === exportingDraftId);
+    if (d && typeof d.round === 'number') return d.round;
+  }
+  return state.round;
+}
+
 function escapeHtml(s) {
   return String(s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -1012,7 +1023,10 @@ function formatDraftDate(iso) {
   try {
     const d = new Date(iso);
     if (isNaN(d.getTime())) return '';
-    return d.toISOString().slice(0, 10);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
   } catch { return ''; }
 }
 
@@ -2421,7 +2435,7 @@ function buildMarkdown() {
   const outcome  = document.getElementById('exp-outcome').value;
   const session  = document.getElementById('exp-session').value.trim()  || '—';
   const summary  = document.getElementById('exp-summary').value.trim()  || '';
-  const rounds   = state.round;
+  const rounds   = recoveredDraftRoundFallback();
 
   const pcs     = Object.values(combatLog).filter(e=>e.type==='pc');
   const enemies = Object.values(combatLog).filter(e=>e.type==='enemy');
@@ -2558,7 +2572,12 @@ function collectLoot() {
 }
 
 function buildCombatObject() {
-  state.combatants.forEach(snapshotCombatant);
+  // Skip re-snapshot when exporting a recovered draft — combatLog was
+  // already populated by handleBannerExport with the draft's historical
+  // data; iterating live combatants here would overwrite it.
+  if (!exportingDraftId || exportingDraftId === currentDraftId) {
+    state.combatants.forEach(snapshotCombatant);
+  }
   const pcs     = Object.values(combatLog).filter(e=>e.type==='pc');
   const enemies = Object.values(combatLog).filter(e=>e.type==='enemy');
   return {
@@ -2567,7 +2586,7 @@ function buildCombatObject() {
     date:     document.getElementById('exp-date').value.trim()      || '',
     location: document.getElementById('exp-location').value.trim()  || '',
     outcome:  document.getElementById('exp-outcome').value,
-    rounds:   state.round,
+    rounds:   recoveredDraftRoundFallback(),
     summary:  document.getElementById('exp-summary').value.trim()   || '',
     pcsDowned:       pcs.filter(e=>e.endHp<=0).map(e=>e.name),
     enemiesDefeated: enemies.filter(e=>e.endHp<=0).map(e=>e.name),
