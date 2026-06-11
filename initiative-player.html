@@ -431,10 +431,9 @@ function renderNotesList(combatantId, notes, viewer) {
     empty.className = 'notes-empty';
     empty.textContent = 'No notes yet.';
     root.appendChild(empty);
-    return;
-  }
-  const sorted = notes.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  sorted.forEach(n => {
+  } else {
+    const sorted = notes.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    sorted.forEach(n => {
     const card = document.createElement('div');
     card.className = 'note-card' + (viewer.characterId && n.authorCharId === viewer.characterId ? ' is-mine' : '');
     if (n._pending) card.classList.add('is-pending');
@@ -468,6 +467,7 @@ function renderNotesList(combatantId, notes, viewer) {
     card.appendChild(meta);
     root.appendChild(card);
   });
+  }
 
   // Add-note form (only for logged-in players)
   if (viewer.characterId) {
