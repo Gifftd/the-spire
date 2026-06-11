@@ -118,6 +118,30 @@ function defaultPC() {
 }
 
 const expandedPC = new Set();    // pmIds currently expanded
+
+// Plain summary strings — extracted so surgical updaters (refreshPCSummary,
+// refreshActionSummary) can recompute them on every keystroke without
+// rebuilding the entire DOM (which would destroy the input the user is typing in).
+function pcSummary(pm) {
+  return `${pm.identity.name} · L${pm.identity.level} · ${pm.combat.hp}HP · AC${pm.combat.ac}`;
+}
+function actionSummary(act) {
+  return `${act.name} · ${act.type}` +
+    (act.damage ? ` · ${act.damage.dice}+${act.damage.mod === '+atkAbility' ? (act.atkAbility||'str').toUpperCase() : act.damage.mod}` : '') +
+    (act.heal ? ` · heals ${act.heal.dice || act.heal.flat || 0}` : '');
+}
+function refreshPCSummary(pmId) {
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  const el = document.getElementById('pc-summary-' + pmId);
+  if (el) el.textContent = pcSummary(pm);
+}
+function refreshActionSummary(pmId, aId) {
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  const act = pm.actions.find(a => a.id === aId); if (!act) return;
+  const el = document.getElementById('act-summary-' + aId);
+  if (el) el.textContent = actionSummary(act);
+}
+
 function renderParty() {
   const root = document.getElementById('party-list');
   document.getElementById('party-count').textContent = '(' + party.length + ')';
@@ -136,14 +160,13 @@ function renderParty() {
 
 function renderPCCard(pm) {
   const expanded = expandedPC.has(pm.id);
-  const summary = `${pm.identity.name} · L${pm.identity.level} · ${pm.combat.hp}HP · AC${pm.combat.ac}`;
   const posLabel = pcPositionLabel(pm);
   const pillColor = pm.positionOverride ? 'var(--c-accent)' : 'var(--c-ink-faint)';
   return `
     <div class="pc-card" style="border:1px solid var(--c-border); border-radius:4px; margin-bottom:0.5rem; padding:0.5rem;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div onclick="togglePC('${pm.id}')" style="cursor:pointer; flex:1;">
-          <b>${escapeHtml(summary)}</b>
+          <b id="pc-summary-${pm.id}">${escapeHtml(pcSummary(pm))}</b>
         </div>
         <span onclick="cyclePositionOverride('${pm.id}'); event.stopPropagation();"
               title="Click to cycle override"
@@ -208,14 +231,11 @@ function renderPCEditor(pm) {
 const expandedAction = new Set();
 function renderActionRow(pm, act) {
   const isOpen = expandedAction.has(act.id);
-  const summary = `${act.name} · ${act.type}` +
-    (act.damage ? ` · ${act.damage.dice}+${act.damage.mod === '+atkAbility' ? act.atkAbility.toUpperCase() : act.damage.mod}` : '') +
-    (act.heal ? ` · heals ${act.heal.dice || act.heal.flat || 0}` : '');
   return `
     <div style="padding:0.25rem; border-bottom:1px dashed var(--c-border); font-size:0.85rem">
       <div style="cursor:pointer; display:flex; justify-content:space-between"
         onclick="toggleAction('${act.id}')">
-        <span>${escapeHtml(summary)}</span>
+        <span id="act-summary-${act.id}">${escapeHtml(actionSummary(act))}</span>
         <span style="color:var(--c-ink-faint)">${isOpen ? '▾' : '▸'}</span>
       </div>
       ${isOpen ? renderActionEditor(pm, act) : ''}
@@ -311,6 +331,10 @@ function updatePC(id, path, value) {
   for (let i = 0; i < parts.length - 1; i++) o = o[parts[i]];
   o[parts[parts.length-1]] = value;
   saveParty();
+  // Surgical updates only — never rebuild input DOM, that destroys cursor focus.
+  refreshPCSummary(id);
+  refreshGate();
+  renderFmBudget();
 }
 
 // Compute a PC's active position bucket using engine helpers.
@@ -348,25 +372,29 @@ function removePC(id) {
 function updateAction(pmId, aId, field, value) {
   const pm = party.find(p => p.id === pmId); if (!pm) return;
   const act = pm.actions.find(a => a.id === aId); if (!act) return;
-  act[field] = value; saveParty(); renderParty();
+  act[field] = value; saveParty();
+  refreshActionSummary(pmId, aId); refreshGate();
 }
 function updateActionDamage(pmId, aId, field, value) {
   const pm = party.find(p => p.id === pmId); if (!pm) return;
   const act = pm.actions.find(a => a.id === aId); if (!act) return;
   act.damage = act.damage || {};
-  act.damage[field] = value; saveParty(); renderParty();
+  act.damage[field] = value; saveParty();
+  refreshActionSummary(pmId, aId); refreshGate();
 }
 function updateActionSave(pmId, aId, field, value) {
   const pm = party.find(p => p.id === pmId); if (!pm) return;
   const act = pm.actions.find(a => a.id === aId); if (!act) return;
   act.save = act.save || {};
-  act.save[field] = value; saveParty(); renderParty();
+  act.save[field] = value; saveParty();
+  refreshActionSummary(pmId, aId); refreshGate();
 }
 function updateActionHeal(pmId, aId, field, value) {
   const pm = party.find(p => p.id === pmId); if (!pm) return;
   const act = pm.actions.find(a => a.id === aId); if (!act) return;
   act.heal = act.heal || { target:'ally', aoeTargets:0, reviveDowned:false };
-  act.heal[field] = value; saveParty(); renderParty();
+  act.heal[field] = value; saveParty();
+  refreshActionSummary(pmId, aId); refreshGate();
 }
 function changeActionType(pmId, aId, newType) {
   const pm = party.find(p => p.id === pmId); if (!pm) return;
