@@ -147,6 +147,12 @@ const INITIATIVE_NOTES = (function () {
     }
     const out = Object.assign({}, state);
     out.combatants = filtered;
+    if (!isDM) {
+      // Encounter linkage — DM-only. Defense-in-depth: the DM tracker should already
+      // omit these from player-facing POSTs, but enforce here regardless.
+      delete out.encounterId;
+      delete out.encounterStagedAt;
+    }
     return out;
   }
 
