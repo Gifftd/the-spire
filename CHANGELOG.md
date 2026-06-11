@@ -7,7 +7,34 @@ Dates are YYYY-MM-DD.
 
 ---
 
-## [Unreleased] — 2026-06-02
+## [Unreleased] — 2026-06-11
+
+### Initiative DM: persistent combat drafts (recovery for forgotten exports)
+
+- **Worker:** new DM-only KV type `combat_drafts` — added a GET branch
+  (DM auth required, returns the array, `[]` default) and included
+  `combat_drafts` in `DM_WRITE_TYPES` so POSTs are DM-gated.
+  **Worker must be redeployed** (paste `cloudflare-worker.js` into the
+  Cloudflare dashboard) for drafts to persist; until then the front-end
+  degrades gracefully (POST/GET 401 silently, no errors surfaced).
+- **Initiative DM:** combat data is now auto-saved to KV on every
+  existing `pushState` debounce while a combat is active. `endCombat()`
+  flips the draft to `pending-export` and persists immediately;
+  `exportToChronicle()` removes the draft from KV after a successful
+  Chronicle write.
+- **Recovery banner** above the lobby banner lists any un-exported
+  drafts on page load with per-row `Export` and `Discard` buttons.
+  Exporting from the banner re-opens the existing export modal
+  pre-bound to the recovered draft (the live combat's `combatLog` is
+  stashed and restored on modal close so the live combat is not
+  polluted). Banner hides during active combat and re-renders on
+  return to lobby.
+- In-progress drafts older than 24h auto-promote to `pending-export`
+  on page load so a crashed-mid-combat orphan eventually surfaces in
+  the banner instead of sitting invisible.
+- Player views (`initiative-player.html`, `map.html` anonymous) are
+  unaffected — drafts are DM-only end to end, with no field added to
+  the `initiative_state` payload.
 
 ### Initiative tracker: player notes & defense-in-depth filter
 

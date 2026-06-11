@@ -159,6 +159,41 @@ body {
 .lobby-banner.hidden { display: none; }
 .lobby-banner-icon { font-size: 1.1rem; }
 
+/* ── Draft recovery banner ── */
+.draft-banner {
+  background: rgba(192, 130, 50, 0.08);
+  border: 1px solid #c08232;
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-bottom: 1rem;
+  font-family: 'Cinzel', serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: #d4a060;
+}
+.draft-banner.hidden { display: none; }
+.draft-banner-title {
+  font-size: 0.78rem;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.draft-banner-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-top: 1px solid rgba(192, 130, 50, 0.2);
+  font-family: 'Crimson Text', serif;
+  font-size: 0.85rem;
+  letter-spacing: 0;
+}
+.draft-banner-meta { color: var(--ink); }
+.draft-banner-meta .draft-date { color: var(--ink-faint); font-size: 0.78rem; }
+.draft-banner-actions { display: flex; gap: 6px; }
+
 /* ── Combatant cards ── */
 .combatant-card {
   background: var(--surface);
@@ -553,6 +588,7 @@ body {
 
 <main class="main" id="main">
   <div class="combatant-col">
+    <div class="draft-banner hidden" id="draft-banner"></div>
     <div class="lobby-banner" id="lobby-banner">
       <span class="lobby-banner-icon">🔒</span>
       <span>You are in <strong>Lobby</strong> mode — players see "Combat incoming…" until you press Start Combat. Add enemies and set initiative freely.</span>
@@ -830,6 +866,18 @@ let state = {
 };
 
 let combatLog   = {};  // { id: { name, type, startHp, maxHp, endHp, conditionsApplied, notes } }
+
+// ── Persistent combat drafts ──
+// `allDrafts` mirrors the KV array. `currentDraftId` is set during an active
+// combat. `exportingDraftId` is set while the export modal is open and bound
+// to a specific draft (the live one, or a recovered one from the banner).
+// `savedCombatLog` stashes the live combatLog while exporting a recovered
+// draft, so we can restore it when the modal closes.
+let allDrafts = [];
+let currentDraftId = null;
+let exportingDraftId = null;
+let savedCombatLog = null;
+
 let expandedIds = new Set();
 // Combatant cards whose stat-block panel is currently open. Only valid for
 // combatants spawned via the Bestiary picker (`bestiaryId` set).
@@ -875,6 +923,229 @@ function loadCustomConds() {
 }
 
 // ═══════════════════════════════════════════════════════
+//  DRAFT PERSISTENCE
+// ═══════════════════════════════════════════════════════
+function nowIso() { return new Date().toISOString(); }
+
+function mintDraftId() {
+  return 'dr_' + Date.now() + '_' + Math.floor(Math.random() * 100000).toString(36);
+}
+
+// Serialize the in-memory combatLog (which holds Sets) into a KV-safe shape.
+function serializeCombatLog(log) {
+  const out = {};
+  Object.keys(log).forEach(id => {
+    const e = log[id];
+    out[id] = {
+      name: e.name, type: e.type,
+      startHp: e.startHp, maxHp: e.maxHp, endHp: e.endHp,
+      conditionsApplied: Array.from(e.conditionsApplied || []),
+      notes: e.notes || ''
+    };
+  });
+  return out;
+}
+
+// Rehydrate a KV-loaded combatLog: arrays back into Sets so the rest of
+// the existing modal/export code works unchanged.
+function deserializeCombatLog(log) {
+  const out = {};
+  Object.keys(log || {}).forEach(id => {
+    const e = log[id] || {};
+    out[id] = {
+      name: e.name || '', type: e.type || 'enemy',
+      startHp: e.startHp ?? 0, maxHp: e.maxHp ?? 0, endHp: e.endHp ?? 0,
+      conditionsApplied: new Set(Array.isArray(e.conditionsApplied) ? e.conditionsApplied : []),
+      notes: e.notes || ''
+    };
+  });
+  return out;
+}
+
+function pcEnemyCounts() {
+  let pc = 0, enemy = 0;
+  Object.values(combatLog).forEach(e => {
+    if (e.type === 'pc') pc++; else if (e.type === 'enemy') enemy++;
+  });
+  return { pc, enemy };
+}
+
+// Build the draft snapshot for the *currently active* combat.
+// If `prev` is already pending-export (e.g., user opened the export modal
+// from carryover, then cancelled — currentDraftId is still set, but the
+// draft has been flipped), preserve that status so subsequent pushState
+// writes don't accidentally re-open the combat.
+function currentDraftSnapshot(prev) {
+  const counts = pcEnemyCounts();
+  const isPending = prev?.status === 'pending-export';
+  return {
+    id: currentDraftId,
+    status: isPending ? 'pending-export' : 'in-progress',
+    startedAt: prev?.startedAt || nowIso(),
+    endedAt: isPending ? (prev?.endedAt || nowIso()) : null,
+    savedAt: nowIso(),
+    round: state.round,
+    combatLog: serializeCombatLog(combatLog),
+    title: prev?.title || '',
+    pcCount: counts.pc,
+    enemyCount: counts.enemy
+  };
+}
+
+// Upsert a draft into allDrafts by id, then POST. Network errors are
+// swallowed (degrade gracefully if the worker isn't redeployed yet).
+async function saveDrafts() {
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: Auth.dmHeaders(),
+      body: JSON.stringify({ type: 'combat_drafts', payload: allDrafts })
+    });
+    if (res.status === 401) {
+      // DM session expired or worker not yet redeployed. Don't logout —
+      // initiative_state writes will handle that. Just stop saving drafts.
+      return false;
+    }
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function loadDrafts() {
+  try {
+    const res = await fetch(WORKER_URL + '?type=combat_drafts', {
+      headers: Auth.dmHeaders()
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+// Any in-progress draft with savedAt older than 24h is promoted to
+// pending-export so it surfaces in the banner instead of sitting invisible.
+function promoteStaleDrafts(drafts) {
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  let changed = false;
+  drafts.forEach(d => {
+    if (d.status === 'in-progress') {
+      const t = Date.parse(d.savedAt || '');
+      if (!isNaN(t) && t < cutoff) {
+        d.status = 'pending-export';
+        d.endedAt = d.savedAt;
+        changed = true;
+      }
+    }
+  });
+  return changed;
+}
+
+function upsertDraft(draft) {
+  const idx = allDrafts.findIndex(d => d.id === draft.id);
+  if (idx >= 0) allDrafts[idx] = draft; else allDrafts.push(draft);
+}
+
+function removeDraft(id) {
+  const idx = allDrafts.findIndex(d => d.id === id);
+  if (idx >= 0) allDrafts.splice(idx, 1);
+}
+
+// When exporting a recovered draft (not the live combat), report the
+// draft's stored round count instead of state.round, which has been
+// reset to 1 in lobby mode.
+function recoveredDraftRoundFallback() {
+  if (exportingDraftId && exportingDraftId !== currentDraftId) {
+    const d = allDrafts.find(x => x.id === exportingDraftId);
+    if (d && typeof d.round === 'number') return d.round;
+  }
+  return state.round;
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function formatDraftDate(iso) {
+  if (!iso) return '';
+  // Show local date only — YYYY-MM-DD is enough context for the DM.
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  } catch { return ''; }
+}
+
+function renderDraftBanner() {
+  const el = document.getElementById('draft-banner');
+  if (!el) return;
+  if (mode === 'combat') { el.classList.add('hidden'); return; }
+  const pending = allDrafts.filter(d => d.status === 'pending-export');
+  if (pending.length === 0) {
+    el.classList.add('hidden');
+    el.innerHTML = '';
+    return;
+  }
+  // Newest first.
+  pending.sort((a, b) => (b.endedAt || b.savedAt || '').localeCompare(a.endedAt || a.savedAt || ''));
+  const rows = pending.map(d => {
+    const date  = formatDraftDate(d.endedAt || d.savedAt);
+    const title = escapeHtml(d.title || 'Combat');
+    const rounds = d.round || 0;
+    const pcs    = d.pcCount || 0;
+    const enem   = d.enemyCount || 0;
+    return `
+      <div class="draft-banner-row" data-draft-id="${escapeHtml(d.id)}">
+        <div class="draft-banner-meta">
+          <div>${title} <span class="draft-date">— ${date}</span></div>
+          <div class="draft-date">${rounds} round${rounds === 1 ? '' : 's'}, ${pcs} PC${pcs === 1 ? '' : 's'} / ${enem} enem${enem === 1 ? 'y' : 'ies'}</div>
+        </div>
+        <div class="draft-banner-actions">
+          <button class="btn btn-gold btn-sm" onclick="handleBannerExport('${escapeHtml(d.id)}')">Export</button>
+          <button class="btn btn-ghost btn-sm" onclick="handleBannerDiscard('${escapeHtml(d.id)}')">Discard</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  const titleLine = pending.length === 1
+    ? '⚠ You have 1 un-exported combat from a previous session.'
+    : `⚠ You have ${pending.length} un-exported combats from previous sessions.`;
+  el.innerHTML = `<div class="draft-banner-title">${titleLine}</div>${rows}`;
+  el.classList.remove('hidden');
+}
+
+function handleBannerExport(draftId) {
+  const d = allDrafts.find(x => x.id === draftId);
+  if (!d) { renderDraftBanner(); return; }
+  // Stash the live combatLog so closeExport() can restore it.
+  savedCombatLog = combatLog;
+  combatLog = deserializeCombatLog(d.combatLog);
+  // Bind the modal to the recovered draft BEFORE opening, and tell
+  // openExport() to skip its live-combatant snapshot (which would
+  // pollute the recovered combatLog).
+  exportingDraftId = draftId;
+  openExport({ fromDraft: true });
+  if (d.title) {
+    const titleEl = document.getElementById('exp-title');
+    if (titleEl) { titleEl.value = d.title; updatePreview(); }
+  }
+}
+
+async function handleBannerDiscard(draftId) {
+  if (!confirm('Discard this combat log? This cannot be undone.')) return;
+  removeDraft(draftId);
+  await saveDrafts();
+  renderDraftBanner();
+}
+
+// ═══════════════════════════════════════════════════════
 //  COMBAT LOG
 // ═══════════════════════════════════════════════════════
 function initCombatLog() {
@@ -901,13 +1172,29 @@ function snapshotCombatant(c) {
 function startCombat() {
   mode = 'combat';
   initCombatLog();
+  currentDraftId = mintDraftId();
   updateModeUI();
   pushState();
 }
 
-function endCombat() {
+async function endCombat() {
   // Snapshot everything before opening modal
   state.combatants.forEach(snapshotCombatant);
+  if (currentDraftId) {
+    const prev = allDrafts.find(d => d.id === currentDraftId);
+    const draft = currentDraftSnapshot(prev);
+    draft.status = 'pending-export';
+    draft.endedAt = nowIso();
+    upsertDraft(draft);
+    // Immediate (non-debounced) save: this is the user-visible safety
+    // milestone. If it fails, the carry-over modal still opens — the
+    // next pushState will retry. We KEEP currentDraftId set so that if
+    // the user picks "Export & Carry Over", openExport() binds the modal
+    // to this draft via exportingDraftId = currentDraftId. The id is
+    // cleared on the next startCombat() (which overwrites it) or on
+    // successful exportToChronicle().
+    await saveDrafts();
+  }
   openCarryover();
 }
 
@@ -922,6 +1209,12 @@ function updateModeUI() {
   document.getElementById('btn-end').style.display       = inCombat ? '' : 'none';
   document.getElementById('btn-export').style.display    = inCombat ? '' : 'none';
   document.getElementById('lobby-banner').classList.toggle('hidden', inCombat);
+  if (inCombat) {
+    document.getElementById('draft-banner').classList.add('hidden');
+  } else {
+    // Returning to lobby — re-render so any pending-export drafts surface.
+    renderDraftBanner();
+  }
   document.getElementById('lobby-pc-section').style.display = inCombat ? 'none' : '';
 }
 
@@ -2145,6 +2438,18 @@ async function pushState() {
         conditions: c.conditions, dead: c.dead
       }))
     };
+
+    // Build the draft snapshot if there's an active combat. Drafts are
+    // saved in parallel with the player state; a failure here does not
+    // affect the main sync indicator.
+    let draftPromise = Promise.resolve(true);
+    if (currentDraftId) {
+      const prev = allDrafts.find(d => d.id === currentDraftId);
+      const draft = currentDraftSnapshot(prev);
+      upsertDraft(draft);
+      draftPromise = saveDrafts();
+    }
+
     try {
       const res = await fetch(WORKER_URL, {
         method:'POST', headers: Auth.dmHeaders(),
@@ -2155,6 +2460,7 @@ async function pushState() {
         window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.'));
         return;
       }
+      await draftPromise;
       setSyncStatus(res.ok?'ok':'fail', res.ok?'✦ Synced':'⚠ Sync failed');
     } catch { setSyncStatus('fail','⚠ Offline'); }
   }, 600);
@@ -2213,8 +2519,20 @@ setTimeout(pollPlayerNotes, 500);
 // ═══════════════════════════════════════════════════════
 //  EXPORT
 // ═══════════════════════════════════════════════════════
-function openExport() {
-  state.combatants.forEach(snapshotCombatant);
+// opts.fromDraft (default false) — when true, the caller has already
+// swapped combatLog to a recovered draft's data and bound exportingDraftId
+// itself. In that case we MUST NOT snapshot the lobby's live combatants
+// into combatLog (it would pollute the recovered draft's data) and we
+// MUST NOT override exportingDraftId.
+function openExport(opts) {
+  opts = opts || {};
+  if (!opts.fromDraft) {
+    state.combatants.forEach(snapshotCombatant);
+    // Bind the modal to whichever draft is active (the live combat's).
+    // After endCombat the id is still set (intentional), so this still works
+    // when invoked via openExportFromCarryover().
+    exportingDraftId = currentDraftId;
+  }
   const today = new Date();
   document.getElementById('exp-date').value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
   // Reset the chronicle section each time the modal opens.
@@ -2229,6 +2547,12 @@ function openExport() {
 }
 function closeExport() {
   document.getElementById('export-modal').classList.add('hidden');
+  // If we swapped combatLog for a recovered draft, restore the live one.
+  if (savedCombatLog !== null) {
+    combatLog = savedCombatLog;
+    savedCombatLog = null;
+  }
+  exportingDraftId = null;
   if (exportCalledFromCarryover) { exportCalledFromCarryover = false; openCarryover(); }
 }
 
@@ -2239,7 +2563,7 @@ function buildMarkdown() {
   const outcome  = document.getElementById('exp-outcome').value;
   const session  = document.getElementById('exp-session').value.trim()  || '—';
   const summary  = document.getElementById('exp-summary').value.trim()  || '';
-  const rounds   = state.round;
+  const rounds   = recoveredDraftRoundFallback();
 
   const pcs     = Object.values(combatLog).filter(e=>e.type==='pc');
   const enemies = Object.values(combatLog).filter(e=>e.type==='enemy');
@@ -2376,7 +2700,12 @@ function collectLoot() {
 }
 
 function buildCombatObject() {
-  state.combatants.forEach(snapshotCombatant);
+  // Skip re-snapshot when exporting a recovered draft — combatLog was
+  // already populated by handleBannerExport with the draft's historical
+  // data; iterating live combatants here would overwrite it.
+  if (!exportingDraftId || exportingDraftId === currentDraftId) {
+    state.combatants.forEach(snapshotCombatant);
+  }
   const pcs     = Object.values(combatLog).filter(e=>e.type==='pc');
   const enemies = Object.values(combatLog).filter(e=>e.type==='enemy');
   return {
@@ -2385,7 +2714,7 @@ function buildCombatObject() {
     date:     document.getElementById('exp-date').value.trim()      || '',
     location: document.getElementById('exp-location').value.trim()  || '',
     outcome:  document.getElementById('exp-outcome').value,
-    rounds:   state.round,
+    rounds:   recoveredDraftRoundFallback(),
     summary:  document.getElementById('exp-summary').value.trim()   || '',
     pcsDowned:       pcs.filter(e=>e.endHp<=0).map(e=>e.name),
     enemiesDefeated: enemies.filter(e=>e.endHp<=0).map(e=>e.name),
@@ -2429,6 +2758,16 @@ async function exportToChronicle() {
       return;
     }
     if (!r.ok) throw new Error('HTTP ' + r.status);
+    // Chronicle write succeeded — drop the bound draft (best-effort).
+    if (exportingDraftId) {
+      removeDraft(exportingDraftId);
+      // If we just exported the live combat, clear currentDraftId so the
+      // next pushState doesn't re-create the draft we just removed.
+      if (exportingDraftId === currentDraftId) currentDraftId = null;
+      await saveDrafts();
+      // Refresh the banner in case the user exported a recovered draft.
+      renderDraftBanner();
+    }
     setSyncStatus('ok', '✦ Added to Chronicle');
     setTimeout(() => setSyncStatus('', ''), 3000);
     closeExport();
@@ -2445,7 +2784,7 @@ async function exportToChronicle() {
 // ═══════════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════════
-function init() {
+async function init() {
   state.customConditions = loadCustomConds();
   const pcs = loadPCs();
   if (pcs.length > 0) { state.combatants = pcs; _id = Math.max(...pcs.map(c=>c.id), 0); }
@@ -2457,6 +2796,14 @@ function init() {
   ['add-name','add-init','add-hp','add-ac'].forEach(id => {
     document.getElementById(id).addEventListener('keydown', e => { if(e.key==='Enter') addCombatant(); });
   });
+
+  // Load drafts from KV, auto-promote stale in-progress drafts, render banner.
+  // Requires DM auth; if it fails (e.g., worker not redeployed), degrade silently.
+  allDrafts = await loadDrafts();
+  if (promoteStaleDrafts(allDrafts)) {
+    await saveDrafts();
+  }
+  renderDraftBanner();
 }
 init();
 </script>
