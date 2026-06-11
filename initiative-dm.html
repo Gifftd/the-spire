@@ -792,6 +792,18 @@ let state = {
 };
 
 let combatLog   = {};  // { id: { name, type, startHp, maxHp, endHp, conditionsApplied, notes } }
+
+// ── Persistent combat drafts ──
+// `allDrafts` mirrors the KV array. `currentDraftId` is set during an active
+// combat. `exportingDraftId` is set while the export modal is open and bound
+// to a specific draft (the live one, or a recovered one from the banner).
+// `savedCombatLog` stashes the live combatLog while exporting a recovered
+// draft, so we can restore it when the modal closes.
+let allDrafts = [];
+let currentDraftId = null;
+let exportingDraftId = null;
+let savedCombatLog = null;
+
 let expandedIds = new Set();
 // Combatant cards whose stat-block panel is currently open. Only valid for
 // combatants spawned via the Bestiary picker (`bestiaryId` set).
@@ -819,6 +831,137 @@ function saveCustomConds() {
 }
 function loadCustomConds() {
   try { return JSON.parse(localStorage.getItem('init_custom_conds') || '[]'); } catch { return []; }
+}
+
+// ═══════════════════════════════════════════════════════
+//  DRAFT PERSISTENCE
+// ═══════════════════════════════════════════════════════
+function nowIso() { return new Date().toISOString(); }
+
+function mintDraftId() {
+  return 'dr_' + Date.now() + '_' + Math.floor(Math.random() * 100000).toString(36);
+}
+
+// Serialize the in-memory combatLog (which holds Sets) into a KV-safe shape.
+function serializeCombatLog(log) {
+  const out = {};
+  Object.keys(log).forEach(id => {
+    const e = log[id];
+    out[id] = {
+      name: e.name, type: e.type,
+      startHp: e.startHp, maxHp: e.maxHp, endHp: e.endHp,
+      conditionsApplied: Array.from(e.conditionsApplied || []),
+      notes: e.notes || ''
+    };
+  });
+  return out;
+}
+
+// Rehydrate a KV-loaded combatLog: arrays back into Sets so the rest of
+// the existing modal/export code works unchanged.
+function deserializeCombatLog(log) {
+  const out = {};
+  Object.keys(log || {}).forEach(id => {
+    const e = log[id] || {};
+    out[id] = {
+      name: e.name || '', type: e.type || 'enemy',
+      startHp: e.startHp ?? 0, maxHp: e.maxHp ?? 0, endHp: e.endHp ?? 0,
+      conditionsApplied: new Set(Array.isArray(e.conditionsApplied) ? e.conditionsApplied : []),
+      notes: e.notes || ''
+    };
+  });
+  return out;
+}
+
+function pcEnemyCounts() {
+  let pc = 0, enemy = 0;
+  Object.values(combatLog).forEach(e => {
+    if (e.type === 'pc') pc++; else if (e.type === 'enemy') enemy++;
+  });
+  return { pc, enemy };
+}
+
+// Build the draft snapshot for the *currently active* combat.
+// If `prev` is already pending-export (e.g., user opened the export modal
+// from carryover, then cancelled — currentDraftId is still set, but the
+// draft has been flipped), preserve that status so subsequent pushState
+// writes don't accidentally re-open the combat.
+function currentDraftSnapshot(prev) {
+  const counts = pcEnemyCounts();
+  const isPending = prev?.status === 'pending-export';
+  return {
+    id: currentDraftId,
+    status: isPending ? 'pending-export' : 'in-progress',
+    startedAt: prev?.startedAt || nowIso(),
+    endedAt: isPending ? (prev?.endedAt || nowIso()) : null,
+    savedAt: nowIso(),
+    round: state.round,
+    combatLog: serializeCombatLog(combatLog),
+    title: prev?.title || '',
+    pcCount: counts.pc,
+    enemyCount: counts.enemy
+  };
+}
+
+// Upsert a draft into allDrafts by id, then POST. Network errors are
+// swallowed (degrade gracefully if the worker isn't redeployed yet).
+async function saveDrafts() {
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: Auth.dmHeaders(),
+      body: JSON.stringify({ type: 'combat_drafts', payload: allDrafts })
+    });
+    if (res.status === 401) {
+      // DM session expired or worker not yet redeployed. Don't logout —
+      // initiative_state writes will handle that. Just stop saving drafts.
+      return false;
+    }
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function loadDrafts() {
+  try {
+    const res = await fetch(WORKER_URL + '?type=combat_drafts', {
+      headers: Auth.dmHeaders()
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+// Any in-progress draft with savedAt older than 24h is promoted to
+// pending-export so it surfaces in the banner instead of sitting invisible.
+function promoteStaleDrafts(drafts) {
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  let changed = false;
+  drafts.forEach(d => {
+    if (d.status === 'in-progress') {
+      const t = Date.parse(d.savedAt || '');
+      if (!isNaN(t) && t < cutoff) {
+        d.status = 'pending-export';
+        d.endedAt = d.savedAt;
+        changed = true;
+      }
+    }
+  });
+  return changed;
+}
+
+function upsertDraft(draft) {
+  const idx = allDrafts.findIndex(d => d.id === draft.id);
+  if (idx >= 0) allDrafts[idx] = draft; else allDrafts.push(draft);
+}
+
+function removeDraft(id) {
+  const idx = allDrafts.findIndex(d => d.id === id);
+  if (idx >= 0) allDrafts.splice(idx, 1);
 }
 
 // ═══════════════════════════════════════════════════════
