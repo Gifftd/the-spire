@@ -423,20 +423,6 @@
       return state.encounters.find(e => e.id === state.selectedId) || null;
     }
 
-    // ── Section mounting helper ──
-    // Replaces the element with given id's outerHTML with new HTML, or inserts
-    // the new HTML before `beforeEl` if the element doesn't yet exist.
-    function mountSection(id, html, beforeEl) {
-      const existing = document.getElementById(id);
-      if (existing) {
-        const tmp = document.createElement('template');
-        tmp.innerHTML = html.trim();
-        existing.replaceWith(tmp.content.firstChild);
-      } else if (beforeEl) {
-        beforeEl.insertAdjacentHTML('beforebegin', html);
-      }
-    }
-
     function renderEditor() {
       const enc = currentEncounter();
       document.getElementById('editor-empty').style.display = enc ? 'none' : '';
@@ -614,7 +600,6 @@
       const e = currentEncounter();
       e.tactical.waves[i][key] = value;
       scheduleSave();
-      renderEditor();
     }
     function addWave() {
       const e = currentEncounter();
