@@ -964,6 +964,10 @@ function removeDraft(id) {
   if (idx >= 0) allDrafts.splice(idx, 1);
 }
 
+// Placeholder — wired up in the banner task. Kept as a no-op so callers
+// (e.g. exportToChronicle) work before the banner module lands.
+function renderDraftBanner() { /* replaced in Task 8 */ }
+
 // ═══════════════════════════════════════════════════════
 //  COMBAT LOG
 // ═══════════════════════════════════════════════════════
@@ -2257,8 +2261,20 @@ async function pushState() {
 // ═══════════════════════════════════════════════════════
 //  EXPORT
 // ═══════════════════════════════════════════════════════
-function openExport() {
-  state.combatants.forEach(snapshotCombatant);
+// opts.fromDraft (default false) — when true, the caller has already
+// swapped combatLog to a recovered draft's data and bound exportingDraftId
+// itself. In that case we MUST NOT snapshot the lobby's live combatants
+// into combatLog (it would pollute the recovered draft's data) and we
+// MUST NOT override exportingDraftId.
+function openExport(opts) {
+  opts = opts || {};
+  if (!opts.fromDraft) {
+    state.combatants.forEach(snapshotCombatant);
+    // Bind the modal to whichever draft is active (the live combat's).
+    // After endCombat the id is still set (intentional), so this still works
+    // when invoked via openExportFromCarryover().
+    exportingDraftId = currentDraftId;
+  }
   const today = new Date();
   document.getElementById('exp-date').value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
   // Reset the chronicle section each time the modal opens.
@@ -2273,6 +2289,12 @@ function openExport() {
 }
 function closeExport() {
   document.getElementById('export-modal').classList.add('hidden');
+  // If we swapped combatLog for a recovered draft, restore the live one.
+  if (savedCombatLog !== null) {
+    combatLog = savedCombatLog;
+    savedCombatLog = null;
+  }
+  exportingDraftId = null;
   if (exportCalledFromCarryover) { exportCalledFromCarryover = false; openCarryover(); }
 }
 
@@ -2473,6 +2495,16 @@ async function exportToChronicle() {
       return;
     }
     if (!r.ok) throw new Error('HTTP ' + r.status);
+    // Chronicle write succeeded — drop the bound draft (best-effort).
+    if (exportingDraftId) {
+      removeDraft(exportingDraftId);
+      // If we just exported the live combat, clear currentDraftId so the
+      // next pushState doesn't re-create the draft we just removed.
+      if (exportingDraftId === currentDraftId) currentDraftId = null;
+      await saveDrafts();
+      // Refresh the banner in case the user exported a recovered draft.
+      renderDraftBanner();
+    }
     setSyncStatus('ok', '✦ Added to Chronicle');
     setTimeout(() => setSyncStatus('', ''), 3000);
     closeExport();
