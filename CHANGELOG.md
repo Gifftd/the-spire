@@ -9,6 +9,25 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-02
 
+### Initiative tracker: player notes & defense-in-depth filter
+
+- **Player notes on combatants.** Players can attach short combat-scoped notes to
+  any combatant in `initiative-player.html` — themselves, party members, enemies.
+  Notes are private (author only) or party-visible (all logged-in players + DM).
+  The DM sees everything read-only in the expanded combatant card on
+  `initiative-dm.html`. Notes die with the encounter (live entirely inside
+  `initiative_state`).
+- **Defense-in-depth filter on the player GET path.** The DM tracker already
+  strips `notes` (DM-only string) and `hidden` combatants client-side before POSTing
+  to the worker, so KV's `initiative_state` value has never actually contained them
+  in practice. The new worker-side filter (`filterInitiativeState`) enforces the
+  same rules server-side regardless of what lands in KV — so a future bug or
+  malicious DM client can't accidentally leak the fields.
+- **Worker change requires manual redeploy.** New endpoints
+  `initiative_note` + `initiative_note_delete`; filter pass on GET
+  `initiative_state`; notes-preservation merge step on the existing DM
+  `initiative_state` POST handler (prevents DM HP/condition writes from
+  clobbering player notes).
 ### Crucible: PC editor no longer drops the cursor on every keystroke
 
 - The four action-edit handlers (`updateAction`, `updateActionDamage`,

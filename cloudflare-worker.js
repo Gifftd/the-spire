@@ -96,6 +96,109 @@ async function verifyDMAuth(request, env) {
   return { ok: false };
 }
 
+// ─── Player auth ───────────────────────────────────────────────────
+// Mirrors the inline validation used in character_login + brew handlers.
+// Returns { ok: true, character } or { ok: false, error: '<reason>' }.
+// Uses the SAME shape as DM auth so handlers can branch uniformly.
+async function verifyCharacterAuth(body, env) {
+  const characterId = (body && body.characterId || '').toString();
+  const code        = (body && body.code        || '').toString();
+  if (!characterId || !code) return { ok: false, error: 'characterId and code required' };
+  const chars = await kvGet(env, 'characters', []);
+  const me = chars.find(c => c.id === characterId);
+  if (!me || me.code !== code) return { ok: false, error: 'invalid character or code' };
+  return { ok: true, character: me };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// BEGIN initiative-notes.js (inlined — keep in sync with /initiative-notes.js)
+// Any change to MAX_NOTE_LENGTH, MAX_NOTES_PER_CHARACTER, filterInitiativeState,
+// mergeDMWritePreservingNotes, validateNote, or canDeleteNote MUST be mirrored
+// in both files. Tests at /tests/initiative-notes.test.html cover the source.
+// ═══════════════════════════════════════════════════════════════════════
+const INITIATIVE_NOTES = (function () {
+  const MAX_NOTE_LENGTH = 500;
+  const MAX_NOTES_PER_CHARACTER = 50;
+  const VISIBILITIES = ['private', 'party'];
+
+  function filterInitiativeState(state, viewer) {
+    if (!state || typeof state !== 'object') return { combatants: [] };
+    const isDM = !!(viewer && viewer.role === 'dm');
+    const myId = (viewer && viewer.role === 'player' && viewer.characterId) || null;
+    const combatants = Array.isArray(state.combatants) ? state.combatants : [];
+    const filtered = [];
+    for (const c of combatants) {
+      if (!c) continue;
+      if (!isDM && c.hidden) continue;
+      const clone = Object.assign({}, c);
+      if (!isDM) delete clone.notes;
+      const allNotes = Array.isArray(c.playerNotes) ? c.playerNotes : [];
+      if (isDM) {
+        clone.playerNotes = allNotes.slice();
+      } else {
+        clone.playerNotes = allNotes.filter(n => {
+          if (!n) return false;
+          if (n.visibility === 'party') return true;
+          if (myId && n.authorCharId === myId) return true;
+          return false;
+        });
+      }
+      filtered.push(clone);
+    }
+    const out = Object.assign({}, state);
+    out.combatants = filtered;
+    return out;
+  }
+
+  function mergeDMWritePreservingNotes(prev, incoming) {
+    const prevCombatants = (prev && Array.isArray(prev.combatants)) ? prev.combatants : [];
+    const prevNotesById = new Map();
+    for (const c of prevCombatants) {
+      if (c && c.id) prevNotesById.set(c.id, Array.isArray(c.playerNotes) ? c.playerNotes.slice() : []);
+    }
+    const incCombatants = (incoming && Array.isArray(incoming.combatants)) ? incoming.combatants : [];
+    const mergedCombatants = incCombatants.map(c => {
+      if (!c) return c;
+      const clone = Object.assign({}, c);
+      clone.playerNotes = prevNotesById.has(c.id) ? prevNotesById.get(c.id) : [];
+      return clone;
+    });
+    const out = Object.assign({}, incoming || {});
+    out.combatants = mergedCombatants;
+    return out;
+  }
+
+  function validateNote(input) {
+    if (!input || typeof input !== 'object') {
+      return { ok: false, error: 'note must be an object' };
+    }
+    const body = typeof input.body === 'string' ? input.body : '';
+    const trimmed = body.trim();
+    if (!trimmed) return { ok: false, error: 'body is required' };
+    if (body.length > MAX_NOTE_LENGTH) {
+      return { ok: false, error: 'body too long (max ' + MAX_NOTE_LENGTH + ' chars)' };
+    }
+    if (!VISIBILITIES.includes(input.visibility)) {
+      return { ok: false, error: 'visibility must be private or party' };
+    }
+    return { ok: true };
+  }
+
+  function canDeleteNote(note, viewer) {
+    if (!note || !viewer) return false;
+    if (viewer.role === 'dm') return true;
+    if (viewer.role === 'player' && viewer.characterId
+        && note.authorCharId === viewer.characterId) return true;
+    return false;
+  }
+
+  return {
+    MAX_NOTE_LENGTH, MAX_NOTES_PER_CHARACTER, VISIBILITIES,
+    filterInitiativeState, mergeDMWritePreservingNotes, validateNote, canDeleteNote,
+  };
+})();
+// END initiative-notes.js (inlined)
+
 function sanitizeCharacters(chars) {
   return (chars || []).map(c => ({ id: c.id, name: c.name, player: c.player || '' }));
 }
@@ -328,10 +431,33 @@ export default {
         return json(value);
       }
 
-      // Initiative state — readable by everyone (players need it to see turn order)
+      // Initiative state — filtered per viewer (see initiative-notes.js).
+      //   DM creds (X-DM-* headers)            → full unfiltered state
+      //   Player creds (?characterId=…&code=…) → hidden combatants dropped,
+      //                                          DM `notes` string stripped,
+      //                                          playerNotes = own private + party
+      //   No creds                             → same as player, but party-only notes
       if (type === 'initiative_state') {
         const value = await kvGet(env, type, {});
-        return json(value);
+        // Try DM first
+        const dmAuth = await verifyDMAuth(request, env);
+        if (dmAuth.ok) {
+          return json(INITIATIVE_NOTES.filterInitiativeState(value, { role: 'dm' }));
+        }
+        // Try player query creds (?characterId=…&code=…)
+        const qCharacterId = url.searchParams.get('characterId') || '';
+        const qCode        = url.searchParams.get('code') || '';
+        if (qCharacterId || qCode) {
+          if (!qCharacterId || !qCode) return json({ error: 'characterId and code required' }, 400);
+          const chars = await kvGet(env, 'characters', []);
+          const me = chars.find(c => c.id === qCharacterId);
+          if (!me || me.code !== qCode) return json({ error: 'invalid character or code' }, 401);
+          return json(INITIATIVE_NOTES.filterInitiativeState(value, {
+            role: 'player', characterId: me.id
+          }));
+        }
+        // Anonymous
+        return json(INITIATIVE_NOTES.filterInitiativeState(value, null));
       }
 
       // Anonymous map view — server-side filter strips visibleTo-gated items
@@ -584,6 +710,87 @@ export default {
       return json({ ok: true, character: { id: me.id, name: me.name, player: me.player || '' } });
     }
 
+    // ── Add a note on a combatant (player-only authoring) ──────────
+    // Auth: body.characterId + body.code.
+    // Worker re-resolves authorName from the looked-up character to prevent
+    // spoofing. Per-character cap of MAX_NOTES_PER_CHARACTER per encounter.
+    // Body length capped at MAX_NOTE_LENGTH chars.
+    if (body?.type === 'initiative_note') {
+      const auth = await verifyCharacterAuth(body, env);
+      if (!auth.ok) return json({ error: auth.error }, 401);
+
+      const combatantId = (body.combatantId || '').toString();
+      if (!combatantId) return json({ error: 'combatantId required' }, 400);
+
+      const v = INITIATIVE_NOTES.validateNote({ body: body.body, visibility: body.visibility });
+      if (!v.ok) return json({ error: v.error }, 400);
+
+      const state = await kvGet(env, 'initiative_state', { combatants: [] });
+      const combatants = Array.isArray(state.combatants) ? state.combatants : [];
+      const idx = combatants.findIndex(c => c && c.id === combatantId);
+      if (idx < 0) return json({ error: 'combatant not found' }, 404);
+
+      const target = combatants[idx];
+      const existing = Array.isArray(target.playerNotes) ? target.playerNotes : [];
+      const authoredByMe = existing.filter(n => n && n.authorCharId === auth.character.id).length;
+      if (authoredByMe >= INITIATIVE_NOTES.MAX_NOTES_PER_CHARACTER) {
+        return json({ error: 'note limit reached for this encounter' }, 400);
+      }
+
+      const note = {
+        id: 'n_' + Math.random().toString(36).slice(2, 10),
+        combatantId,
+        authorCharId: auth.character.id,
+        authorName: auth.character.name || '',
+        body: body.body.toString(),
+        visibility: body.visibility,
+        createdAt: Date.now(),
+      };
+      target.playerNotes = existing.concat([note]);
+      combatants[idx] = target;
+      state.combatants = combatants;
+      await kvPut(env, 'initiative_state', state);
+      return json({ ok: true, note });
+    }
+
+    // ── Delete a note on a combatant ────────────────────────────────
+    // Auth: player creds (body.characterId + body.code) OR DM headers.
+    // Only the note's author can delete their own; DM can delete any.
+    if (body?.type === 'initiative_note_delete') {
+      // Determine viewer (player vs DM). Try player creds first.
+      let viewer = null;
+      if (body.characterId && body.code) {
+        const a = await verifyCharacterAuth(body, env);
+        if (!a.ok) return json({ error: a.error }, 401);
+        viewer = { role: 'player', characterId: a.character.id };
+      } else {
+        const dm = await verifyDMAuth(request, env);
+        if (!dm.ok) return json({ error: 'player or DM auth required' }, 401);
+        viewer = { role: 'dm' };
+      }
+
+      const combatantId = (body.combatantId || '').toString();
+      const noteId      = (body.noteId      || '').toString();
+      if (!combatantId || !noteId) return json({ error: 'combatantId and noteId required' }, 400);
+
+      const state = await kvGet(env, 'initiative_state', { combatants: [] });
+      const combatants = Array.isArray(state.combatants) ? state.combatants : [];
+      const idx = combatants.findIndex(c => c && c.id === combatantId);
+      if (idx < 0) return json({ error: 'combatant not found' }, 404);
+
+      const existing = Array.isArray(combatants[idx].playerNotes) ? combatants[idx].playerNotes : [];
+      const note = existing.find(n => n && n.id === noteId);
+      if (!note) return json({ error: 'note not found' }, 404);
+      if (!INITIATIVE_NOTES.canDeleteNote(note, viewer)) {
+        return json({ error: 'not allowed to delete that note' }, 403);
+      }
+
+      combatants[idx].playerNotes = existing.filter(n => n && n.id !== noteId);
+      state.combatants = combatants;
+      await kvPut(env, 'initiative_state', state);
+      return json({ ok: true });
+    }
+
     // ── Brew a potion (player or DM) ──────────────────────────
     // Auth: player (characterId + code) OR DM headers (test-brew, no consume).
     // Resolution + ingredient consumption happen server-side so the potion
@@ -675,7 +882,18 @@ export default {
     if (DM_WRITE_TYPES.includes(body?.type)) {
       const auth = await verifyDMAuth(request, env);
       if (!auth.ok) return json({ error: 'DM auth required' }, 401);
-      const ok = await kvPut(env, body.type, body.payload);
+
+      // Notes-preservation merge for initiative_state: the DM tracker never
+      // authors playerNotes, so KV is authoritative for that field. Copy prev
+      // notes forward by combatant.id so DM HP/condition writes don't clobber
+      // player-authored notes (spec §4.5).
+      let payload = body.payload;
+      if (body.type === 'initiative_state') {
+        const prev = await kvGet(env, 'initiative_state', { combatants: [] });
+        payload = INITIATIVE_NOTES.mergeDMWritePreservingNotes(prev, body.payload || { combatants: [] });
+      }
+
+      const ok = await kvPut(env, body.type, payload);
       if (!ok) return json({ error: 'KV not bound' }, 500);
       return json({ ok: true, ...(auth.warning ? { warning: auth.warning } : {}) });
     }

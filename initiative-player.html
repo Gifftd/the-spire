@@ -175,6 +175,194 @@ body {
 .ac-chip small { display: block; font-size: 0.55rem; color: var(--ink-faint); }
 
 .right-col { display: flex; align-items: center; }
+
+/* ── Player notes preview (on collapsed row) ── */
+.notes-preview {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 5px;
+  font-size: 0.78rem;
+  color: var(--ink-dim);
+  font-style: italic;
+  /* truncate to one line */
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.notes-preview .pn-icon {
+  color: var(--gold-light); font-style: normal;
+  font-size: 0.85rem;
+}
+.notes-preview .pn-count {
+  font-family: 'Cinzel', serif;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  color: var(--gold-faint);
+  padding: 0 4px;
+  border-radius: 8px;
+  background: rgba(184,134,11,0.10);
+  border: 1px solid rgba(184,134,11,0.25);
+  font-style: normal;
+}
+.notes-preview .pn-author {
+  color: var(--ink-faint);
+}
+
+/* ── Expanded row (notes panel) ── */
+.row-expanded {
+  display: none;
+  padding: 10px 14px 14px;
+  border-top: 1px solid var(--border);
+  background: rgba(0,0,0,0.18);
+}
+.row.expanded .row-expanded { display: block; }
+.row.expanded { cursor: default; }
+.row:not(.expanded) { cursor: pointer; }
+
+.notes-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.note-card {
+  background: var(--surface2);
+  border: 1px solid var(--border-light);
+  border-left: 2px solid var(--gold-faint);
+  border-radius: 3px;
+  padding: 7px 10px;
+  position: relative;
+}
+.note-card.is-mine { border-left-color: var(--pc-accent); }
+.note-card.is-pending { opacity: 0.55; }
+.note-body {
+  color: var(--ink);
+  font-size: 0.86rem;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+.note-meta {
+  margin-top: 3px;
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'Cinzel', serif;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+.note-meta .vis-chip {
+  padding: 1px 6px; border-radius: 8px;
+  border: 1px solid var(--border-light);
+}
+.note-meta .vis-chip.party   { color: var(--gold-light);  border-color: var(--gold-faint); }
+.note-meta .vis-chip.private { color: #95d0d0; border-color: var(--lobby-accent); }
+.note-meta .delete-btn {
+  margin-left: auto;
+  background: none; border: 0; color: var(--ink-faint);
+  cursor: pointer; font-size: 0.9rem; padding: 0 4px;
+}
+.note-meta .delete-btn:hover { color: var(--red); }
+.notes-empty {
+  color: var(--ink-faint); font-style: italic; font-size: 0.8rem;
+  padding: 4px 0;
+}
+
+.add-note-form {
+  display: flex; flex-direction: column; gap: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-light);
+}
+.add-note-form textarea {
+  width: 100%;
+  min-height: 50px;
+  resize: vertical;
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--border-light);
+  border-radius: 3px;
+  font-family: 'Crimson Text', Georgia, serif;
+  font-size: 0.88rem;
+  padding: 6px 8px;
+}
+.add-note-form textarea:focus { outline: none; border-color: var(--gold); }
+.add-note-form .row-actions {
+  display: flex; align-items: center; gap: 12px;
+  font-family: 'Cinzel', serif; font-size: 0.7rem; letter-spacing: 0.06em;
+  color: var(--ink-dim);
+}
+.add-note-form .vis-toggle { display: flex; gap: 10px; }
+.add-note-form label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+.add-note-form input[type=radio] { accent-color: var(--gold); }
+.add-note-form button {
+  margin-left: auto;
+  padding: 5px 14px;
+  background: var(--gold-faint);
+  color: var(--ink);
+  border: 1px solid var(--gold);
+  border-radius: 3px;
+  font-family: 'Cinzel', serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.add-note-form button:hover { background: var(--gold); color: #1a1408; }
+.add-note-form button:disabled { opacity: 0.4; cursor: not-allowed; }
+.add-note-form .char-counter {
+  font-size: 0.65rem; color: var(--ink-faint);
+}
+.add-note-form .char-counter.warn { color: var(--amber); }
+.add-note-form .char-counter.over { color: var(--red); }
+.add-note-form .form-error {
+  color: var(--red); font-size: 0.78rem; font-style: italic;
+  font-family: 'Crimson Text', serif;
+}
+.login-banner {
+  padding: 8px 10px;
+  background: rgba(58,96,96,0.18);
+  border: 1px solid var(--lobby-accent);
+  border-radius: 3px;
+  color: var(--ink-dim);
+  font-size: 0.82rem;
+  font-style: italic;
+  display: flex; align-items: center; gap: 10px;
+}
+.login-banner a {
+  color: var(--gold-light);
+  text-decoration: none;
+  font-family: 'Cinzel', serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  padding: 3px 10px;
+  border: 1px solid var(--gold-faint);
+  border-radius: 3px;
+}
+.login-banner a:hover { background: var(--gold-faint); color: var(--ink); }
+.login-banner select,
+.login-banner input[type=text] {
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--border-light);
+  border-radius: 3px;
+  padding: 4px 6px;
+  font-family: 'Crimson Text', Georgia, serif;
+  font-size: 0.85rem;
+}
+.login-banner select { min-width: 160px; }
+.login-banner button.login-trigger,
+.login-banner button.login-submit {
+  background: var(--gold-faint);
+  color: var(--ink);
+  border: 1px solid var(--gold);
+  border-radius: 3px;
+  font-family: 'Cinzel', serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  padding: 4px 12px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.login-banner button.login-trigger:hover,
+.login-banner button.login-submit:hover {
+  background: var(--gold); color: #1a1408;
+}
+.login-banner .login-error {
+  color: var(--red);
+  font-size: 0.8rem;
+  font-style: italic;
+  margin-left: 4px;
+}
 </style>
 </head>
 <body>
@@ -207,12 +395,271 @@ body {
 </main>
 
 <script src="auth.js"></script>
+<script src="initiative-notes.js"></script>
 <script>
 const WORKER_URL = (window.Auth && window.Auth.WORKER_URL) || 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
 const POLL_MS    = 2500;
 
 let lastMode = null;
 let failCount = 0;
+let expandedId = null;   // combatant.id currently expanded, or null
+
+// Bind click to expand/collapse. Called from row creation in renderRow().
+function bindRowClick(rowEl, combatantId) {
+  rowEl.addEventListener('click', (e) => {
+    // Ignore clicks inside the expanded area (form inputs, delete buttons)
+    if (e.target.closest('.row-expanded')) return;
+    expandedId = (expandedId === combatantId) ? null : combatantId;
+    renderExpandedState();
+  });
+}
+
+function renderExpandedState() {
+  document.querySelectorAll('.row').forEach(r => {
+    const id = r.dataset.combatantId;
+    r.classList.toggle('expanded', id === expandedId);
+  });
+}
+
+function renderNotesList(combatantId, notes, viewer) {
+  // viewer = { role: 'player'|'anonymous', characterId? } (no DM here)
+  const root = document.querySelector(`.row-expanded[data-combatant-id="${CSS.escape(combatantId)}"] .notes-list`);
+  if (!root) return;
+  root.innerHTML = '';
+  if (!notes || notes.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'notes-empty';
+    empty.textContent = 'No notes yet.';
+    root.appendChild(empty);
+    return;
+  }
+  const sorted = notes.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  sorted.forEach(n => {
+    const card = document.createElement('div');
+    card.className = 'note-card' + (viewer.characterId && n.authorCharId === viewer.characterId ? ' is-mine' : '');
+    if (n._pending) card.classList.add('is-pending');
+
+    const body = document.createElement('div');
+    body.className = 'note-body';
+    body.textContent = n.body;   // textContent, never innerHTML
+    card.appendChild(body);
+
+    const meta = document.createElement('div');
+    meta.className = 'note-meta';
+    const vis = document.createElement('span');
+    vis.className = 'vis-chip ' + n.visibility;
+    vis.textContent = n.visibility;
+    meta.appendChild(vis);
+    const author = document.createElement('span');
+    const isMine = viewer.characterId && n.authorCharId === viewer.characterId;
+    author.textContent = (isMine ? 'you' : (n.authorName || '?')) + ' · ' + relTime(n.createdAt);
+    meta.appendChild(author);
+
+    if (InitiativeNotes.canDeleteNote(n,
+        { role: 'player', characterId: viewer.characterId })) {
+      const del = document.createElement('button');
+      del.className = 'delete-btn';
+      del.textContent = '×';
+      del.title = 'Delete this note';
+      del.onclick = (e) => { e.stopPropagation(); deleteNote(combatantId, n.id); };
+      meta.appendChild(del);
+    }
+
+    card.appendChild(meta);
+    root.appendChild(card);
+  });
+
+  // Add-note form (only for logged-in players)
+  if (viewer.characterId) {
+    const form = document.createElement('div');
+    form.className = 'add-note-form';
+    const lastVis = localStorage.getItem('spire-initiative-note-vis') || 'party';
+    form.innerHTML = `
+      <textarea placeholder="Add a note about ${escapeAttr(getCombatantName(combatantId))}…"
+                maxlength="${InitiativeNotes.MAX_NOTE_LENGTH + 50 /* allow overflow for counter */}"></textarea>
+      <div class="row-actions">
+        <div class="vis-toggle">
+          <label><input type="radio" name="vis-${CSS.escape(combatantId)}" value="private" ${lastVis === 'private' ? 'checked' : ''}>JUST ME</label>
+          <label><input type="radio" name="vis-${CSS.escape(combatantId)}" value="party"   ${lastVis === 'party'   ? 'checked' : ''}>PARTY</label>
+        </div>
+        <span class="char-counter">0/${InitiativeNotes.MAX_NOTE_LENGTH}</span>
+        <button class="save-btn" disabled>Save</button>
+      </div>
+      <div class="form-error" style="display:none"></div>
+    `;
+    const textarea = form.querySelector('textarea');
+    const counter  = form.querySelector('.char-counter');
+    const saveBtn  = form.querySelector('.save-btn');
+    const errEl    = form.querySelector('.form-error');
+
+    textarea.addEventListener('input', () => {
+      const len = textarea.value.length;
+      counter.textContent = len + '/' + InitiativeNotes.MAX_NOTE_LENGTH;
+      counter.classList.toggle('warn', len > 400 && len <= InitiativeNotes.MAX_NOTE_LENGTH);
+      counter.classList.toggle('over', len > InitiativeNotes.MAX_NOTE_LENGTH);
+      saveBtn.disabled = (textarea.value.trim().length === 0) || len > InitiativeNotes.MAX_NOTE_LENGTH;
+    });
+
+    saveBtn.addEventListener('click', () => {
+      const vis = form.querySelector('input[type=radio]:checked').value;
+      localStorage.setItem('spire-initiative-note-vis', vis);
+      submitNote(combatantId, textarea.value, vis, { textarea, errEl, saveBtn });
+    });
+
+    root.parentElement.appendChild(form);  // appended outside .notes-list (sibling)
+  } else {
+    // Anonymous: show login banner. Two-state: trigger button → inline form.
+    const banner = document.createElement('div');
+    banner.className = 'login-banner';
+    banner.innerHTML = `
+      <span>Log in as your character to add notes.</span>
+      <button class="login-trigger" type="button">Log in</button>
+    `;
+    banner.querySelector('.login-trigger').addEventListener('click',
+      (e) => { e.stopPropagation(); openInlineLogin(banner); });
+    root.parentElement.appendChild(banner);
+  }
+}
+
+function escapeAttr(s) {
+  return String(s || '').replace(/[&<>"']/g, ch => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[ch]));
+}
+
+function getCombatantName(id) {
+  // Look up the latest snapshot's combatants. lastSnapshot stored in poll().
+  const c = (lastSnapshot && lastSnapshot.combatants || []).find(x => x.id === id);
+  return c ? c.name : 'this combatant';
+}
+
+let lastSnapshot = null;
+
+function relTime(ms) {
+  if (!ms) return '';
+  const diff = Date.now() - ms;
+  if (diff < 60_000)         return 'just now';
+  if (diff < 3_600_000)      return Math.floor(diff / 60_000) + 'm ago';
+  if (diff < 86_400_000)     return Math.floor(diff / 3_600_000) + 'h ago';
+  const d = new Date(ms);
+  return d.toLocaleDateString();
+}
+
+async function deleteNote(combatantId, noteId) {
+  const me = (window.Auth && Auth.playerCreds && Auth.playerCreds()) || null;
+  if (!me || !me.characterId || !me.code) return;
+
+  // Optimistic local remove
+  let removedFromSnapshot = null;
+  if (lastSnapshot && Array.isArray(lastSnapshot.combatants)) {
+    const c = lastSnapshot.combatants.find(x => x.id === combatantId);
+    if (c && Array.isArray(c.playerNotes)) {
+      removedFromSnapshot = c.playerNotes.find(n => n.id === noteId);
+      c.playerNotes = c.playerNotes.filter(n => n.id !== noteId);
+      renderNotesList(combatantId, c.playerNotes, { role: 'player', characterId: me.characterId });
+    }
+  }
+
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'initiative_note_delete',
+        characterId: me.characterId,
+        code: me.code,
+        combatantId, noteId,
+      }),
+    });
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody.error || ('HTTP ' + res.status));
+    }
+  } catch (e) {
+    // Roll back: re-insert the note
+    if (removedFromSnapshot && lastSnapshot && Array.isArray(lastSnapshot.combatants)) {
+      const c = lastSnapshot.combatants.find(x => x.id === combatantId);
+      if (c) {
+        c.playerNotes = (c.playerNotes || []).concat([removedFromSnapshot]);
+        renderNotesList(combatantId, c.playerNotes, { role: 'player', characterId: me.characterId });
+      }
+    }
+    alert('Couldn\'t delete: ' + (e.message || 'try again'));
+  }
+}
+
+async function submitNote(combatantId, rawBody, visibility, els) {
+  const body = (rawBody || '').toString();
+  const v = InitiativeNotes.validateNote({ body, visibility });
+  if (!v.ok) {
+    els.errEl.style.display = 'block';
+    els.errEl.textContent = v.error;
+    return;
+  }
+  els.errEl.style.display = 'none';
+
+  const me = (window.Auth && Auth.playerCreds && Auth.playerCreds()) || null;
+  if (!me || !me.characterId || !me.code) {
+    els.errEl.style.display = 'block';
+    els.errEl.textContent = 'You are not logged in.';
+    return;
+  }
+
+  // Optimistic local insert
+  const tempNote = {
+    id: 'temp_' + Math.random().toString(36).slice(2, 8),
+    combatantId,
+    authorCharId: me.characterId,
+    authorName: me.name || '?',
+    body, visibility,
+    createdAt: Date.now(),
+    _pending: true,
+  };
+  if (lastSnapshot && Array.isArray(lastSnapshot.combatants)) {
+    const c = lastSnapshot.combatants.find(x => x.id === combatantId);
+    if (c) {
+      c.playerNotes = (c.playerNotes || []).concat([tempNote]);
+      renderNotesList(combatantId, c.playerNotes, { role: 'player', characterId: me.characterId });
+    }
+  }
+  els.saveBtn.disabled = true;
+  const originalText = els.textarea.value;
+  els.textarea.value = '';
+
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'initiative_note',
+        characterId: me.characterId,
+        code: me.code,
+        combatantId,
+        body,
+        visibility,
+      }),
+    });
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody.error || ('HTTP ' + res.status));
+    }
+    // Success: the next poll tick will replace the pending temp note
+    // with the server-issued one. No further action needed here.
+  } catch (e) {
+    // Roll back optimistic insert
+    if (lastSnapshot && Array.isArray(lastSnapshot.combatants)) {
+      const c = lastSnapshot.combatants.find(x => x.id === combatantId);
+      if (c && Array.isArray(c.playerNotes)) {
+        c.playerNotes = c.playerNotes.filter(n => n.id !== tempNote.id);
+        renderNotesList(combatantId, c.playerNotes, { role: 'player', characterId: me.characterId });
+      }
+    }
+    els.errEl.style.display = 'block';
+    els.errEl.textContent = 'Couldn\'t save — ' + (e.message || 'try again') + '.';
+    els.textarea.value = originalText;  // restore the user's text
+    els.saveBtn.disabled = false;
+  }
+}
 
 function hpColor(pct) {
   return pct > 60 ? '#2d6a3f' : pct > 30 ? '#c87800' : '#c0392b';
@@ -294,15 +741,74 @@ function showCombat(s) {
           ${acHtml}
         </div>
       </div>
+      <div class="row-expanded" data-combatant-id="${c.id}">
+        <div class="notes-list"></div>
+      </div>
     `;
+
+    // ── Notes preview (one-line, newest visible note) ─────────────
+    const notes = Array.isArray(c.playerNotes) ? c.playerNotes : [];
+    if (notes.length > 0) {
+      // Newest first by createdAt
+      const sorted = notes.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      const top = sorted[0];
+      const previewEl = document.createElement('div');
+      previewEl.className = 'notes-preview';
+      // Build the preview using textContent so note bodies can't inject HTML
+      const icon = document.createElement('span'); icon.className = 'pn-icon'; icon.textContent = '📝';
+      const count = document.createElement('span'); count.className = 'pn-count';
+      count.textContent = '×' + notes.length;
+      const body = document.createElement('span');
+      const truncated = top.body.length > 60 ? top.body.slice(0, 57) + '…' : top.body;
+      body.textContent = '"' + truncated + '"';
+      const author = document.createElement('span');
+      author.className = 'pn-author';
+      author.textContent = '— ' + (top.authorName || '?');
+      previewEl.appendChild(icon);
+      previewEl.appendChild(count);
+      previewEl.appendChild(body);
+      previewEl.appendChild(author);
+      // Append into the row-main's middle column (the name area)
+      const middleCol = row.querySelector('.row-main > div:nth-child(2)');
+      if (middleCol) middleCol.appendChild(previewEl);
+    }
+
     list.appendChild(row);
+
+    row.dataset.combatantId = c.id;
+    bindRowClick(row, c.id);
+
+    const me = (window.Auth && Auth.playerCreds && Auth.playerCreds()) || null;
+    const viewer = { role: 'player', characterId: me ? me.characterId : null };
+    renderNotesList(c.id, c.playerNotes || [], viewer);
   });
+
+  renderExpandedState();
+}
+
+function buildStateUrl() {
+  // Auth.playerCreds() returns { characterId, code, name } for logged-in players,
+  // or null if anonymous/DM. (Defined in auth.js around line 138.)
+  const me = (window.Auth && Auth.playerCreds && Auth.playerCreds()) || null;
+  let url = WORKER_URL + '?type=initiative_state';
+  if (me && me.characterId && me.code) {
+    url += '&characterId=' + encodeURIComponent(me.characterId)
+        +  '&code='        + encodeURIComponent(me.code);
+  }
+  return url;
 }
 
 async function poll() {
   try {
-    const res  = await fetch(WORKER_URL + '?type=initiative_state', { cache: 'no-store' });
-    if (!res.ok) throw new Error(res.status);
+    const res  = await fetch(buildStateUrl(), { cache: 'no-store' });
+    if (!res.ok) {
+      // 401 means our player creds were rotated — fall back to anonymous next tick.
+      // Auth.logout() clears the whole spire-auth blob; since localStorage holds
+      // one role at a time, this is equivalent to clearing player creds when
+      // role === 'player'.
+      if (res.status === 401 && window.Auth && Auth.logout) Auth.logout();
+      throw new Error(res.status);
+    }
     const data = await res.json();
     failCount  = 0;
 
@@ -311,6 +817,7 @@ async function poll() {
     bar.textContent = '✦ Live — updates every few seconds';
 
     if (data && typeof data.mode !== 'undefined') {
+      lastSnapshot = data;
       if (data.mode === 'lobby') {
         showLobby();
       } else {
@@ -327,6 +834,59 @@ async function poll() {
     }
   }
   setTimeout(poll, POLL_MS);
+}
+
+async function refreshOnce() {
+  try {
+    const res = await fetch(buildStateUrl(), { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && typeof data.mode !== 'undefined') {
+      lastSnapshot = data;
+      if (data.mode === 'lobby') showLobby(); else showCombat(data);
+    }
+  } catch {}
+}
+
+async function openInlineLogin(bannerEl) {
+  // Fetch the public sanitized character list (works without auth)
+  let chars = [];
+  try { chars = await Auth.characterList(); } catch { chars = []; }
+  if (!Array.isArray(chars)) chars = [];
+
+  bannerEl.innerHTML = `
+    <select class="login-char-sel">
+      <option value="">— pick a character —</option>
+      ${chars.map(c => `<option value="${escapeAttr(c.id)}">${escapeAttr(c.name)}</option>`).join('')}
+    </select>
+    <input class="login-code" type="text" maxlength="6" placeholder="Code" autocapitalize="characters">
+    <button class="login-submit" type="button">Log in</button>
+    <span class="login-error" style="display:none"></span>
+  `;
+  const select = bannerEl.querySelector('.login-char-sel');
+  const codeIn = bannerEl.querySelector('.login-code');
+  const submit = bannerEl.querySelector('.login-submit');
+  const errEl  = bannerEl.querySelector('.login-error');
+
+  // Prevent row-expand click swallowing form interactions
+  [select, codeIn, submit].forEach(el =>
+    el.addEventListener('click', (e) => e.stopPropagation()));
+
+  submit.addEventListener('click', async () => {
+    errEl.style.display = 'none';
+    if (!select.value) { errEl.style.display = 'inline'; errEl.textContent = 'Pick a character.'; return; }
+    if (!codeIn.value) { errEl.style.display = 'inline'; errEl.textContent = 'Enter your code.'; return; }
+    submit.disabled = true;
+    const r = await Auth.playerLogin(select.value, codeIn.value);
+    if (!r.ok) {
+      errEl.style.display = 'inline';
+      errEl.textContent = r.error || 'Login failed.';
+      submit.disabled = false;
+      return;
+    }
+    // Logged in. Refresh data once; on next render the banner becomes the form.
+    await refreshOnce();
+  });
 }
 
 poll();

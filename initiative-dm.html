@@ -246,6 +246,43 @@ body {
 .notes-input { width: 100%; background: var(--bg); border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink); font-family: 'Crimson Text', serif; font-size: 0.88rem; padding: 4px 6px; outline: none; resize: vertical; min-height: 44px; }
 .notes-input:focus { border-color: var(--gold); }
 
+/* ── Player notes (read-only, on combatant card) ── */
+.player-notes-section {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-light);
+}
+.player-notes-section .pn-header {
+  font-family: 'Cinzel', serif;
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  color: var(--gold-light);
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+.player-notes-section .pn-item {
+  font-size: 0.82rem;
+  color: var(--ink);
+  padding: 3px 0;
+  display: flex; gap: 6px; align-items: baseline;
+}
+.player-notes-section .pn-item .pn-body { flex: 1; word-break: break-word; }
+.player-notes-section .pn-item .pn-meta {
+  font-family: 'Cinzel', serif;
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.player-notes-section .pn-item .pn-vis {
+  padding: 0 5px;
+  border-radius: 7px;
+  border: 1px solid var(--border-light);
+}
+.player-notes-section .pn-item .pn-vis.party   { color: var(--gold-light);  border-color: var(--gold-faint); }
+.player-notes-section .pn-item .pn-vis.private { color: #95d0d0; border-color: var(--lobby-accent); }
+
 /* ── Sidebar ── */
 .sidebar-section { margin-bottom: 1.3rem; }
 .sidebar-title {
@@ -761,6 +798,7 @@ body {
 </div>
 
 <script src="auth.js"></script>
+<script src="initiative-notes.js"></script>
 <script src="bestiary-merge.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════
@@ -801,6 +839,21 @@ let dragSrc     = null;
 let syncTimer   = null;
 let _id         = 0;
 function uid() { return ++_id; }
+
+function escapeHTML(s) {
+  return String(s || '').replace(/[&<>"']/g, ch => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[ch]));
+}
+
+function relTimeDM(ms) {
+  if (!ms) return '';
+  const diff = Date.now() - ms;
+  if (diff < 60_000)         return 'just now';
+  if (diff < 3_600_000)      return Math.floor(diff / 60_000) + 'm ago';
+  if (diff < 86_400_000)     return Math.floor(diff / 3_600_000) + 'h ago';
+  return new Date(ms).toLocaleDateString();
+}
 
 // Flag: whether we're returning to carryover modal after export
 let exportCalledFromCarryover = false;
@@ -1994,6 +2047,31 @@ function render() {
           <span class="exp-label">DM NOTES (NOT SHOWN TO PLAYERS)</span>
           <textarea class="notes-input" onclick="event.stopPropagation()" onchange="setNotes(${c.id},this.value)" placeholder="Secret notes…">${c.notes}</textarea>
         </div>
+        ${(() => {
+          const notes = Array.isArray(c.playerNotes) ? c.playerNotes : [];
+          if (notes.length === 0) return '';
+          const sorted = notes.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+          const lines = sorted.map(n => {
+            const safeBody = escapeHTML(n.body || '');
+            const author   = escapeHTML(n.authorName || '?');
+            const vis      = n.visibility === 'private' ? 'private' : 'party';
+            const rel      = relTimeDM(n.createdAt);
+            return `
+              <div class="pn-item">
+                <span class="pn-body">"${safeBody}"</span>
+                <span class="pn-meta">— ${author}</span>
+                <span class="pn-meta pn-vis ${vis}">${vis}</span>
+                <span class="pn-meta">${rel}</span>
+              </div>
+            `;
+          }).join('');
+          return `
+            <div class="player-notes-section">
+              <div class="pn-header">📝 Player notes (${notes.length})</div>
+              ${lines}
+            </div>
+          `;
+        })()}
         ${c.bestiaryId ? `
         <div class="sb-toggle-row">
           <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();toggleStatblock(${c.id})">
