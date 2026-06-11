@@ -175,6 +175,35 @@ body {
 .ac-chip small { display: block; font-size: 0.55rem; color: var(--ink-faint); }
 
 .right-col { display: flex; align-items: center; }
+
+/* ── Player notes preview (on collapsed row) ── */
+.notes-preview {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 5px;
+  font-size: 0.78rem;
+  color: var(--ink-dim);
+  font-style: italic;
+  /* truncate to one line */
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.notes-preview .pn-icon {
+  color: var(--gold-light); font-style: normal;
+  font-size: 0.85rem;
+}
+.notes-preview .pn-count {
+  font-family: 'Cinzel', serif;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  color: var(--gold-faint);
+  padding: 0 4px;
+  border-radius: 8px;
+  background: rgba(184,134,11,0.10);
+  border: 1px solid rgba(184,134,11,0.25);
+  font-style: normal;
+}
+.notes-preview .pn-author {
+  color: var(--ink-faint);
+}
 </style>
 </head>
 <body>
@@ -296,6 +325,34 @@ function showCombat(s) {
         </div>
       </div>
     `;
+
+    // ── Notes preview (one-line, newest visible note) ─────────────
+    const notes = Array.isArray(c.playerNotes) ? c.playerNotes : [];
+    if (notes.length > 0) {
+      // Newest first by createdAt
+      const sorted = notes.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      const top = sorted[0];
+      const previewEl = document.createElement('div');
+      previewEl.className = 'notes-preview';
+      // Build the preview using textContent so note bodies can't inject HTML
+      const icon = document.createElement('span'); icon.className = 'pn-icon'; icon.textContent = '📝';
+      const count = document.createElement('span'); count.className = 'pn-count';
+      count.textContent = '×' + notes.length;
+      const body = document.createElement('span');
+      const truncated = top.body.length > 60 ? top.body.slice(0, 57) + '…' : top.body;
+      body.textContent = '"' + truncated + '"';
+      const author = document.createElement('span');
+      author.className = 'pn-author';
+      author.textContent = '— ' + (top.authorName || '?');
+      previewEl.appendChild(icon);
+      previewEl.appendChild(count);
+      previewEl.appendChild(body);
+      previewEl.appendChild(author);
+      // Append into the row-main's middle column (the name area)
+      const middleCol = row.querySelector('.row-main > div:nth-child(2)');
+      if (middleCol) middleCol.appendChild(previewEl);
+    }
+
     list.appendChild(row);
   });
 }
