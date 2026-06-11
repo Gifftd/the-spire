@@ -504,6 +504,7 @@
       // ── Always: update non-Combatants sections in place ──
       document.getElementById('enc-identity-section').outerHTML = renderIdentity(enc);
       document.getElementById('enc-tactical-section').outerHTML = renderTactical(enc);
+      document.getElementById('enc-playbook-section').outerHTML = renderPlaybook(enc);
 
       // Sync party inputs only when not focused (avoid disrupting typing).
       const szEl = document.getElementById('enc-bp-party-size');
@@ -621,6 +622,42 @@
       e.tactical.waves.splice(i, 1);
       scheduleSave();
       renderEditor();
+    }
+
+    // ── DM Playbook section ──
+
+    function renderPlaybook(e) {
+      return `
+        <details class="enc-section" id="enc-playbook-section"><summary>DM playbook</summary>
+          <div class="field"><label>Overall tactics</label>
+            <textarea rows="3" oninput="updateField('playbook.overallTactics', this.value)">${escapeHtml(e.playbook.overallTactics)}</textarea>
+          </div>
+          <div class="field"><label>Per-monster tactics</label>
+            ${e.picks.map(p => `
+              <div style="display:flex;gap:6px;margin-bottom:4px;align-items:center">
+                <span style="min-width:80px;font-size:0.75rem;color:var(--c-ink-faint)">${escapeHtml(p.pickKey + ': ' + (p.id || '?'))}</span>
+                <input type="text" value="${escapeHtml(p.tactics || '')}"
+                       oninput="updatePickTactics('${p.pickKey}', this.value)" style="flex:1">
+              </div>
+            `).join('') || '<em>Add monsters above first.</em>'}
+          </div>
+          <div class="field"><label>Retreat triggers</label>
+            <textarea rows="2" oninput="updateField('playbook.retreatTriggers', this.value)">${escapeHtml(e.playbook.retreatTriggers)}</textarea>
+          </div>
+          <div class="field"><label>Victory conditions</label>
+            <textarea rows="2" oninput="updateField('playbook.victoryConditions', this.value)">${escapeHtml(e.playbook.victoryConditions)}</textarea>
+          </div>
+          <div class="field"><label>DM reminders</label>
+            <textarea rows="2" oninput="updateField('playbook.reminders', this.value)">${escapeHtml(e.playbook.reminders)}</textarea>
+          </div>
+        </details>
+      `;
+    }
+
+    function updatePickTactics(pickKey, value) {
+      const e = currentEncounter();
+      const p = e.picks.find(x => x.pickKey === pickKey);
+      if (p) { p.tactics = value; scheduleSave(); }
     }
 
     function renderLaunchpad() {
