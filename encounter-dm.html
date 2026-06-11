@@ -222,6 +222,10 @@
     .enc-budget .enc-verdict.high     { color: var(--c-brass); }
     .enc-budget .enc-verdict.over     { color: #e88; }
 
+    /* ── Wave rows (Tactical section) ── */
+    .wave-row { display: flex; gap: 6px; margin-bottom: 4px; align-items: center; }
+    .wave-row > * { font-size: 0.85rem; }
+
     /* ── Identity / shared field styles ── */
     .enc-section { margin-bottom: 1rem; border: 1px solid var(--c-border); border-radius: 3px; padding: 8px; background: var(--c-bg); }
     .enc-section > summary { font-family: 'Cinzel', serif; font-size: 0.85rem; cursor: pointer; padding: 4px; }
@@ -499,6 +503,7 @@
 
       // ── Always: update non-Combatants sections in place ──
       document.getElementById('enc-identity-section').outerHTML = renderIdentity(enc);
+      document.getElementById('enc-tactical-section').outerHTML = renderTactical(enc);
 
       // Sync party inputs only when not focused (avoid disrupting typing).
       const szEl = document.getElementById('enc-bp-party-size');
@@ -550,6 +555,72 @@
       e.updatedAt = new Date().toISOString();
       if (path === 'name' || path === 'status') renderLibrary();
       scheduleSave();
+    }
+
+    // ── Tactical section ──
+
+    function renderTactical(e) {
+      const waves = e.tactical.waves.map((w, i) => `
+        <div class="wave-row">
+          <input type="number" min="1" max="50" value="${w.round}" placeholder="round"
+                 oninput="updateWave(${i}, 'round', parseInt(this.value, 10) || 1)" style="width:60px">
+          <select onchange="updateWave(${i}, 'pickKey', this.value)">
+            <option value="">(none)</option>
+            ${e.picks.map(p => `<option value="${p.pickKey}" ${w.pickKey === p.pickKey ? 'selected' : ''}>${escapeHtml(p.pickKey + ': ' + (p.id || '?'))}</option>`).join('')}
+          </select>
+          <input type="number" min="1" value="${w.count}" placeholder="count"
+                 oninput="updateWave(${i}, 'count', parseInt(this.value, 10) || 1)" style="width:60px">
+          <input type="text" value="${escapeHtml(w.fromDirection || '')}" placeholder="from direction"
+                 oninput="updateWave(${i}, 'fromDirection', this.value)">
+          <button onclick="removeWave(${i})">×</button>
+        </div>
+      `).join('');
+      return `
+        <details class="enc-section" id="enc-tactical-section"><summary>Tactical setup</summary>
+          <div class="field"><label>Terrain</label>
+            <textarea oninput="updateField('tactical.terrain', this.value)">${escapeHtml(e.tactical.terrain)}</textarea>
+          </div>
+          <div class="field"><label>Lighting</label>
+            <select onchange="updateField('tactical.lighting', this.value)">
+              ${EncounterSchema.LIGHTING.map(l => `<option value="${l}" ${e.tactical.lighting === l ? 'selected' : ''}>${l}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label>Surprise</label>
+            <select onchange="updateField('tactical.surprise', this.value)">
+              ${EncounterSchema.SURPRISE.map(s => `<option value="${s}" ${e.tactical.surprise === s ? 'selected' : ''}>${s}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label>Starting positions</label>
+            <textarea oninput="updateField('tactical.startingPositions', this.value)">${escapeHtml(e.tactical.startingPositions)}</textarea>
+          </div>
+          <div class="field"><label>Waves</label>
+            <div id="waves-list">${waves || '<em>None — fight starts with all combatants.</em>'}</div>
+            <button onclick="addWave()">+ Add wave</button>
+          </div>
+          <div class="field"><label>Opening read-aloud (shown to DM at top of tracker)</label>
+            <textarea rows="4" oninput="updateField('tactical.readAloud', this.value)">${escapeHtml(e.tactical.readAloud)}</textarea>
+          </div>
+        </details>
+      `;
+    }
+
+    function updateWave(i, key, value) {
+      const e = currentEncounter();
+      e.tactical.waves[i][key] = value;
+      scheduleSave();
+      renderEditor();
+    }
+    function addWave() {
+      const e = currentEncounter();
+      e.tactical.waves.push({ round: 2, pickKey: e.picks[0]?.pickKey || '', count: 1, fromDirection: '', notes: '' });
+      scheduleSave();
+      renderEditor();
+    }
+    function removeWave(i) {
+      const e = currentEncounter();
+      e.tactical.waves.splice(i, 1);
+      scheduleSave();
+      renderEditor();
     }
 
     function renderLaunchpad() {
