@@ -624,7 +624,14 @@ export default {
       if (type === 'encounters') {
         const auth = await verifyDMAuth(request, env);
         if (!auth.ok) return json({ error: 'DM auth required' }, 401);
-        return json(await kvGet(env, 'encounters', []));
+        const arr = await kvGet(env, 'encounters', []);
+        // Stamp schemaVersion: 1 on records missing it so the front-end can branch cleanly.
+        const stamped = Array.isArray(arr) ? arr.map(r =>
+          (r && typeof r === 'object' && r.schemaVersion == null)
+            ? { ...r, schemaVersion: 1 }
+            : r
+        ) : [];
+        return json(stamped);
       }
 
       // DM-only: normalized feature library used by the Menagerie's
