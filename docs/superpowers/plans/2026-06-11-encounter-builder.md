@@ -1036,8 +1036,8 @@ Use the same structure as other DM pages. Reference: open `crucible-dm.html` for
     /* Three-pane layout: library | editor | launchpad */
     body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; margin: 0; }
     .workshop { display: grid; grid-template-columns: 280px 1fr 280px; flex: 1; min-height: 0; }
-    .pane { padding: 1rem; overflow-y: auto; border-right: 1px solid var(--border); }
-    .pane:last-child { border-right: none; border-left: 1px solid var(--border); }
+    .pane { padding: 1rem; overflow-y: auto; border-right: 1px solid var(--c-border); }
+    .pane:last-child { border-right: none; border-left: 1px solid var(--c-border); }
     @media (max-width: 1100px) {
       .workshop { grid-template-columns: 1fr; }
       .pane.launchpad { position: sticky; bottom: 0; }
@@ -1144,10 +1144,10 @@ git commit -m "Encounter builder: page scaffold + parallel data load"
 In the `<style>` block:
 
 ```css
-.lib-row { padding: 8px 10px; border: 1px solid var(--border); border-radius: 3px; margin-bottom: 6px; cursor: pointer; background: var(--bg); }
-.lib-row.selected { border-color: var(--gold); background: rgba(184,138,90,0.10); }
+.lib-row { padding: 8px 10px; border: 1px solid var(--c-border); border-radius: 3px; margin-bottom: 6px; cursor: pointer; background: var(--c-surface); }
+.lib-row.selected { border-color: var(--c-brass); background: rgba(184,138,90,0.10); }
 .lib-row-name { font-family: 'Cinzel', serif; font-size: 0.85rem; }
-.lib-row-meta { display: flex; gap: 8px; margin-top: 4px; font-size: 0.7rem; color: var(--ink-dim); }
+.lib-row-meta { display: flex; gap: 8px; margin-top: 4px; font-size: 0.7rem; color: var(--c-ink-faint); }
 .lib-status-pill { padding: 1px 6px; border-radius: 8px; border: 1px solid currentColor; font-family: 'Cinzel', serif; font-size: 0.55rem; letter-spacing: 0.08em; text-transform: uppercase; }
 .lib-status-draft     { color: #8a8275; }
 .lib-status-ready     { color: #6c8; }
@@ -1155,7 +1155,7 @@ In the `<style>` block:
 .lib-status-live      { color: #d66; }
 .lib-status-completed { color: #b88a5a; }
 .lib-status-archived  { color: #555; }
-#new-btn { width: 100%; margin-bottom: 8px; padding: 8px; background: var(--gold); color: #1a1f24; border: none; border-radius: 3px; font-family: 'Cinzel', serif; cursor: pointer; }
+#new-btn { width: 100%; margin-bottom: 8px; padding: 8px; background: var(--c-brass); color: #1a1f24; border: none; border-radius: 3px; font-family: 'Cinzel', serif; cursor: pointer; }
 ```
 
 - [ ] **Step 2: Replace `renderLibrary()`**
@@ -1374,12 +1374,12 @@ git commit -m "Encounter builder: save flow with re-fetch-and-splice"
 Add to the `<style>` block:
 
 ```css
-details { margin-bottom: 1rem; border: 1px solid var(--border); border-radius: 3px; padding: 8px; background: var(--bg); }
+details { margin-bottom: 1rem; border: 1px solid var(--c-border); border-radius: 3px; padding: 8px; background: var(--c-surface); }
 summary { font-family: 'Cinzel', serif; font-size: 0.85rem; cursor: pointer; padding: 4px; }
 .field { margin-bottom: 8px; }
-.field label { display: block; font-size: 0.7rem; color: var(--ink-dim); margin-bottom: 2px; }
+.field label { display: block; font-size: 0.7rem; color: var(--c-ink-faint); margin-bottom: 2px; }
 .field input, .field textarea, .field select {
-  width: 100%; background: var(--surface); color: var(--ink); border: 1px solid var(--border);
+  width: 100%; background: var(--c-surface); color: var(--c-ink); border: 1px solid var(--c-border);
   border-radius: 2px; padding: 6px 8px; font-family: 'Crimson Text', serif; font-size: 0.9rem; box-sizing: border-box;
 }
 ```
@@ -1554,7 +1554,7 @@ git commit -m "Encounter builder: Tactical setup section"
           <div class="field"><label>Per-monster tactics</label>
             ${e.picks.map(p => `
               <div style="display:flex;gap:6px;margin-bottom:4px;align-items:center">
-                <span style="min-width:80px;font-size:0.75rem;color:var(--ink-dim)">${escapeHtml(p.pickKey + ': ' + (p.id || '?'))}</span>
+                <span style="min-width:80px;font-size:0.75rem;color:var(--c-ink-faint)">${escapeHtml(p.pickKey + ': ' + (p.id || '?'))}</span>
                 <input type="text" value="${escapeHtml(p.tactics || '')}"
                        oninput="updatePickTactics('${p.pickKey}', this.value)" style="flex:1">
               </div>
@@ -1855,13 +1855,13 @@ git commit -m "Encounter builder: Linkages section (location, session, NPCs)"
 Add to `<style>`:
 
 ```css
-.lp-card { padding: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; margin-bottom: 8px; }
+.lp-card { padding: 8px; background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 3px; margin-bottom: 8px; }
 .lp-status { display: inline-block; padding: 1px 8px; border: 1px solid currentColor; border-radius: 8px; font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; }
 .lp-name { font-family: 'Cinzel', serif; font-size: 1rem; margin: 6px 0; }
-.lp-meta { font-size: 0.75rem; color: var(--ink-dim); }
-.btn-primary { width: 100%; padding: 10px; background: var(--gold); color: #1a1f24; border: none; border-radius: 3px; font-family: 'Cinzel', serif; cursor: pointer; margin-bottom: 6px; }
-.btn-secondary { width: 100%; padding: 8px; background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 3px; cursor: pointer; margin-bottom: 6px; }
-.lp-last-run { padding: 8px; background: var(--bg); border-left: 3px solid var(--gold); font-size: 0.8rem; margin-bottom: 8px; }
+.lp-meta { font-size: 0.75rem; color: var(--c-ink-faint); }
+.btn-primary { width: 100%; padding: 10px; background: var(--c-brass); color: #1a1f24; border: none; border-radius: 3px; font-family: 'Cinzel', serif; cursor: pointer; margin-bottom: 6px; }
+.btn-secondary { width: 100%; padding: 8px; background: var(--c-surface); color: var(--c-ink); border: 1px solid var(--c-border); border-radius: 3px; cursor: pointer; margin-bottom: 6px; }
+.lp-last-run { padding: 8px; background: var(--c-surface); border-left: 3px solid var(--c-brass); font-size: 0.8rem; margin-bottom: 8px; }
 ```
 
 - [ ] **Step 2: Test — buttons render, "Run" navigates to `initiative-dm.html?stage=<id>`, "Send to Crucible" navigates to `crucible-dm.html?from-encounter=<id>`**
@@ -1985,8 +1985,8 @@ Delete the `_BP.encounters` field initialization (line 1353) and the `fetch(WORK
 Replace the deleted markup with:
 
 ```html
-        <span style="font-family:Cinzel,serif;font-size:0.66rem;letter-spacing:0.1em;color:var(--ink-faint)">
-          To save a re-usable encounter, use <a href="encounter-dm.html" style="color:var(--gold)">The Anvil</a>.
+        <span style="font-family:Cinzel,serif;font-size:0.66rem;letter-spacing:0.1em;color:var(--c-ink-dim)">
+          To save a re-usable encounter, use <a href="encounter-dm.html" style="color:var(--c-brass)">The Anvil</a>.
         </span>
 ```
 
@@ -2170,7 +2170,7 @@ The page already has a recovery-banner area for `combat_drafts` (search for `rec
         bar = document.createElement('div');
         bar.id = 'readaloud-banner';
         bar.className = 'recovery-banner';  // reuse existing styling
-        bar.style.cssText = 'padding:10px 14px;background:#3a4a3a;border-left:4px solid var(--gold);margin:8px 0;font-family:Crimson Text,serif;';
+        bar.style.cssText = 'padding:10px 14px;background:#3a4a3a;border-left:4px solid var(--c-brass);margin:8px 0;font-family:Crimson Text,serif;';
         // Insert above the tracker — adjust selector to the actual tracker container id.
         document.body.insertBefore(bar, document.querySelector('.tracker, #tracker, main'));
       }
@@ -2505,8 +2505,8 @@ Locate `openLocModal` (around line 2049). At the start, ensure encounters are lo
 Find the location modal body (the section after the existing fields, before the modal footer). Add:
 
 ```html
-    <div id="loc-encounters-panel" style="margin-top:1rem;padding:8px;border:1px solid var(--border-light);border-radius:3px">
-      <div style="font-family:Cinzel,serif;font-size:0.66rem;letter-spacing:0.1em;color:var(--gold);margin-bottom:6px;text-transform:uppercase">Encounters here</div>
+    <div id="loc-encounters-panel" style="margin-top:1rem;padding:8px;border:1px solid var(--c-border-light);border-radius:3px">
+      <div style="font-family:Cinzel,serif;font-size:0.66rem;letter-spacing:0.1em;color:var(--c-brass);margin-bottom:6px;text-transform:uppercase">Encounters here</div>
       <div id="loc-encounters-list">—</div>
       <button onclick="newEncounterAtCurrentLocation()" style="margin-top:6px">+ New encounter here</button>
     </div>
@@ -2538,8 +2538,8 @@ Add the renderer:
       }
       root.innerHTML = matches.map(e => `
         <div style="padding:4px 0">
-          <a href="encounter-dm.html?id=${encodeURIComponent(e.id)}" style="color:var(--gold)">${escapeHtml(e.name || '(untitled)')}</a>
-          <span style="font-size:0.7rem;color:var(--ink-dim);margin-left:6px">${e.status} · ${e.picks.length} monsters</span>
+          <a href="encounter-dm.html?id=${encodeURIComponent(e.id)}" style="color:var(--c-brass)">${escapeHtml(e.name || '(untitled)')}</a>
+          <span style="font-size:0.7rem;color:var(--c-ink-faint);margin-left:6px">${e.status} · ${e.picks.length} monsters</span>
         </div>
       `).join('');
     }
@@ -2577,8 +2577,8 @@ git commit -m "Atlas Workshop: 'Encounters here' panel in location detail (world
 Find the session entry editor (search for the session detail form). Add a panel mirroring the Atlas one:
 
 ```html
-    <div id="session-encounters-panel" style="margin-top:1rem;padding:8px;border:1px solid var(--border-light);border-radius:3px">
-      <div style="font-family:Cinzel,serif;font-size:0.66rem;letter-spacing:0.1em;color:var(--gold);margin-bottom:6px;text-transform:uppercase">Encounters planned</div>
+    <div id="session-encounters-panel" style="margin-top:1rem;padding:8px;border:1px solid var(--c-border-light);border-radius:3px">
+      <div style="font-family:Cinzel,serif;font-size:0.66rem;letter-spacing:0.1em;color:var(--c-brass);margin-bottom:6px;text-transform:uppercase">Encounters planned</div>
       <div id="session-encounters-list">—</div>
       <button onclick="newEncounterForCurrentSession()" style="margin-top:6px">+ Add encounter to this session</button>
     </div>
@@ -2596,8 +2596,8 @@ In the editor's open/render flow:
       if (!matches.length) { root.innerHTML = '<em>None yet.</em>'; return; }
       root.innerHTML = matches.map(e => `
         <div style="padding:4px 0">
-          <a href="encounter-dm.html?id=${encodeURIComponent(e.id)}" style="color:var(--gold)">${escapeHtml(e.name || '(untitled)')}</a>
-          <span style="font-size:0.7rem;color:var(--ink-dim);margin-left:6px">${e.status} · ${e.picks.length} monsters</span>
+          <a href="encounter-dm.html?id=${encodeURIComponent(e.id)}" style="color:var(--c-brass)">${escapeHtml(e.name || '(untitled)')}</a>
+          <span style="font-size:0.7rem;color:var(--c-ink-faint);margin-left:6px">${e.status} · ${e.picks.length} monsters</span>
         </div>
       `).join('');
     }
@@ -2618,7 +2618,7 @@ Locate where session rows are rendered in the session list. Add a per-row tally:
       const ready = planned.filter(e => e.status === 'ready' || e.status === 'scheduled').length;
       const draft = planned.length - ready;
       const tally = planned.length
-        ? `<span style="font-size:0.7rem;color:var(--ink-dim)">${planned.length} encounters: ${ready} ready, ${draft} draft</span>`
+        ? `<span style="font-size:0.7rem;color:var(--c-ink-faint)">${planned.length} encounters: ${ready} ready, ${draft} draft</span>`
         : '';
       // Append `tally` to the row's existing HTML.
 ```
@@ -2667,8 +2667,8 @@ git commit -m "Chronicle Workshop: 'Encounters planned' panel + session-list rea
       const paneB = document.getElementById('pane-encounter') || document.querySelector('.pane-encounter');
       if (paneB) {
         const chip = document.createElement('div');
-        chip.style.cssText = 'padding:6px 10px;background:rgba(184,138,90,0.15);border-left:3px solid var(--gold);font-family:Crimson Text,serif;margin-bottom:8px';
-        chip.innerHTML = `Testing: <strong>${escapeHtml(enc.name)}</strong> — <a href="encounter-dm.html?id=${encodeURIComponent(enc.id)}" style="color:var(--gold)">back to The Anvil</a>`;
+        chip.style.cssText = 'padding:6px 10px;background:rgba(184,138,90,0.15);border-left:3px solid var(--c-brass);font-family:Crimson Text,serif;margin-bottom:8px';
+        chip.innerHTML = `Testing: <strong>${escapeHtml(enc.name)}</strong> — <a href="encounter-dm.html?id=${encodeURIComponent(enc.id)}" style="color:var(--c-brass)">back to The Anvil</a>`;
         paneB.prepend(chip);
       }
     })();
