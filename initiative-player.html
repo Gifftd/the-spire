@@ -405,11 +405,15 @@ let failCount = 0;
 let expandedId = null;   // combatant.id currently expanded, or null
 
 // Bind click to expand/collapse. Called from row creation in renderRow().
+// Note: combatant ids from the worker can be numbers (DM tracker uid is ++_id).
+// We coerce to string so the comparison with dataset.combatantId (always a
+// string) works under strict equality.
 function bindRowClick(rowEl, combatantId) {
+  const id = String(combatantId);
   rowEl.addEventListener('click', (e) => {
     // Ignore clicks inside the expanded area (form inputs, delete buttons)
     if (e.target.closest('.row-expanded')) return;
-    expandedId = (expandedId === combatantId) ? null : combatantId;
+    expandedId = (expandedId === id) ? null : id;
     renderExpandedState();
   });
 }
