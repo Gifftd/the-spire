@@ -238,6 +238,15 @@
       width: 100%; background: var(--c-surface); color: var(--c-ink); border: 1px solid var(--c-border);
       border-radius: 2px; padding: 6px 8px; font-family: 'Crimson Text', serif; font-size: 0.9rem; box-sizing: border-box;
     }
+
+    /* ── Launchpad pane ── */
+    .lp-card { padding: 8px; background: var(--c-bg); border: 1px solid var(--c-border); border-radius: 3px; margin-bottom: 8px; }
+    .lp-status { display: inline-block; padding: 1px 8px; border: 1px solid currentColor; border-radius: 8px; font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    .lp-name { font-family: 'Cinzel', serif; font-size: 1rem; margin: 6px 0; }
+    .lp-meta { font-size: 0.75rem; color: var(--c-ink-faint); }
+    .btn-primary { width: 100%; padding: 10px; background: var(--c-brass); color: #1a1f24; border: none; border-radius: 3px; font-family: 'Cinzel', serif; cursor: pointer; margin-bottom: 6px; }
+    .btn-secondary { width: 100%; padding: 8px; background: var(--c-surface); color: var(--c-ink); border: 1px solid var(--c-border); border-radius: 3px; cursor: pointer; margin-bottom: 6px; }
+    .lp-last-run { padding: 8px; background: var(--c-bg); border-left: 3px solid var(--c-brass); font-size: 0.8rem; margin-bottom: 8px; }
   </style>
 </head>
 <body>
@@ -776,8 +785,78 @@
     }
 
     function renderLaunchpad() {
-      // Stub — populated in Task 3.10.
-      document.getElementById('launchpad-content').textContent = '';
+      const root = document.getElementById('launchpad-content');
+      const e = currentEncounter();
+      if (!e) { root.innerHTML = ''; return; }
+      const totalCount = e.picks.reduce((a, p) => a + (p.qty || 1), 0);
+      root.innerHTML = `
+        <div class="lp-card">
+          <div class="lp-status lib-status-${e.status}">${e.status}</div>
+          <div class="lp-name">${escapeHtml(e.name || '(untitled)')}</div>
+          <div class="lp-meta">${totalCount} monster${totalCount === 1 ? '' : 's'}</div>
+        </div>
+        <button class="btn-primary" onclick="runOnWarTable()">▶ Run on War Table</button>
+        <button class="btn-secondary" onclick="sendToCrucible()">⚗ Send to Crucible</button>
+        <hr>
+        <div class="field"><label>Status</label>
+          <select onchange="updateField('status', this.value)">
+            ${EncounterSchema.STATUSES.map(s => `<option value="${s}" ${e.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        ${e.resolvedAt ? `
+          <div class="lp-last-run">
+            <strong>Last run:</strong> ${new Date(e.resolvedAt).toLocaleDateString()}<br>
+            Outcome: ${e.lastOutcome || '(unrecorded)'}
+          </div>` : ''}
+        <hr>
+        <details><summary>Actions</summary>
+          <button onclick="duplicateEncounter()">Duplicate</button>
+          <button onclick="archiveEncounter()">Archive</button>
+          <button onclick="deleteEncounter()" style="color:#d66">Delete</button>
+        </details>
+      `;
+    }
+
+    function runOnWarTable() {
+      const e = currentEncounter();
+      if (!e) return;
+      location.href = 'initiative-dm.html?stage=' + encodeURIComponent(e.id);
+    }
+    function sendToCrucible() {
+      const e = currentEncounter();
+      if (!e) return;
+      location.href = 'crucible-dm.html?from-encounter=' + encodeURIComponent(e.id);
+    }
+    function duplicateEncounter() {
+      const e = currentEncounter();
+      if (!e) return;
+      const copy = JSON.parse(JSON.stringify(e));
+      copy.id = EncounterSchema.genId('enc');
+      copy.name = (e.name || '(untitled)') + ' (copy)';
+      copy.status = 'draft';
+      copy.createdAt = copy.updatedAt = new Date().toISOString();
+      copy.lastStagedAt = copy.resolvedAt = copy.resolvedInTimelineId = null;
+      copy.lastOutcome = null;
+      state.encounters.push(copy);
+      state.selectedId = copy.id;
+      scheduleSave();
+      render();
+    }
+    function archiveEncounter() {
+      const e = currentEncounter();
+      if (!e) return;
+      e.status = 'archived';
+      scheduleSave();
+      render();
+    }
+    function deleteEncounter() {
+      const e = currentEncounter();
+      if (!e) return;
+      if (!confirm('Delete "' + (e.name || '(untitled)') + '" permanently?')) return;
+      state.encounters = state.encounters.filter(x => x.id !== e.id);
+      state.selectedId = null;
+      scheduleSave();
+      render();
     }
 
     // ═══════════════════════════════════════════════════════
