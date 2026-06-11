@@ -9,12 +9,12 @@
     /* Three-pane layout: library | editor | launchpad */
     body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; margin: 0; }
     .workshop { display: grid; grid-template-columns: 280px 1fr 280px; flex: 1; min-height: 0; }
-    .pane { padding: 1rem; overflow-y: auto; border-right: 1px solid var(--border); }
-    .pane:last-child { border-right: none; border-left: 1px solid var(--border); }
-    .lib-row { padding: 8px 10px; border: 1px solid var(--border); border-radius: 3px; margin-bottom: 6px; cursor: pointer; background: var(--bg); }
-    .lib-row.selected { border-color: var(--gold); background: rgba(184,138,90,0.10); }
+    .pane { padding: 1rem; overflow-y: auto; border-right: 1px solid var(--c-border); }
+    .pane:last-child { border-right: none; border-left: 1px solid var(--c-border); }
+    .lib-row { padding: 8px 10px; border: 1px solid var(--c-border); border-radius: 3px; margin-bottom: 6px; cursor: pointer; background: var(--c-surface); }
+    .lib-row.selected { border-color: var(--c-brass); background: rgba(184,138,90,0.10); }
     .lib-row-name { font-family: 'Cinzel', serif; font-size: 0.85rem; }
-    .lib-row-meta { display: flex; gap: 8px; margin-top: 4px; font-size: 0.7rem; color: var(--ink-dim); }
+    .lib-row-meta { display: flex; gap: 8px; margin-top: 4px; font-size: 0.7rem; color: var(--c-ink-faint); }
     .lib-status-pill { padding: 1px 6px; border-radius: 8px; border: 1px solid currentColor; font-family: 'Cinzel', serif; font-size: 0.55rem; letter-spacing: 0.08em; text-transform: uppercase; }
     .lib-status-draft     { color: #8a8275; }
     .lib-status-ready     { color: #6c8; }
@@ -22,7 +22,7 @@
     .lib-status-live      { color: #d66; }
     .lib-status-completed { color: #b88a5a; }
     .lib-status-archived  { color: #555; }
-    #new-btn { width: 100%; margin-bottom: 8px; padding: 8px; background: var(--gold); color: #1a1f24; border: none; border-radius: 3px; font-family: 'Cinzel', serif; cursor: pointer; }
+    #new-btn { width: 100%; margin-bottom: 8px; padding: 8px; background: var(--c-brass); color: #1a1f24; border: none; border-radius: 3px; font-family: 'Cinzel', serif; cursor: pointer; }
     @media (max-width: 1100px) {
       .workshop { grid-template-columns: 1fr; }
       .pane.launchpad { position: sticky; bottom: 0; }
@@ -51,7 +51,7 @@
   <script>
     Auth.requireRole('dm', { redirect: 'home.html', notice: 'DM sign-in required for the encounter builder.' });
 
-    const WORKER_URL = 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+    const WORKER_URL = (window.Auth && window.Auth.WORKER_URL) || 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
     const state = {
       encounters: [],
       worldData: null,    // for locationRef resolution
@@ -63,10 +63,10 @@
     async function loadAll() {
       const headers = Auth.dmHeaders();
       const [encs, world, npcs, tl] = await Promise.all([
-        fetch(WORKER_URL + '?type=encounters', { headers }).then(r => r.json()),
-        fetch(WORKER_URL + '?type=map_data_dm', { headers }).then(r => r.json()),
-        fetch(WORKER_URL + '?type=npcs', { headers }).then(r => r.json()),
-        fetch(WORKER_URL + '?type=timeline_dm', { headers }).then(r => r.json()),
+        fetch(WORKER_URL + '?type=encounters', { headers, cache: 'no-store' }).then(r => r.json()),
+        fetch(WORKER_URL + '?type=map_data_dm', { headers, cache: 'no-store' }).then(r => r.json()),
+        fetch(WORKER_URL + '?type=npcs', { headers, cache: 'no-store' }).then(r => r.json()),
+        fetch(WORKER_URL + '?type=timeline_dm', { headers, cache: 'no-store' }).then(r => r.json()),
       ]);
       state.encounters = (Array.isArray(encs) ? encs : []).map(EncounterSchema.migrateInMemory);
       state.worldData = world && world.map_data ? world.map_data : world;
@@ -113,7 +113,7 @@
       const e = EncounterSchema.newEncounter('New encounter');
       state.encounters.push(e);
       state.selectedId = e.id;
-      saveEncounters();
+      saveEncounters().catch(err => showBanner('Save error: ' + err.message, 'warn'));
       render();
     }
 
@@ -124,60 +124,68 @@
     }
 
     let saveTimer = null;
+    let saveInFlight = false;
     function scheduleSave() {
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = setTimeout(saveEncounters, 600);
     }
 
     async function saveEncounters() {
-      const headers = Auth.dmHeaders();
-      // Re-fetch to reduce two-tab clobber risk.
-      let serverArr = [];
+      if (saveInFlight) { scheduleSave(); return; }
+      saveInFlight = true;
       try {
-        const r = await fetch(WORKER_URL + '?type=encounters', { headers });
-        serverArr = await r.json();
-        if (!Array.isArray(serverArr)) serverArr = [];
-        serverArr = serverArr.map(EncounterSchema.migrateInMemory);
-      } catch (e) {
-        showBanner('Could not load latest encounters before save — retrying in 10s', 'warn');
-        setTimeout(saveEncounters, 10000);
-        return;
-      }
-      // Splice local edits in by id.
-      const byId = new Map(serverArr.map(x => [x.id, x]));
-      state.encounters.forEach(local => byId.set(local.id, local));
-      const merged = Array.from(byId.values());
-
-      // Validate before POST — fail loud locally.
-      const errs = merged.flatMap(e => {
-        const r = EncounterSchema.validateEncounter(e);
-        return r.ok ? [] : r.errors.map(x => ({ id: e.id, ...x }));
-      });
-      if (errs.length) {
-        console.warn('Local validation errors, refusing save:', errs);
-        showBanner('Validation errors — see console', 'warn');
-        return;
-      }
-
-      try {
-        const r = await fetch(WORKER_URL, {
-          method: 'POST',
-          headers: { ...headers, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'encounters', payload: merged }),
-        });
-        if (!r.ok) {
-          const body = await r.json().catch(() => ({}));
-          console.warn('Save failed', r.status, body);
-          showBanner('Save failed (' + r.status + '). Retrying in 10s.', 'warn');
+        const headers = Auth.dmHeaders();
+        // Re-fetch to reduce two-tab clobber risk.
+        let serverArr = [];
+        try {
+          const r = await fetch(WORKER_URL + '?type=encounters', { headers, cache: 'no-store' });
+          serverArr = await r.json();
+          if (!Array.isArray(serverArr)) serverArr = [];
+          serverArr = serverArr.map(EncounterSchema.migrateInMemory);
+        } catch (e) {
+          showBanner('Could not load latest encounters before save — retrying in 10s', 'warn');
           setTimeout(saveEncounters, 10000);
           return;
         }
-        state.encounters = merged;
-        render();
-      } catch (e) {
-        console.warn('Save network error', e);
-        showBanner('Network error during save — retrying in 10s', 'warn');
-        setTimeout(saveEncounters, 10000);
+        // Splice local edits in by id.
+        const byId = new Map(serverArr.map(x => [x.id, x]));
+        state.encounters.forEach(local => byId.set(local.id, local));
+        const merged = Array.from(byId.values());
+
+        // Validate before POST — fail loud locally.
+        const errs = merged.flatMap(e => {
+          const r = EncounterSchema.validateEncounter(e);
+          return r.ok ? [] : r.errors.map(x => ({ id: e.id, ...x }));
+        });
+        if (errs.length) {
+          console.warn('Local validation errors, refusing save:', errs);
+          const first = errs[0];
+          showBanner('Save blocked — ' + (first.field || 'encounter') + ': ' + first.message + ' (see console for full list)', 'warn');
+          return;
+        }
+
+        try {
+          const r = await fetch(WORKER_URL, {
+            method: 'POST',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'encounters', payload: merged }),
+          });
+          if (!r.ok) {
+            const body = await r.json().catch(() => ({}));
+            console.warn('Save failed', r.status, body);
+            showBanner('Save failed (' + r.status + '). Retrying in 10s.', 'warn');
+            setTimeout(saveEncounters, 10000);
+            return;
+          }
+          state.encounters = merged;
+          render();
+        } catch (e) {
+          console.warn('Save network error', e);
+          showBanner('Network error during save — retrying in 10s', 'warn');
+          setTimeout(saveEncounters, 10000);
+        }
+      } finally {
+        saveInFlight = false;
       }
     }
 
@@ -197,7 +205,8 @@
       document.getElementById('editor-form').style.display = state.selectedId ? '' : 'none';
     }
     function renderLaunchpad() {
-      document.getElementById('launchpad-content').textContent = state.selectedId ? '' : '';
+      // Stub — populated in Task 3.10.
+      document.getElementById('launchpad-content').textContent = '';
     }
 
     loadAll().catch(e => {
