@@ -221,6 +221,16 @@
     .enc-budget .enc-verdict.moderate { color: #88c8e0; }
     .enc-budget .enc-verdict.high     { color: var(--c-brass); }
     .enc-budget .enc-verdict.over     { color: #e88; }
+
+    /* ── Identity / shared field styles ── */
+    .enc-section { margin-bottom: 1rem; border: 1px solid var(--c-border); border-radius: 3px; padding: 8px; background: var(--c-bg); }
+    .enc-section > summary { font-family: 'Cinzel', serif; font-size: 0.85rem; cursor: pointer; padding: 4px; }
+    .field { margin-bottom: 8px; }
+    .field label { display: block; font-size: 0.7rem; color: var(--c-ink-faint); margin-bottom: 2px; }
+    .field input, .field textarea, .field select {
+      width: 100%; background: var(--c-surface); color: var(--c-ink); border: 1px solid var(--c-border);
+      border-radius: 2px; padding: 6px 8px; font-family: 'Crimson Text', serif; font-size: 0.9rem; box-sizing: border-box;
+    }
   </style>
 </head>
 <body>
@@ -406,6 +416,20 @@
       return state.encounters.find(e => e.id === state.selectedId) || null;
     }
 
+    // ── Section mounting helper ──
+    // Replaces the element with given id's outerHTML with new HTML, or inserts
+    // the new HTML before `beforeEl` if the element doesn't yet exist.
+    function mountSection(id, html, beforeEl) {
+      const existing = document.getElementById(id);
+      if (existing) {
+        const tmp = document.createElement('template');
+        tmp.innerHTML = html.trim();
+        existing.replaceWith(tmp.content.firstChild);
+      } else if (beforeEl) {
+        beforeEl.insertAdjacentHTML('beforebegin', html);
+      }
+    }
+
     function renderEditor() {
       const enc = currentEncounter();
       document.getElementById('editor-empty').style.display = enc ? 'none' : '';
@@ -413,16 +437,13 @@
       if (!enc) return;
 
       const form = document.getElementById('editor-form');
-      // Render the name field if not yet present (stable, no re-create needed).
-      let nameField = document.getElementById('enc-field-name');
-      if (!nameField) {
+
+      // ── First render: build Combatants (stable, never blasted) ──
+      let combatantsSection = document.getElementById('enc-combatants-section');
+      if (!combatantsSection) {
+        // Insert Identity placeholder + Combatants into the form.
         form.innerHTML = `
-          <div style="margin-bottom:0.8rem">
-            <label style="font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;color:var(--c-ink-faint);display:block;margin-bottom:3px;text-transform:uppercase">Name</label>
-            <input id="enc-field-name" type="text" maxlength="120"
-              style="width:100%;background:var(--c-surface);border:1px solid var(--c-border-light);border-radius:3px;color:var(--c-ink);font-family:'Crimson Text',serif;font-size:0.95rem;padding:6px 10px;box-sizing:border-box;outline:none"
-              oninput="onEncFieldChange('name',this.value)">
-          </div>
+          <div id="enc-identity-section"></div>
           <details class="enc-section" id="enc-combatants-section">
             <summary>Combatants <span id="enc-pick-count-badge" style="font-size:0.6rem;color:var(--c-ink-faint);font-family:'Crimson Text',serif;font-style:italic;font-weight:normal;text-transform:none;letter-spacing:0"></span></summary>
             <div class="enc-bestiary-filters">
@@ -456,9 +477,14 @@
               <div id="enc-bp-fm-extras" style="font-size:0.78rem;color:var(--c-ink-faint);margin-top:0.4rem;line-height:1.45"></div>
             </div>
           </details>
+          <div id="enc-tactical-section"></div>
+          <div id="enc-playbook-section"></div>
+          <div id="enc-loot-section"></div>
+          <div id="enc-linkages-section"></div>
         `;
+        combatantsSection = document.getElementById('enc-combatants-section');
         // Lazy-load bestiary when the section is first opened.
-        document.getElementById('enc-combatants-section').addEventListener('toggle', async function() {
+        combatantsSection.addEventListener('toggle', async function() {
           if (this.open && !_BP.loaded && !_BP.loading) {
             await encLoadBestiary();
             encPopulateFilterDropdowns();
@@ -471,11 +497,8 @@
         });
       }
 
-      // Always sync field values to the current encounter (handles switching).
-      const nameInput = document.getElementById('enc-field-name');
-      if (nameInput && document.activeElement !== nameInput) {
-        nameInput.value = enc.name || '';
-      }
+      // ── Always: update non-Combatants sections in place ──
+      document.getElementById('enc-identity-section').outerHTML = renderIdentity(enc);
 
       // Sync party inputs only when not focused (avoid disrupting typing).
       const szEl = document.getElementById('enc-bp-party-size');
@@ -491,13 +514,42 @@
       }
     }
 
-    function onEncFieldChange(field, value) {
-      const enc = currentEncounter();
-      if (!enc) return;
-      enc[field] = value;
-      enc.updatedAt = new Date().toISOString();
+    function renderIdentity(e) {
+      return `
+        <details class="enc-section" id="enc-identity-section" open><summary>Identity</summary>
+          <div class="field">
+            <label>Name</label>
+            <input type="text" value="${escapeHtml(e.name)}" oninput="updateField('name', this.value)">
+          </div>
+          <div class="field">
+            <label>Description</label>
+            <input type="text" value="${escapeHtml(e.description)}" oninput="updateField('description', this.value)">
+          </div>
+          <div class="field">
+            <label>Tags (comma-separated)</label>
+            <input type="text" value="${escapeHtml((e.tags || []).join(', '))}" oninput="updateField('tags', this.value.split(',').map(s => s.trim()).filter(Boolean))">
+          </div>
+          <div class="field">
+            <label>Status</label>
+            <select onchange="updateField('status', this.value)">
+              ${EncounterSchema.STATUSES.map(s =>
+                `<option value="${s}" ${e.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+            </select>
+          </div>
+        </details>
+      `;
+    }
+
+    function updateField(path, value) {
+      const e = currentEncounter();
+      if (!e) return;
+      const parts = path.split('.');
+      let obj = e;
+      for (let i = 0; i < parts.length - 1; i++) obj = obj[parts[i]] = obj[parts[i]] || {};
+      obj[parts[parts.length - 1]] = value;
+      e.updatedAt = new Date().toISOString();
+      if (path === 'name' || path === 'status') renderLibrary();
       scheduleSave();
-      renderLibrary();   // update name in sidebar live
     }
 
     function renderLaunchpad() {
