@@ -299,6 +299,33 @@
       state.npcs = Array.isArray(npcs) ? npcs : (npcs?.npcs || []);
       state.timeline = Array.isArray(tl) ? tl : (tl?.entries || []);
       render();
+      handleUrlParams();
+    }
+
+    function handleUrlParams() {
+      const params = new URLSearchParams(location.search);
+      const id = params.get('id');
+      const newAt = params.get('newAt');
+      const newFor = params.get('newFor');
+
+      if (id) {
+        if (state.encounters.some(e => e.id === id)) selectEncounter(id);
+      } else if (newAt || newFor) {
+        const e = EncounterSchema.newEncounter('New encounter');
+        if (newAt) {
+          const [kind, parent, loc] = newAt.split(':');
+          e.locationRef = kind === 'world'
+            ? { kind: 'world', locationId: loc }
+            : { kind: 'submap', parentLocationId: parent, locationId: loc };
+        }
+        if (newFor) e.sessionId = newFor;
+        state.encounters.push(e);
+        state.selectedId = e.id;
+        scheduleSave();
+        render();
+      }
+      // Strip params so refresh doesn't re-trigger.
+      if (id || newAt || newFor) history.replaceState(null, '', location.pathname);
     }
 
     function render() {
