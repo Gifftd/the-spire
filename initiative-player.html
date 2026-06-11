@@ -500,9 +500,47 @@ function relTime(ms) {
   return d.toLocaleDateString();
 }
 
-function deleteNote(combatantId, noteId) {
-  // Implemented in Task 18.
-  console.log('TODO delete', combatantId, noteId);
+async function deleteNote(combatantId, noteId) {
+  const me = (window.Auth && Auth.playerCreds && Auth.playerCreds()) || null;
+  if (!me || !me.characterId || !me.code) return;
+
+  // Optimistic local remove
+  let removedFromSnapshot = null;
+  if (lastSnapshot && Array.isArray(lastSnapshot.combatants)) {
+    const c = lastSnapshot.combatants.find(x => x.id === combatantId);
+    if (c && Array.isArray(c.playerNotes)) {
+      removedFromSnapshot = c.playerNotes.find(n => n.id === noteId);
+      c.playerNotes = c.playerNotes.filter(n => n.id !== noteId);
+      renderNotesList(combatantId, c.playerNotes, { role: 'player', characterId: me.characterId });
+    }
+  }
+
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'initiative_note_delete',
+        characterId: me.characterId,
+        code: me.code,
+        combatantId, noteId,
+      }),
+    });
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody.error || ('HTTP ' + res.status));
+    }
+  } catch (e) {
+    // Roll back: re-insert the note
+    if (removedFromSnapshot && lastSnapshot && Array.isArray(lastSnapshot.combatants)) {
+      const c = lastSnapshot.combatants.find(x => x.id === combatantId);
+      if (c) {
+        c.playerNotes = (c.playerNotes || []).concat([removedFromSnapshot]);
+        renderNotesList(combatantId, c.playerNotes, { role: 'player', characterId: me.characterId });
+      }
+    }
+    alert('Couldn\'t delete: ' + (e.message || 'try again'));
+  }
 }
 
 async function submitNote(combatantId, rawBody, visibility, els) {
