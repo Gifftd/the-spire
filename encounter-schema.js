@@ -6,6 +6,7 @@
 // The worker mirrors these rules in cloudflare-worker.js — keep both in sync.
 
 (function (global) {
+  'use strict';
   const STATUSES = ['draft', 'ready', 'scheduled', 'live', 'completed', 'archived'];
   const LIGHTING = ['bright', 'dim', 'dark', 'varied'];
   const SURPRISE = ['none', 'party', 'monsters', 'both'];
@@ -151,10 +152,12 @@
     }
 
     // Picks: cap + pickKey uniqueness (when present)
+    let keyed = null;  // null = picks wasn't an array, so we can't check pickKey refs
+
     if (Array.isArray(e.picks)) {
       if (e.picks.length > CAPS.picks) push('picks', `too many picks (max ${CAPS.picks})`);
       const seen = new Set();
-      const keyed = new Set();
+      keyed = new Set();
       e.picks.forEach((p, i) => {
         if (p && typeof p.pickKey === 'string' && p.pickKey) {
           if (seen.has(p.pickKey)) push('picks', `duplicate pickKey "${p.pickKey}" at index ${i}`);
@@ -162,23 +165,27 @@
           keyed.add(p.pickKey);
         }
       });
-      if (e.tactical && Array.isArray(e.tactical.waves)) {
-        if (e.tactical.waves.length > CAPS.waves) push('tactical.waves', `too many waves (max ${CAPS.waves})`);
-        e.tactical.waves.forEach((w, i) => {
-          if (typeof w.round !== 'number' || w.round < 1 || w.round > CAPS.waveRound) {
-            push(`tactical.waves[${i}].round`, `round must be 1..${CAPS.waveRound}`);
-          }
-          if (w.pickKey && !keyed.has(w.pickKey)) {
-            push(`tactical.waves[${i}].pickKey`, `references missing pickKey "${w.pickKey}"`);
-          }
-        });
-      }
+    }
+
+    if (e.tactical && Array.isArray(e.tactical.waves)) {
+      if (e.tactical.waves.length > CAPS.waves) push('tactical.waves', `too many waves (max ${CAPS.waves})`);
+      e.tactical.waves.forEach((w, i) => {
+        if (!w || typeof w !== 'object') { push(`tactical.waves[${i}]`, 'must be an object'); return; }
+        if (typeof w.round !== 'number' || w.round < 1 || w.round > CAPS.waveRound) {
+          push(`tactical.waves[${i}].round`, `round must be 1..${CAPS.waveRound}`);
+        }
+        // pickKey referential integrity only fires when we have a keyed set from picks
+        if (keyed !== null && w.pickKey && !keyed.has(w.pickKey)) {
+          push(`tactical.waves[${i}].pickKey`, `references missing pickKey "${w.pickKey}"`);
+        }
+      });
     }
 
     if (Array.isArray(e.loot) && e.loot.length > CAPS.loot) push('loot', `too many loot rows (max ${CAPS.loot})`);
     if (Array.isArray(e.npcRoles)) {
       if (e.npcRoles.length > CAPS.npcRoles) push('npcRoles', `too many npc roles (max ${CAPS.npcRoles})`);
       e.npcRoles.forEach((r, i) => {
+        if (!r || typeof r !== 'object') { push(`npcRoles[${i}]`, 'must be an object'); return; }
         if (!NPC_ROLES.includes(r.role)) push(`npcRoles[${i}].role`, `unknown role: ${r.role}`);
       });
     }
@@ -226,9 +233,15 @@
     return null;
   }
 
-  global.EncounterSchema = {
+  const EncounterSchema = {
     STATUSES, LIGHTING, SURPRISE, NPC_ROLES, LOCATION_REF_KINDS, OUTCOMES, CAPS,
     newEncounter, genId, genPickKeys, migrateInMemory, validateEncounter,
     equalLocationRefs, resolveLocationRef,
   };
+
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = EncounterSchema;
+  } else {
+    global.EncounterSchema = EncounterSchema;
+  }
 })(typeof window !== 'undefined' ? window : globalThis);

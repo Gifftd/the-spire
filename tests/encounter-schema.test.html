@@ -251,6 +251,36 @@
       assertEq(EncounterSchema.resolveLocationRef({ kind: 'world', locationId: 'missing' }, world), null);
       assertEq(EncounterSchema.resolveLocationRef({ kind: 'submap', parentLocationId: 'missing', locationId: 'x' }, world), null);
     });
+
+    test('genId returns prefixed unique strings', () => {
+      const a = EncounterSchema.genId('test');
+      const b = EncounterSchema.genId('test');
+      assert(a.startsWith('test_'), 'prefix present');
+      assert(a.length > 10, 'has content after prefix');
+      assert(a !== b, 'two calls produce distinct ids');
+    });
+
+    test('migrateInMemory tolerates null input', () => {
+      const out = EncounterSchema.migrateInMemory(null);
+      assertEq(out.schemaVersion, 2);
+      assertEq(out.picks, []);
+      assert(typeof out.id === 'string' && out.id.startsWith('enc_'), 'fresh id');
+    });
+
+    test('validateEncounter tolerates missing tactical section', () => {
+      const e = EncounterSchema.newEncounter('no-tac');
+      delete e.tactical;
+      const r = EncounterSchema.validateEncounter(e);
+      assertEq(r.ok, true);
+    });
+
+    test('validateEncounter rejects submap locationRef missing parentLocationId', () => {
+      const e = EncounterSchema.newEncounter('BadSubmap');
+      e.locationRef = { kind: 'submap', locationId: 'chapel' };  // no parentLocationId
+      const r = EncounterSchema.validateEncounter(e);
+      assertEq(r.ok, false);
+      assert(r.errors.some(x => x.field === 'locationRef.parentLocationId'), 'parentLocationId required');
+    });
   </script>
 </body>
 </html>
