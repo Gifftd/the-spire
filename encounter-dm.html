@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Encounter Builder · The Spire</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    /* Three-pane layout: library | editor | launchpad */
+    body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; margin: 0; }
+    .workshop { display: grid; grid-template-columns: 280px 1fr 280px; flex: 1; min-height: 0; }
+    .pane { padding: 1rem; overflow-y: auto; border-right: 1px solid var(--border); }
+    .pane:last-child { border-right: none; border-left: 1px solid var(--border); }
+    @media (max-width: 1100px) {
+      .workshop { grid-template-columns: 1fr; }
+      .pane.launchpad { position: sticky; bottom: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div id="topbar" class="topbar"></div>
+
+  <div class="workshop">
+    <aside class="pane library" id="pane-library">
+      <h2>Encounters</h2>
+      <div id="library-list">Loading…</div>
+    </aside>
+    <main class="pane editor" id="pane-editor">
+      <div id="editor-empty" class="empty-state">Select or create an encounter.</div>
+      <div id="editor-form" style="display:none"></div>
+    </main>
+    <aside class="pane launchpad" id="pane-launchpad">
+      <div id="launchpad-content"></div>
+    </aside>
+  </div>
+
+  <script src="auth.js"></script>
+  <script src="encounter-schema.js"></script>
+  <script>
+    Auth.requireRole('dm', { redirect: 'home.html', notice: 'DM sign-in required for the encounter builder.' });
+
+    const WORKER_URL = 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+    const state = {
+      encounters: [],
+      worldData: null,    // for locationRef resolution
+      npcs: [],           // for NPC role pickers
+      timeline: [],       // for session picker
+      selectedId: null,
+    };
+
+    async function loadAll() {
+      const headers = Auth.dmHeaders();
+      const [encs, world, npcs, tl] = await Promise.all([
+        fetch(WORKER_URL + '?type=encounters', { headers }).then(r => r.json()),
+        fetch(WORKER_URL + '?type=map_data_dm', { headers }).then(r => r.json()),
+        fetch(WORKER_URL + '?type=npcs', { headers }).then(r => r.json()),
+        fetch(WORKER_URL + '?type=timeline_dm', { headers }).then(r => r.json()),
+      ]);
+      state.encounters = (Array.isArray(encs) ? encs : []).map(EncounterSchema.migrateInMemory);
+      state.worldData = world && world.map_data ? world.map_data : world;
+      state.npcs = Array.isArray(npcs) ? npcs : (npcs?.npcs || []);
+      state.timeline = Array.isArray(tl) ? tl : (tl?.entries || []);
+      render();
+    }
+
+    function render() {
+      renderLibrary();
+      renderEditor();
+      renderLaunchpad();
+    }
+
+    function renderLibrary() {
+      const root = document.getElementById('library-list');
+      root.textContent = state.encounters.length ? '' : 'No encounters yet.';
+    }
+    function renderEditor() {
+      document.getElementById('editor-empty').style.display = state.selectedId ? 'none' : '';
+      document.getElementById('editor-form').style.display = state.selectedId ? '' : 'none';
+    }
+    function renderLaunchpad() {
+      document.getElementById('launchpad-content').textContent = state.selectedId ? '' : '';
+    }
+
+    loadAll().catch(e => {
+      document.getElementById('library-list').textContent = 'Load failed: ' + e.message;
+    });
+  </script>
+</body>
+</html>
