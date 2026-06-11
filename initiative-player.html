@@ -473,55 +473,71 @@ function renderNotesList(combatantId, notes, viewer) {
   });
   }
 
-  // Add-note form (only for logged-in players)
+  // Form/banner are siblings of .notes-list inside .row-expanded.
+  // We only re-create them when the appropriate one doesn't already exist
+  // — this preserves the user's in-progress textarea + radio state across
+  // re-renders triggered by optimistic insert/delete (submitNote /
+  // deleteNote call renderNotesList without destroying the row).
+  // showCombat's poll-cycle rebuild always destroys the row first, so on
+  // that path no existing form is found and a fresh one is created.
+  const expanded = root.parentElement;
   if (viewer.characterId) {
-    const form = document.createElement('div');
-    form.className = 'add-note-form';
-    const lastVis = localStorage.getItem('spire-initiative-note-vis') || 'party';
-    form.innerHTML = `
-      <textarea placeholder="Add a note about ${escapeAttr(getCombatantName(combatantId))}…"
-                maxlength="${InitiativeNotes.MAX_NOTE_LENGTH + 50 /* allow overflow for counter */}"></textarea>
-      <div class="row-actions">
-        <div class="vis-toggle">
-          <label><input type="radio" name="vis-${CSS.escape(combatantId)}" value="private" ${lastVis === 'private' ? 'checked' : ''}>JUST ME</label>
-          <label><input type="radio" name="vis-${CSS.escape(combatantId)}" value="party"   ${lastVis === 'party'   ? 'checked' : ''}>PARTY</label>
+    // Logged-in: ensure a form exists, drop any stale banner.
+    const oldBanner = expanded.querySelector(':scope > .login-banner');
+    if (oldBanner) oldBanner.remove();
+    if (!expanded.querySelector(':scope > .add-note-form')) {
+      const form = document.createElement('div');
+      form.className = 'add-note-form';
+      const lastVis = localStorage.getItem('spire-initiative-note-vis') || 'party';
+      form.innerHTML = `
+        <textarea placeholder="Add a note about ${escapeAttr(getCombatantName(combatantId))}…"
+                  maxlength="${InitiativeNotes.MAX_NOTE_LENGTH + 50 /* allow overflow for counter */}"></textarea>
+        <div class="row-actions">
+          <div class="vis-toggle">
+            <label><input type="radio" name="vis-${CSS.escape(combatantId)}" value="private" ${lastVis === 'private' ? 'checked' : ''}>JUST ME</label>
+            <label><input type="radio" name="vis-${CSS.escape(combatantId)}" value="party"   ${lastVis === 'party'   ? 'checked' : ''}>PARTY</label>
+          </div>
+          <span class="char-counter">0/${InitiativeNotes.MAX_NOTE_LENGTH}</span>
+          <button class="save-btn" disabled>Save</button>
         </div>
-        <span class="char-counter">0/${InitiativeNotes.MAX_NOTE_LENGTH}</span>
-        <button class="save-btn" disabled>Save</button>
-      </div>
-      <div class="form-error" style="display:none"></div>
-    `;
-    const textarea = form.querySelector('textarea');
-    const counter  = form.querySelector('.char-counter');
-    const saveBtn  = form.querySelector('.save-btn');
-    const errEl    = form.querySelector('.form-error');
+        <div class="form-error" style="display:none"></div>
+      `;
+      const textarea = form.querySelector('textarea');
+      const counter  = form.querySelector('.char-counter');
+      const saveBtn  = form.querySelector('.save-btn');
+      const errEl    = form.querySelector('.form-error');
 
-    textarea.addEventListener('input', () => {
-      const len = textarea.value.length;
-      counter.textContent = len + '/' + InitiativeNotes.MAX_NOTE_LENGTH;
-      counter.classList.toggle('warn', len > 400 && len <= InitiativeNotes.MAX_NOTE_LENGTH);
-      counter.classList.toggle('over', len > InitiativeNotes.MAX_NOTE_LENGTH);
-      saveBtn.disabled = (textarea.value.trim().length === 0) || len > InitiativeNotes.MAX_NOTE_LENGTH;
-    });
+      textarea.addEventListener('input', () => {
+        const len = textarea.value.length;
+        counter.textContent = len + '/' + InitiativeNotes.MAX_NOTE_LENGTH;
+        counter.classList.toggle('warn', len > 400 && len <= InitiativeNotes.MAX_NOTE_LENGTH);
+        counter.classList.toggle('over', len > InitiativeNotes.MAX_NOTE_LENGTH);
+        saveBtn.disabled = (textarea.value.trim().length === 0) || len > InitiativeNotes.MAX_NOTE_LENGTH;
+      });
 
-    saveBtn.addEventListener('click', () => {
-      const vis = form.querySelector('input[type=radio]:checked').value;
-      localStorage.setItem('spire-initiative-note-vis', vis);
-      submitNote(combatantId, textarea.value, vis, { textarea, errEl, saveBtn });
-    });
+      saveBtn.addEventListener('click', () => {
+        const vis = form.querySelector('input[type=radio]:checked').value;
+        localStorage.setItem('spire-initiative-note-vis', vis);
+        submitNote(combatantId, textarea.value, vis, { textarea, errEl, saveBtn });
+      });
 
-    root.parentElement.appendChild(form);  // appended outside .notes-list (sibling)
+      expanded.appendChild(form);
+    }
   } else {
-    // Anonymous: show login banner. Two-state: trigger button → inline form.
-    const banner = document.createElement('div');
-    banner.className = 'login-banner';
-    banner.innerHTML = `
-      <span>Log in as your character to add notes.</span>
-      <button class="login-trigger" type="button">Log in</button>
-    `;
-    banner.querySelector('.login-trigger').addEventListener('click',
-      (e) => { e.stopPropagation(); openInlineLogin(banner); });
-    root.parentElement.appendChild(banner);
+    // Anonymous: ensure a banner exists, drop any stale form.
+    const oldForm = expanded.querySelector(':scope > .add-note-form');
+    if (oldForm) oldForm.remove();
+    if (!expanded.querySelector(':scope > .login-banner')) {
+      const banner = document.createElement('div');
+      banner.className = 'login-banner';
+      banner.innerHTML = `
+        <span>Log in as your character to add notes.</span>
+        <button class="login-trigger" type="button">Log in</button>
+      `;
+      banner.querySelector('.login-trigger').addEventListener('click',
+        (e) => { e.stopPropagation(); openInlineLogin(banner); });
+      expanded.appendChild(banner);
+    }
   }
 }
 
@@ -705,10 +721,12 @@ function showCombat(s) {
     banner.classList.add('show');
   }
 
-  // Preserve in-progress textarea content + cursor + focus across poll
-  // re-renders. Without this, every 2.5s poll destroys the user's typed text
-  // and clobbers their cursor position.
+  // Preserve in-progress textarea content + cursor + focus + radio choice
+  // across poll re-renders. Without this, every 2.5s poll destroys the
+  // user's typed text, clobbers their cursor position, and resets the
+  // private/party radio back to localStorage's last-saved value.
   const draftsByCombatantId = new Map();
+  const radioByCombatantId  = new Map();
   const activeEl = document.activeElement;
   let focusedDraft = null;  // { combatantId, selStart, selEnd } or null
   document.querySelectorAll('.row-expanded[data-combatant-id]').forEach(re => {
@@ -722,6 +740,8 @@ function showCombat(s) {
         selEnd:   ta.selectionEnd,
       };
     }
+    const checked = re.querySelector('.add-note-form input[type=radio]:checked');
+    if (checked) radioByCombatantId.set(id, checked.value);
   });
 
   list.innerHTML = '';
@@ -817,6 +837,16 @@ function showCombat(s) {
         // Fire input event so the char counter + Save button enable state recompute
         ta.dispatchEvent(new Event('input'));
       }
+    });
+  }
+
+  // Restore radio state (private vs party) captured before the rebuild.
+  if (radioByCombatantId.size > 0) {
+    radioByCombatantId.forEach((vis, combatantId) => {
+      const radio = document.querySelector(
+        `.row-expanded[data-combatant-id="${CSS.escape(combatantId)}"] .add-note-form input[type=radio][value="${vis}"]`
+      );
+      if (radio) radio.checked = true;
     });
   }
 
