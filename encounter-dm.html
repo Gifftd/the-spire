@@ -27,6 +27,200 @@
       .workshop { grid-template-columns: 1fr; }
       .pane.launchpad { position: sticky; bottom: 0; }
     }
+
+    /* ── Combatants section: editor details block ── */
+    .enc-section { margin-bottom: 1rem; }
+    .enc-section summary {
+      font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--c-brass); cursor: pointer;
+      padding: 6px 0; border-bottom: 1px solid var(--c-border); margin-bottom: 0.6rem;
+      list-style: none; display: flex; align-items: center; gap: 6px;
+    }
+    .enc-section summary::-webkit-details-marker { display: none; }
+    .enc-section summary::before { content: '▶'; font-size: 0.5rem; transition: transform 150ms; }
+    .enc-section[open] summary::before { transform: rotate(90deg); }
+
+    /* ── Bestiary filters ── */
+    .enc-bestiary-filters { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto; gap: 6px; margin-bottom: 0.8rem; }
+    .enc-bestiary-filters input, .enc-bestiary-filters select {
+      background: var(--c-bg); border: 1px solid var(--c-border-light); border-radius: 3px;
+      color: var(--c-ink); font-family: 'Crimson Text', serif; font-size: 0.88rem;
+      padding: 6px 9px; outline: none; transition: border-color 120ms, box-shadow 120ms;
+    }
+    .enc-bestiary-filters input:focus, .enc-bestiary-filters select:focus {
+      border-color: var(--c-brass); box-shadow: 0 0 0 3px rgba(184,138,90,0.16);
+    }
+    .enc-bestiary-filters input::placeholder { color: var(--c-ink-faint); opacity: 0.6; font-style: italic; }
+    .enc-bestiary-filters .enc-clear-btn {
+      font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.08em;
+      padding: 4px 10px; background: none; border: 1px solid var(--c-border-light);
+      border-radius: 2px; color: var(--c-ink-faint); cursor: pointer;
+    }
+    .enc-bestiary-filters .enc-clear-btn:hover { color: var(--c-ink); border-color: var(--c-brass); }
+
+    .enc-bestiary-status {
+      font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.08em;
+      color: var(--c-ink-faint); margin-bottom: 0.4rem;
+    }
+    .enc-bestiary-list {
+      max-height: 28vh; overflow-y: auto; border: 1px solid var(--c-border);
+      border-radius: var(--radius-sm); background: var(--c-bg);
+    }
+    .enc-bestiary-row { padding: 7px 10px; border-bottom: 1px solid var(--c-border); cursor: pointer; }
+    .enc-bestiary-row:last-child { border-bottom: none; }
+    .enc-bestiary-row:hover { background: var(--c-surface); }
+    .enc-bestiary-row.in-picks { background: rgba(184,138,90,0.08); }
+    .enc-bestiary-row-head { display: flex; align-items: center; gap: 10px; }
+    .enc-bestiary-row-nm { flex: 1; font-size: 0.92rem; color: var(--c-ink); min-width: 0; }
+    .enc-bestiary-row-nm small {
+      display: block; font-family: 'Cinzel', serif; font-size: 0.54rem;
+      color: var(--c-ink-faint); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 1px;
+    }
+    .enc-bestiary-row-meta { display: flex; gap: 10px; font-family: 'Cinzel', serif; font-size: 0.66rem; color: var(--c-ink-faint); white-space: nowrap; }
+    .enc-bestiary-row-meta span { display: inline-flex; flex-direction: column; align-items: center; min-width: 38px; }
+    .enc-bestiary-row-meta span small { color: var(--c-ink-faint); font-size: 0.5rem; letter-spacing: 0.08em; }
+    .enc-bestiary-empty-note { padding: 1.5rem 1rem; text-align: center; color: var(--c-ink-faint); font-style: italic; font-size: 0.9rem; }
+
+    /* CR chip */
+    .enc-cr-chip {
+      font-family: 'Cinzel', serif; font-size: 0.55rem; letter-spacing: 0.08em;
+      padding: 2px 7px; border-radius: 8px; border: 1px solid var(--c-border-light);
+      color: var(--c-ink-faint); white-space: nowrap;
+    }
+    .enc-cr-chip.t-low  { color: var(--c-ink-faint); }
+    .enc-cr-chip.t-mid  { color: #88c8e0; border-color: #4a8090; }
+    .enc-cr-chip.t-high { color: var(--c-brass); border-color: rgba(184,138,90,0.5); }
+    .enc-cr-chip.t-epic { color: #e88; border-color: #844; }
+
+    /* Source / category / custom chips */
+    .enc-custom-chip {
+      font-family: 'Cinzel', serif; font-size: 0.5rem; letter-spacing: 0.08em;
+      padding: 1px 6px; border-radius: 8px; border: 1px solid var(--c-brass);
+      color: var(--c-brass); background: rgba(184,138,90,0.10); margin-left: 6px;
+    }
+    .enc-source-chip {
+      font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.1em;
+      text-transform: uppercase; padding: 1px 6px; border-radius: 8px;
+      border: 1px solid var(--c-ink-faint); color: var(--c-ink-faint);
+      background: transparent; margin-left: 6px; vertical-align: middle;
+    }
+    .enc-source-chip.s-mm-2024 { border-color: #6c8db5; color: #8eb5e8; }
+    .enc-source-chip.s-tob-v1  { border-color: #a89478; color: #d2bd96; }
+    .enc-source-chip.s-fm-v1   { border-color: #c29478; color: #e3a08e; }
+    .enc-source-chip.s-custom  { border-color: var(--c-brass); color: var(--c-brass); }
+    .enc-cat-chip {
+      font-family: 'Cinzel', serif; font-size: 0.48rem; letter-spacing: 0.1em;
+      text-transform: uppercase; padding: 1px 6px; border-radius: 8px;
+      margin-left: 6px; vertical-align: middle; white-space: nowrap;
+    }
+    .enc-cat-chip.solo          { border: 1px solid #b86060; color: #e3a08e; background: rgba(154,90,90,0.10); }
+    .enc-cat-chip.minion        { border: 1px solid #8b9bb5; color: #a8b9d0; background: rgba(94,118,150,0.10); }
+    .enc-cat-chip.companion     { border: 1px solid #82a878; color: #a8c89b; background: rgba(102,140,90,0.10); }
+    .enc-cat-chip.retainer      { border: 1px solid var(--c-brass); color: var(--c-brass); background: rgba(184,138,90,0.10); }
+    .enc-cat-chip.villain-party { border: 1px solid #b07ac8; color: #d4a3e8; background: rgba(140,90,180,0.10); }
+
+    /* Picks cart */
+    .enc-cart-head {
+      display: flex; justify-content: space-between; align-items: center;
+      font-family: 'Cinzel', serif; font-size: 0.66rem; letter-spacing: 0.1em;
+      color: var(--c-brass); margin: 0.8rem 0 0.3rem; text-transform: uppercase;
+    }
+    .enc-cart-head .enc-clear-picks {
+      font-family: 'Cinzel', serif; font-size: 0.55rem; letter-spacing: 0.08em;
+      padding: 3px 8px; background: none; border: 1px solid var(--c-border-light);
+      border-radius: 2px; color: var(--c-ink-faint); cursor: pointer;
+    }
+    .enc-cart-head .enc-clear-picks:hover { color: var(--c-ink); border-color: var(--c-brass); }
+    .enc-cart {
+      border: 1px solid var(--c-border); border-radius: var(--radius-sm);
+      background: var(--c-bg); max-height: 20vh; overflow-y: auto;
+    }
+    .enc-cart .enc-empty {
+      padding: 0.7rem; text-align: center; color: var(--c-ink-faint);
+      font-style: italic; font-size: 0.85rem;
+    }
+    .enc-pick-row { padding: 6px 8px; border-bottom: 1px solid var(--c-border); }
+    .enc-pick-row:last-child { border-bottom: none; }
+    .enc-pick-head { display: flex; align-items: center; gap: 8px; }
+    .enc-pick-nm { flex: 1; font-size: 0.88rem; color: var(--c-ink); min-width: 0; }
+    .enc-pick-nm small {
+      display: block; font-family: 'Cinzel', serif; font-size: 0.52rem;
+      color: var(--c-ink-faint); letter-spacing: 0.08em;
+    }
+    .enc-pick-qty { display: flex; align-items: center; gap: 4px; }
+    .enc-pick-qty button {
+      width: 22px; height: 22px; border-radius: 3px; border: 1px solid var(--c-border-light);
+      background: var(--c-surface); color: var(--c-ink); cursor: pointer;
+      font-size: 0.9rem; line-height: 1; padding: 0;
+    }
+    .enc-pick-qty button:hover { border-color: var(--c-brass); }
+    .enc-pick-qty .enc-q { min-width: 26px; text-align: center; font-family: 'Cinzel', serif; color: var(--c-brass); }
+    .enc-pick-xp { font-family: 'Cinzel', serif; font-size: 0.7rem; color: var(--c-ink-faint); min-width: 65px; text-align: right; }
+    .enc-pick-toggle {
+      background: none; border: none; color: var(--c-ink-faint);
+      font-size: 0.85rem; cursor: pointer; padding: 0 4px;
+    }
+    .enc-pick-toggle:hover { color: var(--c-ink); }
+    .enc-pick-remove {
+      background: none; border: none; color: var(--c-ink-faint);
+      font-size: 0.9rem; cursor: pointer; padding: 0 4px;
+    }
+    .enc-pick-remove:hover { color: #e88; }
+    .enc-pick-opts {
+      display: none; padding: 6px 0 0; margin-top: 6px;
+      border-top: 1px dashed var(--c-border);
+      grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+      gap: 6px; align-items: end;
+    }
+    .enc-pick-row.expanded .enc-pick-opts { display: grid; }
+    .enc-pick-opts label {
+      font-family: 'Cinzel', serif; font-size: 0.52rem; letter-spacing: 0.08em;
+      color: var(--c-ink-faint); display: block; margin-bottom: 2px;
+    }
+    .enc-pick-opts input[type=number] {
+      width: 100%; background: var(--c-bg); border: 1px solid var(--c-border-light);
+      border-radius: 2px; color: var(--c-ink); padding: 3px 5px; font-size: 0.85rem;
+    }
+    .enc-pick-opts .enc-toggle { display: flex; align-items: center; gap: 5px; font-size: 0.78rem; color: var(--c-ink-faint); cursor: pointer; }
+    .enc-pick-opts .enc-toggle input[type=checkbox] { accent-color: var(--c-brass); width: 12px; height: 12px; }
+
+    /* Starting conditions textarea inside expanded opts */
+    .enc-starting-conds-wrap { grid-column: 1 / -1; }
+    .enc-starting-conds-wrap textarea {
+      width: 100%; background: var(--c-bg); border: 1px solid var(--c-border-light);
+      border-radius: 2px; color: var(--c-ink); padding: 3px 5px; font-size: 0.82rem;
+      font-family: 'Crimson Text', serif; resize: vertical; min-height: 38px; box-sizing: border-box;
+    }
+
+    /* Party config + budget */
+    .enc-party-row {
+      display: grid; grid-template-columns: auto 60px auto 60px 1fr; gap: 8px;
+      align-items: center; margin-top: 0.6rem; padding: 8px 10px;
+      background: var(--c-bg); border: 1px solid var(--c-border); border-radius: var(--radius-sm);
+      font-size: 0.85rem; color: var(--c-ink-faint);
+    }
+    .enc-party-row label { font-family: 'Cinzel', serif; font-size: 0.6rem; letter-spacing: 0.08em; color: var(--c-ink-faint); }
+    .enc-party-row input {
+      background: var(--c-surface); border: 1px solid var(--c-border-light);
+      border-radius: 2px; color: var(--c-ink); padding: 4px 6px; font-size: 0.85rem; width: 100%;
+    }
+    .enc-budget {
+      margin-top: 0.5rem; padding: 8px 10px;
+      background: var(--c-bg); border: 1px solid var(--c-border); border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+    }
+    .enc-budget .enc-total { font-family: 'Cinzel', serif; font-size: 1rem; color: var(--c-brass); margin-bottom: 4px; }
+    .enc-budget .enc-thresholds {
+      display: flex; gap: 10px; flex-wrap: wrap;
+      font-family: 'Cinzel', serif; font-size: 0.66rem; color: var(--c-ink-faint);
+    }
+    .enc-budget .enc-thresholds span { padding: 2px 7px; border: 1px solid var(--c-border-light); border-radius: 8px; }
+    .enc-budget .enc-thresholds span.hit { border-color: var(--c-brass); color: var(--c-brass); background: rgba(184,138,90,0.10); }
+    .enc-budget .enc-verdict { margin-top: 5px; font-size: 0.82rem; }
+    .enc-budget .enc-verdict.low      { color: #9ad080; }
+    .enc-budget .enc-verdict.moderate { color: #88c8e0; }
+    .enc-budget .enc-verdict.high     { color: var(--c-brass); }
+    .enc-budget .enc-verdict.over     { color: #e88; }
   </style>
 </head>
 <body>
@@ -48,6 +242,7 @@
 
   <script src="auth.js"></script>
   <script src="encounter-schema.js"></script>
+  <script src="bestiary-merge.js"></script>
   <script>
     Auth.requireRole('dm', { redirect: 'home.html', notice: 'DM sign-in required for the encounter builder.' });
 
@@ -106,6 +301,7 @@
 
     function selectEncounter(id) {
       state.selectedId = id;
+      syncPicksFromEncounter();
       render();
     }
 
@@ -113,6 +309,7 @@
       const e = EncounterSchema.newEncounter('New encounter');
       state.encounters.push(e);
       state.selectedId = e.id;
+      syncPicksFromEncounter();
       saveEncounters().catch(err => showBanner('Save error: ' + err.message, 'warn'));
       render();
     }
@@ -200,13 +397,618 @@
       bar.textContent = msg;
       bar.style.background = kind === 'warn' ? '#5a4030' : '#3a4030';
     }
-    function renderEditor() {
-      document.getElementById('editor-empty').style.display = state.selectedId ? 'none' : '';
-      document.getElementById('editor-form').style.display = state.selectedId ? '' : 'none';
+    function currentEncounter() {
+      return state.encounters.find(e => e.id === state.selectedId) || null;
     }
+
+    function renderEditor() {
+      const enc = currentEncounter();
+      document.getElementById('editor-empty').style.display = enc ? 'none' : '';
+      document.getElementById('editor-form').style.display = enc ? '' : 'none';
+      if (!enc) return;
+
+      const form = document.getElementById('editor-form');
+      // Render the name field if not yet present (stable, no re-create needed).
+      let nameField = document.getElementById('enc-field-name');
+      if (!nameField) {
+        form.innerHTML = `
+          <div style="margin-bottom:0.8rem">
+            <label style="font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;color:var(--c-ink-faint);display:block;margin-bottom:3px;text-transform:uppercase">Name</label>
+            <input id="enc-field-name" type="text" maxlength="120"
+              style="width:100%;background:var(--c-surface);border:1px solid var(--c-border-light);border-radius:3px;color:var(--c-ink);font-family:'Crimson Text',serif;font-size:0.95rem;padding:6px 10px;box-sizing:border-box;outline:none"
+              oninput="onEncFieldChange('name',this.value)">
+          </div>
+          <details class="enc-section" id="enc-combatants-section">
+            <summary>Combatants <span id="enc-pick-count-badge" style="font-size:0.6rem;color:var(--c-ink-faint);font-family:'Crimson Text',serif;font-style:italic;font-weight:normal;text-transform:none;letter-spacing:0"></span></summary>
+            <div class="enc-bestiary-filters">
+              <input type="text" id="enc-bp-search" placeholder="Search name…" oninput="encRenderBestiaryList()">
+              <select id="enc-bp-type" onchange="encRenderBestiaryList()"><option value="">All types</option></select>
+              <select id="enc-bp-size" onchange="encRenderBestiaryList()"><option value="">All sizes</option></select>
+              <select id="enc-bp-cr-min" onchange="encRenderBestiaryList()"><option value="">CR ≥ any</option></select>
+              <select id="enc-bp-cr-max" onchange="encRenderBestiaryList()"><option value="">CR ≤ any</option></select>
+              <button class="enc-clear-btn" onclick="encClearBestiaryFilters()">Clear</button>
+            </div>
+            <div class="enc-bestiary-status" id="enc-bp-status">Open this section to load the bestiary.</div>
+            <div class="enc-bestiary-list" id="enc-bp-list"></div>
+
+            <div class="enc-cart-head">
+              <span>Picks (<span id="enc-bp-pick-count">0</span>) — click a row above to add</span>
+              <button class="enc-clear-picks" onclick="encClearAllPicks()">Clear all</button>
+            </div>
+            <div class="enc-cart" id="enc-bp-cart"></div>
+
+            <div class="enc-party-row">
+              <label>Party size</label>
+              <input type="number" id="enc-bp-party-size" min="1" max="12" value="4" oninput="encOnPartyChange()">
+              <label>Avg level</label>
+              <input type="number" id="enc-bp-party-level" min="1" max="20" value="5" oninput="encOnPartyChange()">
+              <span style="font-size:0.78rem;color:var(--c-ink-faint);font-style:italic">Flee Mortals CR budget — per-character × party size.</span>
+            </div>
+            <div class="enc-budget" id="enc-bp-budget">
+              <div class="enc-total">Total CR: <span id="enc-bp-cr-total">0</span> <small id="enc-bp-xp-total-note" style="color:var(--c-ink-faint);font-weight:normal;margin-left:8px"></small></div>
+              <div class="enc-thresholds" id="enc-bp-thresholds"></div>
+              <div class="enc-verdict" id="enc-bp-verdict"></div>
+              <div id="enc-bp-fm-extras" style="font-size:0.78rem;color:var(--c-ink-faint);margin-top:0.4rem;line-height:1.45"></div>
+            </div>
+          </details>
+        `;
+        // Lazy-load bestiary when the section is first opened.
+        document.getElementById('enc-combatants-section').addEventListener('toggle', async function() {
+          if (this.open && !_BP.loaded && !_BP.loading) {
+            await encLoadBestiary();
+            encPopulateFilterDropdowns();
+            encRenderBestiaryList();
+          } else if (this.open) {
+            encPopulateFilterDropdowns();
+            encRenderBestiaryList();
+          }
+          if (this.open) encRenderPicks();
+        });
+      }
+
+      // Always sync field values to the current encounter (handles switching).
+      const nameInput = document.getElementById('enc-field-name');
+      if (nameInput && document.activeElement !== nameInput) {
+        nameInput.value = enc.name || '';
+      }
+
+      // Sync party inputs only when not focused (avoid disrupting typing).
+      const szEl = document.getElementById('enc-bp-party-size');
+      const lvEl = document.getElementById('enc-bp-party-level');
+      if (szEl && document.activeElement !== szEl) szEl.value = enc.party.size;
+      if (lvEl && document.activeElement !== lvEl) lvEl.value = enc.party.level;
+
+      // Update pick count badge.
+      const badge = document.getElementById('enc-pick-count-badge');
+      if (badge) {
+        const n = (enc.picks || []).length;
+        badge.textContent = n ? `${n} monster type${n === 1 ? '' : 's'}` : '';
+      }
+    }
+
+    function onEncFieldChange(field, value) {
+      const enc = currentEncounter();
+      if (!enc) return;
+      enc[field] = value;
+      enc.updatedAt = new Date().toISOString();
+      scheduleSave();
+      renderLibrary();   // update name in sidebar live
+    }
+
     function renderLaunchpad() {
       // Stub — populated in Task 3.10.
       document.getElementById('launchpad-content').textContent = '';
+    }
+
+    // ═══════════════════════════════════════════════════════
+    //  BESTIARY PICKER (lifted from initiative-dm.html)
+    //  All CSS class names and element ids have "enc-" prefix.
+    //  _BP.picks mirrors currentEncounter().picks at all times.
+    //  Any mutation calls syncPicksToEncounter() + scheduleSave().
+    // ═══════════════════════════════════════════════════════
+
+    const _BP = {
+      loaded: false,
+      loading: false,
+      monsters: [],
+      picks: [],      // mirrors currentEncounter().picks
+    };
+
+    // ── Flee Mortals encounter math ──
+    const FM_CR_BUDGET = {
+       1: {e: 0.125, s: 0.125, h: 0.25,  cap: 1 },
+       2: {e: 0.125, s: 0.25,  h: 0.5,   cap: 3 },
+       3: {e: 0.25,  s: 0.5,   h: 0.75,  cap: 4 },
+       4: {e: 0.5,   s: 0.75,  h: 1,     cap: 6 },
+       5: {e: 1,     s: 1.5,   h: 2.5,   cap: 8 },
+       6: {e: 1.5,   s: 2,     h: 3,     cap: 9 },
+       7: {e: 2,     s: 2.5,   h: 3.5,   cap: 10},
+       8: {e: 2.5,   s: 3,     h: 4,     cap: 12},
+       9: {e: 3,     s: 3.5,   h: 4.5,   cap: 13},
+      10: {e: 3.5,   s: 4,     h: 5,     cap: 15},
+      11: {e: 4,     s: 4.5,   h: 5.5,   cap: 16},
+      12: {e: 4.5,   s: 5,     h: 6,     cap: 17},
+      13: {e: 5,     s: 5.5,   h: 6.5,   cap: 19},
+      14: {e: 5.5,   s: 6,     h: 7,     cap: 20},
+      15: {e: 6,     s: 6.5,   h: 7.5,   cap: 22},
+      16: {e: 6.5,   s: 7,     h: 8,     cap: 24},
+      17: {e: 7,     s: 7.5,   h: 8.5,   cap: 25},
+      18: {e: 7.5,   s: 8,     h: 9,     cap: 26},
+      19: {e: 8,     s: 8.5,   h: 9.5,   cap: 28},
+      20: {e: 8.5,   s: 9,     h: 10,    cap: 30}
+    };
+
+    const FM_MINIONS_PER_STD = {
+      0:5, 0.125:5, 0.25:5, 0.5:5, 1:5, 2:5, 3:5, 4:5,
+      5:8, 6:8, 7:8, 8:8,
+      9:10, 10:10, 11:10, 12:10, 13:10, 14:10, 15:10, 16:10, 17:10, 18:10,
+      19:10, 20:10, 21:10, 22:10, 23:10, 24:10, 25:10, 26:10, 27:10, 28:10,
+      29:10, 30:10
+    };
+    function encMinionsPerStd(cr) {
+      const c = +cr || 0;
+      if (FM_MINIONS_PER_STD[c] != null) return FM_MINIONS_PER_STD[c];
+      const keys = Object.keys(FM_MINIONS_PER_STD).map(Number).sort((a, b) => a - b);
+      let best = keys[0];
+      for (const k of keys) { if (Math.abs(k - c) < Math.abs(best - c)) best = k; }
+      return FM_MINIONS_PER_STD[best];
+    }
+
+    function encFmCR(v) {
+      if (v == null) return '—';
+      if (v === 0.125) return '⅛';
+      if (v === 0.25)  return '¼';
+      if (v === 0.5)   return '½';
+      if (v === 0.75)  return '¾';
+      if (v === 1.5)   return '1½';
+      if (v % 1 === 0) return String(v);
+      if (Math.abs(v - Math.floor(v) - 0.5) < 0.001) return `${Math.floor(v)}½`;
+      return v.toFixed(2);
+    }
+
+    function encFmDifficultyBand(totalCR, budget) {
+      if (totalCR <= 0) return 'none';
+      if (totalCR < budget.easy * 0.9)      return 'trivial';
+      if (totalCR <= budget.easy * 1.1)     return 'easy';
+      if (totalCR <= budget.standard * 1.1) return 'standard';
+      if (totalCR <= budget.hard * 1.1)     return 'hard';
+      return 'extreme';
+    }
+
+    function encFmSoloBand(soloCr, level, size) {
+      const row = FM_CR_BUDGET[Math.max(1, Math.min(20, level))];
+      const diff = row.cap - (+soloCr || 0);
+      if (size <= 5) {
+        if (diff >= 7) return 'trivial';
+        if (diff >= 5) return 'easy';
+        if (diff >= 3) return 'standard';
+        if (diff >= 0) return 'hard';
+        return 'extreme';
+      }
+      if (diff >= 6) return 'trivial';
+      if (diff >= 4) return 'easy';
+      if (diff >= 2) return 'standard';
+      if (diff >= 0) return 'hard';
+      return 'extreme';
+    }
+
+    const FM_DAILY_POINTS = { trivial: 0, easy: 1, standard: 2, hard: 4, extreme: 8 };
+
+    const BP_CR_OPTIONS = [
+      ['0','0'], ['0.125','1/8'], ['0.25','1/4'], ['0.5','1/2'],
+      ['1','1'],   ['2','2'],   ['3','3'],   ['4','4'],   ['5','5'],
+      ['6','6'],   ['7','7'],   ['8','8'],   ['9','9'],   ['10','10'],
+      ['11','11'], ['12','12'], ['13','13'], ['14','14'], ['15','15'],
+      ['16','16'], ['17','17'], ['18','18'], ['19','19'], ['20','20'],
+      ['21','21'], ['22','22'], ['23','23'], ['24','24'], ['25','25'],
+      ['26','26'], ['27','27'], ['28','28'], ['29','29'], ['30','30']
+    ];
+
+    // ── Chip helpers ──
+
+    function encSourceChipHTML(m) {
+      if (!m || m._custom) return '';
+      const src = m.source;
+      if (!src) return '';
+      const norm = String(src).trim();
+      if (!norm || norm === 'imported' || norm === 'custom') return '';
+      const cls = 's-' + norm.replace(/[^a-zA-Z0-9-]+/g, '-').toLowerCase();
+      return `<span class="enc-source-chip ${cls}" title="Source book">${escapeHtml(norm)}</span>`;
+    }
+
+    function encCategoryChipHTML(m) {
+      if (!m) return '';
+      let cat = '';
+      if (m.isMinion) cat = 'minion';
+      else if (m.isSolo) cat = 'solo';
+      else if (m.fmCategory && m.fmCategory !== 'standard') cat = m.fmCategory;
+      if (!cat) return '';
+      const labels = { minion:'Minion', solo:'Solo', companion:'Companion', retainer:'Retainer', 'villain-party':'Villain' };
+      const label = labels[cat] || '';
+      if (!label) return '';
+      return `<span class="enc-cat-chip ${escapeHtml(cat)}" title="Flee Mortals encounter category">${label}</span>`;
+    }
+
+    function encCrTier(cr) {
+      const c = +cr;
+      if (!isFinite(c)) return 't-low';
+      if (c <= 1)  return 't-low';
+      if (c <= 5)  return 't-mid';
+      if (c <= 15) return 't-high';
+      return 't-epic';
+    }
+
+    // ── Bestiary load (lazy, once per session) ──
+
+    async function encLoadBestiary() {
+      _BP.loading = true;
+      const statusEl = document.getElementById('enc-bp-status');
+      if (statusEl) statusEl.textContent = 'Loading bestiary…';
+      try {
+        const [r, rc] = await Promise.all([
+          fetch(WORKER_URL + '?type=bestiary',        { cache: 'no-store', headers: Auth.dmHeaders() }),
+          fetch(WORKER_URL + '?type=bestiary_custom', { cache: 'no-store', headers: Auth.dmHeaders() }),
+        ]);
+        if (r.status === 401 || rc.status === 401) {
+          if (statusEl) statusEl.textContent = 'Your DM session expired — sign in again on the home page.';
+          _BP.loading = false;
+          return;
+        }
+        const imported = r.ok  ? await r.json()  : { monsters: [] };
+        const custom   = rc.ok ? await rc.json() : [];
+        _BP.monsters = BestiaryMerge.mergeBestiaries(imported, custom);
+        _BP.loaded = true;
+      } catch (e) {
+        if (statusEl) statusEl.textContent = 'Could not reach the worker. Try again after redeploying.';
+      }
+      _BP.loading = false;
+    }
+
+    // ── Filter dropdowns ──
+
+    function encPopulateFilterDropdowns() {
+      const types = Array.from(new Set(_BP.monsters.map(m => m.type).filter(Boolean))).sort();
+      const sizes = ['Tiny','Small','Medium','Large','Huge','Gargantuan'].filter(s => _BP.monsters.some(m => m.size === s));
+      const t = document.getElementById('enc-bp-type');
+      const s = document.getElementById('enc-bp-size');
+      if (t && t.options.length <= 1) t.innerHTML = '<option value="">All types</option>' + types.map(x => `<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
+      if (s && s.options.length <= 1) s.innerHTML = '<option value="">All sizes</option>' + sizes.map(x => `<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
+      const mn = document.getElementById('enc-bp-cr-min');
+      const mx = document.getElementById('enc-bp-cr-max');
+      if (mn && mn.options.length <= 1) mn.innerHTML = '<option value="">CR ≥ any</option>' + BP_CR_OPTIONS.map(([v,l]) => `<option value="${v}">CR ≥ ${l}</option>`).join('');
+      if (mx && mx.options.length <= 1) mx.innerHTML = '<option value="">CR ≤ any</option>' + BP_CR_OPTIONS.map(([v,l]) => `<option value="${v}">CR ≤ ${l}</option>`).join('');
+    }
+
+    function encClearBestiaryFilters() {
+      ['enc-bp-search','enc-bp-type','enc-bp-size','enc-bp-cr-min','enc-bp-cr-max']
+        .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+      encRenderBestiaryList();
+    }
+
+    // ── List render ──
+
+    function encRenderBestiaryList() {
+      const statusEl = document.getElementById('enc-bp-status');
+      const list = document.getElementById('enc-bp-list');
+      if (!list) return;
+      if (!_BP.monsters.length) {
+        if (statusEl) statusEl.textContent = _BP.loaded
+          ? 'No bestiary loaded. Import one in The Menagerie first.'
+          : (_BP.loading ? 'Loading bestiary…' : 'Open this section to load.');
+        list.innerHTML = '';
+        return;
+      }
+      const q  = (document.getElementById('enc-bp-search')?.value || '').trim().toLowerCase();
+      const tF = document.getElementById('enc-bp-type')?.value || '';
+      const sF = document.getElementById('enc-bp-size')?.value || '';
+      const lo = parseFloat(document.getElementById('enc-bp-cr-min')?.value || '');
+      const hi = parseFloat(document.getElementById('enc-bp-cr-max')?.value || '');
+      const filtered = _BP.monsters.filter(m => {
+        if (q  && !(m.name || '').toLowerCase().includes(q)) return false;
+        if (tF && m.type !== tF) return false;
+        if (sF && m.size !== sF) return false;
+        const cr = +m.cr;
+        if (!isNaN(lo) && (!isFinite(cr) || cr < lo)) return false;
+        if (!isNaN(hi) && (!isFinite(cr) || cr > hi)) return false;
+        return true;
+      });
+      filtered.sort((a, b) => (+a.cr || 0) - (+b.cr || 0) || (a.name || '').localeCompare(b.name || ''));
+      if (statusEl) statusEl.textContent = `${filtered.length} of ${_BP.monsters.length} monsters`;
+      if (!filtered.length) {
+        list.innerHTML = '<div class="enc-bestiary-empty-note">No monsters match those filters.</div>';
+        return;
+      }
+      list.innerHTML = filtered.map(m => encBestiaryRowHTML(m)).join('');
+    }
+
+    function encBestiaryRowHTML(m) {
+      const inPicks = !!_BP.picks.find(p => p.id === m.id);
+      const safeId = escapeHtml(m.id);
+      return `
+        <div class="enc-bestiary-row${inPicks ? ' in-picks' : ''}" id="enc-bprow-${safeId}" onclick="encAddPick('${safeId}')">
+          <div class="enc-bestiary-row-head">
+            <div class="enc-bestiary-row-nm">${escapeHtml(m.name)}${m._custom ? '<span class="enc-custom-chip">Custom</span>' : ''}${encSourceChipHTML(m)}${encCategoryChipHTML(m)}<small>${escapeHtml(m.size || '')} ${escapeHtml(m.type || '')}${m.alignment ? ` · ${escapeHtml(m.alignment)}` : ''}</small></div>
+            <div class="enc-bestiary-row-meta">
+              <span>${m.ac ?? '—'}<small>AC</small></span>
+              <span>${m.hp ?? '—'}<small>HP</small></span>
+              <span>${m.xp ? m.xp.toLocaleString() : '—'}<small>XP</small></span>
+            </div>
+            <span class="enc-cr-chip ${encCrTier(m.cr)}">CR ${escapeHtml(m.crText || m.cr || '?')}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    // ── Pick mutations — always sync to encounter + scheduleSave ──
+
+    function syncPicksToEncounter() {
+      const enc = currentEncounter();
+      if (!enc) return;
+      // Strip transient `expanded` before writing to the schema object.
+      enc.picks = _BP.picks.map(p => {
+        const { expanded, ...rest } = p;
+        return rest;
+      });
+      // Ensure pickKeys are set.
+      enc.picks = EncounterSchema.genPickKeys(enc.picks);
+      // Keep _BP.picks in sync with keyed version.
+      _BP.picks = enc.picks.map(p => ({ ...p, expanded: _BP.picks.find(x => x.id === p.id)?.expanded || false }));
+      enc.updatedAt = new Date().toISOString();
+      scheduleSave();
+      // Update pick count badge.
+      const badge = document.getElementById('enc-pick-count-badge');
+      if (badge) {
+        const n = enc.picks.length;
+        badge.textContent = n ? `${n} monster type${n === 1 ? '' : 's'}` : '';
+      }
+    }
+
+    function encAddPick(id) {
+      const m = _BP.monsters.find(x => x.id === id);
+      if (!m) return;
+      const existing = _BP.picks.find(p => p.id === id);
+      if (existing) {
+        existing.qty = Math.min(50, existing.qty + 1);
+      } else {
+        _BP.picks.push({
+          id,
+          qty: 1,
+          rollHp: !!m.hpFormula,
+          rollInit: true,
+          hidden: false,
+          hpOverride: null,
+          initOverride: null,
+          startingConditions: [],
+          expanded: false,
+        });
+      }
+      syncPicksToEncounter();
+      encRenderBestiaryList();
+      encRenderPicks();
+    }
+
+    function encUpdatePick(id, field, val) {
+      const p = _BP.picks.find(x => x.id === id);
+      if (!p) return;
+      if (field === 'qty') {
+        p.qty = Math.max(0, Math.min(50, parseInt(val, 10) || 0));
+        if (p.qty === 0) { encRemovePick(id); return; }
+      } else if (field === 'hpOverride' || field === 'initOverride') {
+        const n = parseInt(val, 10);
+        p[field] = Number.isFinite(n) ? n : null;
+      } else if (field === 'startingConditions') {
+        // val is a newline-separated string from the textarea.
+        p.startingConditions = String(val).split('\n').map(s => s.trim()).filter(Boolean);
+      } else {
+        p[field] = !!val;
+      }
+      syncPicksToEncounter();
+      encRenderPicks();
+    }
+
+    function encRemovePick(id) {
+      _BP.picks = _BP.picks.filter(p => p.id !== id);
+      syncPicksToEncounter();
+      encRenderBestiaryList();
+      encRenderPicks();
+    }
+
+    function encClearAllPicks() {
+      _BP.picks = [];
+      syncPicksToEncounter();
+      encRenderBestiaryList();
+      encRenderPicks();
+    }
+
+    function encTogglePickExpanded(id) {
+      const p = _BP.picks.find(x => x.id === id);
+      if (!p) return;
+      p.expanded = !p.expanded;
+      encRenderPicks();
+    }
+
+    function encTotalPickedXP() {
+      let total = 0;
+      for (const p of _BP.picks) {
+        const m = _BP.monsters.find(x => x.id === p.id);
+        const xp = m && Number.isFinite(m.xp) ? m.xp : 0;
+        total += xp * p.qty;
+      }
+      return total;
+    }
+
+    function encTotalPickedCount() {
+      return _BP.picks.reduce((a, p) => a + p.qty, 0);
+    }
+
+    function encRenderPicks() {
+      const countEl = document.getElementById('enc-bp-pick-count');
+      if (countEl) countEl.textContent = String(_BP.picks.length);
+      const cart = document.getElementById('enc-bp-cart');
+      if (!cart) return;
+      if (!_BP.picks.length) {
+        cart.innerHTML = '<div class="enc-empty">No picks yet — click a monster above to add it here.</div>';
+      } else {
+        cart.innerHTML = _BP.picks.map(p => {
+          const m = _BP.monsters.find(x => x.id === p.id) || { name: '(missing)' };
+          const safeId = escapeHtml(p.id);
+          const xpEach = Number.isFinite(m.xp) ? m.xp : 0;
+          const xpTotal = xpEach * p.qty;
+          const condsValue = escapeHtml((p.startingConditions || []).join('\n'));
+          return `
+            <div class="enc-pick-row${p.expanded ? ' expanded' : ''}">
+              <div class="enc-pick-head">
+                <div class="enc-pick-nm">${escapeHtml(m.name)}${m._custom ? '<span class="enc-custom-chip">Custom</span>' : ''}${encSourceChipHTML(m)}${encCategoryChipHTML(m)}<small>CR ${escapeHtml(m.crText || m.cr || '?')} · ${xpEach.toLocaleString()} XP ea</small></div>
+                <div class="enc-pick-qty">
+                  <button onclick="encUpdatePick('${safeId}','qty',${p.qty - 1})">−</button>
+                  <span class="enc-q">${p.qty}</span>
+                  <button onclick="encUpdatePick('${safeId}','qty',${p.qty + 1})">+</button>
+                </div>
+                <div class="enc-pick-xp">${xpTotal.toLocaleString()} XP</div>
+                <button class="enc-pick-toggle" onclick="encTogglePickExpanded('${safeId}')" title="Toggle per-pick options">⚙</button>
+                <button class="enc-pick-remove" onclick="encRemovePick('${safeId}')" title="Remove">×</button>
+              </div>
+              <div class="enc-pick-opts">
+                <div><label>HP override</label><input type="number" placeholder="${m.hp ?? ''}" value="${p.hpOverride ?? ''}" oninput="encUpdatePick('${safeId}','hpOverride',this.value)"></div>
+                <div><label>Init override</label><input type="number" placeholder="roll" value="${p.initOverride ?? ''}" oninput="encUpdatePick('${safeId}','initOverride',this.value)"></div>
+                <label class="enc-toggle"><input type="checkbox" ${p.rollHp ? 'checked' : ''} ${m.hpFormula ? '' : 'disabled'} onchange="encUpdatePick('${safeId}','rollHp',this.checked)"> Roll HP${m.hpFormula ? ` (${escapeHtml(m.hpFormula)})` : ' (no formula)'}</label>
+                <label class="enc-toggle"><input type="checkbox" ${p.rollInit ? 'checked' : ''} onchange="encUpdatePick('${safeId}','rollInit',this.checked)"> Roll init</label>
+                <label class="enc-toggle"><input type="checkbox" ${p.hidden ? 'checked' : ''} onchange="encUpdatePick('${safeId}','hidden',this.checked)"> Hidden</label>
+                <div class="enc-starting-conds-wrap">
+                  <label>Starting conditions (one per line)</label>
+                  <textarea placeholder="e.g. Prone&#10;Frightened" oninput="encUpdatePick('${safeId}','startingConditions',this.value)">${condsValue}</textarea>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+      encRenderBudget();
+    }
+
+    // ── Party change ──
+
+    function encOnPartyChange() {
+      const enc = currentEncounter();
+      if (!enc) return;
+      const sz = parseInt(document.getElementById('enc-bp-party-size')?.value, 10);
+      const lv = parseInt(document.getElementById('enc-bp-party-level')?.value, 10);
+      if (Number.isFinite(sz)) enc.party.size  = Math.max(1, Math.min(12, sz));
+      if (Number.isFinite(lv)) enc.party.level = Math.max(1, Math.min(20, lv));
+      enc.updatedAt = new Date().toISOString();
+      scheduleSave();
+      encRenderBudget();
+    }
+
+    // ── Budget render ──
+
+    function encRenderBudget() {
+      const enc = currentEncounter();
+      const partySize  = enc ? enc.party.size  : 4;
+      const partyLevel = enc ? enc.party.level : 5;
+      const lvl  = Math.max(1, Math.min(20, partyLevel));
+      const size = partySize;
+      const row  = FM_CR_BUDGET[lvl];
+      const xp   = encTotalPickedXP();
+
+      let totalCR = 0, nonMinionCount = 0, minionCount = 0;
+      let soloPicks = [], capExceeded = [];
+
+      for (const p of _BP.picks) {
+        const m = _BP.monsters.find(x => x.id === p.id);
+        if (!m) continue;
+        const cr = +m.cr || 0;
+        const q  = p.qty || 1;
+        if (m.isSolo) { soloPicks.push({ m, q }); continue; }
+        if (m.isMinion) {
+          totalCR += (cr / encMinionsPerStd(cr)) * q;
+          minionCount += q;
+        } else {
+          totalCR += cr * q;
+          nonMinionCount += q;
+        }
+        if (row && cr > row.cap) capExceeded.push(m);
+      }
+
+      const displayCR = Math.round(totalCR * 4) / 4;
+      const crTotalEl = document.getElementById('enc-bp-cr-total');
+      const xpNoteEl  = document.getElementById('enc-bp-xp-total-note');
+      if (crTotalEl) crTotalEl.textContent = encFmCR(displayCR);
+      if (xpNoteEl)  xpNoteEl.textContent  = xp ? `(${xp.toLocaleString()} XP via 2014 tables)` : '';
+
+      const thrEl     = document.getElementById('enc-bp-thresholds');
+      const verdictEl = document.getElementById('enc-bp-verdict');
+      const extrasEl  = document.getElementById('enc-bp-fm-extras');
+      if (!row) {
+        if (thrEl)     thrEl.innerHTML    = '';
+        if (verdictEl) verdictEl.textContent = '';
+        if (extrasEl)  extrasEl.innerHTML  = '';
+        return;
+      }
+
+      const budget = { easy: row.e * size, standard: row.s * size, hard: row.h * size };
+      let band = encFmDifficultyBand(totalCR, budget);
+      let soloBand = null;
+      if (soloPicks.length) {
+        soloPicks.sort((a, b) => (b.m.cr || 0) - (a.m.cr || 0));
+        soloBand = encFmSoloBand(soloPicks[0].m.cr, lvl, size);
+        band = soloBand;
+      }
+
+      const hit = b => band === b ? ' hit' : '';
+      if (thrEl) thrEl.innerHTML = `
+        <span class="${hit('easy')}">Easy CR ${encFmCR(budget.easy)}</span>
+        <span class="${hit('standard')}">Standard CR ${encFmCR(budget.standard)}</span>
+        <span class="${hit('hard')}">Hard CR ${encFmCR(budget.hard)}</span>
+      `;
+
+      const bandToCss = { none:'low', trivial:'low', easy:'low', standard:'moderate', hard:'high', extreme:'over' };
+      if (verdictEl) {
+        verdictEl.className = 'enc-verdict ' + (bandToCss[band] || 'low');
+        const points = FM_DAILY_POINTS[band] ?? 0;
+        const pl = points === 1 ? '' : 's';
+        verdictEl.textContent = ({
+          none:     'No monsters picked yet.',
+          trivial:  'Trivial — barely a speed bump. 0 daily encounter points.',
+          easy:     `Easy — minimal resource drain. ${points} daily encounter point${pl}.`,
+          standard: `Standard — meaningful resource drain. ${points} daily encounter points.`,
+          hard:     `Hard — risk of PC deaths without smart play. ${points} daily encounter points.`,
+          extreme:  'Extreme — party survival not guaranteed. ' + (FM_DAILY_POINTS.extreme) + ' daily encounter points.',
+        })[band] || '';
+      }
+
+      if (extrasEl) {
+        const bits = [];
+        bits.push(`CR cap for level ${lvl}: <b>${row.cap}</b>`);
+        if (capExceeded.length) {
+          const names = capExceeded.map(m => `${m.name} (CR ${m.crText || m.cr})`).join(', ');
+          bits.push(`<span style="color:var(--c-rust)">⚠ Above CR cap: ${escapeHtml(names)} — FM advises swapping these out at this level.</span>`);
+        }
+        const nonMinionLimit = 3 * size;
+        if (nonMinionCount > nonMinionLimit) {
+          bits.push(`<span style="color:var(--c-rust)">⚠ ${nonMinionCount} non-minion creatures exceeds FM's recommended cap of ${nonMinionLimit} (3 × party size) — action economy may overwhelm the party.</span>`);
+        } else if (nonMinionCount) {
+          bits.push(`Non-minion creatures: ${nonMinionCount} / ${nonMinionLimit} max`);
+        }
+        if (minionCount) {
+          bits.push(`Minions: ${minionCount} (count fractionally per FM Minion Encounter Building table)`);
+        }
+        if (soloPicks.length) {
+          const sName = soloPicks[0].m.name;
+          bits.push(`Solo encounter — difficulty scored against the FM Solo Creatures table using <b>${escapeHtml(sName)}</b> (CR ${soloPicks[0].m.crText || soloPicks[0].m.cr}). Mixing other monsters with a solo is non-standard.`);
+        }
+        extrasEl.innerHTML = bits.join('<br>');
+      }
+    }
+
+    // ── Sync _BP.picks from the currently-selected encounter ──
+    // Called whenever selectEncounter changes the active record.
+
+    function syncPicksFromEncounter() {
+      const enc = currentEncounter();
+      _BP.picks = enc
+        ? (enc.picks || []).map(p => ({ ...p, expanded: false }))
+        : [];
     }
 
     loadAll().catch(e => {
