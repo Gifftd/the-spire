@@ -22,7 +22,53 @@
     waveRound: 50,
   };
 
+  function genId(prefix) {
+    const rand = Math.floor(Math.random() * 1e9).toString(36);
+    return `${prefix}_${Date.now()}_${rand}`;
+  }
+
+  function newEncounter(name) {
+    const now = new Date().toISOString();
+    return {
+      id: genId('enc'),
+      schemaVersion: 2,
+      name: name || '',
+      description: '',
+      tags: [],
+      status: 'draft',
+      picks: [],
+      party: { size: 4, level: 5 },
+      totalXp: 0,
+      monsterCount: 0,
+      tactical: {
+        terrain: '',
+        lighting: 'bright',
+        surprise: 'none',
+        startingPositions: '',
+        waves: [],
+        readAloud: '',
+      },
+      playbook: {
+        overallTactics: '',
+        retreatTriggers: '',
+        victoryConditions: '',
+        reminders: '',
+      },
+      loot: [],
+      locationRef: null,
+      sessionId: null,
+      npcRoles: [],
+      createdAt: now,
+      updatedAt: now,
+      lastStagedAt: null,
+      resolvedAt: null,
+      resolvedInTimelineId: null,
+      lastOutcome: null,
+    };
+  }
+
   global.EncounterSchema = {
     STATUSES, LIGHTING, SURPRISE, NPC_ROLES, LOCATION_REF_KINDS, OUTCOMES, CAPS,
+    newEncounter, genId,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

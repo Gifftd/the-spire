@@ -52,6 +52,25 @@
       ['draft','ready','scheduled','live','completed','archived'].forEach(v =>
         assert(s.includes(v), v + ' missing from STATUSES'));
     });
+
+    test('newEncounter returns a v2-shape draft', () => {
+      const e = EncounterSchema.newEncounter('My fight');
+      assertEq(e.schemaVersion, 2);
+      assertEq(e.status, 'draft');
+      assertEq(e.name, 'My fight');
+      assertEq(e.picks, []);
+      assertEq(e.tactical.lighting, 'bright');
+      assertEq(e.tactical.surprise, 'none');
+      assertEq(e.tactical.waves, []);
+      assertEq(e.playbook.overallTactics, '');
+      assertEq(e.loot, []);
+      assertEq(e.npcRoles, []);
+      assertEq(e.locationRef, null);
+      assertEq(e.sessionId, null);
+      assert(typeof e.id === 'string' && e.id.startsWith('enc_'), 'id format');
+      assert(typeof e.createdAt === 'string', 'createdAt set');
+      assertEq(e.lastOutcome, null);
+    });
   </script>
 </body>
 </html>
