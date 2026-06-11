@@ -393,6 +393,14 @@ export default {
         return json(await kvGet(env, 'timeline', []));
       }
 
+      // DM-only: combat drafts (auto-saved in-progress and pending-export combats).
+      // Always DM-only — never returned to players. Drafts contain dmDetail HP logs.
+      if (type === 'combat_drafts') {
+        const auth = await verifyDMAuth(request, env);
+        if (!auth.ok) return json({ error: 'DM auth required' }, 401);
+        return json(await kvGet(env, 'combat_drafts', []));
+      }
+
       // Player NPC roster — only NPCs the character has been marked as knowing,
       // with DM-only fields stripped server-side.
       if (type === 'npc_roster') {
