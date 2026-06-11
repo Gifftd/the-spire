@@ -11,6 +11,18 @@
     .workshop { display: grid; grid-template-columns: 280px 1fr 280px; flex: 1; min-height: 0; }
     .pane { padding: 1rem; overflow-y: auto; border-right: 1px solid var(--border); }
     .pane:last-child { border-right: none; border-left: 1px solid var(--border); }
+    .lib-row { padding: 8px 10px; border: 1px solid var(--border); border-radius: 3px; margin-bottom: 6px; cursor: pointer; background: var(--bg); }
+    .lib-row.selected { border-color: var(--gold); background: rgba(184,138,90,0.10); }
+    .lib-row-name { font-family: 'Cinzel', serif; font-size: 0.85rem; }
+    .lib-row-meta { display: flex; gap: 8px; margin-top: 4px; font-size: 0.7rem; color: var(--ink-dim); }
+    .lib-status-pill { padding: 1px 6px; border-radius: 8px; border: 1px solid currentColor; font-family: 'Cinzel', serif; font-size: 0.55rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    .lib-status-draft     { color: #8a8275; }
+    .lib-status-ready     { color: #6c8; }
+    .lib-status-scheduled { color: #88c8e0; }
+    .lib-status-live      { color: #d66; }
+    .lib-status-completed { color: #b88a5a; }
+    .lib-status-archived  { color: #555; }
+    #new-btn { width: 100%; margin-bottom: 8px; padding: 8px; background: var(--gold); color: #1a1f24; border: none; border-radius: 3px; font-family: 'Cinzel', serif; cursor: pointer; }
     @media (max-width: 1100px) {
       .workshop { grid-template-columns: 1fr; }
       .pane.launchpad { position: sticky; bottom: 0; }
@@ -71,8 +83,48 @@
 
     function renderLibrary() {
       const root = document.getElementById('library-list');
-      root.textContent = state.encounters.length ? '' : 'No encounters yet.';
+      root.innerHTML = '<button id="new-btn" onclick="createEncounter()">+ New encounter</button>';
+      if (!state.encounters.length) {
+        root.insertAdjacentHTML('beforeend', '<div class="empty-state">No encounters yet.</div>');
+        return;
+      }
+      const sorted = state.encounters.slice().sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+      sorted.forEach(e => {
+        const row = document.createElement('div');
+        row.className = 'lib-row' + (e.id === state.selectedId ? ' selected' : '');
+        row.onclick = () => selectEncounter(e.id);
+        row.innerHTML = `
+          <div class="lib-row-name">${escapeHtml(e.name || '(untitled)')}</div>
+          <div class="lib-row-meta">
+            <span class="lib-status-pill lib-status-${e.status}">${e.status}</span>
+            <span>${e.picks.length} monster${e.picks.length === 1 ? '' : 's'}</span>
+          </div>
+        `;
+        root.appendChild(row);
+      });
     }
+
+    function selectEncounter(id) {
+      state.selectedId = id;
+      render();
+    }
+
+    function createEncounter() {
+      const e = EncounterSchema.newEncounter('New encounter');
+      state.encounters.push(e);
+      state.selectedId = e.id;
+      saveEncounters();
+      render();
+    }
+
+    function escapeHtml(s) {
+      return (s || '').toString()
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // Stub — implemented in Task 3.3.
+    async function saveEncounters() { /* implemented in Task 3.3 */ }
     function renderEditor() {
       document.getElementById('editor-empty').style.display = state.selectedId ? 'none' : '';
       document.getElementById('editor-form').style.display = state.selectedId ? '' : 'none';
