@@ -96,6 +96,42 @@
       const out = EncounterSchema.genPickKeys(picks);
       assertEq(out.map(p => p.pickKey), ['p1','p2']);
     });
+
+    test('migrateInMemory upgrades a v1 record to v2', () => {
+      const v1 = {
+        id: 'enc_old',
+        name: 'Old fight',
+        picks: [{ id: 'g', qty: 3 }, { id: 'o', qty: 1 }],
+        party: { size: 4, level: 5 },
+        totalXp: 100,
+        monsterCount: 4,
+        createdAt: '2026-05-01T00:00:00Z',
+      };
+      const v2 = EncounterSchema.migrateInMemory(v1);
+      assertEq(v2.schemaVersion, 2);
+      assertEq(v2.status, 'ready');
+      assertEq(v2.picks.map(p => p.pickKey), ['p1','p2']);
+      assertEq(v2.tactical.lighting, 'bright');
+      assertEq(v2.tactical.surprise, 'none');
+      assertEq(v2.tactical.waves, []);
+      assertEq(v2.locationRef, null);
+      assertEq(v2.sessionId, null);
+      assertEq(v2.npcRoles, []);
+      assertEq(v2.updatedAt, v2.createdAt);
+    });
+
+    test('migrateInMemory is a no-op on v2 records', () => {
+      const e = EncounterSchema.newEncounter('Already v2');
+      const out = EncounterSchema.migrateInMemory(e);
+      assertEq(out, e);
+    });
+
+    test('migrateInMemory handles malformed input gracefully', () => {
+      const out = EncounterSchema.migrateInMemory({});
+      assertEq(out.schemaVersion, 2);
+      assertEq(out.picks, []);
+      assertEq(out.status, 'ready');
+    });
   </script>
 </body>
 </html>
