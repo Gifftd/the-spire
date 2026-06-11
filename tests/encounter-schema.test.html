@@ -201,6 +201,56 @@
       const r = EncounterSchema.validateEncounter(e);
       assertEq(r.ok, true);
     });
+
+    test('equalLocationRefs handles null + world + submap', () => {
+      const eq = EncounterSchema.equalLocationRefs;
+      assertEq(eq(null, null), true);
+      assertEq(eq(null, { kind: 'world', locationId: 'a' }), false);
+      assertEq(eq({ kind: 'world', locationId: 'a' }, { kind: 'world', locationId: 'a' }), true);
+      assertEq(eq({ kind: 'world', locationId: 'a' }, { kind: 'world', locationId: 'b' }), false);
+      assertEq(eq(
+        { kind: 'submap', parentLocationId: 'p', locationId: 'l' },
+        { kind: 'submap', parentLocationId: 'p', locationId: 'l' }), true);
+      assertEq(eq(
+        { kind: 'submap', parentLocationId: 'p', locationId: 'l' },
+        { kind: 'submap', parentLocationId: 'X', locationId: 'l' }), false);
+      assertEq(eq(
+        { kind: 'world',  locationId: 'l' },
+        { kind: 'submap', parentLocationId: 'p', locationId: 'l' }), false);
+    });
+
+    test('resolveLocationRef returns world location + null parent', () => {
+      const world = {
+        locations: [
+          { id: 'numira-bad', name: "Numira'Bad", subMap: { locations: [{ id: 'chapel', name: 'Chapel' }] } },
+          { id: 'chapel', name: 'World Chapel' },
+        ],
+      };
+      const res = EncounterSchema.resolveLocationRef(
+        { kind: 'world', locationId: 'chapel' }, world);
+      assertEq(res.parent, null);
+      assertEq(res.location.name, 'World Chapel');
+    });
+
+    test('resolveLocationRef returns submap location + parent', () => {
+      const world = {
+        locations: [
+          { id: 'numira-bad', name: "Numira'Bad", subMap: { locations: [{ id: 'chapel', name: 'Sub Chapel' }] } },
+          { id: 'chapel', name: 'World Chapel' },
+        ],
+      };
+      const res = EncounterSchema.resolveLocationRef(
+        { kind: 'submap', parentLocationId: 'numira-bad', locationId: 'chapel' }, world);
+      assertEq(res.parent.id, 'numira-bad');
+      assertEq(res.location.name, 'Sub Chapel');
+    });
+
+    test('resolveLocationRef returns null for broken refs', () => {
+      const world = { locations: [{ id: 'a' }] };
+      assertEq(EncounterSchema.resolveLocationRef(null, world), null);
+      assertEq(EncounterSchema.resolveLocationRef({ kind: 'world', locationId: 'missing' }, world), null);
+      assertEq(EncounterSchema.resolveLocationRef({ kind: 'submap', parentLocationId: 'missing', locationId: 'x' }, world), null);
+    });
   </script>
 </body>
 </html>

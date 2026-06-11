@@ -202,8 +202,33 @@
     return { ok: errors.length === 0, errors };
   }
 
+  function equalLocationRefs(a, b) {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    if (a.kind !== b.kind) return false;
+    if (a.locationId !== b.locationId) return false;
+    if (a.kind === 'submap' && a.parentLocationId !== b.parentLocationId) return false;
+    return true;
+  }
+
+  function resolveLocationRef(ref, worldData) {
+    if (!ref || !worldData || !Array.isArray(worldData.locations)) return null;
+    if (ref.kind === 'world') {
+      const loc = worldData.locations.find(l => l.id === ref.locationId);
+      return loc ? { location: loc, parent: null } : null;
+    }
+    if (ref.kind === 'submap') {
+      const parent = worldData.locations.find(l => l.id === ref.parentLocationId);
+      if (!parent || !parent.subMap || !Array.isArray(parent.subMap.locations)) return null;
+      const loc = parent.subMap.locations.find(l => l.id === ref.locationId);
+      return loc ? { location: loc, parent } : null;
+    }
+    return null;
+  }
+
   global.EncounterSchema = {
     STATUSES, LIGHTING, SURPRISE, NPC_ROLES, LOCATION_REF_KINDS, OUTCOMES, CAPS,
     newEncounter, genId, genPickKeys, migrateInMemory, validateEncounter,
+    equalLocationRefs, resolveLocationRef,
   };
 })(typeof window !== 'undefined' ? window : globalThis);
