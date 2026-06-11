@@ -329,6 +329,40 @@ body {
   border-radius: 3px;
 }
 .login-banner a:hover { background: var(--gold-faint); color: var(--ink); }
+.login-banner select,
+.login-banner input[type=text] {
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--border-light);
+  border-radius: 3px;
+  padding: 4px 6px;
+  font-family: 'Crimson Text', Georgia, serif;
+  font-size: 0.85rem;
+}
+.login-banner select { min-width: 160px; }
+.login-banner button.login-trigger,
+.login-banner button.login-submit {
+  background: var(--gold-faint);
+  color: var(--ink);
+  border: 1px solid var(--gold);
+  border-radius: 3px;
+  font-family: 'Cinzel', serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  padding: 4px 12px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.login-banner button.login-trigger:hover,
+.login-banner button.login-submit:hover {
+  background: var(--gold); color: #1a1408;
+}
+.login-banner .login-error {
+  color: var(--red);
+  font-size: 0.8rem;
+  font-style: italic;
+  margin-left: 4px;
+}
 </style>
 </head>
 <body>
@@ -473,6 +507,17 @@ function renderNotesList(combatantId, notes, viewer) {
     });
 
     root.parentElement.appendChild(form);  // appended outside .notes-list (sibling)
+  } else {
+    // Anonymous: show login banner. Two-state: trigger button → inline form.
+    const banner = document.createElement('div');
+    banner.className = 'login-banner';
+    banner.innerHTML = `
+      <span>Log in as your character to add notes.</span>
+      <button class="login-trigger" type="button">Log in</button>
+    `;
+    banner.querySelector('.login-trigger').addEventListener('click',
+      (e) => { e.stopPropagation(); openInlineLogin(banner); });
+    root.parentElement.appendChild(banner);
   }
 }
 
@@ -789,6 +834,59 @@ async function poll() {
     }
   }
   setTimeout(poll, POLL_MS);
+}
+
+async function refreshOnce() {
+  try {
+    const res = await fetch(buildStateUrl(), { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && typeof data.mode !== 'undefined') {
+      lastSnapshot = data;
+      if (data.mode === 'lobby') showLobby(); else showCombat(data);
+    }
+  } catch {}
+}
+
+async function openInlineLogin(bannerEl) {
+  // Fetch the public sanitized character list (works without auth)
+  let chars = [];
+  try { chars = await Auth.characterList(); } catch { chars = []; }
+  if (!Array.isArray(chars)) chars = [];
+
+  bannerEl.innerHTML = `
+    <select class="login-char-sel">
+      <option value="">— pick a character —</option>
+      ${chars.map(c => `<option value="${escapeAttr(c.id)}">${escapeAttr(c.name)}</option>`).join('')}
+    </select>
+    <input class="login-code" type="text" maxlength="6" placeholder="Code" autocapitalize="characters">
+    <button class="login-submit" type="button">Log in</button>
+    <span class="login-error" style="display:none"></span>
+  `;
+  const select = bannerEl.querySelector('.login-char-sel');
+  const codeIn = bannerEl.querySelector('.login-code');
+  const submit = bannerEl.querySelector('.login-submit');
+  const errEl  = bannerEl.querySelector('.login-error');
+
+  // Prevent row-expand click swallowing form interactions
+  [select, codeIn, submit].forEach(el =>
+    el.addEventListener('click', (e) => e.stopPropagation()));
+
+  submit.addEventListener('click', async () => {
+    errEl.style.display = 'none';
+    if (!select.value) { errEl.style.display = 'inline'; errEl.textContent = 'Pick a character.'; return; }
+    if (!codeIn.value) { errEl.style.display = 'inline'; errEl.textContent = 'Enter your code.'; return; }
+    submit.disabled = true;
+    const r = await Auth.playerLogin(select.value, codeIn.value);
+    if (!r.ok) {
+      errEl.style.display = 'inline';
+      errEl.textContent = r.error || 'Login failed.';
+      submit.disabled = false;
+      return;
+    }
+    // Logged in. Refresh data once; on next render the banner becomes the form.
+    await refreshOnce();
+  });
 }
 
 poll();
