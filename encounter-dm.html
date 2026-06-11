@@ -222,6 +222,9 @@
     .enc-budget .enc-verdict.high     { color: var(--c-brass); }
     .enc-budget .enc-verdict.over     { color: #e88; }
 
+    /* ── Loot rows ── */
+    .loot-row { display: flex; gap: 6px; margin-bottom: 4px; }
+
     /* ── Wave rows (Tactical section) ── */
     .wave-row { display: flex; gap: 6px; margin-bottom: 4px; align-items: center; }
     .wave-row > * { font-size: 0.85rem; }
@@ -505,6 +508,7 @@
       document.getElementById('enc-identity-section').outerHTML = renderIdentity(enc);
       document.getElementById('enc-tactical-section').outerHTML = renderTactical(enc);
       document.getElementById('enc-playbook-section').outerHTML = renderPlaybook(enc);
+      document.getElementById('enc-loot-section').outerHTML = renderLoot(enc);
 
       // Sync party inputs only when not focused (avoid disrupting typing).
       const szEl = document.getElementById('enc-bp-party-size');
@@ -658,6 +662,49 @@
       const e = currentEncounter();
       const p = e.picks.find(x => x.pickKey === pickKey);
       if (p) { p.tactics = value; scheduleSave(); }
+    }
+
+    // ── Pre-staged loot section ──
+
+    function renderLoot(e) {
+      return `
+        <details class="enc-section" id="enc-loot-section"><summary>Pre-staged loot</summary>
+          <div id="loot-list">
+            ${e.loot.map((l, i) => `
+              <div class="loot-row">
+                <input type="text" value="${escapeHtml(l.name || '')}" placeholder="item"
+                       oninput="updateLoot(${i}, 'name', this.value)" style="flex:1">
+                <input type="number" min="1" value="${l.qty || 1}" placeholder="qty"
+                       oninput="updateLoot(${i}, 'qty', parseInt(this.value, 10) || 1)" style="width:60px">
+                <input type="text" value="${escapeHtml(l.value || '')}" placeholder="value"
+                       oninput="updateLoot(${i}, 'value', this.value)" style="width:80px">
+                <input type="text" value="${escapeHtml(l.notes || '')}" placeholder="notes"
+                       oninput="updateLoot(${i}, 'notes', this.value)" style="flex:1">
+                <button onclick="removeLoot(${i})">×</button>
+              </div>
+            `).join('')}
+          </div>
+          <button onclick="addLoot()">+ Add loot row</button>
+        </details>
+      `;
+    }
+
+    function updateLoot(i, key, value) {
+      currentEncounter().loot[i][key] = value;
+      scheduleSave();
+    }
+    function addLoot() {
+      currentEncounter().loot.push({
+        id: 'lt_' + Date.now() + Math.floor(Math.random() * 100000),
+        name: '', qty: 1, value: '—', notes: '',
+      });
+      scheduleSave();
+      renderEditor();
+    }
+    function removeLoot(i) {
+      currentEncounter().loot.splice(i, 1);
+      scheduleSave();
+      renderEditor();
     }
 
     function renderLaunchpad() {
