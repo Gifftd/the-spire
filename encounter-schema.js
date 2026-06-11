@@ -152,12 +152,12 @@
     }
 
     // Picks: cap + pickKey uniqueness (when present)
-    let keyed = null;  // null = picks wasn't an array, so we can't check pickKey refs
-
+    // keyed tracks valid pickKeys; stays empty when picks is missing/invalid,
+    // so any wave pickKey reference is correctly flagged as orphan.
+    const keyed = new Set();
     if (Array.isArray(e.picks)) {
       if (e.picks.length > CAPS.picks) push('picks', `too many picks (max ${CAPS.picks})`);
       const seen = new Set();
-      keyed = new Set();
       e.picks.forEach((p, i) => {
         if (p && typeof p.pickKey === 'string' && p.pickKey) {
           if (seen.has(p.pickKey)) push('picks', `duplicate pickKey "${p.pickKey}" at index ${i}`);
@@ -174,8 +174,7 @@
         if (typeof w.round !== 'number' || w.round < 1 || w.round > CAPS.waveRound) {
           push(`tactical.waves[${i}].round`, `round must be 1..${CAPS.waveRound}`);
         }
-        // pickKey referential integrity only fires when we have a keyed set from picks
-        if (keyed !== null && w.pickKey && !keyed.has(w.pickKey)) {
+        if (w.pickKey && !keyed.has(w.pickKey)) {
           push(`tactical.waves[${i}].pickKey`, `references missing pickKey "${w.pickKey}"`);
         }
       });

@@ -281,6 +281,15 @@
       assertEq(r.ok, false);
       assert(r.errors.some(x => x.field === 'locationRef.parentLocationId'), 'parentLocationId required');
     });
+
+    test('validateEncounter flags orphan wave pickKey when picks is missing', () => {
+      const e = EncounterSchema.newEncounter('OrphanNoPicks');
+      e.picks = undefined;  // no picks array at all
+      e.tactical.waves = [{ round: 2, pickKey: 'p1', count: 1 }];
+      const r = EncounterSchema.validateEncounter(e);
+      assertEq(r.ok, false);
+      assert(r.errors.some(x => x.field === 'tactical.waves[0].pickKey'), 'orphan wave detected');
+    });
   </script>
 </body>
 </html>

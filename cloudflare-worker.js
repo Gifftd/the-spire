@@ -449,14 +449,14 @@ function validateEncountersPayload(payload) {
         errors.push({ field: `[${i}].tactical.surprise`, message: `unknown surprise: ${e.tactical.surprise}` });
       }
     }
-    // Picks loop builds the `keyed` set used by wave referential check below.
-    let keyed = null;
+    // keyed tracks valid pickKeys; stays empty when picks is missing/invalid,
+    // so any wave pickKey reference is correctly flagged as orphan.
+    const keyed = new Set();
     if (Array.isArray(e.picks)) {
       if (e.picks.length > ENC_CAPS.picks) {
         errors.push({ field: `[${i}].picks`, message: `too many picks (max ${ENC_CAPS.picks})` });
       }
       const seen = new Set();
-      keyed = new Set();
       e.picks.forEach((p, pi) => {
         if (p && typeof p.pickKey === 'string' && p.pickKey) {
           if (seen.has(p.pickKey)) {
@@ -481,7 +481,7 @@ function validateEncountersPayload(payload) {
         if (typeof w.round !== 'number' || w.round < 1 || w.round > ENC_CAPS.waveRound) {
           errors.push({ field: `[${i}].tactical.waves[${wi}].round`, message: `round must be 1..${ENC_CAPS.waveRound}` });
         }
-        if (keyed !== null && w.pickKey && !keyed.has(w.pickKey)) {
+        if (w.pickKey && !keyed.has(w.pickKey)) {
           errors.push({ field: `[${i}].tactical.waves[${wi}].pickKey`, message: `references missing pickKey "${w.pickKey}"` });
         }
       });
@@ -1035,7 +1035,7 @@ export default {
         const errs = validateEncountersPayload(body.payload);
         if (errs.length) return json({ error: 'validation failed', details: errs }, 400);
         if (Array.isArray(body.payload)) {
-          const reqDate = new Date(request.headers.get('date') || Date.now()).toISOString();
+          const reqDate = new Date().toISOString();
           payload = body.payload.map(e => (e && typeof e === 'object') ? { ...e, updatedAt: reqDate } : e);
         }
       }
