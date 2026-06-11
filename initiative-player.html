@@ -820,8 +820,16 @@ function showCombat(s) {
     });
   }
 
+  // IMPORTANT: apply the .expanded class BEFORE attempting to restore focus.
+  // The new .row-expanded panels are display:none until they get .expanded,
+  // and you cannot focus a display:none element — calling .focus() on a
+  // hidden textarea silently fails, which is the entire reason typing
+  // appeared to be "impossible" earlier.
+  renderExpandedState();
+
   // Restore focus + cursor position to whichever textarea the user was
-  // typing in before the poll rebuilt the row.
+  // typing in before the poll rebuilt the row. Must run AFTER
+  // renderExpandedState so the textarea's row is display:block.
   if (focusedDraft) {
     const ta = document.querySelector(
       `.row-expanded[data-combatant-id="${CSS.escape(focusedDraft.combatantId)}"] .add-note-form textarea`
@@ -833,8 +841,6 @@ function showCombat(s) {
       catch { /* ignore — selection isn't critical */ }
     }
   }
-
-  renderExpandedState();
 }
 
 function buildStateUrl() {
