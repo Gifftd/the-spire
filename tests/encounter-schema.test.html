@@ -71,6 +71,31 @@
       assert(typeof e.createdAt === 'string', 'createdAt set');
       assertEq(e.lastOutcome, null);
     });
+
+    test('genPickKeys assigns p1, p2, ... in array order', () => {
+      const picks = [{ id: 'goblin' }, { id: 'orc' }, { id: 'goblin' }];
+      const out = EncounterSchema.genPickKeys(picks);
+      assertEq(out.map(p => p.pickKey), ['p1','p2','p3']);
+    });
+
+    test('genPickKeys preserves existing pickKeys when unique', () => {
+      const picks = [{ id: 'goblin', pickKey: 'pX' }, { id: 'orc' }];
+      const out = EncounterSchema.genPickKeys(picks);
+      assertEq(out.map(p => p.pickKey), ['pX','p1']);
+    });
+
+    test('genPickKeys resolves duplicate pickKeys by re-assigning later ones', () => {
+      const picks = [{ id: 'goblin', pickKey: 'p1' }, { id: 'orc', pickKey: 'p1' }];
+      const out = EncounterSchema.genPickKeys(picks);
+      assertEq(out[0].pickKey, 'p1');
+      assert(out[1].pickKey !== 'p1', 'duplicate must be re-assigned');
+    });
+
+    test('genPickKeys is idempotent on already-keyed picks', () => {
+      const picks = [{ id: 'g', pickKey: 'p1' }, { id: 'o', pickKey: 'p2' }];
+      const out = EncounterSchema.genPickKeys(picks);
+      assertEq(out.map(p => p.pickKey), ['p1','p2']);
+    });
   </script>
 </body>
 </html>

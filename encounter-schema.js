@@ -67,8 +67,32 @@
     };
   }
 
+  function genPickKeys(picks) {
+    if (!Array.isArray(picks)) return [];
+    const seen = new Set();
+    const out = picks.map(p => ({ ...p }));
+    // Pass 1: keep unique existing keys.
+    out.forEach(p => {
+      if (typeof p.pickKey === 'string' && p.pickKey && !seen.has(p.pickKey)) {
+        seen.add(p.pickKey);
+      } else {
+        p.pickKey = null;
+      }
+    });
+    // Pass 2: assign the lowest unused pN to the unkeyed.
+    let n = 1;
+    out.forEach(p => {
+      if (p.pickKey == null) {
+        while (seen.has('p' + n)) n++;
+        p.pickKey = 'p' + n;
+        seen.add(p.pickKey);
+      }
+    });
+    return out;
+  }
+
   global.EncounterSchema = {
     STATUSES, LIGHTING, SURPRISE, NPC_ROLES, LOCATION_REF_KINDS, OUTCOMES, CAPS,
-    newEncounter, genId,
+    newEncounter, genId, genPickKeys,
   };
 })(typeof window !== 'undefined' ? window : globalThis);
