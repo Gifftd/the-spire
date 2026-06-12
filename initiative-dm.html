@@ -2018,7 +2018,10 @@ function loadAllPicks(){
         // surface a Minion/Solo chip without re-looking-up the bestiary.
         bestiaryCategory: m.isMinion ? 'minion'
                        : m.isSolo ? 'solo'
-                       : (m.fmCategory && m.fmCategory !== 'standard' ? m.fmCategory : '')
+                       : (m.fmCategory && m.fmCategory !== 'standard' ? m.fmCategory : ''),
+        // Propagate pickKey so wave reminders can identify which pick a
+        // combatant came from (set when staging from an Anvil encounter).
+        pickKey: p.pickKey || null
       };
       state.combatants.push(c);
       if (mode === 'combat') snapshotCombatant(c);
@@ -2747,8 +2750,88 @@ async function handleStageParam() {
   stageEncounter(enc);
 }
 
-// Stub replaced in Task 4.3.
-function stageEncounter(enc) { console.log('Phase 4A stub: stageEncounter', enc); }
+function stageEncounter(enc) {
+  // Clear the current roster. PCs survive into the next encounter via
+  // the carryover modal in normal flow, but when staging from a URL
+  // the DM has already confirmed the discard, so we remove everything.
+  state.combatants = [];
+  state.round = 1;
+  state.activeIndex = 0;
+  mode = 'lobby';
+  expandedIds.clear();
+  statblockOpenIds.clear();
+
+  // Bridge to the existing bestiary add-picks code path.
+  _BP.picks = (enc.picks || []).map(p => ({
+    id: p.id,
+    qty: (p.qty > 0 ? p.qty : 1),
+    rollHp: !!p.rollHp,
+    hpOverride: Number.isFinite(p.hpOverride) ? p.hpOverride : null,
+    rollInit: !!p.rollInit,
+    initOverride: Number.isFinite(p.initOverride) ? p.initOverride : null,
+    hidden: !!p.hidden,
+    pickKey: p.pickKey || null,
+    startingConditions: Array.isArray(p.startingConditions) ? p.startingConditions : [],
+    expanded: false
+  }));
+
+  // Spawn the combatants using the existing bestiary add path.
+  // loadAllPicks() empties _BP.picks, closes the picker modal, then
+  // calls render() + pushState(). We re-open from here if needed.
+  // Since the picker modal is not open, closeBestiaryPicker() is a no-op.
+  loadAllPicks();
+
+  // Apply staging metadata (surprise flags + starting conditions).
+  // combatants have been pushed to state.combatants by loadAllPicks().
+  applyStagingMetadata(enc);
+
+  // Record the encounter association on the window so pushState() can
+  // include it on the next write.
+  window.encounterId = enc.id;
+  window.encounterStagedAt = new Date().toISOString();
+  pushState();
+
+  // Flip the encounter status to 'live' in KV (best-effort).
+  markEncounterStatusLive(enc.id);
+
+  // Read-aloud banner (Task 4.4).
+  if (enc.tactical && enc.tactical.readAloud) {
+    showReadAloudBanner(enc.tactical.readAloud, enc.name);
+  }
+
+  // Wave reminders (Task 4.5).
+  stagedWaves = (enc.tactical && Array.isArray(enc.tactical.waves)) ? enc.tactical.waves.slice() : [];
+  checkWaveReminders();
+
+  updateModeUI();
+}
+
+function applyStagingMetadata(enc) {
+  const tactical = enc.tactical || {};
+  // Build a lookup of startingConditions by pickKey.
+  const condsByPickKey = {};
+  (enc.picks || []).forEach(p => {
+    if (p.pickKey) condsByPickKey[p.pickKey] = Array.isArray(p.startingConditions) ? p.startingConditions : [];
+  });
+
+  state.combatants.forEach(c => {
+    // Apply starting conditions from the pick this combatant came from.
+    if (c.pickKey && condsByPickKey[c.pickKey] && condsByPickKey[c.pickKey].length) {
+      c.conditions = (Array.isArray(c.conditions) ? c.conditions : []).concat(condsByPickKey[c.pickKey]);
+    }
+    // Surprise: tag combatants based on tactical.surprise setting.
+    const surprise = tactical.surprise || 'none';
+    if (surprise === 'monsters' || surprise === 'both') {
+      if (c.type === 'enemy') c.surprised = true;
+    }
+    if (surprise === 'party' || surprise === 'both') {
+      if (c.type === 'pc') c.surprised = true;
+    }
+  });
+}
+
+// Stub for Task 4.6 (implemented below).
+async function markEncounterStatusLive(id) { /* implemented in Task 4.6 */ }
 </script>
 </body>
 </html>
