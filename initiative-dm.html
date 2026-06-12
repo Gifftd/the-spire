@@ -883,6 +883,8 @@ let expandedIds = new Set();
 // Combatant cards whose stat-block panel is currently open. Only valid for
 // combatants spawned via the Bestiary picker (`bestiaryId` set).
 let statblockOpenIds = new Set();
+// Waves queued from a staged encounter: [{ round, pickKey, count, fromDirection }]
+let stagedWaves = [];
 let addType     = 'pc';
 let dragSrc     = null;
 let syncTimer   = null;
@@ -2098,7 +2100,10 @@ function removeCustomCondition(cond) {
 function nextTurn() {
   if (state.combatants.length === 0 || mode !== 'combat') return;
   state.activeIndex = (state.activeIndex + 1) % state.combatants.length;
-  if (state.activeIndex === 0) state.round++;
+  if (state.activeIndex === 0) {
+    state.round++;
+    checkWaveReminders();
+  }
   render(); pushState();
 }
 function sortByInit() { state.combatants.sort((a,b)=>b.init-a.init); state.activeIndex=0; render(); pushState(); }
@@ -2866,6 +2871,76 @@ function showReadAloudBanner(text, name) {
 
 function dismissReadAloud() {
   document.getElementById('readaloud-banner')?.remove();
+}
+
+// ── Wave reminders ──
+function getOrCreateWaveArea() {
+  let root = document.getElementById('wave-reminder-area');
+  if (!root) {
+    root = document.createElement('div');
+    root.id = 'wave-reminder-area';
+    const col = document.querySelector('.combatant-col');
+    if (col) {
+      const list = document.getElementById('combatant-list');
+      col.insertBefore(root, list || col.firstChild);
+    } else {
+      document.body.insertBefore(root, document.body.firstChild);
+    }
+  }
+  return root;
+}
+
+function checkWaveReminders() {
+  // Only show reminders if waves were staged for this encounter.
+  if (!stagedWaves.length) return;
+  const root = getOrCreateWaveArea();
+  const round = state.round;
+  const due = stagedWaves.filter(w => w.round === round + 1);
+  if (!due.length) { root.innerHTML = ''; return; }
+  root.innerHTML = due.map((w, idx) => {
+    // Look up the monster name from the bestiary if available.
+    const pick = _BP.picks.find(p => p.pickKey === w.pickKey);
+    const monsterName = pick
+      ? ((_BP.monsters.find(m => m.id === pick.id) || {}).name || pick.id || w.pickKey)
+      : (w.pickKey || 'Unknown');
+    const safeKey  = escapeHtml(String(w.pickKey || ''));
+    const safeDir  = w.fromDirection ? ' from ' + escapeHtml(w.fromDirection) : '';
+    const safeNote = w.note ? ' — ' + escapeHtml(w.note) : '';
+    return '<div style="padding:8px 14px;background:#4a3a2a;border-left:4px solid var(--c-brass);' +
+      'border-radius:var(--radius);margin:6px 0;font-family:\'Crimson Text\',Georgia,serif">' +
+      '<div style="font-family:\'Cinzel\',serif;font-size:0.7rem;letter-spacing:0.1em;' +
+      'color:var(--c-brass);margin-bottom:4px">Wave incoming — Round ' + (round + 1) + '</div>' +
+      '<span style="color:var(--c-ink)">' + (w.count || 1) + ' × ' + escapeHtml(monsterName) + safeDir + safeNote + '</span> ' +
+      '<button onclick="spawnWave(\'' + safeKey + '\',' + (w.round) + ')" ' +
+      'style="font-family:\'Cinzel\',serif;font-size:0.6rem;letter-spacing:0.08em;padding:3px 10px;' +
+      'background:none;border:1px solid var(--c-brass);border-radius:2px;color:var(--c-brass);cursor:pointer;margin-left:8px">' +
+      'Add wave</button>' +
+      '</div>';
+  }).join('');
+}
+
+function spawnWave(pickKey, waveRound) {
+  // Find the wave definition.
+  const wave = stagedWaves.find(w => w.pickKey === pickKey && w.round === waveRound);
+  if (!wave) return;
+  // Find the pick in _BP.picks (bridged from the staged encounter).
+  const pick = _BP.picks.find(p => p.pickKey === pickKey);
+  if (!pick) {
+    alert('Cannot spawn wave — pick "' + pickKey + '" not found in current pick list.\nTry adding the monster manually via the bestiary.');
+    return;
+  }
+  // Temporarily override picks with just this wave pick at the requested count,
+  // then call the standard add path, then restore.
+  const savedPicks = _BP.picks;
+  _BP.picks = [{ ...pick, qty: wave.count || 1 }];
+  // loadAllPicks() empties _BP.picks, closes picker, calls render+pushState.
+  // We restore savedPicks (minus the spawned wave) after.
+  loadAllPicks();
+  // Restore the remaining picks (minus the ones loadAllPicks consumed).
+  _BP.picks = savedPicks;
+  // Remove the spawned wave from the queue and refresh banners.
+  stagedWaves = stagedWaves.filter(w => !(w.pickKey === pickKey && w.round === waveRound));
+  checkWaveReminders();
 }
 </script>
 </body>
