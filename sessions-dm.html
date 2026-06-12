@@ -839,6 +839,12 @@ body { display: flex; flex-direction: column; }
         <textarea id="f-dmNotes" rows="5" placeholder="What actually happened. Threads opened, threads closed, who said what."></textarea>
       </div>
 
+      <div id="session-encounters-panel" style="margin-top:1rem;padding:8px;border:1px solid var(--c-border-light);border-radius:3px">
+        <div style="font-family:Cinzel,serif;font-size:0.66rem;letter-spacing:0.1em;color:var(--c-brass);margin-bottom:6px;text-transform:uppercase">Encounters planned</div>
+        <div id="session-encounters-list">—</div>
+        <button onclick="newEncounterForCurrentSession()" style="margin-top:6px">+ Add encounter to this session</button>
+      </div>
+
       <div class="action-row">
         <button class="btn btn--brass" onclick="saveSession()">SAVE</button>
         <button class="btn btn--ghost" onclick="cancelEdit()">CANCEL</button>
@@ -954,6 +960,7 @@ body { display: flex; flex-direction: column; }
 </div>
 
 <script src="auth.js"></script>
+<script src="encounter-schema.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════════
 //  Chronicle Workshop — sessions-dm.html
@@ -1061,6 +1068,8 @@ async function loadAll() {
   if (Array.isArray(np)) { npcs = np; localStorage.setItem('dm_npcs', JSON.stringify(np)); }
   if (md && md.locations) { worldData = md; localStorage.setItem('dm_map_data', JSON.stringify(md)); }
   renderList(); renderEditor(); renderSidebar();
+  // Pre-warm encounter cache so the session-list tally is available on first render.
+  ensureEncountersLoaded().then(() => renderList()).catch(() => {});
   setStatus('Saved', 'ok');
 }
 
@@ -1081,6 +1090,42 @@ function escapeHtml(s) {
 }
 function uid() { return 'tle_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 function lootUid() { return 'lt_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+// ── Encounters planned (Task 5.2) ────────────────────────────────
+async function ensureEncountersLoaded() {
+  if (window.allEncounters) return window.allEncounters;
+  const r = await fetch(WORKER_URL + '?type=encounters', { headers: Auth.dmHeaders(), cache: 'no-store' });
+  const arr = r.ok ? await r.json() : [];
+  window.allEncounters = (arr || []).map(EncounterSchema.migrateInMemory);
+  return window.allEncounters;
+}
+
+async function renderSessionEncounters(entry) {
+  if (!entry) {
+    document.getElementById('session-encounters-list').textContent = 'Save the session first to bind encounters.';
+    return;
+  }
+  const all = await ensureEncountersLoaded();
+  const matches = all.filter(e => e.sessionId === entry.id);
+  const root = document.getElementById('session-encounters-list');
+  if (!matches.length) {
+    root.innerHTML = '<em>None yet.</em>';
+    return;
+  }
+  root.innerHTML = matches.map(e => `
+    <div style="padding:4px 0">
+      <a href="encounter-dm.html?id=${encodeURIComponent(e.id)}" style="color:var(--c-brass)">${escapeHtml(e.name || '(untitled)')}</a>
+      <span style="font-size:0.7rem;color:var(--c-ink-faint);margin-left:6px">${e.status} · ${e.picks.length} monster${e.picks.length === 1 ? '' : 's'}</span>
+    </div>
+  `).join('');
+}
+
+function newEncounterForCurrentSession() {
+  const id = editingId;
+  if (!id || id === '__new__') { alert('Save the session first.'); return; }
+  location.href = 'encounter-dm.html?newFor=' + encodeURIComponent(id);
+}
+// ────────────────────────────────────────────────────────────────
 
 function entriesAll() { return timeline.slice(); }   // all kinds
 function normalizeKind(k) { return VALID_KINDS.includes(k) ? k : 'event'; }
@@ -1478,6 +1523,12 @@ function renderList() {
     const num = (k === 'session') ? sessionNumber(s) : '';
     const attN = (s.attendance || []).length;
     const date = (s.dateReal || s.dateSort || '').slice(0, 10);
+    const planned = (window.allEncounters || []).filter(e => e.sessionId === s.id);
+    const encTally = planned.length ? (() => {
+      const ready = planned.filter(e => e.status === 'ready' || e.status === 'scheduled').length;
+      const draft = planned.length - ready;
+      return `<span style="font-size:0.7rem;color:var(--c-ink-faint);margin-left:6px">${planned.length} enc: ${ready} ready, ${draft} draft</span>`;
+    })() : '';
     return `<div class="entry-card kind-${k} ${sel}" onclick="selectSession('${s.id}')">
       <div class="entry-card-row">
         <span class="entry-card-kind kind-${k}">${k}</span>
@@ -1489,6 +1540,7 @@ function renderList() {
         ${attN ? `<span class="att">${attN} attended</span>` : ''}
         ${s.combats?.length ? `<span>⚔ ${s.combats.length}</span>` : ''}
         ${s.loot?.length ? `<span>◆ ${s.loot.length} loot</span>` : ''}
+        ${encTally}
       </div>
     </div>`;
   };
@@ -1601,6 +1653,11 @@ function renderEditor() {
   renderChips();
   renderLoot();
   renderCombats();
+  // Render encounters panel — pass null for new/unsaved entries
+  const entryForPanel = (editingId && editingId !== '__new__')
+    ? (timeline.find(t => t.id === editingId) || null)
+    : null;
+  renderSessionEncounters(entryForPanel);
 }
 
 function onKindChange() {
