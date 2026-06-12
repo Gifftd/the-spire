@@ -483,23 +483,6 @@ body {
 .bestiary-cat-chip.villain-party { border: 1px solid #b07ac8; color: #d4a3e8; background: rgba(140,90,180,0.10); }
 .bestiary-empty-note { padding: 1.5rem 1rem; text-align: center; color: var(--ink-faint); font-style: italic; font-size: 0.9rem; }
 
-/* Saved encounters */
-.bestiary-enc-head { display: flex; justify-content: space-between; align-items: center; font-family: 'Cinzel', serif; font-size: 0.66rem; letter-spacing: 0.1em; color: var(--gold); margin: 0.8rem 0 0.3rem; text-transform: uppercase; }
-.bestiary-enc-head .enc-save { font-family: 'Cinzel', serif; font-size: 0.55rem; letter-spacing: 0.08em; padding: 3px 9px; background: var(--bg); border: 1px solid var(--gold); border-radius: 2px; color: var(--gold); cursor: pointer; }
-.bestiary-enc-head .enc-save:hover { background: rgba(184,138,90,0.18); }
-.bestiary-enc-head .enc-save:disabled { opacity: 0.35; cursor: not-allowed; }
-.bestiary-enc-list { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); max-height: 15vh; overflow-y: auto; }
-.bestiary-enc-list .empty { padding: 0.5rem; text-align: center; color: var(--ink-faint); font-style: italic; font-size: 0.84rem; }
-.enc-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-bottom: 1px solid var(--border); cursor: pointer; }
-.enc-row:last-child { border-bottom: none; }
-.enc-row:hover { background: var(--surface); }
-.enc-nm { flex: 1; font-size: 0.88rem; color: var(--ink); min-width: 0; }
-.enc-nm small { display: block; font-family: 'Cinzel', serif; font-size: 0.52rem; color: var(--ink-faint); letter-spacing: 0.08em; }
-.enc-actions { display: flex; gap: 4px; }
-.enc-actions button { background: none; border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink-dim); padding: 2px 8px; font-family: 'Cinzel', serif; font-size: 0.55rem; letter-spacing: 0.08em; cursor: pointer; }
-.enc-actions button:hover { color: var(--ink); border-color: var(--gold); }
-.enc-actions button.danger:hover { color: #e88; border-color: #844; }
-
 /* Picks cart */
 .bestiary-cart-head { display: flex; justify-content: space-between; align-items: center; font-family: 'Cinzel', serif; font-size: 0.66rem; letter-spacing: 0.1em; color: var(--gold); margin: 0.8rem 0 0.3rem; text-transform: uppercase; }
 .bestiary-cart-head .clear-picks { font-family: 'Cinzel', serif; font-size: 0.55rem; letter-spacing: 0.08em; padding: 3px 8px; background: none; border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink-faint); cursor: pointer; }
@@ -885,6 +868,9 @@ let expandedIds = new Set();
 let statblockOpenIds = new Set();
 // Waves queued from a staged encounter: [{ round, pickKey, count, fromDirection }]
 let stagedWaves = [];
+// Map of pickKey → original encounter pick, captured at stage time so wave
+// reminders and spawnWave can resolve picks even after loadAllPicks() empties _BP.picks.
+let stagedPicksByKey = {};
 let addType     = 'pc';
 let dragSrc     = null;
 let syncTimer   = null;
@@ -2810,6 +2796,8 @@ function stageEncounter(enc) {
   }
 
   // Wave reminders (Task 4.5).
+  stagedPicksByKey = {};
+  (enc.picks || []).forEach(p => { if (p.pickKey) stagedPicksByKey[p.pickKey] = p; });
   stagedWaves = (enc.tactical && Array.isArray(enc.tactical.waves)) ? enc.tactical.waves.slice() : [];
   checkWaveReminders();
 
@@ -2919,8 +2907,9 @@ function checkWaveReminders() {
   const due = stagedWaves.filter(w => w.round === round + 1);
   if (!due.length) { root.innerHTML = ''; return; }
   root.innerHTML = due.map((w, idx) => {
-    // Look up the monster name from the bestiary if available.
-    const pick = _BP.picks.find(p => p.pickKey === w.pickKey);
+    // Look up the monster name from the staged picks snapshot (stagedPicksByKey),
+    // since _BP.picks is drained by loadAllPicks() after staging.
+    const pick = stagedPicksByKey[w.pickKey];
     const monsterName = pick
       ? ((_BP.monsters.find(m => m.id === pick.id) || {}).name || pick.id || w.pickKey)
       : (w.pickKey || 'Unknown');
@@ -2944,8 +2933,9 @@ function spawnWave(pickKey, waveRound) {
   // Find the wave definition.
   const wave = stagedWaves.find(w => w.pickKey === pickKey && w.round === waveRound);
   if (!wave) return;
-  // Find the pick in _BP.picks (bridged from the staged encounter).
-  const pick = _BP.picks.find(p => p.pickKey === pickKey);
+  // Find the pick from the staged picks snapshot (stagedPicksByKey),
+  // since _BP.picks is drained by loadAllPicks() after staging.
+  const pick = stagedPicksByKey[pickKey];
   if (!pick) {
     alert('Cannot spawn wave — pick "' + pickKey + '" not found in current pick list.\nTry adding the monster manually via the bestiary.');
     return;
