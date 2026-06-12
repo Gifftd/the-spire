@@ -281,6 +281,8 @@
       selectedId: null,
     };
 
+    let hadV1OnLoad = false;
+
     async function loadAll() {
       const headers = Auth.dmHeaders();
       const [encs, world, npcs, tl] = await Promise.all([
@@ -289,7 +291,9 @@
         fetch(WORKER_URL + '?type=npcs', { headers, cache: 'no-store' }).then(r => r.json()),
         fetch(WORKER_URL + '?type=timeline_dm', { headers, cache: 'no-store' }).then(r => r.json()),
       ]);
-      state.encounters = (Array.isArray(encs) ? encs : []).map(EncounterSchema.migrateInMemory);
+      const rawEncs = Array.isArray(encs) ? encs : [];
+      hadV1OnLoad = rawEncs.some(r => !r || r.schemaVersion !== 2);
+      state.encounters = rawEncs.map(EncounterSchema.migrateInMemory);
       // If a selection was set (e.g., from URL param in future tasks), make sure
       // the picker state mirrors that encounter's picks on first render.
       if (state.selectedId && typeof syncPicksFromEncounter === 'function') {
@@ -334,9 +338,22 @@
       renderLaunchpad();
     }
 
+    async function migrateAllToV2() {
+      await saveEncounters();
+      hadV1OnLoad = false;
+      render();
+    }
+
     function renderLibrary() {
       const root = document.getElementById('library-list');
       root.innerHTML = '<button id="new-btn" onclick="createEncounter()">+ New encounter</button>';
+      if (hadV1OnLoad) {
+        root.insertAdjacentHTML('beforeend', `
+          <button id="migrate-btn" onclick="migrateAllToV2()" style="width:100%;margin-bottom:8px;padding:6px;background:#5a4030;color:var(--c-ink);border:1px solid var(--c-border);border-radius:3px;font-family:Cinzel,serif;cursor:pointer;font-size:0.75rem">
+            Persist v2 migration (${state.encounters.length} record${state.encounters.length === 1 ? '' : 's'})
+          </button>
+        `);
+      }
       if (!state.encounters.length) {
         root.insertAdjacentHTML('beforeend', '<div class="empty-state">No encounters yet.</div>');
         return;
