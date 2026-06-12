@@ -2689,12 +2689,15 @@ async function exportToChronicle() {
   const combat = buildCombatObject();
   const loot   = collectLoot();
   const sel    = document.getElementById('exp-session-select').value;
+  let timelineEntryId = null; // captured for encounter resolution (Task 4.8)
 
   if (sel === '__new__') {
+    const newId       = 'tl_' + Date.now() + Math.floor(Math.random()*1000);
+    timelineEntryId   = newId;
     const title      = document.getElementById('exp-new-session-title').value.trim() || combat.title;
     const dateInGame = document.getElementById('exp-new-session-date').value.trim();
     chronicleAll.push({
-      id: 'tl_' + Date.now() + Math.floor(Math.random()*1000),
+      id: newId,
       title, kind: 'session',
       dateInGame, dateSort: '', dateReal: new Date().toISOString().slice(0,10),
       body: combat.summary || '',
@@ -2703,6 +2706,7 @@ async function exportToChronicle() {
       combats: [combat], loot
     });
   } else {
+    timelineEntryId = sel;
     const entry = chronicleAll.find(e => e.id === sel);
     if (!entry) { alert('That session is gone — reopen the export to refresh.'); return; }
     entry.combats = Array.isArray(entry.combats) ? entry.combats : [];
@@ -2731,6 +2735,10 @@ async function exportToChronicle() {
       // Refresh the banner in case the user exported a recovered draft.
       renderDraftBanner();
     }
+    // Resolve the staged encounter to 'completed' (Task 4.8).
+    if (window.encounterId) {
+      await resolveEncounterAfterExport(window.encounterId, timelineEntryId);
+    }
     setSyncStatus('ok', '✦ Added to Chronicle');
     setTimeout(() => setSyncStatus('', ''), 3000);
     closeExport();
@@ -2738,6 +2746,60 @@ async function exportToChronicle() {
     btn.disabled = false; btn.textContent = 'Add to Chronicle';
     alert('Could not reach the Chronicle. Try again.');
   }
+}
+
+// Map the export modal's outcome dropdown value to an EncounterSchema OUTCOME.
+// Modal values: "Victory", "Defeat", "Retreat", "Stalemate", "Pyrrhic Victory".
+// Schema OUTCOMES: 'won', 'tpk', 'fled', 'skipped'.
+function _modalOutcomeToSchemaOutcome(modalValue) {
+  if (!modalValue) return null;
+  switch (modalValue) {
+    case 'Victory':         return 'won';
+    case 'Pyrrhic Victory': return 'won';
+    case 'Defeat':          return 'tpk';
+    case 'Retreat':         return 'fled';
+    default:                return null; // Stalemate and unknowns → null
+  }
+}
+
+// Write encounter status='completed' to KV after a successful timeline write.
+// Best-effort: shows a toast on failure rather than blocking the export.
+async function resolveEncounterAfterExport(encId, timelineEntryId) {
+  const outcomeEl = document.getElementById('exp-outcome');
+  const outcome = _modalOutcomeToSchemaOutcome(outcomeEl ? outcomeEl.value : null);
+  const headers = Auth.dmHeaders();
+  try {
+    const arr = await fetch(WORKER_URL + '?type=encounters', { headers, cache: 'no-store' }).then(r => r.json());
+    const merged = (Array.isArray(arr) ? arr : []).map(EncounterSchema.migrateInMemory).map(e =>
+      e.id === encId ? {
+        ...e,
+        status: 'completed',
+        resolvedAt: new Date().toISOString(),
+        resolvedInTimelineId: timelineEntryId,
+        lastOutcome: outcome,
+      } : e
+    );
+    await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'encounters', payload: merged }),
+    });
+    // Clear the encounter context so a re-export doesn't re-resolve.
+    window.encounterId = null;
+    window.encounterStagedAt = null;
+    _stagedEncCache = null;
+  } catch (e) {
+    console.warn('Encounter resolution write failed:', e);
+    showExportToast('Encounter status didn\'t update — refresh the builder and mark complete manually.');
+  }
+}
+
+function showExportToast(msg) {
+  const t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#5a4030;color:#e8e6df;padding:10px 14px;border-radius:4px;font-family:Crimson Text,serif;z-index:2000;';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 6000);
 }
 
 ['exp-title','exp-date','exp-location','exp-outcome','exp-session','exp-summary'].forEach(id => {
