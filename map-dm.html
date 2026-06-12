@@ -2112,7 +2112,10 @@ async function renderLocEncounters(loc) {
     document.getElementById('loc-encounters-list').textContent = 'Save the location first to bind encounters.';
     return;
   }
+  const requestedLocId = loc.id;  // capture at call time
   const all = await ensureEncountersLoaded();
+  // If the user opened a different location while we were awaiting, abort.
+  if (editingLocId !== requestedLocId) return;
   const ref = inSubMap()
     ? { kind: 'submap', parentLocationId: subMapStack[subMapStack.length - 1]?.parentLocationId, locationId: loc.id }
     : { kind: 'world', locationId: loc.id };

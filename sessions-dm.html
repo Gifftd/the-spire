@@ -1105,7 +1105,10 @@ async function renderSessionEncounters(entry) {
     document.getElementById('session-encounters-list').textContent = 'Save the session first to bind encounters.';
     return;
   }
+  const requestedId = entry.id;  // capture at call time
   const all = await ensureEncountersLoaded();
+  // If the user opened a different session while we were awaiting, abort.
+  if (editingId !== requestedId) return;
   const matches = all.filter(e => e.sessionId === entry.id);
   const root = document.getElementById('session-encounters-list');
   if (!matches.length) {

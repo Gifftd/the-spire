@@ -1354,12 +1354,15 @@ loadBestiary().catch(e => console.warn('Bestiary preload failed', e));
   const headers = Auth.dmHeaders ? Auth.dmHeaders() : {};
   let arr;
   try {
-    arr = await fetch(WORKER_URL + '?type=encounters', { headers, cache: 'no-store' }).then(r => r.json());
+    const r = await fetch(WORKER_URL + '?type=encounters', { headers, cache: 'no-store' });
+    if (!r.ok) { alert('Could not load encounter (HTTP ' + r.status + ').'); return; }
+    arr = await r.json();
   } catch (e) {
     alert('Could not load encounter: ' + (e.message || e));
     return;
   }
-  const enc = (arr || []).map(EncounterSchema.migrateInMemory).find(e => e.id === id);
+  if (!Array.isArray(arr)) { alert('Could not load encounter: unexpected response from server.'); return; }
+  const enc = arr.map(EncounterSchema.migrateInMemory).find(e => e.id === id);
   if (!enc) {
     alert('Encounter not found.');
     return;
