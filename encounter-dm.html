@@ -953,6 +953,13 @@
       scheduleSave();
       render();
     }
+    // Deletion semantics: this removes the encounter from local state and the
+    // next save POSTs the array without it. If another Anvil tab is open with
+    // the same encounter in its local state, that tab's next save will re-insert
+    // the encounter (re-fetch-and-splice merges local-wins). True durable
+    // deletion across tabs would require a tombstone field on the encounter
+    // record or a server-side delete endpoint. Acceptable limitation for a
+    // single-DM tool.
     function deleteEncounter() {
       const e = currentEncounter();
       if (!e) return;

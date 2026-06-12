@@ -2465,13 +2465,11 @@ async function _fetchAndPreFillEncounter(encId) {
       updatePreview();
     }
 
-    // Location — free-text field; use the locationId as a hint (DM can refine).
-    // We store it only if the field is still empty.
-    const locEl = document.getElementById('exp-location');
-    if (locEl && !locEl.value && enc.locationRef && enc.locationRef.locationId) {
-      locEl.value = enc.locationRef.locationId;
-      updatePreview();
-    }
+    // Location: encounter.locationRef stores a machine id, not a human name.
+    // The export modal's location field is free-text; pre-filling with the
+    // raw id would write a slug like "loc_..." into the Chronicle entry.
+    // Better to let the DM type the name. The encounter still tracks the
+    // canonical locationRef in The Anvil for filtering/binding purposes.
 
     // Session binding — populateSessionSelect() will apply this once the
     // chronicle section is opened and chronicleAll is loaded.
@@ -2487,7 +2485,7 @@ async function _fetchAndPreFillEncounter(encId) {
     }
 
     // NPC participation: export modal has no NPC field — skip.
-    console.log('Encounter pre-fill applied:', enc.name, '— no NPC field in export modal, skipping NPC pre-fill');
+    console.debug('Encounter pre-fill applied:', enc.name, '— no NPC field in export modal, skipping NPC pre-fill');
   } catch (err) {
     console.warn('Encounter pre-fill failed:', err);
     // Don't block the export — modal is already open.
@@ -2563,6 +2561,15 @@ function downloadLog() {
   const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([md],{type:'text/markdown'})), download: filename });
   a.click(); URL.revokeObjectURL(a.href);
   closeExport();
+  // Download-only path: no Chronicle write happened, so no automatic
+  // resolution. Clear the staging pointer so the next combat doesn't
+  // inherit it, and prompt the DM to mark it complete manually.
+  if (window.encounterId) {
+    showExportToast('Combat downloaded — mark the encounter complete in The Anvil.');
+    window.encounterId = null;
+    window.encounterStagedAt = null;
+    _stagedEncCache = null;
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2970,13 +2977,20 @@ function applyStagingMetadata(enc) {
     if (c.pickKey && condsByPickKey[c.pickKey] && condsByPickKey[c.pickKey].length) {
       c.conditions = (Array.isArray(c.conditions) ? c.conditions : []).concat(condsByPickKey[c.pickKey]);
     }
-    // Surprise: tag combatants based on tactical.surprise setting.
+    // Surprise: push 'Surprised' condition so it appears as a visible badge,
+    // consistent with startingConditions. (Setting c.surprised is not read anywhere.)
     const surprise = tactical.surprise || 'none';
     if (surprise === 'monsters' || surprise === 'both') {
-      if (c.type === 'enemy') c.surprised = true;
+      if (c.type === 'enemy') {
+        c.conditions = c.conditions || [];
+        if (!c.conditions.includes('Surprised')) c.conditions.push('Surprised');
+      }
     }
     if (surprise === 'party' || surprise === 'both') {
-      if (c.type === 'pc') c.surprised = true;
+      if (c.type === 'pc') {
+        c.conditions = c.conditions || [];
+        if (!c.conditions.includes('Surprised')) c.conditions.push('Surprised');
+      }
     }
   });
 }
