@@ -104,6 +104,8 @@ in the library whenever v1 records are detected on load — clicking it calls
 - Home page (`home.html`): "The Anvil" card appears in the Keeper's Wing;
   existing card ordering may shift.
 
+**UX polish pass (post-Phase 3D).** Three user-reported blocking bugs fixed in `encounter-dm.html`: (1) Topbar was empty — the existing `#topbar` div is now populated with a "← The Spire" home link, "The Anvil" page title, a DM role chip, the signed-in username, and a Sign out button. (2) Cursor was lost every ~600ms while typing and expanded `<details>` sections collapsed at the same cadence — root cause was `saveEncounters()` success path calling `render()`, which `outerHTML`-swapped the focused input; fixed by removing `render()` from that path (all mutation paths already update the UI surgically). `renderLaunchpad()` is now also called from `updateField` when the path is `'status'` so the launchpad's status pill stays in sync without a full re-render. (3) Structural mutations (`addWave`, `addLoot`, `addNpcRole`, `setLocationRef`) invoke `renderEditor()` which `outerHTML`-swaps the 5 non-Combatants sections; any `<details>` the DM had opened would silently collapse — fixed by capturing `open` state before the swaps and restoring it after.
+
 **Manual UI checklist (post-deploy):**
 - [ ] Sign in as DM → home shows "The Anvil" card in Keeper's Wing.
 - [ ] Open The Anvil → existing saved encounters appear in the library with
