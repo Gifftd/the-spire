@@ -2332,6 +2332,11 @@ async function pushState() {
         conditions: c.conditions, dead: c.dead
       }))
     };
+    // Stamp encounter association when a staged encounter is active.
+    if (window.encounterId) {
+      playerState.encounterId      = window.encounterId;
+      playerState.encounterStagedAt = window.encounterStagedAt;
+    }
 
     // Build the draft snapshot if there's an active combat. Drafts are
     // saved in parallel with the player state; a failure here does not
@@ -2835,8 +2840,24 @@ function applyStagingMetadata(enc) {
   });
 }
 
-// Stub for Task 4.6 (implemented below).
-async function markEncounterStatusLive(id) { /* implemented in Task 4.6 */ }
+async function markEncounterStatusLive(id) {
+  const headers = Auth.dmHeaders();
+  try {
+    const arr = await fetch(WORKER_URL + '?type=encounters', { headers, cache: 'no-store' }).then(r => r.json());
+    const merged = (Array.isArray(arr) ? arr : [])
+      .map(EncounterSchema.migrateInMemory)
+      .map(e => e.id === id
+        ? { ...e, status: 'live', lastStagedAt: new Date().toISOString() }
+        : e);
+    await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'encounters', payload: merged }),
+    });
+  } catch (e) {
+    console.warn('markEncounterStatusLive failed:', e);
+  }
+}
 
 // ── Read-aloud banner ──
 function showReadAloudBanner(text, name) {
