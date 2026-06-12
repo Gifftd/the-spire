@@ -2832,6 +2832,41 @@ function applyStagingMetadata(enc) {
 
 // Stub for Task 4.6 (implemented below).
 async function markEncounterStatusLive(id) { /* implemented in Task 4.6 */ }
+
+// ── Read-aloud banner ──
+function showReadAloudBanner(text, name) {
+  let bar = document.getElementById('readaloud-banner');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'readaloud-banner';
+    bar.style.cssText = [
+      'padding:10px 14px',
+      'background:#3a4a3a',
+      'border-left:4px solid var(--c-brass)',
+      'border-radius:var(--radius)',
+      'margin:8px 0',
+      'font-family:"Crimson Text",Georgia,serif',
+    ].join(';');
+    // Insert above the combatant list, inside the combatant column.
+    const col = document.querySelector('.combatant-col');
+    if (col) {
+      const list = document.getElementById('combatant-list');
+      col.insertBefore(bar, list || col.firstChild);
+    } else {
+      document.body.insertBefore(bar, document.body.firstChild);
+    }
+  }
+  bar.innerHTML =
+    '<div style="font-family:\'Cinzel\',serif;font-size:0.72rem;letter-spacing:0.1em;color:var(--c-brass);margin-bottom:5px">' +
+    escapeHtml(name || '') + ' — Read Aloud</div>' +
+    '<p style="margin:0 0 8px;color:var(--c-ink);line-height:1.55">' +
+    escapeHtml(text).replace(/\n/g, '<br>') + '</p>' +
+    '<button onclick="dismissReadAloud()" style="font-family:\'Cinzel\',serif;font-size:0.6rem;letter-spacing:0.1em;padding:3px 10px;background:none;border:1px solid var(--c-brass);border-radius:2px;color:var(--c-brass);cursor:pointer">Dismiss</button>';
+}
+
+function dismissReadAloud() {
+  document.getElementById('readaloud-banner')?.remove();
+}
 </script>
 </body>
 </html>
