@@ -2429,6 +2429,59 @@ function openExport(opts) {
   document.getElementById('exp-new-session-date').value = '';
   updatePreview();
   document.getElementById('export-modal').classList.remove('hidden');
+  // Pre-fill from staged encounter (Task 4.7).
+  _stagedEncCache = null;
+  if (window.encounterId) {
+    _fetchAndPreFillEncounter(window.encounterId);
+  }
+}
+
+// Fetch the staged encounter from KV and pre-fill the export modal fields.
+// Runs async after the modal is already open; fields are applied as they resolve.
+// Loot pre-fill is deferred to toggleChronicleSection so loot rows are reset
+// first (openExport clears #loot-rows before we fetch).
+async function _fetchAndPreFillEncounter(encId) {
+  try {
+    const headers = Auth.dmHeaders();
+    const arr = await fetch(WORKER_URL + '?type=encounters', { headers, cache: 'no-store' }).then(r => r.json());
+    const enc = (Array.isArray(arr) ? arr : []).map(EncounterSchema.migrateInMemory).find(e => e.id === encId);
+    if (!enc) return;
+    _stagedEncCache = enc;
+
+    // Title — only set if still empty (DM may have typed something already).
+    const titleEl = document.getElementById('exp-title');
+    if (titleEl && !titleEl.value && enc.name) {
+      titleEl.value = enc.name;
+      updatePreview();
+    }
+
+    // Location — free-text field; use the locationId as a hint (DM can refine).
+    // We store it only if the field is still empty.
+    const locEl = document.getElementById('exp-location');
+    if (locEl && !locEl.value && enc.locationRef && enc.locationRef.locationId) {
+      locEl.value = enc.locationRef.locationId;
+      updatePreview();
+    }
+
+    // Session binding — populateSessionSelect() will apply this once the
+    // chronicle section is opened and chronicleAll is loaded.
+    // If the session select is already populated (chronicleAll was loaded from
+    // a prior open), apply immediately.
+    if (enc.sessionId) {
+      const sel = document.getElementById('exp-session-select');
+      if (sel && sel.options.length > 1) {
+        // Check whether the session id is actually in the select.
+        const opt = Array.from(sel.options).find(o => o.value === enc.sessionId);
+        if (opt) { sel.value = enc.sessionId; onSessionSelectChange(); }
+      }
+    }
+
+    // NPC participation: export modal has no NPC field — skip.
+    console.log('Encounter pre-fill applied:', enc.name, '— no NPC field in export modal, skipping NPC pre-fill');
+  } catch (err) {
+    console.warn('Encounter pre-fill failed:', err);
+    // Don't block the export — modal is already open.
+  }
 }
 function closeExport() {
   document.getElementById('export-modal').classList.add('hidden');
@@ -2506,6 +2559,7 @@ function downloadLog() {
 //  SEND COMBAT + LOOT TO THE CHRONICLE (timeline)
 // ═══════════════════════════════════════════════════════
 let chronicleAll = [];   // full timeline (DM view), loaded lazily when export opens
+let _stagedEncCache = null; // cached encounter data for the currently-staged encounter
 
 async function loadChronicle() {
   try {
@@ -2530,6 +2584,11 @@ function populateSessionSelect() {
     .sort((a,b) => ((b.dateSort||'')+'~'+(b.id||'')).localeCompare((a.dateSort||'')+'~'+(a.id||'')));
   sel.innerHTML = '<option value="__new__">➕ New session…</option>' +
     sessions.map(s => `<option value="${s.id}">${(s.title||'(untitled)').replace(/</g,'&lt;')}${s.dateInGame?' — '+s.dateInGame.replace(/</g,'&lt;'):''}</option>`).join('');
+  // Apply session pre-fill from staged encounter if available (Task 4.7).
+  if (_stagedEncCache && _stagedEncCache.sessionId) {
+    const opt = Array.from(sel.options).find(o => o.value === _stagedEncCache.sessionId);
+    if (opt) sel.value = _stagedEncCache.sessionId;
+  }
   onSessionSelectChange();
 }
 
@@ -2542,8 +2601,27 @@ function toggleChronicleSection() {
     // default the new-session title to the combat title
     const t = document.getElementById('exp-new-session-title');
     if (t && !t.value) t.value = (document.getElementById('exp-title').value.trim() || '');
-    if (document.querySelectorAll('#loot-rows .loot-row').length === 0) addLootRow();
+    // Pre-fill loot from staged encounter (Task 4.7); fall back to blank row.
+    if (document.querySelectorAll('#loot-rows .loot-row').length === 0) {
+      if (_stagedEncCache && Array.isArray(_stagedEncCache.loot) && _stagedEncCache.loot.length) {
+        preFillEncounterLoot(_stagedEncCache.loot);
+      } else {
+        addLootRow();
+      }
+    }
   }
+}
+
+// Populate the export modal's loot rows with encounter loot entries.
+// Encounter loot shape: {id, name, qty, value, notes}.
+// Export loot row shape: item (text), qty (text), recipient (text).
+function preFillEncounterLoot(lootArr) {
+  lootArr.forEach(l => {
+    const item = l.name || '';
+    const qty  = l.qty != null ? String(l.qty) : '1';
+    // No recipient field on encounter loot — default to 'Party'.
+    addLootRow(item, qty, 'Party');
+  });
 }
 
 function onSessionSelectChange() {
