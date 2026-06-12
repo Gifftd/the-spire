@@ -677,11 +677,11 @@ body {
       <div class="bestiary-status" id="bp-status">Loading bestiary…</div>
       <div class="bestiary-list" id="bp-list"></div>
 
-      <div class="bestiary-enc-head">
-        <span>Saved encounters (<span id="bp-enc-count">0</span>)</span>
-        <button class="enc-save" id="bp-enc-save-btn" onclick="saveCurrentEncounter()" disabled>💾 Save current as…</button>
+      <div style="margin:0.8rem 0 0.3rem">
+        <span style="font-family:Cinzel,serif;font-size:0.66rem;letter-spacing:0.1em;color:var(--c-ink-faint)">
+          To save a re-usable encounter, use <a href="encounter-dm.html" style="color:var(--c-brass)">The Anvil</a>.
+        </span>
       </div>
-      <div class="bestiary-enc-list" id="bp-enc-list"></div>
 
       <div class="bestiary-cart-head">
         <span>Picks (<span id="bp-pick-count">0</span>) — click a row above to add</span>
@@ -1524,7 +1524,6 @@ async function openBestiaryPicker(){
   if (!_BP.loaded && !_BP.loading) await loadBestiary();
   populateBestiaryFilterDropdowns();
   renderBestiaryList();
-  renderEncounters();
   renderPicks();
   setTimeout(() => document.getElementById('bp-search')?.focus(), 50);
 }
@@ -1759,120 +1758,6 @@ function renderPicks(){
   btn.textContent = total === 0 ? 'Load 0 monsters'
                   : total === 1 ? 'Load 1 monster into combat'
                                 : `Load ${total} monsters into combat`;
-  // Save button is only useful when there's something to save.
-  const saveBtn = document.getElementById('bp-enc-save-btn');
-  if (saveBtn) saveBtn.disabled = total === 0;
-}
-
-// ───── Saved encounters ─────
-function renderEncounters(){
-  document.getElementById('bp-enc-count').textContent = String(_BP.encounters.length);
-  const list = document.getElementById('bp-enc-list');
-  if (!_BP.encounters.length){
-    list.innerHTML = '<div class="empty">No saved encounters yet. Build a pick list above, then click "💾 Save current as…".</div>';
-    return;
-  }
-  // Newest first.
-  const sorted = _BP.encounters.slice().sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
-  list.innerHTML = sorted.map(e => {
-    const safeId = bpEsc(e.id);
-    const xp = (e.totalXp != null) ? e.totalXp.toLocaleString() : '?';
-    const mc = (e.monsterCount != null) ? e.monsterCount : '?';
-    const party = e.party ? `party ${e.party.size}×L${e.party.level}` : '';
-    return `
-      <div class="enc-row" onclick="loadEncounter('${safeId}')" title="Click to load these picks">
-        <div class="enc-nm">${bpEsc(e.name)}<small>${mc} monsters · ${xp} XP${party?` · ${bpEsc(party)}`:''}</small></div>
-        <div class="enc-actions">
-          <button onclick="event.stopPropagation(); loadEncounter('${safeId}')">Load</button>
-          <button class="danger" onclick="event.stopPropagation(); deleteEncounter('${safeId}')">×</button>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-async function saveCurrentEncounter(){
-  if (!_BP.picks.length) return;
-  const name = prompt('Name this encounter:', '')?.trim();
-  if (!name) return;
-  const enc = {
-    id: 'enc-' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
-    name,
-    // Strip the transient `expanded` flag — it's UI state, not part of the saved preset.
-    picks: _BP.picks.map(p => ({
-      id: p.id, qty: p.qty,
-      rollHp: p.rollHp, rollInit: p.rollInit, hidden: p.hidden,
-      hpOverride: p.hpOverride, initOverride: p.initOverride
-    })),
-    party: { ...(_BP.party) },
-    totalXp: totalPickedXP(),
-    monsterCount: totalPickedCount(),
-    createdAt: new Date().toISOString()
-  };
-  const next = _BP.encounters.concat([enc]);
-  const ok = await saveEncountersToKV(next);
-  if (!ok) return;
-  _BP.encounters = next;
-  renderEncounters();
-}
-
-function loadEncounter(id){
-  const e = _BP.encounters.find(x => x.id === id);
-  if (!e) return;
-  const overwrite = _BP.picks.length > 0
-    ? confirm(`Replace your current ${totalPickedCount()} picked monster(s) with "${e.name}" (${e.monsterCount} monsters)?`)
-    : true;
-  if (!overwrite) return;
-  _BP.picks = (e.picks || []).map(p => ({
-    id: p.id,
-    qty: p.qty | 0,
-    rollHp: !!p.rollHp, rollInit: !!p.rollInit, hidden: !!p.hidden,
-    hpOverride: Number.isFinite(p.hpOverride) ? p.hpOverride : null,
-    initOverride: Number.isFinite(p.initOverride) ? p.initOverride : null,
-    expanded: false
-  }));
-  if (e.party){
-    if (Number.isFinite(e.party.size))  _BP.party.size  = e.party.size;
-    if (Number.isFinite(e.party.level)) _BP.party.level = e.party.level;
-    document.getElementById('bp-party-size').value  = _BP.party.size;
-    document.getElementById('bp-party-level').value = _BP.party.level;
-    try { localStorage.setItem('init_party_config', JSON.stringify(_BP.party)); } catch {}
-  }
-  renderBestiaryList();   // refresh "in-picks" highlights
-  renderPicks();
-}
-
-async function deleteEncounter(id){
-  const e = _BP.encounters.find(x => x.id === id);
-  if (!e) return;
-  if (!confirm(`Delete encounter "${e.name}"? This can't be undone.`)) return;
-  const next = _BP.encounters.filter(x => x.id !== id);
-  const ok = await saveEncountersToKV(next);
-  if (!ok) return;
-  _BP.encounters = next;
-  renderEncounters();
-}
-
-async function saveEncountersToKV(encs){
-  try {
-    const r = await fetch(WORKER_URL, {
-      method:'POST', headers: Auth.dmHeaders(),
-      body: JSON.stringify({ type: 'encounters', payload: encs })
-    });
-    if (r.status === 401){
-      alert('Your DM session expired — sign in again on the home page.');
-      return false;
-    }
-    let b = {}; try { b = await r.json(); } catch {}
-    if (!r.ok || b.error){
-      alert('Save failed: ' + (b.error || ('HTTP ' + r.status)) + '\n(Worker may need to be redeployed for the new `encounters` endpoint.)');
-      return false;
-    }
-    return true;
-  } catch(e){
-    alert('Save failed: ' + e.message);
-    return false;
-  }
 }
 
 function onPartyChange(){
