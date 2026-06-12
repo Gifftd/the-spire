@@ -593,6 +593,26 @@
       }
     }
 
+    // Re-render a single named section by swapping its outerHTML, preserving
+    // its open/closed state. htmlFn(encounter) must return the full
+    // <details id="sectionId">…</details> markup string.
+    function renderSectionOnly(sectionId, htmlFn) {
+      const e = currentEncounter();
+      if (!e) return;
+      const old = document.getElementById(sectionId);
+      if (!old) return;
+      const wasOpen = old.open;
+      old.outerHTML = htmlFn(e);
+      const fresh = document.getElementById(sectionId);
+      if (fresh && wasOpen) fresh.open = true;
+    }
+
+    function renderTacticalSection()  { renderSectionOnly('enc-tactical-section',  renderTactical); }
+    function renderPlaybookSection()  { renderSectionOnly('enc-playbook-section',  renderPlaybook); }
+    function renderLootSection()      { renderSectionOnly('enc-loot-section',      renderLoot); }
+    function renderLinkagesSection()  { renderSectionOnly('enc-linkages-section',  renderLinkages); }
+    function renderIdentitySection()  { renderSectionOnly('enc-identity-section',  renderIdentity); }
+
     function renderIdentity(e) {
       return `
         <details class="enc-section" id="enc-identity-section" open><summary>Identity</summary>
@@ -688,13 +708,13 @@
       const e = currentEncounter();
       e.tactical.waves.push({ round: 2, pickKey: e.picks[0]?.pickKey || '', count: 1, fromDirection: '', notes: '' });
       scheduleSave();
-      renderEditor();
+      renderTacticalSection();
     }
     function removeWave(i) {
       const e = currentEncounter();
       e.tactical.waves.splice(i, 1);
       scheduleSave();
-      renderEditor();
+      renderTacticalSection();
     }
 
     // ── DM Playbook section ──
@@ -768,12 +788,12 @@
         name: '', qty: 1, value: '—', notes: '',
       });
       scheduleSave();
-      renderEditor();
+      renderLootSection();
     }
     function removeLoot(i) {
       currentEncounter().loot.splice(i, 1);
       scheduleSave();
-      renderEditor();
+      renderLootSection();
     }
 
     // ── Linkages section ──
@@ -840,13 +860,13 @@
           : { kind: 'submap', parentLocationId: parent, locationId: loc };
       }
       scheduleSave();
-      renderEditor();
+      // renderEditor() not needed — the <select> already reflects the user's choice.
     }
     function addNpcRole(npcId) {
       if (!npcId) return;
       currentEncounter().npcRoles.push({ npcId, role: 'enemy' });
       scheduleSave();
-      renderEditor();
+      renderLinkagesSection();
     }
     function updateNpcRole(i, role) {
       currentEncounter().npcRoles[i].role = role;
@@ -855,13 +875,17 @@
     function removeNpcRole(i) {
       currentEncounter().npcRoles.splice(i, 1);
       scheduleSave();
-      renderEditor();
+      renderLinkagesSection();
     }
 
     function renderLaunchpad() {
       const root = document.getElementById('launchpad-content');
       const e = currentEncounter();
       if (!e) { root.innerHTML = ''; return; }
+
+      // Preserve Actions menu open state across rebuild.
+      const actionsWasOpen = document.getElementById('lp-actions')?.open ?? false;
+
       const totalCount = e.picks.reduce((a, p) => a + (p.qty || 1), 0);
       root.innerHTML = `
         <div class="lp-card">
@@ -883,12 +907,18 @@
             Outcome: ${e.lastOutcome || '(unrecorded)'}
           </div>` : ''}
         <hr>
-        <details><summary>Actions</summary>
+        <details id="lp-actions"><summary>Actions</summary>
           <button onclick="duplicateEncounter()">Duplicate</button>
           <button onclick="archiveEncounter()">Archive</button>
           <button onclick="deleteEncounter()" style="color:#d66">Delete</button>
         </details>
       `;
+
+      // Restore Actions menu open state after rebuild.
+      if (actionsWasOpen) {
+        const newActions = document.getElementById('lp-actions');
+        if (newActions) newActions.open = true;
+      }
     }
 
     function runOnWarTable() {
