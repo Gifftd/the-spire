@@ -497,7 +497,10 @@
             return;
           }
           state.encounters = merged;
-          render();
+          // Do NOT call render() here — re-renders destroy focus / collapse <details>.
+          // The library and launchpad already reflect local edits via per-mutation
+          // updates (renderLibrary called from updateField on name/status; structural
+          // mutations call renderEditor explicitly). The save just persists.
         } catch (e) {
           console.warn('Save network error', e);
           showBanner('Network error during save — retrying in 10s', 'warn');
@@ -646,6 +649,7 @@
       obj[parts[parts.length - 1]] = value;
       e.updatedAt = new Date().toISOString();
       if (path === 'name' || path === 'status') renderLibrary();
+      if (path === 'status') renderLaunchpad();
       scheduleSave();
     }
 
