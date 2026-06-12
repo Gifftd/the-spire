@@ -7,6 +7,52 @@ Dates are YYYY-MM-DD.
 
 ---
 
+## [Unreleased] — 2026-06-12
+
+### Encounter Builder: Phase 4A — War Table staging integration
+
+- **`initiative-dm.html`** — six tasks implementing the full staging flow from
+  The Anvil → War Table:
+  - **Task 4.1:** Removed the in-modal saved-encounters sub-section (header,
+    count badge, 💾 Save button, list, and the `saveCurrentEncounter` /
+    `loadEncounter` / `deleteEncounter` / `saveEncountersToKV` /
+    `renderEncounters` functions). Replaced with a one-line link to
+    `encounter-dm.html` (The Anvil) so DMs know where encounter management
+    now lives. The bestiary picker itself (search, filter, picks cart) is
+    untouched.
+  - **Task 4.2:** Added `<script src="encounter-schema.js">` tag. Added
+    `handleStageParam()` (reads `?stage=<id>`, strips the param, fetches the
+    encounter from KV, confirms with the DM if combatants are already present,
+    waits for bestiary load, calls `stageEncounter`). Called at the end of
+    `init()` after drafts load. Added `isCombatActive()` helper.
+  - **Task 4.3:** Implemented `stageEncounter(enc)`: clears the current roster,
+    maps encounter picks onto `_BP.picks`, calls the existing `loadAllPicks()`
+    to spawn combatants (no duplicate code), then calls `applyStagingMetadata()`
+    to stamp `surprised` on combatants by type ('enemy'/'pc') per
+    `enc.tactical.surprise`, and applies `startingConditions` from each pick.
+    Modified `loadAllPicks()` by one line to propagate `pickKey` onto each
+    spawned combatant (required for wave reminders). Stores `window.encounterId`
+    + `window.encounterStagedAt` and calls `pushState()`.
+  - **Task 4.4:** Added `showReadAloudBanner(text, name)` (inserts a styled
+    banner above the combatant list, uses existing `escapeHtml`, renders
+    newlines as `<br>`) and `dismissReadAloud()`. Called from `stageEncounter`
+    when `enc.tactical.readAloud` is non-empty.
+  - **Task 4.5:** Added `stagedWaves` module-level array. Added
+    `checkWaveReminders()` (renders per-wave banners for waves due next round,
+    each with an "Add wave" button) and `spawnWave(pickKey, waveRound)` (uses
+    the existing `loadAllPicks()` path with a temporary picks override).
+    `checkWaveReminders()` is hooked into `nextTurn()` on every round increment.
+  - **Task 4.6:** Added `encounterId` + `encounterStagedAt` to the
+    `initiative_state` POST payload in `pushState()` when `window.encounterId`
+    is set. Implemented `markEncounterStatusLive(id)`: fetches the encounters
+    array, migrates each entry, flips the matched entry to `status:'live'` +
+    sets `lastStagedAt`, POSTs back. Failures are silently logged (network
+    errors never block combat).
+- **No worker changes required** for Phase 4A — the worker already accepts
+  `encounterId` + `encounterStagedAt` pass-through (added in Phase 2), and
+  the `encounters` KV endpoint is already deployed.
+- **No player-facing changes** — all new code is DM-only paths.
+
 ## [Unreleased] — 2026-06-11
 
 ### Initiative DM: persistent combat drafts (recovery for forgotten exports)
