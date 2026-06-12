@@ -977,7 +977,11 @@ function currentDraftSnapshot(prev) {
     combatLog: serializeCombatLog(combatLog),
     title: prev?.title || '',
     pcCount: counts.pc,
-    enemyCount: counts.enemy
+    enemyCount: counts.enemy,
+    // Carry encounter association forward so cross-session recovery can
+    // still trigger the resolution loop (Task 4.9).
+    encounterId: window.encounterId || null,
+    encounterStagedAt: window.encounterStagedAt || null,
   };
 }
 
@@ -1116,6 +1120,12 @@ function handleBannerExport(draftId) {
   // Stash the live combatLog so closeExport() can restore it.
   savedCombatLog = combatLog;
   combatLog = deserializeCombatLog(d.combatLog);
+  // Restore encounter context from the draft so the resolution loop in
+  // exportToChronicle / resolveEncounterAfterExport fires correctly (Task 4.9).
+  if (d.encounterId) {
+    window.encounterId = d.encounterId;
+    window.encounterStagedAt = d.encounterStagedAt || null;
+  }
   // Bind the modal to the recovered draft BEFORE opening, and tell
   // openExport() to skip its live-combatant snapshot (which would
   // pollute the recovered combatLog).
