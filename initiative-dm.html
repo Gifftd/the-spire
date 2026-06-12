@@ -2779,7 +2779,9 @@ async function resolveEncounterAfterExport(encId, timelineEntryId) {
   const outcome = _modalOutcomeToSchemaOutcome(outcomeEl ? outcomeEl.value : null);
   const headers = Auth.dmHeaders();
   try {
-    const arr = await fetch(WORKER_URL + '?type=encounters', { headers, cache: 'no-store' }).then(r => r.json());
+    const getRes = await fetch(WORKER_URL + '?type=encounters', { headers, cache: 'no-store' });
+    if (!getRes.ok) throw new Error('HTTP ' + getRes.status);
+    const arr = await getRes.json();
     const merged = (Array.isArray(arr) ? arr : []).map(EncounterSchema.migrateInMemory).map(e =>
       e.id === encId ? {
         ...e,
@@ -2789,11 +2791,12 @@ async function resolveEncounterAfterExport(encId, timelineEntryId) {
         lastOutcome: outcome,
       } : e
     );
-    await fetch(WORKER_URL, {
+    const res = await fetch(WORKER_URL, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({ type: 'encounters', payload: merged }),
     });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     // Clear the encounter context so a re-export doesn't re-resolve.
     window.encounterId = null;
     window.encounterStagedAt = null;
