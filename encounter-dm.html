@@ -1224,6 +1224,12 @@
         const n = enc.picks.length;
         badge.textContent = n ? `${n} monster type${n === 1 ? '' : 's'}` : '';
       }
+      // Picks changed — Playbook's per-monster tactics rows and Tactical's wave
+      // pickKey dropdown both depend on the picks list. Re-render them so they
+      // don't stay stale. Guards are defensive in case the editor sections
+      // aren't mounted yet (e.g. no current encounter).
+      if (typeof renderPlaybookSection === 'function') renderPlaybookSection();
+      if (typeof renderTacticalSection === 'function') renderTacticalSection();
     }
 
     function encAddPick(id) {
