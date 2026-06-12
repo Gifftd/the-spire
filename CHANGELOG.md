@@ -7,7 +7,126 @@ Dates are YYYY-MM-DD.
 
 ---
 
-## [Unreleased] — 2026-06-11
+## [Unreleased] — 2026-06-12
+
+### The Anvil — encounter builder
+
+A standalone DM tool for authoring, browsing, and launching encounters.
+The Anvil replaces the ad-hoc "saved encounters" list that previously lived
+inside the War Table's bestiary modal with a full-featured, lifecycle-aware
+encounter management system.
+
+**New files:**
+- `encounter-schema.js` — shared encounter schema module (`EncounterSchema`):
+  `newEncounter()`, `migrateInMemory()`, `validate()`, and the v1→v2
+  migration path.
+- `encounter-dm.html` — The Anvil page (DM-only). Three-pane layout:
+  library sidebar, editor centre, launchpad right-pane.
+- `tests/encounter-schema.test.html` — inline vanilla-JS test harness;
+  26 assertions covering schema defaults, field validation, v1→v2 migration,
+  and edge cases. Open in browser and click "Run tests."
+
+**Phase breakdown:**
+
+_Phase 1 — Shared module + tests._ `encounter-schema.js` defines the v2
+schema: `id`, `schemaVersion`, `name`, `status` (draft / ready / running /
+completed / archived), `picks` (monster refs with count + customisations),
+`setup` (tactical notes, surprise flag, read-aloud text), `playbook`
+(DM-facing notes), `loot` (pre-staged items), `locationRef`, `sessionId`,
+`npcIds`, `createdAt`, `updatedAt`. `newEncounter()` stamps a UUID and both
+timestamps. `migrateInMemory()` is idempotent — calling it on a v2 record is
+a no-op; calling it on a v1 record fills missing fields and sets
+`schemaVersion: 2`. `validate()` returns an array of human-readable errors.
+
+_Phase 2 — Worker validation._ `cloudflare-worker.js` gains an `encounters`
+KV key, a `GET type=encounters` branch (DM-gated), and `encounters` in
+`DM_WRITE_TYPES` (POST also DM-gated). The POST handler runs
+`EncounterSchema.validate()` server-side and rejects malformed payloads with
+a 400. **Manual redeploy required** — paste `cloudflare-worker.js` into the
+Cloudflare dashboard (Workers & Pages → `dnd-perk-webhook` → Edit code →
+Save and deploy). Until redeployed, the front-end falls back to
+`localStorage` for encounter persistence.
+
+_Phase 3 — The Anvil page._ `encounter-dm.html` is the DM's authoring UI.
+Left pane (library): searchable/filtered list of encounters with status
+pills, `+ New encounter` button. Centre pane (editor): tabbed sections for
+Monsters (picker reusing the merged bestiary), Setup (tactical notes,
+surprise checkbox, read-aloud text), Playbook (DM-facing freeform), Loot
+(pre-staged items), and Linkages (location pin, session, NPCs). Right pane
+(launchpad): summary card, status progression controls, Run on War Table
+button, Send to Crucible button, and Duplicate / Archive / Delete actions.
+URL params `?id=`, `?newAt=`, `?newFor=` allow deep-linking from other tools.
+
+_Phase 4 — War Table integration._ `initiative-dm.html` gains a "Run
+encounter" flow: the existing "Run on War Table" button in The Anvil's
+launchpad POSTs the encounter id into `localStorage['pending-encounter-id']`.
+On load, the War Table checks for a pending id; if combat is inactive it
+auto-loads the encounter (populates roster from picks, applies the surprise
+flag, shows the read-aloud banner); if combat is active, a confirm modal
+lets the DM cancel or overwrite. The old in-modal "Saved encounters" UI in
+the bestiary panel is removed — The Anvil is the canonical encounter
+management surface. At end-of-combat export to Chronicle, if the active
+encounter has a `locationRef` / `sessionId` / `npcIds`, those are
+pre-filled in the export form; after a successful export the encounter's
+status flips to `completed`.
+
+_Phase 5 — Cross-tool surfaces._
+- **Atlas Workshop** (`map-dm.html`): the location editor gains an
+  "Encounters here" read-only panel listing any encounter whose
+  `locationRef` matches the location being edited (world or sub-map).
+  Clicking an encounter name opens The Anvil at that encounter via
+  `?id=` param.
+- **Chronicle Workshop** (`map-dm.html` Timeline tab): the session editor
+  gains an "Encounters planned" tally showing how many encounters reference
+  this session's id, with a link to create a new one.
+- **Crucible** (`crucible-dm.html`): the "Send to Crucible" launchpad
+  action pre-populates the Crucible's monster picker with the encounter's
+  picks and sets a "Testing: \<name\>" chip in the Crucible header.
+
+**Migration strategy.** Existing encounters (if any were saved under the
+old ad-hoc schema) are auto-upgraded in memory by `migrateInMemory()` on
+every page load. The migration is in-memory only until the DM next saves the
+record (any edit triggers a save). For bulk upgrade without editing each
+record individually, a **"Persist v2 migration (N records)"** button appears
+in the library whenever v1 records are detected on load — clicking it calls
+`saveEncounters()` once and dismisses the button.
+
+**Side effects on existing tools:**
+- War Table (`initiative-dm.html`): the in-modal "Saved encounters" panel
+  is removed. DMs who bookmarked that workflow should use The Anvil instead.
+- Atlas Workshop (`map-dm.html`): location editor and Timeline tab each
+  gain a new read-only panel; no existing functionality changed.
+- Chronicle page (`timeline.html`): unaffected (read-only, no encounter
+  data surfaced to players).
+- Crucible (`crucible-dm.html`): gains "Testing: \<name\>" chip and
+  pre-populated picker flow from launchpad; existing party/encounter state
+  is preserved.
+- Home page (`home.html`): "The Anvil" card appears in the Keeper's Wing;
+  existing card ordering may shift.
+
+**Manual UI checklist (post-deploy):**
+- [ ] Sign in as DM → home shows "The Anvil" card in Keeper's Wing.
+- [ ] Open The Anvil → existing saved encounters appear in the library with
+      auto-set status `ready`.
+- [ ] Create new encounter, fill all sections, reload — survives.
+- [ ] Run on War Table from a clean tracker → roster populated, surprise
+      applied, read-aloud banner visible.
+- [ ] Run on War Table with active combat → confirm modal blocks; cancel
+      preserves; confirm clobbers.
+- [ ] Stage → end combat → export → timeline entry has title / location /
+      session / NPCs / loot pre-filled; Anvil row flips to `completed`.
+- [ ] Send to Crucible → picks pre-populated, "Testing: \<name\>" chip visible.
+- [ ] Atlas Workshop location editor shows "Encounters here" for both world
+      and sub-map matches.
+- [ ] Chronicle Workshop session editor shows "Encounters planned" tally.
+- [ ] Delete a linked location → builder shows "(deleted)" stub; stage still
+      works; export skips broken ref.
+- [ ] Two-tab edit on the same array → second save lands without clobbering
+      (re-fetch-and-splice).
+- [ ] Mobile (≤1100px) → launchpad collapses to sticky bottom; left pane
+      becomes drawer; Run button reachable.
+- [ ] Run the schema test page (`tests/encounter-schema.test.html`) — 26
+      assertions pass.
 
 ### Initiative DM: persistent combat drafts (recovery for forgotten exports)
 
