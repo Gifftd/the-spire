@@ -7,31 +7,6 @@ Dates are YYYY-MM-DD.
 
 ---
 
-## [Unreleased] — 2026-06-12
-
-### Encounter builder: completion loop (Phase 4B — Tasks 4.7–4.9)
-
-- **Export modal pre-fill (Task 4.7):** when a staged encounter is active
-  (`window.encounterId` set), opening the export modal now async-fetches the
-  encounter from KV and pre-fills: title (if empty), location hint (free-text,
-  locationRef.locationId), and session selector (if `enc.sessionId` matches a
-  loaded session). Loot rows are pre-filled with encounter loot (`name`→item,
-  `qty`→qty, `recipient`→Party) when the "Add to Chronicle" checkbox is toggled
-  on. No NPC pre-fill — the export modal has no NPC participation field; logged
-  as a console note.
-- **Resolution POST (Task 4.8):** after a successful Chronicle timeline write,
-  if `window.encounterId` is set, the encounter is resolved in KV:
-  `status: 'completed'`, `resolvedAt`, `resolvedInTimelineId` (the new/target
-  session entry id), and `lastOutcome` (mapped from modal dropdown:
-  Victory→won, Pyrrhic Victory→won, Defeat→tpk, Retreat→fled, Stalemate→null).
-  `window.encounterId` + `window.encounterStagedAt` are cleared so re-export
-  doesn't re-resolve. Failure shows a dismissible toast rather than blocking
-  the export.
-- **Draft carry-forward (Task 4.9):** combat draft snapshots now include
-  `encounterId` + `encounterStagedAt`. When the DM recovers a draft from the
-  banner and clicks Export, `window.encounterId` is restored before the modal
-  opens so the resolution loop fires correctly across sessions.
-
 ## [Unreleased] — 2026-06-11
 
 ### Initiative DM: persistent combat drafts (recovery for forgotten exports)
