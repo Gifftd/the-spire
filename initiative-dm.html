@@ -483,23 +483,6 @@ body {
 .bestiary-cat-chip.villain-party { border: 1px solid #b07ac8; color: #d4a3e8; background: rgba(140,90,180,0.10); }
 .bestiary-empty-note { padding: 1.5rem 1rem; text-align: center; color: var(--ink-faint); font-style: italic; font-size: 0.9rem; }
 
-/* Saved encounters */
-.bestiary-enc-head { display: flex; justify-content: space-between; align-items: center; font-family: 'Cinzel', serif; font-size: 0.66rem; letter-spacing: 0.1em; color: var(--gold); margin: 0.8rem 0 0.3rem; text-transform: uppercase; }
-.bestiary-enc-head .enc-save { font-family: 'Cinzel', serif; font-size: 0.55rem; letter-spacing: 0.08em; padding: 3px 9px; background: var(--bg); border: 1px solid var(--gold); border-radius: 2px; color: var(--gold); cursor: pointer; }
-.bestiary-enc-head .enc-save:hover { background: rgba(184,138,90,0.18); }
-.bestiary-enc-head .enc-save:disabled { opacity: 0.35; cursor: not-allowed; }
-.bestiary-enc-list { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); max-height: 15vh; overflow-y: auto; }
-.bestiary-enc-list .empty { padding: 0.5rem; text-align: center; color: var(--ink-faint); font-style: italic; font-size: 0.84rem; }
-.enc-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-bottom: 1px solid var(--border); cursor: pointer; }
-.enc-row:last-child { border-bottom: none; }
-.enc-row:hover { background: var(--surface); }
-.enc-nm { flex: 1; font-size: 0.88rem; color: var(--ink); min-width: 0; }
-.enc-nm small { display: block; font-family: 'Cinzel', serif; font-size: 0.52rem; color: var(--ink-faint); letter-spacing: 0.08em; }
-.enc-actions { display: flex; gap: 4px; }
-.enc-actions button { background: none; border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink-dim); padding: 2px 8px; font-family: 'Cinzel', serif; font-size: 0.55rem; letter-spacing: 0.08em; cursor: pointer; }
-.enc-actions button:hover { color: var(--ink); border-color: var(--gold); }
-.enc-actions button.danger:hover { color: #e88; border-color: #844; }
-
 /* Picks cart */
 .bestiary-cart-head { display: flex; justify-content: space-between; align-items: center; font-family: 'Cinzel', serif; font-size: 0.66rem; letter-spacing: 0.1em; color: var(--gold); margin: 0.8rem 0 0.3rem; text-transform: uppercase; }
 .bestiary-cart-head .clear-picks { font-family: 'Cinzel', serif; font-size: 0.55rem; letter-spacing: 0.08em; padding: 3px 8px; background: none; border: 1px solid var(--border-light); border-radius: 2px; color: var(--ink-faint); cursor: pointer; }
@@ -677,11 +660,11 @@ body {
       <div class="bestiary-status" id="bp-status">Loading bestiary…</div>
       <div class="bestiary-list" id="bp-list"></div>
 
-      <div class="bestiary-enc-head">
-        <span>Saved encounters (<span id="bp-enc-count">0</span>)</span>
-        <button class="enc-save" id="bp-enc-save-btn" onclick="saveCurrentEncounter()" disabled>💾 Save current as…</button>
+      <div style="margin:0.8rem 0 0.3rem">
+        <span style="font-family:Cinzel,serif;font-size:0.66rem;letter-spacing:0.1em;color:var(--c-ink-faint)">
+          To save a re-usable encounter, use <a href="encounter-dm.html" style="color:var(--c-brass)">The Anvil</a>.
+        </span>
       </div>
-      <div class="bestiary-enc-list" id="bp-enc-list"></div>
 
       <div class="bestiary-cart-head">
         <span>Picks (<span id="bp-pick-count">0</span>) — click a row above to add</span>
@@ -836,6 +819,7 @@ body {
 <script src="auth.js"></script>
 <script src="initiative-notes.js"></script>
 <script src="bestiary-merge.js"></script>
+<script src="encounter-schema.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════
 //  CONFIG
@@ -882,6 +866,11 @@ let expandedIds = new Set();
 // Combatant cards whose stat-block panel is currently open. Only valid for
 // combatants spawned via the Bestiary picker (`bestiaryId` set).
 let statblockOpenIds = new Set();
+// Waves queued from a staged encounter: [{ round, pickKey, count, fromDirection }]
+let stagedWaves = [];
+// Map of pickKey → original encounter pick, captured at stage time so wave
+// reminders and spawnWave can resolve picks even after loadAllPicks() empties _BP.picks.
+let stagedPicksByKey = {};
 let addType     = 'pc';
 let dragSrc     = null;
 let syncTimer   = null;
@@ -988,7 +977,11 @@ function currentDraftSnapshot(prev) {
     combatLog: serializeCombatLog(combatLog),
     title: prev?.title || '',
     pcCount: counts.pc,
-    enemyCount: counts.enemy
+    enemyCount: counts.enemy,
+    // Carry encounter association forward so cross-session recovery can
+    // still trigger the resolution loop (Task 4.9).
+    encounterId: window.encounterId || null,
+    encounterStagedAt: window.encounterStagedAt || null,
   };
 }
 
@@ -1127,6 +1120,12 @@ function handleBannerExport(draftId) {
   // Stash the live combatLog so closeExport() can restore it.
   savedCombatLog = combatLog;
   combatLog = deserializeCombatLog(d.combatLog);
+  // Restore encounter context from the draft so the resolution loop in
+  // exportToChronicle / resolveEncounterAfterExport fires correctly (Task 4.9).
+  if (d.encounterId) {
+    window.encounterId = d.encounterId;
+    window.encounterStagedAt = d.encounterStagedAt || null;
+  }
   // Bind the modal to the recovered draft BEFORE opening, and tell
   // openExport() to skip its live-combatant snapshot (which would
   // pollute the recovered combatLog).
@@ -1524,7 +1523,6 @@ async function openBestiaryPicker(){
   if (!_BP.loaded && !_BP.loading) await loadBestiary();
   populateBestiaryFilterDropdowns();
   renderBestiaryList();
-  renderEncounters();
   renderPicks();
   setTimeout(() => document.getElementById('bp-search')?.focus(), 50);
 }
@@ -1759,120 +1757,6 @@ function renderPicks(){
   btn.textContent = total === 0 ? 'Load 0 monsters'
                   : total === 1 ? 'Load 1 monster into combat'
                                 : `Load ${total} monsters into combat`;
-  // Save button is only useful when there's something to save.
-  const saveBtn = document.getElementById('bp-enc-save-btn');
-  if (saveBtn) saveBtn.disabled = total === 0;
-}
-
-// ───── Saved encounters ─────
-function renderEncounters(){
-  document.getElementById('bp-enc-count').textContent = String(_BP.encounters.length);
-  const list = document.getElementById('bp-enc-list');
-  if (!_BP.encounters.length){
-    list.innerHTML = '<div class="empty">No saved encounters yet. Build a pick list above, then click "💾 Save current as…".</div>';
-    return;
-  }
-  // Newest first.
-  const sorted = _BP.encounters.slice().sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
-  list.innerHTML = sorted.map(e => {
-    const safeId = bpEsc(e.id);
-    const xp = (e.totalXp != null) ? e.totalXp.toLocaleString() : '?';
-    const mc = (e.monsterCount != null) ? e.monsterCount : '?';
-    const party = e.party ? `party ${e.party.size}×L${e.party.level}` : '';
-    return `
-      <div class="enc-row" onclick="loadEncounter('${safeId}')" title="Click to load these picks">
-        <div class="enc-nm">${bpEsc(e.name)}<small>${mc} monsters · ${xp} XP${party?` · ${bpEsc(party)}`:''}</small></div>
-        <div class="enc-actions">
-          <button onclick="event.stopPropagation(); loadEncounter('${safeId}')">Load</button>
-          <button class="danger" onclick="event.stopPropagation(); deleteEncounter('${safeId}')">×</button>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-async function saveCurrentEncounter(){
-  if (!_BP.picks.length) return;
-  const name = prompt('Name this encounter:', '')?.trim();
-  if (!name) return;
-  const enc = {
-    id: 'enc-' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
-    name,
-    // Strip the transient `expanded` flag — it's UI state, not part of the saved preset.
-    picks: _BP.picks.map(p => ({
-      id: p.id, qty: p.qty,
-      rollHp: p.rollHp, rollInit: p.rollInit, hidden: p.hidden,
-      hpOverride: p.hpOverride, initOverride: p.initOverride
-    })),
-    party: { ...(_BP.party) },
-    totalXp: totalPickedXP(),
-    monsterCount: totalPickedCount(),
-    createdAt: new Date().toISOString()
-  };
-  const next = _BP.encounters.concat([enc]);
-  const ok = await saveEncountersToKV(next);
-  if (!ok) return;
-  _BP.encounters = next;
-  renderEncounters();
-}
-
-function loadEncounter(id){
-  const e = _BP.encounters.find(x => x.id === id);
-  if (!e) return;
-  const overwrite = _BP.picks.length > 0
-    ? confirm(`Replace your current ${totalPickedCount()} picked monster(s) with "${e.name}" (${e.monsterCount} monsters)?`)
-    : true;
-  if (!overwrite) return;
-  _BP.picks = (e.picks || []).map(p => ({
-    id: p.id,
-    qty: p.qty | 0,
-    rollHp: !!p.rollHp, rollInit: !!p.rollInit, hidden: !!p.hidden,
-    hpOverride: Number.isFinite(p.hpOverride) ? p.hpOverride : null,
-    initOverride: Number.isFinite(p.initOverride) ? p.initOverride : null,
-    expanded: false
-  }));
-  if (e.party){
-    if (Number.isFinite(e.party.size))  _BP.party.size  = e.party.size;
-    if (Number.isFinite(e.party.level)) _BP.party.level = e.party.level;
-    document.getElementById('bp-party-size').value  = _BP.party.size;
-    document.getElementById('bp-party-level').value = _BP.party.level;
-    try { localStorage.setItem('init_party_config', JSON.stringify(_BP.party)); } catch {}
-  }
-  renderBestiaryList();   // refresh "in-picks" highlights
-  renderPicks();
-}
-
-async function deleteEncounter(id){
-  const e = _BP.encounters.find(x => x.id === id);
-  if (!e) return;
-  if (!confirm(`Delete encounter "${e.name}"? This can't be undone.`)) return;
-  const next = _BP.encounters.filter(x => x.id !== id);
-  const ok = await saveEncountersToKV(next);
-  if (!ok) return;
-  _BP.encounters = next;
-  renderEncounters();
-}
-
-async function saveEncountersToKV(encs){
-  try {
-    const r = await fetch(WORKER_URL, {
-      method:'POST', headers: Auth.dmHeaders(),
-      body: JSON.stringify({ type: 'encounters', payload: encs })
-    });
-    if (r.status === 401){
-      alert('Your DM session expired — sign in again on the home page.');
-      return false;
-    }
-    let b = {}; try { b = await r.json(); } catch {}
-    if (!r.ok || b.error){
-      alert('Save failed: ' + (b.error || ('HTTP ' + r.status)) + '\n(Worker may need to be redeployed for the new `encounters` endpoint.)');
-      return false;
-    }
-    return true;
-  } catch(e){
-    alert('Save failed: ' + e.message);
-    return false;
-  }
 }
 
 function onPartyChange(){
@@ -2132,7 +2016,10 @@ function loadAllPicks(){
         // surface a Minion/Solo chip without re-looking-up the bestiary.
         bestiaryCategory: m.isMinion ? 'minion'
                        : m.isSolo ? 'solo'
-                       : (m.fmCategory && m.fmCategory !== 'standard' ? m.fmCategory : '')
+                       : (m.fmCategory && m.fmCategory !== 'standard' ? m.fmCategory : ''),
+        // Propagate pickKey so wave reminders can identify which pick a
+        // combatant came from (set when staging from an Anvil encounter).
+        pickKey: p.pickKey || null
       };
       state.combatants.push(c);
       if (mode === 'combat') snapshotCombatant(c);
@@ -2209,7 +2096,10 @@ function removeCustomCondition(cond) {
 function nextTurn() {
   if (state.combatants.length === 0 || mode !== 'combat') return;
   state.activeIndex = (state.activeIndex + 1) % state.combatants.length;
-  if (state.activeIndex === 0) state.round++;
+  if (state.activeIndex === 0) {
+    state.round++;
+    checkWaveReminders();
+  }
   render(); pushState();
 }
 function sortByInit() { state.combatants.sort((a,b)=>b.init-a.init); state.activeIndex=0; render(); pushState(); }
@@ -2438,6 +2328,11 @@ async function pushState() {
         conditions: c.conditions, dead: c.dead
       }))
     };
+    // Stamp encounter association when a staged encounter is active.
+    if (window.encounterId) {
+      playerState.encounterId      = window.encounterId;
+      playerState.encounterStagedAt = window.encounterStagedAt;
+    }
 
     // Build the draft snapshot if there's an active combat. Drafts are
     // saved in parallel with the player state; a failure here does not
@@ -2544,6 +2439,57 @@ function openExport(opts) {
   document.getElementById('exp-new-session-date').value = '';
   updatePreview();
   document.getElementById('export-modal').classList.remove('hidden');
+  // Pre-fill from staged encounter (Task 4.7).
+  _stagedEncCache = null;
+  if (window.encounterId) {
+    _fetchAndPreFillEncounter(window.encounterId);
+  }
+}
+
+// Fetch the staged encounter from KV and pre-fill the export modal fields.
+// Runs async after the modal is already open; fields are applied as they resolve.
+// Loot pre-fill is deferred to toggleChronicleSection so loot rows are reset
+// first (openExport clears #loot-rows before we fetch).
+async function _fetchAndPreFillEncounter(encId) {
+  try {
+    const headers = Auth.dmHeaders();
+    const arr = await fetch(WORKER_URL + '?type=encounters', { headers, cache: 'no-store' }).then(r => r.json());
+    const enc = (Array.isArray(arr) ? arr : []).map(EncounterSchema.migrateInMemory).find(e => e.id === encId);
+    if (!enc) return;
+    _stagedEncCache = enc;
+
+    // Title — only set if still empty (DM may have typed something already).
+    const titleEl = document.getElementById('exp-title');
+    if (titleEl && !titleEl.value && enc.name) {
+      titleEl.value = enc.name;
+      updatePreview();
+    }
+
+    // Location: encounter.locationRef stores a machine id, not a human name.
+    // The export modal's location field is free-text; pre-filling with the
+    // raw id would write a slug like "loc_..." into the Chronicle entry.
+    // Better to let the DM type the name. The encounter still tracks the
+    // canonical locationRef in The Anvil for filtering/binding purposes.
+
+    // Session binding — populateSessionSelect() will apply this once the
+    // chronicle section is opened and chronicleAll is loaded.
+    // If the session select is already populated (chronicleAll was loaded from
+    // a prior open), apply immediately.
+    if (enc.sessionId) {
+      const sel = document.getElementById('exp-session-select');
+      if (sel && sel.options.length > 1) {
+        // Check whether the session id is actually in the select.
+        const opt = Array.from(sel.options).find(o => o.value === enc.sessionId);
+        if (opt) { sel.value = enc.sessionId; onSessionSelectChange(); }
+      }
+    }
+
+    // NPC participation: export modal has no NPC field — skip.
+    console.debug('Encounter pre-fill applied:', enc.name, '— no NPC field in export modal, skipping NPC pre-fill');
+  } catch (err) {
+    console.warn('Encounter pre-fill failed:', err);
+    // Don't block the export — modal is already open.
+  }
 }
 function closeExport() {
   document.getElementById('export-modal').classList.add('hidden');
@@ -2615,12 +2561,22 @@ function downloadLog() {
   const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([md],{type:'text/markdown'})), download: filename });
   a.click(); URL.revokeObjectURL(a.href);
   closeExport();
+  // Download-only path: no Chronicle write happened, so no automatic
+  // resolution. Clear the staging pointer so the next combat doesn't
+  // inherit it, and prompt the DM to mark it complete manually.
+  if (window.encounterId) {
+    showExportToast('Combat downloaded — mark the encounter complete in The Anvil.');
+    window.encounterId = null;
+    window.encounterStagedAt = null;
+    _stagedEncCache = null;
+  }
 }
 
 // ═══════════════════════════════════════════════════════
 //  SEND COMBAT + LOOT TO THE CHRONICLE (timeline)
 // ═══════════════════════════════════════════════════════
 let chronicleAll = [];   // full timeline (DM view), loaded lazily when export opens
+let _stagedEncCache = null; // cached encounter data for the currently-staged encounter
 
 async function loadChronicle() {
   try {
@@ -2645,6 +2601,11 @@ function populateSessionSelect() {
     .sort((a,b) => ((b.dateSort||'')+'~'+(b.id||'')).localeCompare((a.dateSort||'')+'~'+(a.id||'')));
   sel.innerHTML = '<option value="__new__">➕ New session…</option>' +
     sessions.map(s => `<option value="${s.id}">${(s.title||'(untitled)').replace(/</g,'&lt;')}${s.dateInGame?' — '+s.dateInGame.replace(/</g,'&lt;'):''}</option>`).join('');
+  // Apply session pre-fill from staged encounter if available (Task 4.7).
+  if (_stagedEncCache && _stagedEncCache.sessionId) {
+    const opt = Array.from(sel.options).find(o => o.value === _stagedEncCache.sessionId);
+    if (opt) sel.value = _stagedEncCache.sessionId;
+  }
   onSessionSelectChange();
 }
 
@@ -2657,8 +2618,27 @@ function toggleChronicleSection() {
     // default the new-session title to the combat title
     const t = document.getElementById('exp-new-session-title');
     if (t && !t.value) t.value = (document.getElementById('exp-title').value.trim() || '');
-    if (document.querySelectorAll('#loot-rows .loot-row').length === 0) addLootRow();
+    // Pre-fill loot from staged encounter (Task 4.7); fall back to blank row.
+    if (document.querySelectorAll('#loot-rows .loot-row').length === 0) {
+      if (_stagedEncCache && Array.isArray(_stagedEncCache.loot) && _stagedEncCache.loot.length) {
+        preFillEncounterLoot(_stagedEncCache.loot);
+      } else {
+        addLootRow();
+      }
+    }
   }
+}
+
+// Populate the export modal's loot rows with encounter loot entries.
+// Encounter loot shape: {id, name, qty, value, notes}.
+// Export loot row shape: item (text), qty (text), recipient (text).
+function preFillEncounterLoot(lootArr) {
+  lootArr.forEach(l => {
+    const item = l.name || '';
+    const qty  = l.qty != null ? String(l.qty) : '1';
+    // No recipient field on encounter loot — default to 'Party'.
+    addLootRow(item, qty, 'Party');
+  });
 }
 
 function onSessionSelectChange() {
@@ -2726,12 +2706,15 @@ async function exportToChronicle() {
   const combat = buildCombatObject();
   const loot   = collectLoot();
   const sel    = document.getElementById('exp-session-select').value;
+  let timelineEntryId = null; // captured for encounter resolution (Task 4.8)
 
   if (sel === '__new__') {
+    const newId       = 'tl_' + Date.now() + Math.floor(Math.random()*1000);
+    timelineEntryId   = newId;
     const title      = document.getElementById('exp-new-session-title').value.trim() || combat.title;
     const dateInGame = document.getElementById('exp-new-session-date').value.trim();
     chronicleAll.push({
-      id: 'tl_' + Date.now() + Math.floor(Math.random()*1000),
+      id: newId,
       title, kind: 'session',
       dateInGame, dateSort: '', dateReal: new Date().toISOString().slice(0,10),
       body: combat.summary || '',
@@ -2740,6 +2723,7 @@ async function exportToChronicle() {
       combats: [combat], loot
     });
   } else {
+    timelineEntryId = sel;
     const entry = chronicleAll.find(e => e.id === sel);
     if (!entry) { alert('That session is gone — reopen the export to refresh.'); return; }
     entry.combats = Array.isArray(entry.combats) ? entry.combats : [];
@@ -2768,6 +2752,10 @@ async function exportToChronicle() {
       // Refresh the banner in case the user exported a recovered draft.
       renderDraftBanner();
     }
+    // Resolve the staged encounter to 'completed' (Task 4.8).
+    if (window.encounterId) {
+      await resolveEncounterAfterExport(window.encounterId, timelineEntryId);
+    }
     setSyncStatus('ok', '✦ Added to Chronicle');
     setTimeout(() => setSyncStatus('', ''), 3000);
     closeExport();
@@ -2775,6 +2763,63 @@ async function exportToChronicle() {
     btn.disabled = false; btn.textContent = 'Add to Chronicle';
     alert('Could not reach the Chronicle. Try again.');
   }
+}
+
+// Map the export modal's outcome dropdown value to an EncounterSchema OUTCOME.
+// Modal values: "Victory", "Defeat", "Retreat", "Stalemate", "Pyrrhic Victory".
+// Schema OUTCOMES: 'won', 'tpk', 'fled', 'skipped'.
+function _modalOutcomeToSchemaOutcome(modalValue) {
+  if (!modalValue) return null;
+  switch (modalValue) {
+    case 'Victory':         return 'won';
+    case 'Pyrrhic Victory': return 'won';
+    case 'Defeat':          return 'tpk';
+    case 'Retreat':         return 'fled';
+    default:                return null; // Stalemate and unknowns → null
+  }
+}
+
+// Write encounter status='completed' to KV after a successful timeline write.
+// Best-effort: shows a toast on failure rather than blocking the export.
+async function resolveEncounterAfterExport(encId, timelineEntryId) {
+  const outcomeEl = document.getElementById('exp-outcome');
+  const outcome = _modalOutcomeToSchemaOutcome(outcomeEl ? outcomeEl.value : null);
+  const headers = Auth.dmHeaders();
+  try {
+    const getRes = await fetch(WORKER_URL + '?type=encounters', { headers, cache: 'no-store' });
+    if (!getRes.ok) throw new Error('HTTP ' + getRes.status);
+    const arr = await getRes.json();
+    const merged = (Array.isArray(arr) ? arr : []).map(EncounterSchema.migrateInMemory).map(e =>
+      e.id === encId ? {
+        ...e,
+        status: 'completed',
+        resolvedAt: new Date().toISOString(),
+        resolvedInTimelineId: timelineEntryId,
+        lastOutcome: outcome,
+      } : e
+    );
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'encounters', payload: merged }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    // Clear the encounter context so a re-export doesn't re-resolve.
+    window.encounterId = null;
+    window.encounterStagedAt = null;
+    _stagedEncCache = null;
+  } catch (e) {
+    console.warn('Encounter resolution write failed:', e);
+    showExportToast('Encounter status didn\'t update — refresh the builder and mark complete manually.');
+  }
+}
+
+function showExportToast(msg) {
+  const t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#5a4030;color:#e8e6df;padding:10px 14px;border-radius:4px;font-family:Crimson Text,serif;z-index:2000;';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 6000);
 }
 
 ['exp-title','exp-date','exp-location','exp-outcome','exp-session','exp-summary'].forEach(id => {
@@ -2804,8 +2849,277 @@ async function init() {
     await saveDrafts();
   }
   renderDraftBanner();
+
+  // Handle ?stage=<id> — must run after drafts are loaded so isCombatActive()
+  // sees the correct state and the bestiary is available for pick instantiation.
+  handleStageParam();
 }
 init();
+
+// ═══════════════════════════════════════════════════════
+//  ENCOUNTER STAGING (?stage= URL param)
+// ═══════════════════════════════════════════════════════
+
+// Detect if a combat is currently in progress.
+function isCombatActive() {
+  return mode === 'combat' || state.combatants.length > 0;
+}
+
+async function handleStageParam() {
+  const id = new URLSearchParams(location.search).get('stage');
+  if (!id) return;
+  history.replaceState(null, '', location.pathname);
+
+  const headers = Auth.dmHeaders();
+  let encs;
+  try {
+    encs = await fetch(WORKER_URL + '?type=encounters', { headers, cache: 'no-store' }).then(r => r.json());
+  } catch (e) {
+    alert('Could not load encounter: ' + e.message);
+    return;
+  }
+  const raw = (Array.isArray(encs) ? encs : []).find(e => e.id === id);
+  if (!raw) {
+    alert('Encounter ' + id + ' not found.');
+    return;
+  }
+  const enc = EncounterSchema.migrateInMemory(raw);
+
+  // Confirm if any combatants are already on the board.
+  if (isCombatActive()) {
+    const count = state.combatants.length;
+    if (!confirm('Combat in progress (' + count + ' combatant' + (count === 1 ? '' : 's') + '). Stage "' + (enc.name || 'this encounter') + '" and discard the current roster?')) {
+      return;
+    }
+  }
+
+  // Bestiary must be loaded before we can instantiate combatants from picks.
+  if (!_BP.loaded && !_BP.loading) {
+    await loadBestiary();
+  } else if (_BP.loading) {
+    // Wait for an in-flight load to finish (unlikely but defensive).
+    await new Promise(resolve => {
+      const check = setInterval(() => { if (!_BP.loading) { clearInterval(check); resolve(); } }, 100);
+    });
+  }
+
+  stageEncounter(enc);
+}
+
+function stageEncounter(enc) {
+  // Clear the current roster. PCs survive into the next encounter via
+  // the carryover modal in normal flow, but when staging from a URL
+  // the DM has already confirmed the discard, so we remove everything.
+  state.combatants = [];
+  state.round = 1;
+  state.activeIndex = 0;
+  mode = 'lobby';
+  expandedIds.clear();
+  statblockOpenIds.clear();
+
+  // Bridge to the existing bestiary add-picks code path.
+  _BP.picks = (enc.picks || []).map(p => ({
+    id: p.id,
+    qty: (p.qty > 0 ? p.qty : 1),
+    rollHp: !!p.rollHp,
+    hpOverride: Number.isFinite(p.hpOverride) ? p.hpOverride : null,
+    rollInit: !!p.rollInit,
+    initOverride: Number.isFinite(p.initOverride) ? p.initOverride : null,
+    hidden: !!p.hidden,
+    pickKey: p.pickKey || null,
+    startingConditions: Array.isArray(p.startingConditions) ? p.startingConditions : [],
+    expanded: false
+  }));
+
+  // Spawn the combatants using the existing bestiary add path.
+  // loadAllPicks() empties _BP.picks, closes the picker modal, then
+  // calls render() + pushState(). We re-open from here if needed.
+  // Since the picker modal is not open, closeBestiaryPicker() is a no-op.
+  loadAllPicks();
+
+  // Apply staging metadata (surprise flags + starting conditions).
+  // combatants have been pushed to state.combatants by loadAllPicks().
+  applyStagingMetadata(enc);
+
+  // Record the encounter association on the window so pushState() can
+  // include it on the next write.
+  window.encounterId = enc.id;
+  window.encounterStagedAt = new Date().toISOString();
+  pushState();
+
+  // Flip the encounter status to 'live' in KV (best-effort).
+  markEncounterStatusLive(enc.id);
+
+  // Read-aloud banner (Task 4.4).
+  if (enc.tactical && enc.tactical.readAloud) {
+    showReadAloudBanner(enc.tactical.readAloud, enc.name);
+  }
+
+  // Wave reminders (Task 4.5).
+  stagedPicksByKey = {};
+  (enc.picks || []).forEach(p => { if (p.pickKey) stagedPicksByKey[p.pickKey] = p; });
+  stagedWaves = (enc.tactical && Array.isArray(enc.tactical.waves)) ? enc.tactical.waves.slice() : [];
+  checkWaveReminders();
+
+  updateModeUI();
+}
+
+function applyStagingMetadata(enc) {
+  const tactical = enc.tactical || {};
+  // Build a lookup of startingConditions by pickKey.
+  const condsByPickKey = {};
+  (enc.picks || []).forEach(p => {
+    if (p.pickKey) condsByPickKey[p.pickKey] = Array.isArray(p.startingConditions) ? p.startingConditions : [];
+  });
+
+  state.combatants.forEach(c => {
+    // Apply starting conditions from the pick this combatant came from.
+    if (c.pickKey && condsByPickKey[c.pickKey] && condsByPickKey[c.pickKey].length) {
+      c.conditions = (Array.isArray(c.conditions) ? c.conditions : []).concat(condsByPickKey[c.pickKey]);
+    }
+    // Surprise: push 'Surprised' condition so it appears as a visible badge,
+    // consistent with startingConditions. (Setting c.surprised is not read anywhere.)
+    const surprise = tactical.surprise || 'none';
+    if (surprise === 'monsters' || surprise === 'both') {
+      if (c.type === 'enemy') {
+        c.conditions = c.conditions || [];
+        if (!c.conditions.includes('Surprised')) c.conditions.push('Surprised');
+      }
+    }
+    if (surprise === 'party' || surprise === 'both') {
+      if (c.type === 'pc') {
+        c.conditions = c.conditions || [];
+        if (!c.conditions.includes('Surprised')) c.conditions.push('Surprised');
+      }
+    }
+  });
+}
+
+async function markEncounterStatusLive(id) {
+  const headers = Auth.dmHeaders();
+  try {
+    const arr = await fetch(WORKER_URL + '?type=encounters', { headers, cache: 'no-store' }).then(r => r.json());
+    const merged = (Array.isArray(arr) ? arr : [])
+      .map(EncounterSchema.migrateInMemory)
+      .map(e => e.id === id
+        ? { ...e, status: 'live', lastStagedAt: new Date().toISOString() }
+        : e);
+    await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'encounters', payload: merged }),
+    });
+  } catch (e) {
+    console.warn('markEncounterStatusLive failed:', e);
+  }
+}
+
+// ── Read-aloud banner ──
+function showReadAloudBanner(text, name) {
+  let bar = document.getElementById('readaloud-banner');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'readaloud-banner';
+    bar.style.cssText = [
+      'padding:10px 14px',
+      'background:#3a4a3a',
+      'border-left:4px solid var(--c-brass)',
+      'border-radius:var(--radius)',
+      'margin:8px 0',
+      'font-family:"Crimson Text",Georgia,serif',
+    ].join(';');
+    // Insert above the combatant list, inside the combatant column.
+    const col = document.querySelector('.combatant-col');
+    if (col) {
+      const list = document.getElementById('combatant-list');
+      col.insertBefore(bar, list || col.firstChild);
+    } else {
+      document.body.insertBefore(bar, document.body.firstChild);
+    }
+  }
+  bar.innerHTML =
+    '<div style="font-family:\'Cinzel\',serif;font-size:0.72rem;letter-spacing:0.1em;color:var(--c-brass);margin-bottom:5px">' +
+    escapeHtml(name || '') + ' — Read Aloud</div>' +
+    '<p style="margin:0 0 8px;color:var(--c-ink);line-height:1.55">' +
+    escapeHtml(text).replace(/\n/g, '<br>') + '</p>' +
+    '<button onclick="dismissReadAloud()" style="font-family:\'Cinzel\',serif;font-size:0.6rem;letter-spacing:0.1em;padding:3px 10px;background:none;border:1px solid var(--c-brass);border-radius:2px;color:var(--c-brass);cursor:pointer">Dismiss</button>';
+}
+
+function dismissReadAloud() {
+  document.getElementById('readaloud-banner')?.remove();
+}
+
+// ── Wave reminders ──
+function getOrCreateWaveArea() {
+  let root = document.getElementById('wave-reminder-area');
+  if (!root) {
+    root = document.createElement('div');
+    root.id = 'wave-reminder-area';
+    const col = document.querySelector('.combatant-col');
+    if (col) {
+      const list = document.getElementById('combatant-list');
+      col.insertBefore(root, list || col.firstChild);
+    } else {
+      document.body.insertBefore(root, document.body.firstChild);
+    }
+  }
+  return root;
+}
+
+function checkWaveReminders() {
+  // Only show reminders if waves were staged for this encounter.
+  if (!stagedWaves.length) return;
+  const root = getOrCreateWaveArea();
+  const round = state.round;
+  const due = stagedWaves.filter(w => w.round === round + 1);
+  if (!due.length) { root.innerHTML = ''; return; }
+  root.innerHTML = due.map((w, idx) => {
+    // Look up the monster name from the staged picks snapshot (stagedPicksByKey),
+    // since _BP.picks is drained by loadAllPicks() after staging.
+    const pick = stagedPicksByKey[w.pickKey];
+    const monsterName = pick
+      ? ((_BP.monsters.find(m => m.id === pick.id) || {}).name || pick.id || w.pickKey)
+      : (w.pickKey || 'Unknown');
+    const safeKey  = escapeHtml(String(w.pickKey || ''));
+    const safeDir  = w.fromDirection ? ' from ' + escapeHtml(w.fromDirection) : '';
+    const safeNote = w.note ? ' — ' + escapeHtml(w.note) : '';
+    return '<div style="padding:8px 14px;background:#4a3a2a;border-left:4px solid var(--c-brass);' +
+      'border-radius:var(--radius);margin:6px 0;font-family:\'Crimson Text\',Georgia,serif">' +
+      '<div style="font-family:\'Cinzel\',serif;font-size:0.7rem;letter-spacing:0.1em;' +
+      'color:var(--c-brass);margin-bottom:4px">Wave incoming — Round ' + (round + 1) + '</div>' +
+      '<span style="color:var(--c-ink)">' + (w.count || 1) + ' × ' + escapeHtml(monsterName) + safeDir + safeNote + '</span> ' +
+      '<button onclick="spawnWave(\'' + safeKey + '\',' + (w.round) + ')" ' +
+      'style="font-family:\'Cinzel\',serif;font-size:0.6rem;letter-spacing:0.08em;padding:3px 10px;' +
+      'background:none;border:1px solid var(--c-brass);border-radius:2px;color:var(--c-brass);cursor:pointer;margin-left:8px">' +
+      'Add wave</button>' +
+      '</div>';
+  }).join('');
+}
+
+function spawnWave(pickKey, waveRound) {
+  // Find the wave definition.
+  const wave = stagedWaves.find(w => w.pickKey === pickKey && w.round === waveRound);
+  if (!wave) return;
+  // Find the pick from the staged picks snapshot (stagedPicksByKey),
+  // since _BP.picks is drained by loadAllPicks() after staging.
+  const pick = stagedPicksByKey[pickKey];
+  if (!pick) {
+    alert('Cannot spawn wave — pick "' + pickKey + '" not found in current pick list.\nTry adding the monster manually via the bestiary.');
+    return;
+  }
+  // Temporarily override picks with just this wave pick at the requested count,
+  // then call the standard add path, then restore.
+  const savedPicks = _BP.picks;
+  _BP.picks = [{ ...pick, qty: wave.count || 1 }];
+  // loadAllPicks() empties _BP.picks, closes picker, calls render+pushState.
+  // We restore savedPicks (minus the spawned wave) after.
+  loadAllPicks();
+  // Restore the remaining picks (minus the ones loadAllPicks consumed).
+  _BP.picks = savedPicks;
+  // Remove the spawned wave from the queue and refresh banners.
+  stagedWaves = stagedWaves.filter(w => !(w.pickKey === pickKey && w.round === waveRound));
+  checkWaveReminders();
+}
 </script>
 </body>
 </html>

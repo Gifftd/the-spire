@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Encounter Schema — tests</title>
+  <style>
+    body { font: 14px/1.4 system-ui, sans-serif; padding: 1rem; background: #1a1f24; color: #e8e6df; }
+    h1 { font-family: Cinzel, serif; }
+    button { font: inherit; padding: 6px 14px; background: #2a3038; color: inherit; border: 1px solid #888; border-radius: 3px; cursor: pointer; }
+    #results { margin-top: 1rem; }
+    .pass { color: #6c8; }
+    .fail { color: #d66; }
+    .case { padding: 2px 0; font-family: ui-monospace, monospace; }
+  </style>
+</head>
+<body>
+  <h1>Encounter Schema — tests</h1>
+  <button onclick="runAll()">Run tests</button>
+  <div id="results"></div>
+
+  <script src="../encounter-schema.js"></script>
+  <script>
+    const tests = [];
+    function test(name, fn) { tests.push({ name, fn }); }
+    function assert(cond, msg) { if (!cond) throw new Error(msg || 'assertion failed'); }
+    function assertEq(a, b, msg) {
+      const sa = JSON.stringify(a), sb = JSON.stringify(b);
+      if (sa !== sb) throw new Error((msg || 'mismatch') + ': ' + sa + ' vs ' + sb);
+    }
+
+    function runAll() {
+      const root = document.getElementById('results');
+      root.innerHTML = '';
+      let pass = 0, fail = 0;
+      for (const t of tests) {
+        const row = document.createElement('div');
+        row.className = 'case';
+        try { t.fn(); row.classList.add('pass'); row.textContent = '✓ ' + t.name; pass++; }
+        catch (e) { row.classList.add('fail'); row.textContent = '✗ ' + t.name + '  —  ' + e.message; fail++; }
+        root.appendChild(row);
+      }
+      const summary = document.createElement('div');
+      summary.style.marginTop = '1rem';
+      summary.style.fontWeight = '600';
+      summary.textContent = `${pass} passed, ${fail} failed (${tests.length} total)`;
+      root.appendChild(summary);
+    }
+
+    // ── Tests ──
+    test('STATUSES contains the v1 + v2 lifecycle states', () => {
+      const s = EncounterSchema.STATUSES;
+      ['draft','ready','scheduled','live','completed','archived'].forEach(v =>
+        assert(s.includes(v), v + ' missing from STATUSES'));
+    });
+
+    test('newEncounter returns a v2-shape draft', () => {
+      const e = EncounterSchema.newEncounter('My fight');
+      assertEq(e.schemaVersion, 2);
+      assertEq(e.status, 'draft');
+      assertEq(e.name, 'My fight');
+      assertEq(e.picks, []);
+      assertEq(e.tactical.lighting, 'bright');
+      assertEq(e.tactical.surprise, 'none');
+      assertEq(e.tactical.waves, []);
+      assertEq(e.playbook.overallTactics, '');
+      assertEq(e.loot, []);
+      assertEq(e.npcRoles, []);
+      assertEq(e.locationRef, null);
+      assertEq(e.sessionId, null);
+      assert(typeof e.id === 'string' && e.id.startsWith('enc_'), 'id format');
+      assert(typeof e.createdAt === 'string', 'createdAt set');
+      assertEq(e.lastOutcome, null);
+    });
+
+    test('genPickKeys assigns p1, p2, ... in array order', () => {
+      const picks = [{ id: 'goblin' }, { id: 'orc' }, { id: 'goblin' }];
+      const out = EncounterSchema.genPickKeys(picks);
+      assertEq(out.map(p => p.pickKey), ['p1','p2','p3']);
+    });
+
+    test('genPickKeys preserves existing pickKeys when unique', () => {
+      const picks = [{ id: 'goblin', pickKey: 'pX' }, { id: 'orc' }];
+      const out = EncounterSchema.genPickKeys(picks);
+      assertEq(out.map(p => p.pickKey), ['pX','p1']);
+    });
+
+    test('genPickKeys resolves duplicate pickKeys by re-assigning later ones', () => {
+      const picks = [{ id: 'goblin', pickKey: 'p1' }, { id: 'orc', pickKey: 'p1' }];
+      const out = EncounterSchema.genPickKeys(picks);
+      assertEq(out[0].pickKey, 'p1');
+      assert(out[1].pickKey !== 'p1', 'duplicate must be re-assigned');
+    });
+
+    test('genPickKeys is idempotent on already-keyed picks', () => {
+      const picks = [{ id: 'g', pickKey: 'p1' }, { id: 'o', pickKey: 'p2' }];
+      const out = EncounterSchema.genPickKeys(picks);
+      assertEq(out.map(p => p.pickKey), ['p1','p2']);
+    });
+
+    test('migrateInMemory upgrades a v1 record to v2', () => {
+      const v1 = {
+        id: 'enc_old',
+        name: 'Old fight',
+        picks: [{ id: 'g', qty: 3 }, { id: 'o', qty: 1 }],
+        party: { size: 4, level: 5 },
+        totalXp: 100,
+        monsterCount: 4,
+        createdAt: '2026-05-01T00:00:00Z',
+      };
+      const v2 = EncounterSchema.migrateInMemory(v1);
+      assertEq(v2.schemaVersion, 2);
+      assertEq(v2.status, 'ready');
+      assertEq(v2.picks.map(p => p.pickKey), ['p1','p2']);
+      assertEq(v2.tactical.lighting, 'bright');
+      assertEq(v2.tactical.surprise, 'none');
+      assertEq(v2.tactical.waves, []);
+      assertEq(v2.locationRef, null);
+      assertEq(v2.sessionId, null);
+      assertEq(v2.npcRoles, []);
+      assertEq(v2.updatedAt, v2.createdAt);
+    });
+
+    test('migrateInMemory is a no-op on v2 records', () => {
+      const e = EncounterSchema.newEncounter('Already v2');
+      const out = EncounterSchema.migrateInMemory(e);
+      assertEq(out, e);
+    });
+
+    test('migrateInMemory handles malformed input gracefully', () => {
+      const out = EncounterSchema.migrateInMemory({});
+      assertEq(out.schemaVersion, 2);
+      assertEq(out.picks, []);
+      assertEq(out.status, 'ready');
+    });
+
+    test('validateEncounter passes a freshly-created encounter', () => {
+      const e = EncounterSchema.newEncounter('OK');
+      const r = EncounterSchema.validateEncounter(e);
+      assertEq(r.ok, true);
+      assertEq(r.errors, []);
+    });
+
+    test('validateEncounter rejects unknown status', () => {
+      const e = EncounterSchema.newEncounter('Bad');
+      e.status = 'in-progress';
+      const r = EncounterSchema.validateEncounter(e);
+      assertEq(r.ok, false);
+      assert(r.errors.some(x => x.field === 'status'), 'status error present');
+    });
+
+    test('validateEncounter rejects unknown lighting / surprise / role', () => {
+      const e = EncounterSchema.newEncounter('Bad');
+      e.tactical.lighting = 'glow';
+      e.tactical.surprise = 'sometimes';
+      e.npcRoles = [{ npcId: 'n1', role: 'sidekick' }];
+      const r = EncounterSchema.validateEncounter(e);
+      assertEq(r.ok, false);
+      ['tactical.lighting','tactical.surprise','npcRoles[0].role']
+        .forEach(f => assert(r.errors.some(x => x.field === f), 'missing error for ' + f));
+    });
+
+    test('validateEncounter rejects duplicate pickKeys', () => {
+      const e = EncounterSchema.newEncounter('Dupes');
+      e.picks = [
+        { id: 'g', qty: 1, pickKey: 'p1' },
+        { id: 'o', qty: 1, pickKey: 'p1' },
+      ];
+      const r = EncounterSchema.validateEncounter(e);
+      assertEq(r.ok, false);
+      assert(r.errors.some(x => x.field === 'picks' && /duplicate/.test(x.message)), 'duplicate-key error');
+    });
+
+    test('validateEncounter rejects wave referencing missing pickKey', () => {
+      const e = EncounterSchema.newEncounter('Orphan');
+      e.picks = [{ id: 'g', qty: 1, pickKey: 'p1' }];
+      e.tactical.waves = [{ round: 2, pickKey: 'p99', count: 1 }];
+      const r = EncounterSchema.validateEncounter(e);
+      assertEq(r.ok, false);
+      assert(r.errors.some(x => x.field === 'tactical.waves[0].pickKey'), 'orphan-wave error');
+    });
+
+    test('validateEncounter rejects locationRef of wrong shape', () => {
+      const e = EncounterSchema.newEncounter('BadRef');
+      e.locationRef = { kind: 'galaxy', locationId: 'andromeda' };
+      const r = EncounterSchema.validateEncounter(e);
+      assertEq(r.ok, false);
+      assert(r.errors.some(x => x.field === 'locationRef.kind'), 'kind enum');
+    });
+
+    test('validateEncounter enforces soft caps', () => {
+      const e = EncounterSchema.newEncounter('TooMany');
+      for (let i = 0; i < 60; i++) e.picks.push({ id: 'g', qty: 1, pickKey: 'q' + i });
+      const r = EncounterSchema.validateEncounter(e);
+      assertEq(r.ok, false);
+      assert(r.errors.some(x => x.field === 'picks' && /50/.test(x.message)), 'cap error');
+    });
+
+    test('validateEncounter tolerates v1 picks without pickKey', () => {
+      const e = EncounterSchema.newEncounter('v1');
+      e.picks = [{ id: 'g', qty: 1 }];  // no pickKey
+      const r = EncounterSchema.validateEncounter(e);
+      assertEq(r.ok, true);
+    });
+
+    test('equalLocationRefs handles null + world + submap', () => {
+      const eq = EncounterSchema.equalLocationRefs;
+      assertEq(eq(null, null), true);
+      assertEq(eq(null, { kind: 'world', locationId: 'a' }), false);
+      assertEq(eq({ kind: 'world', locationId: 'a' }, { kind: 'world', locationId: 'a' }), true);
+      assertEq(eq({ kind: 'world', locationId: 'a' }, { kind: 'world', locationId: 'b' }), false);
+      assertEq(eq(
+        { kind: 'submap', parentLocationId: 'p', locationId: 'l' },
+        { kind: 'submap', parentLocationId: 'p', locationId: 'l' }), true);
+      assertEq(eq(
+        { kind: 'submap', parentLocationId: 'p', locationId: 'l' },
+        { kind: 'submap', parentLocationId: 'X', locationId: 'l' }), false);
+      assertEq(eq(
+        { kind: 'world',  locationId: 'l' },
+        { kind: 'submap', parentLocationId: 'p', locationId: 'l' }), false);
+    });
+
+    test('resolveLocationRef returns world location + null parent', () => {
+      const world = {
+        locations: [
+          { id: 'numira-bad', name: "Numira'Bad", subMap: { locations: [{ id: 'chapel', name: 'Chapel' }] } },
+          { id: 'chapel', name: 'World Chapel' },
+        ],
+      };
+      const res = EncounterSchema.resolveLocationRef(
+        { kind: 'world', locationId: 'chapel' }, world);
+      assertEq(res.parent, null);
+      assertEq(res.location.name, 'World Chapel');
+    });
+
+    test('resolveLocationRef returns submap location + parent', () => {
+      const world = {
+        locations: [
+          { id: 'numira-bad', name: "Numira'Bad", subMap: { locations: [{ id: 'chapel', name: 'Sub Chapel' }] } },
+          { id: 'chapel', name: 'World Chapel' },
+        ],
+      };
+      const res = EncounterSchema.resolveLocationRef(
+        { kind: 'submap', parentLocationId: 'numira-bad', locationId: 'chapel' }, world);
+      assertEq(res.parent.id, 'numira-bad');
+      assertEq(res.location.name, 'Sub Chapel');
+    });
+
+    test('resolveLocationRef returns null for broken refs', () => {
+      const world = { locations: [{ id: 'a' }] };
+      assertEq(EncounterSchema.resolveLocationRef(null, world), null);
+      assertEq(EncounterSchema.resolveLocationRef({ kind: 'world', locationId: 'missing' }, world), null);
+      assertEq(EncounterSchema.resolveLocationRef({ kind: 'submap', parentLocationId: 'missing', locationId: 'x' }, world), null);
+    });
+
+    test('genId returns prefixed unique strings', () => {
+      const a = EncounterSchema.genId('test');
+      const b = EncounterSchema.genId('test');
+      assert(a.startsWith('test_'), 'prefix present');
+      assert(a.length > 10, 'has content after prefix');
+      assert(a !== b, 'two calls produce distinct ids');
+    });
+
+    test('migrateInMemory tolerates null input', () => {
+      const out = EncounterSchema.migrateInMemory(null);
+      assertEq(out.schemaVersion, 2);
+      assertEq(out.picks, []);
+      assert(typeof out.id === 'string' && out.id.startsWith('enc_'), 'fresh id');
+    });
+
+    test('validateEncounter tolerates missing tactical section', () => {
+      const e = EncounterSchema.newEncounter('no-tac');
+      delete e.tactical;
+      const r = EncounterSchema.validateEncounter(e);
+      assertEq(r.ok, true);
+    });
+
+    test('validateEncounter rejects submap locationRef missing parentLocationId', () => {
+      const e = EncounterSchema.newEncounter('BadSubmap');
+      e.locationRef = { kind: 'submap', locationId: 'chapel' };  // no parentLocationId
+      const r = EncounterSchema.validateEncounter(e);
+      assertEq(r.ok, false);
+      assert(r.errors.some(x => x.field === 'locationRef.parentLocationId'), 'parentLocationId required');
+    });
+
+    test('validateEncounter flags orphan wave pickKey when picks is missing', () => {
+      const e = EncounterSchema.newEncounter('OrphanNoPicks');
+      e.picks = undefined;  // no picks array at all
+      e.tactical.waves = [{ round: 2, pickKey: 'p1', count: 1 }];
+      const r = EncounterSchema.validateEncounter(e);
+      assertEq(r.ok, false);
+      assert(r.errors.some(x => x.field === 'tactical.waves[0].pickKey'), 'orphan wave detected');
+    });
+  </script>
+</body>
+</html>

@@ -39,6 +39,7 @@
 </head>
 <body>
 <script src="auth.js"></script>
+<script src="encounter-schema.js"></script>
 
 <div class="topbar">
   <h1>⚔ The Crucible</h1>
@@ -1341,6 +1342,54 @@ loadBestiary().catch(e => console.warn('Bestiary preload failed', e));
     // Display the planned seed by stashing it in lastSimSeed before run;
     // the run handler reads from URL each time anyway.
     document.title = 'The Crucible · seed=' + seedStr;
+  }
+})();
+
+// Handle ?from-encounter=<id> — port encounter picks into the Crucible and show a Testing chip.
+(async function handleFromEncounter() {
+  const id = new URLSearchParams(location.search).get('from-encounter');
+  if (!id) return;
+  history.replaceState(null, '', location.pathname);
+
+  const headers = Auth.dmHeaders ? Auth.dmHeaders() : {};
+  let arr;
+  try {
+    const r = await fetch(WORKER_URL + '?type=encounters', { headers, cache: 'no-store' });
+    if (!r.ok) { alert('Could not load encounter (HTTP ' + r.status + ').'); return; }
+    arr = await r.json();
+  } catch (e) {
+    alert('Could not load encounter: ' + (e.message || e));
+    return;
+  }
+  if (!Array.isArray(arr)) { alert('Could not load encounter: unexpected response from server.'); return; }
+  const enc = arr.map(EncounterSchema.migrateInMemory).find(e => e.id === id);
+  if (!enc) {
+    alert('Encounter not found.');
+    return;
+  }
+
+  // Load the bestiary (reuses the already-started preload) then port picks.
+  const bestiary = await loadBestiary();
+  enc.picks.forEach(p => {
+    const monster = bestiary.find(m => m.id === p.id);
+    if (!monster) {
+      console.warn('[Crucible] from-encounter: monster not found in bestiary, id=', p.id);
+      return;
+    }
+    addPick(monster);
+    // addPick pushes to the end of picks[] with count:1; set the correct qty.
+    const newPick = picks[picks.length - 1];
+    if (newPick && (p.qty || 1) > 1) newPick.count = p.qty;
+  });
+  renderEncounter();
+
+  // Show "Testing: <name>" chip above the encounter pane.
+  const paneB = document.getElementById('pane-encounter');
+  if (paneB) {
+    const chip = document.createElement('div');
+    chip.style.cssText = 'padding:6px 10px;background:rgba(184,138,90,0.15);border-left:3px solid var(--c-brass);font-family:"Crimson Text",serif;margin-bottom:8px';
+    chip.innerHTML = `Testing: <strong>${escapeHtml(enc.name)}</strong> — <a href="encounter-dm.html?id=${encodeURIComponent(enc.id)}" style="color:var(--c-brass)">back to The Anvil</a>`;
+    paneB.prepend(chip);
   }
 })();
 </script>
