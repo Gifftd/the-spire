@@ -594,11 +594,25 @@
       }
 
       // ── Always: update non-Combatants sections in place ──
+      // Capture open state before outerHTML swap (swap destroys the element).
+      const SECTION_IDS = ['enc-identity-section','enc-tactical-section','enc-playbook-section','enc-loot-section','enc-linkages-section'];
+      const openSet = new Set();
+      SECTION_IDS.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.open) openSet.add(id);
+      });
+
       document.getElementById('enc-identity-section').outerHTML = renderIdentity(enc);
       document.getElementById('enc-tactical-section').outerHTML = renderTactical(enc);
       document.getElementById('enc-playbook-section').outerHTML = renderPlaybook(enc);
       document.getElementById('enc-loot-section').outerHTML = renderLoot(enc);
       document.getElementById('enc-linkages-section').outerHTML = renderLinkages(enc);
+
+      // Restore open state after swap.
+      openSet.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.open = true;
+      });
 
       // Sync party inputs only when not focused (avoid disrupting typing).
       const szEl = document.getElementById('enc-bp-party-size');
