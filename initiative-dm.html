@@ -836,6 +836,7 @@ body {
 <script src="auth.js"></script>
 <script src="initiative-notes.js"></script>
 <script src="bestiary-merge.js"></script>
+<script src="encounter-schema.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════
 //  CONFIG
@@ -2689,8 +2690,65 @@ async function init() {
     await saveDrafts();
   }
   renderDraftBanner();
+
+  // Handle ?stage=<id> — must run after drafts are loaded so isCombatActive()
+  // sees the correct state and the bestiary is available for pick instantiation.
+  handleStageParam();
 }
 init();
+
+// ═══════════════════════════════════════════════════════
+//  ENCOUNTER STAGING (?stage= URL param)
+// ═══════════════════════════════════════════════════════
+
+// Detect if a combat is currently in progress.
+function isCombatActive() {
+  return mode === 'combat' || state.combatants.length > 0;
+}
+
+async function handleStageParam() {
+  const id = new URLSearchParams(location.search).get('stage');
+  if (!id) return;
+  history.replaceState(null, '', location.pathname);
+
+  const headers = Auth.dmHeaders();
+  let encs;
+  try {
+    encs = await fetch(WORKER_URL + '?type=encounters', { headers, cache: 'no-store' }).then(r => r.json());
+  } catch (e) {
+    alert('Could not load encounter: ' + e.message);
+    return;
+  }
+  const raw = (Array.isArray(encs) ? encs : []).find(e => e.id === id);
+  if (!raw) {
+    alert('Encounter ' + id + ' not found.');
+    return;
+  }
+  const enc = EncounterSchema.migrateInMemory(raw);
+
+  // Confirm if any combatants are already on the board.
+  if (isCombatActive()) {
+    const count = state.combatants.length;
+    if (!confirm('Combat in progress (' + count + ' combatant' + (count === 1 ? '' : 's') + '). Stage "' + (enc.name || 'this encounter') + '" and discard the current roster?')) {
+      return;
+    }
+  }
+
+  // Bestiary must be loaded before we can instantiate combatants from picks.
+  if (!_BP.loaded && !_BP.loading) {
+    await loadBestiary();
+  } else if (_BP.loading) {
+    // Wait for an in-flight load to finish (unlikely but defensive).
+    await new Promise(resolve => {
+      const check = setInterval(() => { if (!_BP.loading) { clearInterval(check); resolve(); } }, 100);
+    });
+  }
+
+  stageEncounter(enc);
+}
+
+// Stub replaced in Task 4.3.
+function stageEncounter(enc) { console.log('Phase 4A stub: stageEncounter', enc); }
 </script>
 </body>
 </html>
