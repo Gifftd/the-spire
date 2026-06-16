@@ -9,6 +9,23 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-16
 
+### Maps — UX cleanup pass (round 4)
+
+- **DM map: styled confirm dialog for destructive operations.** Replaced
+  9 native `confirm()` popups with an async `confirmDialog()` modal that
+  matches the page theme. Red action button, default focus on Cancel
+  (safer), Esc cancels, Enter confirms, click-outside cancels. Affected
+  flows: delete location / zone / character / NPC / whisper / NPC history
+  entry / timeline entry, detach combat from timeline, reset sub-map.
+  `resetSubMap`, `deleteLocation`, `deleteZone`, `removeTLCombat` became
+  `async`; the other five callers were already async.
+
+  Skipped from the audit ladder: in-app keyboard-shortcut overlay
+  (only ~3 shortcuts exist; not worth a help modal), "frame all pins"
+  fit button (the existing reset suffices), and the touch pin-preview
+  feature (out of scope for cleanup — and `pin-info-panel` is now
+  hidden on touch as of round 3).
+
 ### Maps — UX cleanup pass (round 3)
 
 - **DM map: renamed topbar buttons for clarity.** "⤢ Pop out editor" →
