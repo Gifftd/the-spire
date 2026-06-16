@@ -87,6 +87,13 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 .in-submap-banner{background:linear-gradient(90deg,rgba(180,134,11,0.18) 0%,rgba(180,134,11,0.02) 100%);border-bottom:1px solid var(--gold-faint)}
 .sync-status.ok{color:var(--green-light)}.sync-status.fail{color:var(--red)}.sync-status.ing{color:var(--amber)}
 
+/* Styled confirm dialog — replaces native confirm() for destructive ops */
+.confirm-overlay{position:fixed;inset:0;background:rgba(5,4,3,0.78);backdrop-filter:blur(3px);z-index:9000;display:none;align-items:center;justify-content:center;padding:1rem;opacity:0;transition:opacity 140ms ease}
+.confirm-overlay.visible{display:flex;opacity:1}
+.confirm-modal{background:var(--surface);border:1px solid var(--gold-faint);border-radius:var(--radius);padding:1.3rem 1.4rem;max-width:440px;width:100%;box-shadow:0 14px 44px rgba(0,0,0,0.7)}
+.confirm-msg{font-family:'Crimson Text',serif;font-size:1rem;color:var(--ink);line-height:1.55;margin-bottom:1.1rem;white-space:pre-wrap}
+.confirm-actions{display:flex;gap:8px;justify-content:flex-end}
+
 /* Toast — non-blocking validation/info messages */
 .toast{position:fixed;left:50%;bottom:1.6rem;transform:translateX(-50%) translateY(40px);background:var(--surface);border:1px solid var(--gold-faint);border-radius:var(--radius);padding:10px 18px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.95rem;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.6);opacity:0;pointer-events:none;transition:opacity 180ms ease, transform 180ms ease;max-width:90vw}
 .toast.visible{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -1480,9 +1487,9 @@ function openSubMapEditor() {
   enterSubMap(id);
 }
 
-function resetSubMap() {
+async function resetSubMap() {
   if (!editingLocId) return;
-  if (!confirm('Delete this location\'s entire sub-map (image + pins + zones)? Cannot be undone.')) return;
+  if (!(await confirmDialog('Delete this location\'s entire sub-map (image + pins + zones)? Cannot be undone.'))) return;
   const loc = worldData.locations.find(l => l.id === editingLocId);
   if (!loc) return;
   loc.subMap = null;
@@ -2232,9 +2239,9 @@ function saveLocation() {
   setPublishStatus('','Unpublished changes');
 }
 
-function deleteLocation() {
+async function deleteLocation() {
   if (!editingLocId) return;
-  if (!confirm(`Delete ${data.locations.find(l=>l.id===editingLocId)?.name}?`)) return;
+  if (!(await confirmDialog(`Delete ${data.locations.find(l=>l.id===editingLocId)?.name}?`))) return;
   data.locations=data.locations.filter(l=>l.id!==editingLocId);
   selectedLocId=null; saveAll(); renderLocList(); buildMap(); closeLocModal();
   setPublishStatus('','Unpublished changes');
@@ -2346,8 +2353,8 @@ function updateZone(id,key,val) {
   z[key]=val; saveAll(); buildMap();
   setPublishStatus('','Unpublished changes');
 }
-function deleteZone(id) {
-  if (!confirm('Delete this zone?')) return;
+async function deleteZone(id) {
+  if (!(await confirmDialog('Delete this zone?'))) return;
   data.zones=data.zones.filter(z=>z.id!==id);
   saveAll(); renderZoneList(); buildMap();
 }
@@ -2463,6 +2470,51 @@ function toast(msg, kind) {
   if (_toastTimer) clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => { el.className = el.className.replace(' visible',''); }, 2800);
 }
+
+// Styled confirm dialog. Returns Promise<boolean>. Replaces native confirm() for
+// destructive operations so the UI stays in-character with the rest of the page.
+function confirmDialog(message, opts) {
+  const { confirmLabel = 'Delete', cancelLabel = 'Cancel' } = opts || {};
+  return new Promise(resolve => {
+    let overlay = document.getElementById('confirm-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'confirm-overlay';
+      overlay.className = 'confirm-overlay';
+      overlay.innerHTML = `
+        <div class="confirm-modal" role="dialog" aria-modal="true">
+          <div class="confirm-msg"></div>
+          <div class="confirm-actions">
+            <button class="btn btn-ghost btn-sm confirm-cancel" type="button"></button>
+            <button class="btn btn-red btn-sm confirm-ok" type="button"></button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+    }
+    const okBtn = overlay.querySelector('.confirm-ok');
+    const cancelBtn = overlay.querySelector('.confirm-cancel');
+    overlay.querySelector('.confirm-msg').textContent = message;
+    okBtn.textContent = confirmLabel;
+    cancelBtn.textContent = cancelLabel;
+    overlay.classList.add('visible');
+    const cleanup = (val) => {
+      overlay.classList.remove('visible');
+      okBtn.onclick = cancelBtn.onclick = overlay.onclick = null;
+      document.removeEventListener('keydown', onKey, true);
+      resolve(val);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.stopPropagation(); cleanup(false); }
+      else if (e.key === 'Enter') { e.preventDefault(); cleanup(true); }
+    };
+    okBtn.onclick = () => cleanup(true);
+    cancelBtn.onclick = () => cleanup(false);
+    overlay.onclick = (e) => { if (e.target === overlay) cleanup(false); };
+    document.addEventListener('keydown', onKey, true);
+    setTimeout(() => cancelBtn.focus(), 30);  // focus cancel by default — safer
+  });
+}
+
 function selectText(el) {
   const r = document.createRange(); r.selectNodeContents(el);
   const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
@@ -2546,7 +2598,7 @@ async function deleteCharacter() {
   if (!editingCharId || editingCharId === '__new__') { cancelCharEdit(); return; }
   const c = characters.find(x => x.id === editingCharId);
   if (!c) return;
-  if (!confirm(`Delete ${c.name}? Their claim code will stop working and their whispers will also be removed.`)) return;
+  if (!(await confirmDialog(`Delete ${c.name}? Their claim code will stop working and their whispers will also be removed.`))) return;
   characters = characters.filter(x => x.id !== editingCharId);
   // also drop their journal entries
   journals = journals.filter(j => j.characterId !== editingCharId);
@@ -2611,7 +2663,7 @@ function renderWhisperHistory(charId) {
 }
 
 async function deleteWhisper(jid) {
-  if (!confirm('Delete this whisper? The player will no longer see it.')) return;
+  if (!(await confirmDialog('Delete this whisper? The player will no longer see it.'))) return;
   journals = journals.filter(j => j.id !== jid);
   await saveJournalsKV();
   if (editingCharId) renderWhisperHistory(editingCharId);
@@ -2794,7 +2846,7 @@ async function deleteNPCEntity() {
   if (!editingNPCId || editingNPCId === '__new__') { cancelNPCEdit(); return; }
   const n = npcs.find(x => x.id === editingNPCId);
   if (!n) return;
-  if (!confirm(`Delete ${n.name}? Their history will be lost and players who knew them will no longer see them.`)) return;
+  if (!(await confirmDialog(`Delete ${n.name}? Their history will be lost and players who knew them will no longer see them.`))) return;
   npcs = npcs.filter(x => x.id !== editingNPCId);
   editingNPCId = null;
   document.getElementById('npc-detail').style.display = 'none';
@@ -2879,7 +2931,7 @@ function renderNPCHistory(npcId) {
 
 async function deleteNPCHistoryEntry(hId) {
   if (!editingNPCId) return;
-  if (!confirm('Delete this history entry?')) return;
+  if (!(await confirmDialog('Delete this history entry?'))) return;
   const idx = npcs.findIndex(n => n.id === editingNPCId);
   if (idx < 0) return;
   npcs[idx].history = (npcs[idx].history || []).filter(h => h.id !== hId);
@@ -3067,9 +3119,9 @@ function renderTLCombats() {
   `).join('');
 }
 
-function removeTLCombat(i) {
+async function removeTLCombat(i) {
   const c = tempTLCombats[i];
-  if (!confirm(`Detach combat "${c?.title||'Combat'}" from this entry? Its log and summary are removed from the Chronicle.`)) return;
+  if (!(await confirmDialog(`Detach combat "${c?.title||'Combat'}" from this entry? Its log and summary are removed from the Chronicle.`))) return;
   tempTLCombats.splice(i, 1);
   renderTLCombats();
 }
@@ -3167,7 +3219,7 @@ async function deleteTimelineEntry() {
   if (!editingTLId || editingTLId === '__new__') { cancelTimelineEdit(); return; }
   const e = timeline.find(x => x.id === editingTLId);
   if (!e) return;
-  if (!confirm(`Delete entry "${e.title}"? Cannot be undone.`)) return;
+  if (!(await confirmDialog(`Delete entry "${e.title}"? Cannot be undone.`))) return;
   timeline = timeline.filter(x => x.id !== editingTLId);
   editingTLId = null;
   document.getElementById('tl-detail').style.display = 'none';
