@@ -172,6 +172,12 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 .pin-info-name{font-family:'Cinzel',serif;font-size:1.15rem;letter-spacing:0.05em;color:var(--gold-light);margin-bottom:8px;line-height:1.25}
 .pin-info-desc{font-size:0.98rem;line-height:1.5;color:var(--ink)}
 .pin-info-desc.empty{color:var(--ink-faint);font-style:italic;font-size:0.9rem}
+@media(max-width:640px){
+  .pin-info-panel{display:none}
+}
+@media(pointer:coarse){
+  .pin-info-panel{display:none}
+}
 
 /* ── Login overlay ── */
 .login-overlay{position:fixed;inset:0;background:rgba(5,4,3,0.86);backdrop-filter:blur(4px);z-index:200;display:none;align-items:center;justify-content:center;padding:1rem}
@@ -224,7 +230,9 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 .whisper-body{font-size:0.92rem;line-height:1.55;color:var(--ink-dim);white-space:pre-wrap}
 
 /* NPC roster cards (player view) */
-.npc-roster-panel{border-left-color:var(--gold-faint)}
+.npc-roster-panel{border-left-color:#3a7a82}
+.npc-roster-panel .whispers-title{color:#7ec7d1}
+.panel-title-glyph{display:inline-block;margin-right:8px;opacity:0.85}
 .npc-rcard{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:0.7rem 0.85rem;margin-bottom:0.55rem;cursor:pointer;transition:border-color 0.15s}
 .npc-rcard:hover{border-color:var(--gold-faint)}
 .npc-rcard.expanded{border-color:var(--gold)}
@@ -264,9 +272,9 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
   <div class="player-badge" id="player-badge">
     <span class="player-badge-label">Playing as</span>
     <span class="player-badge-name" id="player-badge-name"></span>
-    <button class="btn-pill" type="button" onclick="toggleNPCRoster()">NPCs</button>
+    <button class="btn-pill" type="button" onclick="toggleNPCRoster()">👤 NPCs</button>
     <button class="btn-pill" type="button" onclick="toggleWhispers()">
-      Whispers
+      ✉ Whispers
       <span class="whispers-count" id="whispers-count">0</span>
     </button>
     <button class="btn-pill" type="button" onclick="logout()">Log out</button>
@@ -297,7 +305,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 <!-- WHISPERS PANEL -->
 <div class="whispers-panel" id="whispers-panel" aria-hidden="true">
   <div class="whispers-header">
-    <span class="whispers-title">WHISPERS</span>
+    <span class="whispers-title"><span class="panel-title-glyph">✉</span>WHISPERS</span>
     <button class="whispers-close" type="button" onclick="toggleWhispers()" aria-label="Close">×</button>
   </div>
   <div class="whispers-list" id="whispers-list"></div>
@@ -306,7 +314,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 <!-- NPC ROSTER PANEL -->
 <div class="whispers-panel npc-roster-panel" id="npc-roster-panel" aria-hidden="true">
   <div class="whispers-header">
-    <span class="whispers-title">KNOWN NPCs</span>
+    <span class="whispers-title"><span class="panel-title-glyph">👤</span>KNOWN NPCs</span>
     <button class="whispers-close" type="button" onclick="toggleNPCRoster()" aria-label="Close">×</button>
   </div>
   <input type="text" id="npc-roster-search" placeholder="Search…" oninput="renderNPCRoster()" style="margin:0.4rem 1rem 0.6rem;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:2px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.92rem;outline:none">

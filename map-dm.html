@@ -164,9 +164,9 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 .map-container.move-mode .poly-zone{cursor:grab}
 
 /* ──────────────────────────────────────────────────────────
-   POP-OUT EDITOR
+   EXPANDED EDITOR
    Slide-out drawer that overlays the map. Toggled by the
-   "⤢ Pop out editor" button in the topbar. Esc collapses it.
+   "⛶ Expand editor" button in the topbar. Esc collapses it.
    ────────────────────────────────────────────────────────── */
 .editor-scrim{
   position:fixed;
@@ -312,6 +312,13 @@ body.editor-expanded #pane-timeline > #tl-detail:not([style*="none"]){
 .field textarea{resize:vertical;min-height:64px;line-height:1.5}
 .field select{cursor:pointer}
 .field-row{display:flex;gap:8px}.field-row .field{flex:1}
+.loc-advanced{margin-bottom:0.8rem;border:1px solid var(--border-light);border-radius:3px;background:rgba(255,255,255,0.02);padding:0 0.7rem}
+.loc-advanced > summary{cursor:pointer;font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.12em;color:var(--ink-faint);text-transform:uppercase;padding:0.55rem 0;outline:none;user-select:none;list-style:none}
+.loc-advanced > summary::-webkit-details-marker{display:none}
+.loc-advanced > summary::before{content:'▸ ';color:var(--gold-faint);display:inline-block;transition:transform 0.12s;transform-origin:center}
+.loc-advanced[open] > summary::before{content:'▾ '}
+.loc-advanced > summary:hover{color:var(--gold-light)}
+.loc-advanced[open]{padding-bottom:0.6rem}
 .toggle-row{display:flex;align-items:center;gap:8px;margin-bottom:0.7rem}
 .toggle-row label{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.12em;color:var(--ink-dim);cursor:pointer;text-transform:uppercase}
 .toggle-row input[type=checkbox]{accent-color:var(--gold);width:14px;height:14px;cursor:pointer}
@@ -566,8 +573,8 @@ body.editor-expanded #pane-timeline > #tl-detail:not([style*="none"]){
   <button class="btn btn-ghost btn-sm" id="move-mode-btn" onclick="toggleMoveMode()">✥ Move mode</button>
   <button class="btn btn-purple btn-sm" onclick="openImport()">⬇ Import</button>
   <button class="btn btn-green" onclick="publishData()">▲ Publish to players</button>
-  <button class="btn btn-ghost btn-sm" onclick="window.open('map.html','_blank')">Preview ↗</button>
-  <button class="btn btn-gold btn-sm" id="expand-editor-btn" onclick="toggleEditorExpand()" title="Pop out the editor for more room (Esc to collapse)" aria-label="Pop out editor for more room">⤢ Pop out editor</button>
+  <button class="btn btn-ghost btn-sm" onclick="window.open('map.html','_blank')" title="Open the player view in a new tab">Preview as player ↗</button>
+  <button class="btn btn-gold btn-sm" id="expand-editor-btn" onclick="toggleEditorExpand()" title="Expand the editor for more room (Esc to collapse)" aria-label="Expand editor for more room">⛶ Expand editor</button>
   <a class="btn btn-ghost btn-sm" href="home.html" style="text-decoration:none">⌂ Home</a>
   <div class="sync-status" id="sync-status">—</div>
 </div>
@@ -913,11 +920,15 @@ body.editor-expanded #pane-timeline > #tl-detail:not([style*="none"]){
           </div>
           <div class="field"><label>ID (URL slug)</label><input type="text" id="loc-id" placeholder="ironhaven"></div>
         </div>
-        <div class="field-row">
-          <div class="field"><label>X POS (%)</label><input type="number" id="loc-x" min="0" max="100" step="0.5"></div>
-          <div class="field"><label>Y POS (%)</label><input type="number" id="loc-y" min="0" max="100" step="0.5"></div>
-        </div>
         <div class="field"><label>SHORT DESCRIPTION (shown on hover)</label><textarea id="loc-shortDesc" rows="2"></textarea></div>
+        <details class="loc-advanced">
+          <summary>Advanced — pin position</summary>
+          <div class="field-row" style="margin-top:0.5rem">
+            <div class="field"><label>X POS (%)</label><input type="number" id="loc-x" min="0" max="100" step="0.5"></div>
+            <div class="field"><label>Y POS (%)</label><input type="number" id="loc-y" min="0" max="100" step="0.5"></div>
+          </div>
+          <div style="font-size:0.72rem;color:var(--ink-faint);font-style:italic;margin-top:-0.2rem">Tip: enable ✥ Move mode and drag the pin instead.</div>
+        </details>
         <div class="field"><label>SUB-MAP IMAGE URL (optional)</label><input type="text" id="loc-mapImage" placeholder="https://… or leave blank"></div>
         <div class="field"><label>CONNECTED LOCATIONS</label>
           <div class="visibleto-chips" id="loc-connected-chips"></div>
@@ -1508,8 +1519,8 @@ function toggleEditorExpand() {
   const btn  = document.getElementById('expand-editor-btn');
   const on   = body.classList.toggle('editor-expanded');
   if (btn) {
-    btn.textContent = on ? '✕ Collapse editor' : '⤢ Pop out editor';
-    btn.setAttribute('aria-label', on ? 'Collapse editor' : 'Pop out editor for more room');
+    btn.textContent = on ? '✕ Collapse editor' : '⛶ Expand editor';
+    btn.setAttribute('aria-label', on ? 'Collapse editor' : 'Expand editor for more room');
   }
 }
 
