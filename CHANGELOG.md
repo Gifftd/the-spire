@@ -7,6 +7,45 @@ Dates are YYYY-MM-DD.
 
 ---
 
+## [Unreleased] — 2026-06-16
+
+### Maps — UX cleanup pass (round 2)
+
+- **DM map: sync-status dot.** Pre-colored 8px dot before the status text
+  (green/red/amber/dim), with a soft pulse animation in the "ing" (in-flight)
+  state. Glanceable status — text becomes optional detail.
+- **DM map: prominent mode banner with Esc hint.** Restyled `.map-hint` from
+  faint subtitle to a gold-tinted banner. Each mode message now includes an
+  "Esc to exit" hint, and the keydown handler exits Move/Place/Polygon modes
+  on Esc.
+- **DM map: connected-locations as chip picker.** The "comma-separated IDs"
+  text field on the location modal is now a chip selector mirroring
+  `visibleTo`. New `tempConnected` state, `renderConnectedChips`,
+  `toggleConnected`. Eliminates a typo-prone raw-ID input.
+- **DM map: replaced 15 `alert()` validation popups with a styled toast.**
+  Non-blocking 2.8s banner at the bottom of the screen. Destructive
+  `confirm()` dialogs left untouched (9 of them) — those will get a styled
+  replacement in a later pass.
+
+### Maps — UX cleanup pass (round 1)
+
+Top three items from the map UI/UX audit. Visual / structural cleanup only;
+no behavior changes beyond filtering.
+
+- **DM map: removed duplicate topbar tab buttons.** The six tab buttons in
+  the topbar duplicated the editor-pane tabs and competed with the action
+  buttons (Publish, Import, etc.) for space. Topbar now keeps only the mode
+  toggles + action buttons; tab switching uses the editor pane's own tab row.
+  `map-dm.html` lines ~563-568.
+- **Player map: re-ordered the topbar.** Home + breadcrumb on the left
+  (convention), title in the middle, player badge + Whispers/NPCs/Logout
+  on the right. The breadcrumb was previously at the far right and got
+  ignored. `map.html` lines ~257-275.
+- **DM map: search box on Locations + Zones panes.** Matches the existing
+  NPC and Timeline panes. Filters by name / id / type / shortDesc (locations)
+  or name / id / shape (zones). `map-dm.html` `renderLocList`,
+  `renderZoneList`.
+
 ## [Unreleased] — 2026-06-12
 
 ### The Anvil — encounter builder

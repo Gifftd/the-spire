@@ -69,7 +69,10 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 .btn-ghost{background:transparent;border-color:var(--border-light);color:var(--ink-dim)}
 .btn-ghost:hover{background:var(--surface2);border-color:var(--ink-dim);color:var(--ink)}
 .btn-sm{font-size:0.6rem;padding:4px 9px;letter-spacing:0.10em}
-.sync-status{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.12em;color:var(--ink-faint);text-transform:uppercase}
+.sync-status{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.12em;color:var(--ink-faint);text-transform:uppercase;display:inline-flex;align-items:center;gap:6px}
+.sync-status::before{content:'';width:8px;height:8px;border-radius:50%;background:currentColor;opacity:0.7;box-shadow:0 0 6px currentColor;flex-shrink:0}
+.sync-status.ing::before{animation:sync-pulse 1s ease-in-out infinite}
+@keyframes sync-pulse{0%,100%{opacity:0.4}50%{opacity:1}}
 .dm-breadcrumb{
   display:flex;align-items:center;gap:8px;
   font-family:'Cinzel',serif;font-size:0.68rem;letter-spacing:0.12em;color:var(--ink-dim);
@@ -84,6 +87,11 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 .in-submap-banner{background:linear-gradient(90deg,rgba(180,134,11,0.18) 0%,rgba(180,134,11,0.02) 100%);border-bottom:1px solid var(--gold-faint)}
 .sync-status.ok{color:var(--green-light)}.sync-status.fail{color:var(--red)}.sync-status.ing{color:var(--amber)}
 
+/* Toast — non-blocking validation/info messages */
+.toast{position:fixed;left:50%;bottom:1.6rem;transform:translateX(-50%) translateY(40px);background:var(--surface);border:1px solid var(--gold-faint);border-radius:var(--radius);padding:10px 18px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.95rem;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.6);opacity:0;pointer-events:none;transition:opacity 180ms ease, transform 180ms ease;max-width:90vw}
+.toast.visible{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.error{border-color:var(--red);color:#f0c8c8}
+
 /* ── Layout ── */
 .main{flex:1;display:grid;grid-template-columns:1fr 320px;overflow:hidden}
 .map-col{position:relative;overflow:hidden;display:flex;flex-direction:column}
@@ -97,7 +105,8 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 .map-controls{position:absolute;bottom:1rem;right:1rem;display:flex;flex-direction:column;gap:4px;z-index:20}
 .map-btn{width:30px;height:30px;background:rgba(19,16,10,0.9);border:1px solid var(--border-light);border-radius:var(--radius);color:var(--ink-dim);font-size:0.9rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
 .map-btn:hover{border-color:var(--gold);color:var(--gold)}
-.map-hint{position:absolute;top:0.5rem;left:50%;transform:translateX(-50%);background:rgba(19,16,10,0.9);border:1px solid var(--border-light);border-radius:var(--radius);padding:4px 10px;font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.08em;color:var(--ink-faint);z-index:20;pointer-events:none}
+.map-hint{position:absolute;top:0.6rem;left:50%;transform:translateX(-50%);background:linear-gradient(180deg,rgba(184,134,11,0.22),rgba(184,134,11,0.08));border:1px solid var(--gold-faint);border-radius:var(--radius);padding:6px 14px;font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.12em;color:var(--gold-light);z-index:20;pointer-events:none;text-transform:uppercase;box-shadow:0 2px 10px rgba(0,0,0,0.5)}
+.map-hint .esc-hint{margin-left:10px;padding-left:10px;border-left:1px solid var(--gold-faint);color:var(--ink-dim);font-size:0.62rem;letter-spacing:0.08em;text-transform:none}
 
 /* ── Pins & zones (DM view) ── */
 .pin{position:absolute;transform:translate(-50%,-100%);cursor:pointer;z-index:10;transition:transform 0.15s}
@@ -554,12 +563,6 @@ body.editor-expanded #pane-timeline > #tl-detail:not([style*="none"]){
     <span class="sep">›</span>
     <span id="dm-breadcrumb-loc">—</span>
   </div>
-  <button class="btn btn-ghost btn-sm" onclick="switchTab('locations')">Locations</button>
-  <button class="btn btn-ghost btn-sm" onclick="switchTab('zones')">Zones</button>
-  <button class="btn btn-ghost btn-sm" onclick="switchTab('characters')">Characters</button>
-  <button class="btn btn-ghost btn-sm" onclick="switchTab('npcs')">NPCs</button>
-  <button class="btn btn-ghost btn-sm" onclick="switchTab('timeline')">Timeline</button>
-  <button class="btn btn-ghost btn-sm" onclick="switchTab('world')">World</button>
   <button class="btn btn-ghost btn-sm" id="move-mode-btn" onclick="toggleMoveMode()">✥ Move mode</button>
   <button class="btn btn-purple btn-sm" onclick="openImport()">⬇ Import</button>
   <button class="btn btn-green" onclick="publishData()">▲ Publish to players</button>
@@ -604,18 +607,20 @@ body.editor-expanded #pane-timeline > #tl-detail:not([style*="none"]){
 
     <!-- LOCATIONS TAB -->
     <div class="editor-pane active" id="pane-locations">
-      <div style="display:flex;gap:6px;margin-bottom:0.6rem;flex-wrap:wrap">
+      <div style="display:flex;gap:6px;margin-bottom:0.6rem;flex-wrap:wrap;align-items:center">
         <button class="btn btn-gold btn-sm" onclick="addLocation()">+ Add location</button>
         <button class="btn btn-ghost btn-sm" id="place-mode-btn" onclick="togglePlaceMode()">📍 Click to place</button>
+        <input type="text" id="loc-search" placeholder="Search…" style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:4px 7px;font-family:'Crimson Text',serif;font-size:0.82rem" oninput="renderLocList()">
       </div>
       <div class="loc-list" id="loc-list"></div>
     </div>
 
     <!-- ZONES TAB -->
     <div class="editor-pane" id="pane-zones">
-      <div style="display:flex;gap:6px;margin-bottom:0.6rem;flex-wrap:wrap">
+      <div style="display:flex;gap:6px;margin-bottom:0.6rem;flex-wrap:wrap;align-items:center">
         <button class="btn btn-gold btn-sm" onclick="addZone()">+ Rectangle zone</button>
         <button class="btn btn-ghost btn-sm" id="poly-draw-btn" onclick="togglePolyDraw()">✏ Draw polygon</button>
+        <input type="text" id="zone-search" placeholder="Search…" style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:4px 7px;font-family:'Crimson Text',serif;font-size:0.82rem" oninput="renderZoneList()">
       </div>
       <div id="zone-list"></div>
     </div>
@@ -914,7 +919,9 @@ body.editor-expanded #pane-timeline > #tl-detail:not([style*="none"]){
         </div>
         <div class="field"><label>SHORT DESCRIPTION (shown on hover)</label><textarea id="loc-shortDesc" rows="2"></textarea></div>
         <div class="field"><label>SUB-MAP IMAGE URL (optional)</label><input type="text" id="loc-mapImage" placeholder="https://… or leave blank"></div>
-        <div class="field"><label>CONNECTED LOCATIONS (comma-separated IDs)</label><input type="text" id="loc-connected" placeholder="ironhaven,greypass"></div>
+        <div class="field"><label>CONNECTED LOCATIONS</label>
+          <div class="visibleto-chips" id="loc-connected-chips"></div>
+        </div>
         <div class="toggle-row">
           <input type="checkbox" id="loc-visible" checked>
           <label for="loc-visible">Visible to players</label>
@@ -1052,6 +1059,7 @@ let editingLocId   = null;
 let tempNPCs       = [];
 let tempQuests     = [];
 let tempVisibleTo  = [];      // ids of characters who can see the location currently being edited
+let tempConnected  = [];      // ids of locations connected to the location currently being edited
 let characters     = [];      // [{id,name,player,code,dmNotes}]
 let journals       = [];      // [{id,characterId,title,body,date,unread}]
 let npcs           = [];      // [{id,name,role,description,currentLocationId,currentActivity,status,notes,dmNotes,knownTo,history,tags}]
@@ -1388,9 +1396,9 @@ function enterSubMap(locationId) {
   closeLocModal();
 
   const loc = worldData.locations.find(l => l.id === locationId);
-  if (!loc) { alert('Location not found.'); return; }
+  if (!loc) { toast('Location not found.'); return; }
   if (!loc.subMap) {
-    alert('Set a sub-map image first.');
+    toast('Set a sub-map image first.');
     return;
   }
   // Ensure shape — locations[] and zones[] are the arrays the editor mutates.
@@ -1449,12 +1457,12 @@ function openSubMapEditor() {
   // Persist whatever's currently in the form, then enter sub-map mode for this location.
   const id = editingLocId;
   if (!id) {
-    alert('Save the location first, then open its sub-map.');
+    toast('Save the location first, then open its sub-map.');
     return;
   }
   const subImage = document.getElementById('loc-subMap-image').value.trim();
   if (!subImage) {
-    alert('Set a sub-map image URL first.');
+    toast('Set a sub-map image URL first.');
     return;
   }
   saveLocation();
@@ -1483,6 +1491,11 @@ document.addEventListener('keydown', e => {
   // Pop-out editor next
   if (document.body.classList.contains('editor-expanded')) {
     toggleEditorExpand();
+    return;
+  }
+  // Active map modes next
+  if (moveMode || placeMode || polyDrawMode) {
+    exitAnyMode();
     return;
   }
   // Sub-map drill-down last
@@ -1988,26 +2001,35 @@ function updateModeUI() {
 
   container.classList.toggle('move-mode', moveMode);
 
+  const esc = '<span class="esc-hint">Esc to exit</span>';
   if (moveMode) {
-    hint.textContent = '✥ Move mode — drag pins and zones to reposition'; hint.style.display='block';
+    hint.innerHTML = '✥ Move mode — drag pins and zones to reposition' + esc;
+    hint.style.display='block';
     container.style.cursor = 'default';
   } else if (polyDrawMode) {
     const remaining = Math.max(0, 3 - polyPoints.length);
-    hint.textContent = polyPoints.length===0
+    const msg = polyPoints.length===0
       ? '✏ Click to place polygon points — click near the first point to close'
       : polyPoints.length < 3
         ? `${remaining} more point${remaining>1?'s':''} needed to close`
         : 'Click near the first point (●) to close the polygon';
+    hint.innerHTML = msg + esc;
     hint.style.display='block';
     container.style.cursor = 'crosshair';
   } else if (placeMode) {
-    hint.textContent = '📍 Click map to place a new location pin';
+    hint.innerHTML = '📍 Click map to place a new location pin' + esc;
     hint.style.display='block';
     container.style.cursor = 'crosshair';
   } else {
     hint.style.display='none';
     container.style.cursor = 'grab';
   }
+}
+
+function exitAnyMode() {
+  if (moveMode)     toggleMoveMode();
+  if (placeMode)    togglePlaceMode();
+  if (polyDrawMode) togglePolyDraw();
 }
 
 // Legacy place mode toggle (for the Locations tab button)
@@ -2028,7 +2050,18 @@ function renderLocList() {
     list.innerHTML='<div style="color:var(--ink-faint);font-style:italic;font-size:0.82rem;padding:0.5rem 0">No locations yet. Click the map or use + Add location.</div>';
     return;
   }
-  data.locations.forEach(loc => {
+  const q = (document.getElementById('loc-search')?.value || '').trim().toLowerCase();
+  const filtered = !q ? data.locations : data.locations.filter(l =>
+    (l.name||'').toLowerCase().includes(q) ||
+    (l.id||'').toLowerCase().includes(q) ||
+    (l.type||'').toLowerCase().includes(q) ||
+    (l.shortDesc||'').toLowerCase().includes(q)
+  );
+  if (filtered.length === 0) {
+    list.innerHTML='<div style="color:var(--ink-faint);font-style:italic;font-size:0.82rem;padding:0.5rem 0">No matches.</div>';
+    return;
+  }
+  filtered.forEach(loc => {
     const el = document.createElement('div');
     el.className = `loc-list-item${loc.id===selectedLocId?' selected':''}`;
     el.innerHTML = `
@@ -2064,7 +2097,7 @@ function openLocModal(id, defaultX, defaultY) {
   document.getElementById('loc-shortDesc').value  = loc?.shortDesc || '';
   document.getElementById('loc-lore').value       = loc?.lore || '';
   document.getElementById('loc-mapImage').value   = loc?.mapImage || '';
-  document.getElementById('loc-connected').value  = (loc?.connected||[]).join(', ');
+  tempConnected = Array.isArray(loc?.connected) ? loc.connected.slice() : [];
   document.getElementById('loc-visible').checked  = loc?.visible !== false;
   document.getElementById('loc-dmNotes').value    = loc?.dmNotes || '';
   tempNPCs   = JSON.parse(JSON.stringify(loc?.npcs   || []));
@@ -2086,7 +2119,7 @@ function openLocModal(id, defaultX, defaultY) {
   // The sub-map tab is meaningless when editing a sub-pin (no recursive sub-maps).
   document.getElementById('ltab-submap').style.display = inSubMap() ? 'none' : '';
   document.getElementById('ltab-npcs').style.display   = inSubMap() ? 'none' : '';
-  renderNPCEditor(); renderQuestEditor(); renderVisibleToChips();
+  renderNPCEditor(); renderQuestEditor(); renderVisibleToChips(); renderConnectedChips();
   renderLocationNPCsHere(loc?.id);
   switchLocTab('info');
   document.getElementById('loc-modal').classList.remove('hidden');
@@ -2134,7 +2167,7 @@ async function renderLocEncounters(loc) {
 }
 
 function newEncounterAtCurrentLocation() {
-  if (!editingLocId) { alert('Save the location first.'); return; }
+  if (!editingLocId) { toast('Save the location first.'); return; }
   const inSub = inSubMap();
   const parent = inSub ? subMapStack[subMapStack.length - 1]?.parentLocationId : '';
   const param = inSub ? `submap:${parent}:${editingLocId}` : `world::${editingLocId}`;
@@ -2145,7 +2178,7 @@ function newEncounterAtCurrentLocation() {
 function saveLocation() {
   const name = document.getElementById('loc-name').value.trim();
   const id   = document.getElementById('loc-id').value.trim().replace(/[^a-z0-9-]/g,'');
-  if (!name||!id) { alert('Name and ID are required.'); return; }
+  if (!name||!id) { toast('Name and ID are required.'); return; }
   // Preserve existing sub-map data (pins, zones) — read sub-map fields from the
   // form only when at the world level. Pin records (inside a sub-map) can't have
   // sub-maps themselves in this phase.
@@ -2175,7 +2208,7 @@ function saveLocation() {
     shortDesc: document.getElementById('loc-shortDesc').value.trim(),
     lore:      document.getElementById('loc-lore').value.trim(),
     mapImage:  document.getElementById('loc-mapImage').value.trim(),
-    connected: document.getElementById('loc-connected').value.split(',').map(s=>s.trim()).filter(Boolean),
+    connected: tempConnected.slice(),
     npcs:      [],                 // NPCs are first-class now; managed in the NPCs tab
     quests:    tempQuests,
     dmNotes:   document.getElementById('loc-dmNotes').value.trim(),
@@ -2255,7 +2288,17 @@ function renderZoneList() {
     list.innerHTML='<div style="color:var(--ink-faint);font-style:italic;font-size:0.82rem;padding:0.5rem 0">No zones yet. Add a rectangle or draw a polygon.</div>';
     return;
   }
-  data.zones.forEach((zone) => {
+  const q = (document.getElementById('zone-search')?.value || '').trim().toLowerCase();
+  const filtered = !q ? data.zones : data.zones.filter(z =>
+    (z.name||'').toLowerCase().includes(q) ||
+    (z.id||'').toLowerCase().includes(q) ||
+    (z.shape||'').toLowerCase().includes(q)
+  );
+  if (filtered.length === 0) {
+    list.innerHTML='<div style="color:var(--ink-faint);font-style:italic;font-size:0.82rem;padding:0.5rem 0">No matches.</div>';
+    return;
+  }
+  filtered.forEach((zone) => {
     const card=document.createElement('div'); card.className='item-card';
     card.style.borderLeft=`3px solid ${zone.color}`;
     const isPoly = zone.shape==='polygon';
@@ -2395,6 +2438,20 @@ function renderCharacterList() {
 }
 
 function escapeHtml(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+let _toastTimer = null;
+function toast(msg, kind) {
+  let el = document.getElementById('toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'toast'; el.className = 'toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.className = `toast visible${kind==='error'?' error':''}`;
+  if (_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { el.className = el.className.replace(' visible',''); }, 2800);
+}
 function selectText(el) {
   const r = document.createRange(); r.selectNodeContents(el);
   const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
@@ -2442,11 +2499,11 @@ function editCharacter(id) {
 
 async function saveCharacter() {
   const name = document.getElementById('char-name').value.trim();
-  if (!name) { alert('Character needs a name.'); return; }
+  if (!name) { toast('Character needs a name.'); return; }
   const player = document.getElementById('char-player').value.trim();
   const code = document.getElementById('char-code').value.trim().toUpperCase();
   const dmNotes = document.getElementById('char-dmNotes').value.trim();
-  if (!code) { alert('Need a claim code (click ⟳ to generate one).'); return; }
+  if (!code) { toast('Need a claim code (click ⟳ to generate one).'); return; }
 
   if (editingCharId === '__new__') {
     let id = slugify(document.getElementById('char-id').value) || slugify(name);
@@ -2505,10 +2562,10 @@ function copyCharCode() {
 
 // Whispers composer
 async function postWhisper() {
-  if (!editingCharId || editingCharId === '__new__') { alert('Save the character first.'); return; }
+  if (!editingCharId || editingCharId === '__new__') { toast('Save the character first.'); return; }
   const title = document.getElementById('whisper-title').value.trim();
   const body  = document.getElementById('whisper-body').value.trim();
-  if (!title && !body) { alert('Whisper needs a title or body.'); return; }
+  if (!title && !body) { toast('Whisper needs a title or body.'); return; }
   const entry = {
     id: 'w' + Date.now() + Math.floor(Math.random()*1000),
     characterId: editingCharId,
@@ -2683,7 +2740,7 @@ function editNPCEntity(id) {
 
 async function saveNPCEntity() {
   const name = document.getElementById('npce-name').value.trim();
-  if (!name) { alert('NPC needs a name.'); return; }
+  if (!name) { toast('NPC needs a name.'); return; }
   const fields = {
     name,
     role: document.getElementById('npce-role').value.trim(),
@@ -2753,7 +2810,7 @@ function toggleNPCKnownTo(id) {
 }
 
 async function logNPCMovement() {
-  if (!editingNPCId || editingNPCId === '__new__') { alert('Save the NPC first.'); return; }
+  if (!editingNPCId || editingNPCId === '__new__') { toast('Save the NPC first.'); return; }
   const idx = npcs.findIndex(n => n.id === editingNPCId);
   if (idx < 0) return;
   const newLoc      = document.getElementById('npce-move-location').value;
@@ -2761,7 +2818,7 @@ async function logNPCMovement() {
   const note        = document.getElementById('npce-move-note').value.trim();
   const date        = document.getElementById('npce-move-date').value || new Date().toISOString().slice(0,10);
   const dmOnly      = document.getElementById('npce-move-dmOnly').checked;
-  if (!newLoc && !newActivity && !note) { alert('Add at least one of: new location, new activity, or a note.'); return; }
+  if (!newLoc && !newActivity && !note) { toast('Add at least one of: new location, new activity, or a note.'); return; }
 
   const entry = {
     id: 'h' + Date.now() + Math.floor(Math.random()*1000),
@@ -3050,7 +3107,7 @@ function toggleTLChip(which, id) {
 
 async function saveTimelineEntry() {
   const title = document.getElementById('tle-title').value.trim();
-  if (!title) { alert('Entry needs a title.'); return; }
+  if (!title) { toast('Entry needs a title.'); return; }
   const fields = {
     title,
     kind:        document.getElementById('tle-kind').value || 'event',
@@ -3110,7 +3167,7 @@ async function deleteTimelineEntry() {
 function quickAddNPCAtLocation() {
   const locId = editingLocId;
   if (!locId) {
-    alert('Save this location first, then add NPCs here.');
+    toast('Save this location first, then add NPCs here.');
     return;
   }
   // Close the location modal and jump to the NPCs tab with currentLocation pre-filled
@@ -3138,6 +3195,26 @@ function toggleVisibleTo(id) {
   const i = tempVisibleTo.indexOf(id);
   if (i >= 0) tempVisibleTo.splice(i,1); else tempVisibleTo.push(id);
   renderVisibleToChips();
+}
+
+// Connected-locations chips inside location modal
+function renderConnectedChips() {
+  const wrap = document.getElementById('loc-connected-chips');
+  if (!wrap) return;
+  const others = (data.locations || []).filter(l => l.id !== editingLocId);
+  if (others.length === 0) {
+    wrap.innerHTML = '<div class="visibleto-empty">No other locations yet.</div>';
+    return;
+  }
+  wrap.innerHTML = others.map(l => {
+    const on = tempConnected.includes(l.id);
+    return `<span class="visibleto-chip ${on?'on':''}" onclick="toggleConnected('${l.id}')">${escapeHtml(l.name)}</span>`;
+  }).join('');
+}
+function toggleConnected(id) {
+  const i = tempConnected.indexOf(id);
+  if (i >= 0) tempConnected.splice(i,1); else tempConnected.push(id);
+  renderConnectedChips();
 }
 
 init();
