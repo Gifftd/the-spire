@@ -9,6 +9,24 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-16
 
+### Maps — UX cleanup pass (round 3)
+
+- **DM map: renamed topbar buttons for clarity.** "⤢ Pop out editor" →
+  "⛶ Expand editor"; "Preview ↗" → "Preview as player ↗" (and added a
+  tooltip explaining it opens a new tab).
+- **Player map: distinguished the NPC roster from Whispers visually.** The
+  two slide-in panels were near-identical (gold border, same width). The
+  NPC roster now uses a teal left-border + cyan title color, and both
+  panels gained glyphs (✉ for Whispers, 👤 for NPCs) — also added to the
+  topbar pill buttons that open them.
+- **Player map: pin info panel hidden on small screens / touch.** Avoids
+  overlap with the legend + zoom buttons at narrow widths, and avoids the
+  dead-weight overlay on touch devices (hover preview never triggers
+  there anyway).
+- **DM map: X/Y position inputs moved into an "Advanced — pin position"
+  `<details>` disclosure.** Declutters the location modal; X/Y is rarely
+  needed thanks to ✥ Move mode and "📍 Click to place".
+
 ### Maps — UX cleanup pass (round 2)
 
 - **DM map: sync-status dot.** Pre-colored 8px dot before the status text
