@@ -2622,6 +2622,83 @@ function renderCharactersListV2(body) { body.innerHTML = '<div class="empty-stat
 function renderWorldPanelV2(body)     { body.innerHTML = '<div class="empty-state">Coming in Task 15.</div>'; }
 
 // ══════════════════════════════════════════════════════════════
+//  PANEL RESIZE + COLLAPSE (Task 10)
+// ══════════════════════════════════════════════════════════════
+const PANEL_MIN = { left: 200, right: 280 };
+const PANEL_MAX = () => Math.floor(window.innerWidth * 0.5);
+
+function loadPanelGeometry() {
+  const lw = parseInt(localStorage.getItem('mapdm.v2.leftWidth') || '', 10);
+  const rw = parseInt(localStorage.getItem('mapdm.v2.rightWidth') || '', 10);
+  const lc = localStorage.getItem('mapdm.v2.leftCollapsed') === '1';
+  const rc = localStorage.getItem('mapdm.v2.rightCollapsed') === '1';
+  const left  = document.getElementById('fp-left');
+  const right = document.getElementById('fp-right');
+  if (left)  {
+    if (!isNaN(lw)) left.style.width = clamp(lw, PANEL_MIN.left, PANEL_MAX()) + 'px';
+    if (lc) left.classList.add('collapsed');
+  }
+  if (right) {
+    if (!isNaN(rw)) right.style.width = clamp(rw, PANEL_MIN.right, PANEL_MAX()) + 'px';
+    if (rc) right.classList.add('collapsed');
+  }
+  // Update bottom-strip left/right offsets so it stays between the panels
+  const bs = document.getElementById('bottom-strip');
+  if (bs && left)  bs.style.left  = (left.getBoundingClientRect().width  + 20) + 'px';
+  if (bs && right) bs.style.right = (right.getBoundingClientRect().width + 20) + 'px';
+}
+
+function setupPanelResize() {
+  document.querySelectorAll('.fp-resize').forEach(handle => {
+    const which = handle.dataset.resize;   // 'left' | 'right'
+    const panel = document.getElementById('fp-' + which);
+    handle.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      handle.setPointerCapture(e.pointerId);
+      const startX = e.clientX;
+      const startW = panel.getBoundingClientRect().width;
+      const min = PANEL_MIN[which];
+      const max = PANEL_MAX();
+      const onMove = (mv) => {
+        const dx = mv.clientX - startX;
+        const w = clamp(startW + (which === 'left' ? dx : -dx), min, max);
+        panel.style.width = w + 'px';
+        // Update bottom-strip left/right offsets so it stays between the panels
+        if (which === 'left')  document.getElementById('bottom-strip').style.left  = (w + 20) + 'px';
+        if (which === 'right') document.getElementById('bottom-strip').style.right = (w + 20) + 'px';
+      };
+      const onUp = () => {
+        handle.removeEventListener('pointermove', onMove);
+        handle.removeEventListener('pointerup', onUp);
+        localStorage.setItem('mapdm.v2.' + which + 'Width', String(panel.getBoundingClientRect().width));
+      };
+      handle.addEventListener('pointermove', onMove);
+      handle.addEventListener('pointerup', onUp);
+    });
+  });
+}
+
+function setupPanelCollapse() {
+  ['left','right'].forEach(which => {
+    const panel = document.getElementById('fp-' + which);
+    if (!panel) return;
+    panel.addEventListener('dblclick', (e) => {
+      // Double-click on header (not on a button/input inside) toggles collapse
+      if (e.target.closest('button,input,textarea,select,.fp-body')) return;
+      const collapsed = panel.classList.toggle('collapsed');
+      localStorage.setItem('mapdm.v2.' + which + 'Collapsed', collapsed ? '1' : '0');
+    });
+    // Clicking a collapsed panel expands it
+    panel.addEventListener('click', (e) => {
+      if (!panel.classList.contains('collapsed')) return;
+      panel.classList.remove('collapsed');
+      localStorage.setItem('mapdm.v2.' + which + 'Collapsed', '0');
+      e.stopPropagation();
+    });
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
 //  LOCATION MODAL
 // ══════════════════════════════════════════════════════════════
 function addLocation() { openLocModal(null, 50, 50); }
@@ -2977,6 +3054,11 @@ async function init() {
 
   // Idle sync indicator
   setSyncState('live');
+
+  // Panel geometry (Task 10): widths + collapse state + handle wiring.
+  loadPanelGeometry();
+  setupPanelResize();
+  setupPanelCollapse();
 }
 
 // ══════════════════════════════════════════════════════════════
