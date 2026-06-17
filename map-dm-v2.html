@@ -1361,9 +1361,15 @@ function switchTab(name) {
   updateModeUI();
 }
 function switchLocTab(name) {
+  // v2: legacy #ltab-* tab buttons were removed in Task 17 (only #lpane-*
+  // pane sources remain, inside #legacy-templates). Null-guard so this
+  // function — still callable from openLocModal's legacy branch — can't
+  // throw.
   ['info','lore','npcs','quests','submap','dm'].forEach(t => {
-    document.getElementById(`ltab-${t}`).classList.toggle('active', t===name);
-    document.getElementById(`lpane-${t}`).classList.toggle('active', t===name);
+    const tab  = document.getElementById(`ltab-${t}`);
+    const pane = document.getElementById(`lpane-${t}`);
+    if (tab)  tab.classList.toggle('active', t===name);
+    if (pane) pane.classList.toggle('active', t===name);
   });
 }
 
