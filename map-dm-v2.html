@@ -1341,10 +1341,17 @@ updateTopClusterPublish();
 //  TABS
 // ══════════════════════════════════════════════════════════════
 function switchTab(name) {
+  // v2: legacy #tab-*/#pane-* DOM is gone — null-guard so this legacy
+  // entry point (still called from enterSubMap/exitToWorld etc.) doesn't
+  // crash the rest of those flows.
   ['locations','zones','characters','npcs','timeline','world'].forEach(t => {
-    document.getElementById(`tab-${t}`).classList.toggle('active', t===name);
-    document.getElementById(`pane-${t}`).classList.toggle('active', t===name);
+    const tab  = document.getElementById(`tab-${t}`);
+    const pane = document.getElementById(`pane-${t}`);
+    if (tab)  tab.classList.toggle('active', t===name);
+    if (pane) pane.classList.toggle('active', t===name);
   });
+  // Mirror to the v2 list-panel tabs so the sidebar reflects the change.
+  if (typeof switchFpTab === 'function') switchFpTab(name);
   // Leaving zones tab cancels polygon draw
   if (name !== 'zones' && polyDrawMode) cancelPolyDraw();
   placeMode = (name === 'locations') && !moveMode;
