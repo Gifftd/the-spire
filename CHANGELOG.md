@@ -9,6 +9,42 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-16
 
+### Atlas Workshop v2 — DM map redesign
+
+The DM map page (`map-dm.html`) was a 3700-line single file with a
+fixed 2-pane grid, modal-stacked editing, and a topbar packed with mode
+toggles. After four UX cleanup rounds patched the worst of it, the
+underlying shell was still the dominant pain point.
+
+`map-dm-v2.html` is a parallel rebuild that keeps the data layer
+untouched and rewrites the shell:
+
+- **Full-bleed map canvas** with chrome floating above (top action
+  cluster, left list panel, right inspector panel, bottom status strip).
+- **Click selects, drag moves** for pins. The legacy Move-mode toggle is
+  gone; cursor is always `grab` over a pin, drag threshold 4 px
+  (10 px on touch).
+- **Right-click context menu** on the map (Add location / Add zone) and
+  on pins (Edit / Duplicate / Toggle visibility / Delete).
+- **Scoped wheel zoom**: wheel only zooms when the cursor is over the
+  map, never when over a panel or top cluster. Fixes the "scrolling
+  zooms the map even when I'm in the sidebar" complaint.
+- **Debounced auto-save** to `map_data_dm` (~600 ms) with a top-cluster
+  sync indicator (live → pending → saving → synced → fail). Publish
+  remains an explicit button that pushes the player-safe blob.
+- **Inline editors** — Location, Zone, NPC, Character, Timeline. The
+  modal-inside-modal pattern is gone; selecting an item opens the editor
+  in the right panel.
+- **Drag-resize + collapse-to-handle** for both panels; sizes persisted
+  in localStorage.
+- **Persistent sub-map breadcrumb** at the top of the canvas.
+- **`home.html` DM card** now links at `map-dm-v2.html`. `map-dm.html`
+  stays in the repo as a fallback for one release before being deleted
+  + renamed.
+
+Deferred to future passes: undo/redo, multi-select pins, command palette
+(Cmd+K), touch-tuned editor surfaces.
+
 ### Maps — UX cleanup pass (round 4)
 
 - **DM map: styled confirm dialog for destructive operations.** Replaced
