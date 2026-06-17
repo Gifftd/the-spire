@@ -86,14 +86,16 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 .dm-breadcrumb .sep{color:var(--ink-faint);opacity:0.6}
 .canvas-breadcrumb{
   position:absolute;top:64px;left:50%;transform:translateX(-50%);
-  background:linear-gradient(180deg,rgba(184,134,11,0.16),rgba(184,134,11,0.04));
+  background:rgba(13,8,4,0.94);
   border:1px solid var(--gold-faint);border-radius:3px;
   padding:5px 14px;
   font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.10em;
   color:var(--ink-dim);text-transform:uppercase;z-index:65;
   display:flex;gap:8px;align-items:center;
-  box-shadow:0 2px 10px rgba(0,0,0,0.5);
+  box-shadow:0 4px 14px rgba(0,0,0,0.6);
+  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
 }
+.canvas-breadcrumb[hidden]{display:none}
 .canvas-breadcrumb a{color:var(--gold-light);text-decoration:none}
 .canvas-breadcrumb a:hover{text-shadow:0 0 8px rgba(212,168,32,0.45)}
 .canvas-breadcrumb .sep{opacity:0.6}
