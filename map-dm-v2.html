@@ -1938,7 +1938,7 @@ function showCtxMenu(clientX, clientY, items) {
   if (!menu) return;
   menu.innerHTML = items.map((it, i) => {
     if (it.sep) return '<div class="ctx-menu-sep"></div>';
-    return `<div class="ctx-menu-item${it.danger?' danger':''}" data-i="${i}">${it.label}</div>`;
+    return `<div class="ctx-menu-item${it.danger?' danger':''}" data-i="${i}">${escapeHtml(it.label)}</div>`;
   }).join('');
   menu.style.left = clientX + 'px';
   menu.style.top  = clientY + 'px';
