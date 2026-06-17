@@ -649,7 +649,7 @@ body.editor-expanded #pane-timeline > #tl-detail:not([style*="none"]){
 }
 
 /* Legacy editor markup — hidden during v2 transition; removed in Task 17 */
-.editor-col,.editor-tabs,.editor-pane,.dm-breadcrumb,.sync-status,.in-submap-banner,.editor-scrim{display:none!important}
+.editor-col,.editor-tabs,.editor-pane,.dm-breadcrumb,.sync-status,.in-submap-banner,.editor-scrim,#loc-modal{display:none!important}
 </style>
 </head>
 <body>
@@ -1532,7 +1532,8 @@ function buildMap() {
   (data.locations||[]).forEach(loc => {
     const type = loc.type||'default';
     const pin = document.createElement('div');
-    pin.className = `pin type-${type}${loc.visible===false?' hidden-pin':''}${loc.id===selectedLocId?' selected-pin':''}`;
+    const isSelectedPin = (selectedEntity && selectedEntity.type==='location' && selectedEntity.id===loc.id) || (loc.id===selectedLocId);
+    pin.className = `pin type-${type}${loc.visible===false?' hidden-pin':''}${isSelectedPin?' selected-pin':''}`;
     pin.style.cssText=`left:${loc.x}%;top:${loc.y}%`;
     pin.innerHTML=`
       <div class="pin-icon">
@@ -2001,6 +2002,7 @@ function togglePlaceMode() {
 // ══════════════════════════════════════════════════════════════
 function renderLocList() {
   const list = document.getElementById('loc-list');
+  if (!list) return;   // v2: legacy #loc-list is gone; renderFpLeftBody owns the list
   list.innerHTML = '';
   if (data.locations.length === 0) {
     list.innerHTML='<div style="color:var(--ink-faint);font-style:italic;font-size:0.82rem;padding:0.5rem 0">No locations yet. Click the map or use + Add location.</div>';
@@ -2032,13 +2034,151 @@ function renderLocList() {
 }
 
 function selectLocation(id) {
-  selectedEntity = { type:'location', id };
-  selectedLocId = id;        // keep legacy in sync — old code still uses it
   selectedZoneId = null;
+  openInspector({ type:'location', id });
+  selectedLocId = id;        // keep legacy in sync — old code still uses it
+  editingLocId  = id;
+  buildMap();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  v2 INSPECTOR (right panel) — dispatch + Location editor inline
+// ══════════════════════════════════════════════════════════════
+function openInspector(entity) {
+  selectedEntity = entity;
+  const panel = document.getElementById('fp-right');
+  if (!panel) return;
+  panel.hidden = false;
+  renderInspector();
+  renderFpLeftBody();   // refresh row highlight
+}
+
+function closeInspector() {
+  selectedEntity = null;
+  selectedLocId  = null;
+  selectedZoneId = null;
+  editingLocId   = null;
+  const panel = document.getElementById('fp-right');
+  if (panel) panel.hidden = true;
   renderFpLeftBody();
   buildMap();
-  // Inspector wiring lands in Task 5; for now no-op.
 }
+
+function renderInspector() {
+  if (!selectedEntity) return;
+  switch (selectedEntity.type) {
+    case 'location':  renderLocationInspector();  break;
+    case 'zone':      renderZoneInspector();      break;   // Task 11
+    case 'npc':       renderNPCInspector();       break;   // Task 12
+    case 'character': renderCharacterInspector(); break;   // Task 13
+    case 'timeline':  renderTimelineInspector();  break;   // Task 14
+  }
+}
+
+// Stubs — implemented in later tasks
+function renderZoneInspector()      { /* Task 11 */ }
+function renderNPCInspector()       { /* Task 12 */ }
+function renderCharacterInspector() { /* Task 13 */ }
+function renderTimelineInspector()  { /* Task 14 */ }
+
+// Scope helper — used by entity editors to find inspector-cloned fields
+// FIRST, then fall back to the legacy DOM-by-ID lookup. Inspector clones
+// duplicate ids; this disambiguates.
+function inspectorScope() {
+  const inspector = document.getElementById('fp-right-body');
+  return {
+    qs: (id) => (inspector && inspector.querySelector('#'+id)) || document.getElementById(id),
+  };
+}
+
+// ── Location inspector ────────────────────────────────────────
+const LOC_INSP_TABS = [
+  { key:'info',   label:'INFO' },
+  { key:'lore',   label:'LORE' },
+  { key:'npcs',   label:'NPCs' },
+  { key:'quests', label:'QUESTS' },
+  { key:'submap', label:'SUB-MAP' },
+  { key:'dm',     label:'DM NOTES' },
+];
+let locInspTab = 'info';
+
+function renderLocationInspector() {
+  const loc = data.locations.find(l => l.id === selectedEntity.id);
+  if (!loc) { closeInspector(); return; }
+
+  // Header
+  const header = document.getElementById('fp-right-header');
+  if (header) {
+    header.innerHTML = `
+      <span class="fp-row-glyph">${TYPE_ICONS[loc.type||'default']||'📍'}</span>
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(loc.name||'Unnamed')}</span>
+      <button class="fp-close" type="button" title="Close" aria-label="Close" onclick="closeInspector()">×</button>
+    `;
+  }
+
+  // Tabs — hide sub-map + npcs while editing a sub-map pin
+  const tabs = document.getElementById('fp-right-tabs');
+  const inSub = (typeof inSubMap === 'function') && inSubMap();
+  if (tabs) {
+    tabs.innerHTML = LOC_INSP_TABS
+      .filter(t => !(inSub && (t.key === 'submap' || t.key === 'npcs')))
+      .map(t => `<button class="fp-tab ${t.key===locInspTab?'active':''}" data-itab="${t.key}" type="button">${t.label}</button>`)
+      .join('');
+    tabs.querySelectorAll('.fp-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        locInspTab = btn.dataset.itab;
+        renderLocationInspector();   // re-render so .active updates too
+      });
+    });
+  }
+  renderLocationInspectorBody(loc);
+}
+
+function renderLocationInspectorBody(loc) {
+  const body = document.getElementById('fp-right-body');
+  if (!body) return;
+  body.innerHTML = '';
+  switch (locInspTab) {
+    case 'info':   body.appendChild(buildLocInfoForm(loc));    break;
+    case 'lore':   body.appendChild(buildLocLoreForm(loc));    break;
+    case 'npcs':   body.appendChild(buildLocNPCsForm(loc));    break;
+    case 'quests': body.appendChild(buildLocQuestsForm(loc));  break;
+    case 'submap': body.appendChild(buildLocSubmapForm(loc));  break;
+    case 'dm':     body.appendChild(buildLocDMForm(loc));      break;
+  }
+  // Add a footer with save/delete (mirrors legacy modal-footer)
+  const footer = document.createElement('div');
+  footer.style.cssText = 'display:flex;gap:6px;justify-content:flex-end;padding-top:10px;margin-top:10px;border-top:1px solid var(--border)';
+  footer.innerHTML = `
+    <button class="btn btn-red btn-sm" type="button" onclick="deleteLocation()">Delete</button>
+    <button class="btn btn-gold btn-sm" type="button" onclick="saveLocation()">Save</button>
+  `;
+  body.appendChild(footer);
+  // After the clone is in the DOM, let the legacy openLocModal populate field values.
+  // inspectorScope() picks the inspector's clones (they're inside #fp-right-body,
+  // which precedes #loc-modal in DOM order, so even raw getElementById falls back to
+  // the clone — but the helper guarantees this even if DOM order changes later).
+  if (typeof openLocModal === 'function') openLocModal(loc.id);
+}
+
+// Clone CHILDREN of the legacy pane (not the pane itself — its .editor-pane class
+// is `display:none!important`). Duplicates `id` attributes; inspectorScope() handles
+// lookup disambiguation.
+function buildLocTabFragment(srcId) {
+  const src = document.getElementById(srcId);
+  const frag = document.createElement('div');
+  if (!src) return frag;
+  Array.from(src.children).forEach(child => {
+    frag.appendChild(child.cloneNode(true));
+  });
+  return frag;
+}
+function buildLocInfoForm(loc)   { return buildLocTabFragment('lpane-info'); }
+function buildLocLoreForm(loc)   { return buildLocTabFragment('lpane-lore'); }
+function buildLocNPCsForm(loc)   { return buildLocTabFragment('lpane-npcs'); }
+function buildLocQuestsForm(loc) { return buildLocTabFragment('lpane-quests'); }
+function buildLocSubmapForm(loc) { return buildLocTabFragment('lpane-submap'); }
+function buildLocDMForm(loc)     { return buildLocTabFragment('lpane-dm'); }
 
 // ══════════════════════════════════════════════════════════════
 //  v2 LEFT PANEL — tab pills, toolbar, list body
@@ -2158,44 +2298,57 @@ function addLocation() { openLocModal(null, 50, 50); }
 function openLocModal(id, defaultX, defaultY) {
   editingLocId = id;
   const loc = id ? data.locations.find(l=>l.id===id) : null;
-  document.getElementById('loc-modal-title').textContent = loc ? `Edit: ${loc.name}` : 'New Location';
-  document.getElementById('loc-name').value       = loc?.name || '';
-  document.getElementById('loc-id').value         = loc?.id   || '';
-  document.getElementById('loc-type').value       = loc?.type || 'default';
-  document.getElementById('loc-x').value          = loc?.x    ?? defaultX ?? 50;
-  document.getElementById('loc-y').value          = loc?.y    ?? defaultY ?? 50;
-  document.getElementById('loc-shortDesc').value  = loc?.shortDesc || '';
-  document.getElementById('loc-lore').value       = loc?.lore || '';
-  document.getElementById('loc-mapImage').value   = loc?.mapImage || '';
+  const $ = inspectorScope();
+  // Note: #loc-modal + #loc-modal-title only live in the legacy modal (not cloned).
+  // The modal is CSS-hidden in v2; toggling its `.hidden` class is harmless.
+  const legacyTitle = document.getElementById('loc-modal-title');
+  if (legacyTitle) legacyTitle.textContent = loc ? `Edit: ${loc.name}` : 'New Location';
+  $.qs('loc-name').value       = loc?.name || '';
+  $.qs('loc-id').value         = loc?.id   || '';
+  $.qs('loc-type').value       = loc?.type || 'default';
+  $.qs('loc-x').value          = loc?.x    ?? defaultX ?? 50;
+  $.qs('loc-y').value          = loc?.y    ?? defaultY ?? 50;
+  $.qs('loc-shortDesc').value  = loc?.shortDesc || '';
+  $.qs('loc-lore').value       = loc?.lore || '';
+  $.qs('loc-mapImage').value   = loc?.mapImage || '';
   tempConnected = Array.isArray(loc?.connected) ? loc.connected.slice() : [];
-  document.getElementById('loc-visible').checked  = loc?.visible !== false;
-  document.getElementById('loc-dmNotes').value    = loc?.dmNotes || '';
+  $.qs('loc-visible').checked  = loc?.visible !== false;
+  $.qs('loc-dmNotes').value    = loc?.dmNotes || '';
   tempNPCs   = JSON.parse(JSON.stringify(loc?.npcs   || []));
   tempQuests = JSON.parse(JSON.stringify(loc?.quests || []));
   tempVisibleTo = Array.isArray(loc?.visibleTo) ? loc.visibleTo.slice() : [];
   // Sub-map fields
   const sub = loc?.subMap || null;
-  document.getElementById('loc-subMap-image').value  = sub?.world?.mapImage || sub?.image || '';
-  document.getElementById('loc-subMap-width').value  = sub?.world?.mapWidth  || sub?.width  || 1200;
-  document.getElementById('loc-subMap-height').value = sub?.world?.mapHeight || sub?.height || 800;
+  if ($.qs('loc-subMap-image'))  $.qs('loc-subMap-image').value  = sub?.world?.mapImage || sub?.image || '';
+  if ($.qs('loc-subMap-width'))  $.qs('loc-subMap-width').value  = sub?.world?.mapWidth  || sub?.width  || 1200;
+  if ($.qs('loc-subMap-height')) $.qs('loc-subMap-height').value = sub?.world?.mapHeight || sub?.height || 800;
   const stat = document.getElementById('submap-stat');
-  if (sub && Array.isArray(sub.locations)) {
-    stat.textContent = `${sub.locations.length} pin${sub.locations.length===1?'':'s'} · ${(sub.zones||[]).length} zone${(sub.zones||[]).length===1?'':'s'}`;
-    document.getElementById('reset-submap-btn').style.display = '';
-  } else {
-    stat.textContent = 'No sub-map yet';
-    document.getElementById('reset-submap-btn').style.display = 'none';
+  if (stat) {
+    if (sub && Array.isArray(sub.locations)) {
+      stat.textContent = `${sub.locations.length} pin${sub.locations.length===1?'':'s'} · ${(sub.zones||[]).length} zone${(sub.zones||[]).length===1?'':'s'}`;
+      const rb = document.getElementById('reset-submap-btn'); if (rb) rb.style.display = '';
+    } else {
+      stat.textContent = 'No sub-map yet';
+      const rb = document.getElementById('reset-submap-btn'); if (rb) rb.style.display = 'none';
+    }
   }
   // The sub-map tab is meaningless when editing a sub-pin (no recursive sub-maps).
-  document.getElementById('ltab-submap').style.display = inSubMap() ? 'none' : '';
-  document.getElementById('ltab-npcs').style.display   = inSubMap() ? 'none' : '';
+  // These IDs live only in the legacy modal (tab buttons aren't cloned).
+  const ltSubmap = document.getElementById('ltab-submap');
+  const ltNPCs   = document.getElementById('ltab-npcs');
+  if (ltSubmap) ltSubmap.style.display = inSubMap() ? 'none' : '';
+  if (ltNPCs)   ltNPCs.style.display   = inSubMap() ? 'none' : '';
   renderNPCEditor(); renderQuestEditor(); renderVisibleToChips(); renderConnectedChips();
   renderLocationNPCsHere(loc?.id);
-  switchLocTab('info');
-  document.getElementById('loc-modal').classList.remove('hidden');
+  // switchLocTab targets legacy DOM; the inspector tracks its own tab state.
+  // Skip it when the inspector is the host.
+  if (!document.getElementById('fp-right-body')?.contains($.qs('loc-name'))) {
+    switchLocTab('info');
+    document.getElementById('loc-modal').classList.remove('hidden');
+  }
   renderLocEncounters(loc || null);
-  document.getElementById('loc-name').addEventListener('input', function() {
-    if (!editingLocId) document.getElementById('loc-id').value = this.value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+  $.qs('loc-name').addEventListener('input', function() {
+    if (!editingLocId) $.qs('loc-id').value = this.value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
   });
 }
 
@@ -2246,8 +2399,9 @@ function newEncounterAtCurrentLocation() {
 // ────────────────────────────────────────────────────────────────
 
 function saveLocation() {
-  const name = document.getElementById('loc-name').value.trim();
-  const id   = document.getElementById('loc-id').value.trim().replace(/[^a-z0-9-]/g,'');
+  const $ = inspectorScope();
+  const name = $.qs('loc-name').value.trim();
+  const id   = $.qs('loc-id').value.trim().replace(/[^a-z0-9-]/g,'');
   if (!name||!id) { toast('Name and ID are required.'); return; }
   // Preserve existing sub-map data (pins, zones) — read sub-map fields from the
   // form only when at the world level. Pin records (inside a sub-map) can't have
@@ -2255,9 +2409,12 @@ function saveLocation() {
   const existing = data.locations.find(l => l.id === editingLocId) || {};
   let subMap = existing.subMap || null;
   if (!inSubMap()) {
-    const subImage  = document.getElementById('loc-subMap-image').value.trim();
-    const subWidth  = parseInt(document.getElementById('loc-subMap-width').value, 10) || 1200;
-    const subHeight = parseInt(document.getElementById('loc-subMap-height').value, 10) || 800;
+    const subImageEl  = $.qs('loc-subMap-image');
+    const subWidthEl  = $.qs('loc-subMap-width');
+    const subHeightEl = $.qs('loc-subMap-height');
+    const subImage  = subImageEl  ? subImageEl.value.trim() : '';
+    const subWidth  = subWidthEl  ? (parseInt(subWidthEl.value, 10)  || 1200) : 1200;
+    const subHeight = subHeightEl ? (parseInt(subHeightEl.value, 10) || 800)  : 800;
     if (subImage || (subMap && (subMap.locations?.length || subMap.zones?.length))) {
       // Persist sub-map structure. Keep existing pins/zones; just update world meta.
       subMap = {
@@ -2271,23 +2428,29 @@ function saveLocation() {
   }
   const locData = {
     id, name,
-    type:      document.getElementById('loc-type').value,
-    x:         parseFloat(document.getElementById('loc-x').value)||50,
-    y:         parseFloat(document.getElementById('loc-y').value)||50,
-    visible:   document.getElementById('loc-visible').checked,
-    shortDesc: document.getElementById('loc-shortDesc').value.trim(),
-    lore:      document.getElementById('loc-lore').value.trim(),
-    mapImage:  document.getElementById('loc-mapImage').value.trim(),
+    type:      $.qs('loc-type').value,
+    x:         parseFloat($.qs('loc-x').value)||50,
+    y:         parseFloat($.qs('loc-y').value)||50,
+    visible:   $.qs('loc-visible').checked,
+    shortDesc: $.qs('loc-shortDesc').value.trim(),
+    lore:      $.qs('loc-lore').value.trim(),
+    mapImage:  $.qs('loc-mapImage').value.trim(),
     connected: tempConnected.slice(),
     npcs:      [],                 // NPCs are first-class now; managed in the NPCs tab
     quests:    tempQuests,
-    dmNotes:   document.getElementById('loc-dmNotes').value.trim(),
+    dmNotes:   $.qs('loc-dmNotes').value.trim(),
     visibleTo: tempVisibleTo.slice(),
     subMap:    subMap,
   };
   const idx = data.locations.findIndex(l=>l.id===editingLocId);
   if (idx>=0) data.locations[idx]=locData; else data.locations.push(locData);
-  selectedLocId=id; saveAll(); renderLocList(); if (typeof renderFpLeftBody === 'function') renderFpLeftBody(); buildMap(); closeLocModal();
+  selectedLocId=id; saveAll(); renderLocList(); if (typeof renderFpLeftBody === 'function') renderFpLeftBody(); buildMap();
+  closeLocModal();
+  // Re-render the inspector with the updated record (header may have new name/glyph).
+  if (selectedEntity && selectedEntity.type === 'location') {
+    selectedEntity.id = id;
+    renderInspector();
+  }
   setPublishStatus('','Unpublished changes');
 }
 
