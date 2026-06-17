@@ -9,25 +9,6 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-16
 
-### Atlas Workshop v2 (Task 7) — right-click context menu
-
-- **`map-dm-v2.html`: right-click adds and edits without modal hunting.**
-  - Right-click empty map → "📍 Add location here" / "◇ Add zone here" —
-    creates the entity at the clicked coords (translates client→map-% via
-    a new `clientToMapPct` helper that accounts for pan + zoom). Locations
-    auto-open in the inspector for naming/editing; zones drop centered on
-    the click.
-  - Right-click a pin → Edit / Duplicate / Toggle visibility / Delete.
-    Duplicate offsets the copy by ~3% on x and y and guarantees a unique
-    id (`-copy`, then `-copy-2`, `-copy-3`…). Delete uses the styled
-    `confirmDialog` from the round-4 UX pass. Toggle-visibility flips
-    the player-visible flag and refreshes the inspector if open.
-  - Menu (`#ctx-menu`) is fixed-positioned and self-clamps to the
-    viewport. Esc / outside-click / left-click on an item all close it.
-  - Pin context handler is wired inside `attachPinGesture` (Task 6); the
-    map handler skips clicks on pins/zones/`.fp`/topbar/bottom-strip so
-    panels keep their native menus.
-
 ### Maps — UX cleanup pass (round 4)
 
 - **DM map: styled confirm dialog for destructive operations.** Replaced
