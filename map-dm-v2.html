@@ -3137,7 +3137,34 @@ function addCharacterV2() {
   selectCharacterV2(newChar.id);
 }
 
-function renderWorldPanelV2(body)     { body.innerHTML = '<div class="empty-state">Coming in Task 15.</div>'; }
+function renderWorldPanelV2(body) {
+  if (!worldData || !worldData.world) { body.innerHTML = '<div class="empty-state">Loading…</div>'; return; }
+  const w = worldData.world;
+  body.innerHTML = `
+    <div class="field"><label>WORLD NAME</label>
+      <input type="text" value="${escapeHtml(w.name||'')}" data-wfield="name">
+    </div>
+    <div class="field"><label>REGION MAP IMAGE URL</label>
+      <input type="text" value="${escapeHtml(w.mapImage||'')}" data-wfield="mapImage" placeholder="https://… or leave blank">
+    </div>
+    <div class="field-row">
+      <div class="field"><label>WIDTH (px)</label><input type="number" value="${w.mapWidth||1200}"  data-wfield="mapWidth"  min="200"></div>
+      <div class="field"><label>HEIGHT (px)</label><input type="number" value="${w.mapHeight||800}" data-wfield="mapHeight" min="200"></div>
+    </div>
+    <div style="margin-top:1rem;padding:0.6rem;background:rgba(184,134,11,0.08);border:1px solid var(--gold-faint);border-radius:3px;font-size:0.78rem;color:var(--ink-dim)">
+      Tip: hit <kbd>Cmd/Ctrl + S</kbd> to force-save immediately. Otherwise edits save automatically.
+    </div>
+  `;
+  body.querySelectorAll('[data-wfield]').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const k = inp.dataset.wfield;
+      let v = inp.type === 'number' ? +inp.value : inp.value;
+      worldData.world[k] = v;
+      scheduleSave();
+      if (k === 'mapImage' || k === 'mapWidth' || k === 'mapHeight') buildMap();
+    });
+  });
+}
 
 // ══════════════════════════════════════════════════════════════
 //  PANEL RESIZE + COLLAPSE (Task 10)
