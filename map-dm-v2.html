@@ -1230,8 +1230,26 @@ async function publishData() {
     else if (!res.needsToken) { setSyncStatus('fail','⚠ Failed'); setPublishStatus('fail','⚠ Publish failed'); }
   } catch { setSyncStatus('fail','⚠ Offline'); setPublishStatus('fail','⚠ Could not reach server'); }
 }
-function setSyncStatus(type, msg) { const el=document.getElementById('sync-status'); el.className=`sync-status ${type}`; el.textContent=msg; }
-function setPublishStatus(type, msg) { const el=document.getElementById('publish-status'); el.className=`sync-status ${type}`; el.textContent=msg; }
+function setSyncStatus(type, msg) { const el=document.getElementById('sync-status'); if (el) { el.className=`sync-status ${type}`; el.textContent=msg; } }
+function setPublishStatus(type, msg) {
+  window.__unpublishedCount = (msg && /unpublished/i.test(msg)) ? (window.__unpublishedCount || 0) + 1 : 0;
+  if (type === 'ok') window.__unpublishedCount = 0;
+  const el = document.getElementById('publish-status');
+  if (el) { el.className=`sync-status ${type}`; el.textContent=msg; }
+  updateTopClusterPublish();
+}
+function updateTopClusterPublish() {
+  const btn = document.getElementById('tc-publish');
+  const count = document.getElementById('tc-publish-count');
+  if (!btn) return;
+  const unpublished = window.__unpublishedCount || 0;
+  if (count) {
+    if (unpublished > 0) { count.hidden = false; count.textContent = String(unpublished); }
+    else { count.hidden = true; }
+  }
+  btn.onclick = publishData;
+}
+updateTopClusterPublish();
 
 // ══════════════════════════════════════════════════════════════
 //  TABS
@@ -1523,6 +1541,7 @@ function buildMap() {
 
   setupMapDrag();
   buildLegend();
+  updateBottomStrip();
 }
 
 // ── Legend ────────────────────────────────────────────────────
@@ -1692,6 +1711,17 @@ function mapZoom(f) {
 }
 function applyTransform() {
   document.getElementById('map-canvas').style.transform=`translate(${mapX}px,${mapY}px) scale(${mapScale})`;
+  updateBottomStrip();
+}
+function updateBottomStrip() {
+  const z = document.getElementById('bs-zoom');
+  const c = document.getElementById('bs-counts');
+  if (z) z.textContent = Math.round((typeof mapScale === 'number' ? mapScale : 1) * 100) + '%';
+  if (c && typeof data !== 'undefined' && data) {
+    const locN = (data.locations||[]).length;
+    const zN  = (data.zones||[]).length;
+    c.textContent = `${locN} pins · ${zN} zones`;
+  }
 }
 
 function setupMapDrag() {
@@ -1715,7 +1745,35 @@ function setupMapDrag() {
     const ns=Math.min(Math.max(mapScale*f,0.15),4);
     mapX=cx-(cx-mapX)*(ns/mapScale); mapY=cy-(cy-mapY)*(ns/mapScale); mapScale=ns; applyTransform();
   },{passive:false});
+  wireCoordsReadout();
 }
+
+// Coords readout — independent of setupMapDrag so it survives any DOM
+// shape change (the v2 shell uses #map-stage instead of #map-container).
+function wireCoordsReadout() {
+  const stage = document.getElementById('map-stage');
+  if (!stage || stage.__bsCoordsWired) return;
+  stage.__bsCoordsWired = true;
+  stage.addEventListener('mousemove', (e) => {
+    const rect = stage.getBoundingClientRect();
+    const W = (typeof data !== 'undefined' && data && data.world && data.world.mapWidth)  || 1200;
+    const H = (typeof data !== 'undefined' && data && data.world && data.world.mapHeight) || 800;
+    // Inverse of applyTransform: convert client px to map %
+    const localX = (e.clientX - rect.left - mapX) / mapScale;
+    const localY = (e.clientY - rect.top  - mapY) / mapScale;
+    const xPct = (localX / W) * 100;
+    const yPct = (localY / H) * 100;
+    const el = document.getElementById('bs-coords');
+    if (!el) return;
+    if (xPct >= 0 && xPct <= 100 && yPct >= 0 && yPct <= 100) {
+      el.textContent = `${xPct.toFixed(1)}, ${yPct.toFixed(1)}`;
+    } else {
+      el.textContent = '—';
+    }
+  });
+}
+// Wire coords readout immediately at script load — doesn't depend on setupMapDrag.
+wireCoordsReadout();
 
 // ══════════════════════════════════════════════════════════════
 //  MOVE MODE — drag handlers
