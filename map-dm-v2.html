@@ -224,6 +224,8 @@ body{overflow:hidden}
 .pin.type-default    .pin-marker{background:#e0a830}.pin.type-default    .pin-tail{background:#e0a830}
 .pin.hidden-pin   .pin-marker{opacity:0.45;border-style:dashed}
 .pin.selected-pin{filter:drop-shadow(0 0 6px var(--gold))}
+.pin.dragging .pin-marker{box-shadow:0 0 14px var(--gold)}
+.pin.dragging{z-index:30}
 .pin-label{position:absolute;top:calc(100% + 4px);left:50%;transform:translateX(-50%);white-space:nowrap;font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.05em;color:var(--ink);background:rgba(10,8,6,0.88);padding:2px 6px;border-radius:2px;border:1px solid var(--border);pointer-events:none;opacity:0;transition:opacity 0.15s}
 .pin:hover .pin-label{opacity:1}
 
@@ -1542,11 +1544,7 @@ function buildMap() {
       </div>
       <div class="pin-label">${loc.name}${loc.visible===false?' 🙈':''}</div>
     `;
-    if (moveMode) {
-      attachPinMoveDrag(pin, loc);
-    } else {
-      pin.addEventListener('click', e => { e.stopPropagation(); selectLocation(loc.id); });
-    }
+    attachPinGesture(pin, loc);
     pin.addEventListener('mouseenter', () => showPinInfo(loc));
     pin.addEventListener('mouseleave', hidePinInfo);
     canvas.appendChild(pin);
@@ -1799,6 +1797,84 @@ function wireCoordsReadout() {
 }
 // Wire coords readout immediately at script load — doesn't depend on setupMapDrag.
 wireCoordsReadout();
+
+// ══════════════════════════════════════════════════════════════
+//  v2 PIN GESTURE — always-on click-vs-drag (replaces Move mode)
+// ══════════════════════════════════════════════════════════════
+// Stub replaced with the debounced auto-save in Task 9. For now it just
+// surfaces the legacy "Unpublished changes" status so the user still gets
+// feedback that a write happened.
+let scheduleSave = function() {
+  if (typeof setPublishStatus === 'function') setPublishStatus('', 'Unpublished changes');
+};
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+const PIN_DRAG_THRESHOLD = 4;   // px
+
+function attachPinGesture(pinEl, loc) {
+  pinEl.style.cursor = 'grab';
+  let active = null;   // { startX, startY, dragging, _newX, _newY }
+
+  pinEl.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;   // left button only; right-click handled in Task 7
+    e.stopPropagation();
+    e.preventDefault();
+    pinEl.setPointerCapture(e.pointerId);
+    active = { startX:e.clientX, startY:e.clientY, dragging:false };
+  });
+
+  pinEl.addEventListener('pointermove', (e) => {
+    if (!active) return;
+    const dx = e.clientX - active.startX;
+    const dy = e.clientY - active.startY;
+    if (!active.dragging && (Math.abs(dx) > PIN_DRAG_THRESHOLD || Math.abs(dy) > PIN_DRAG_THRESHOLD)) {
+      active.dragging = true;
+      pinEl.classList.add('dragging');
+      pinEl.style.cursor = 'grabbing';
+    }
+    if (active.dragging) {
+      const W = data.world.mapWidth||1200, H = data.world.mapHeight||800;
+      const dxPct = (dx / (W * mapScale)) * 100;
+      const dyPct = (dy / (H * mapScale)) * 100;
+      const newX = clamp(Math.round((loc.x + dxPct)*10)/10, 0, 100);
+      const newY = clamp(Math.round((loc.y + dyPct)*10)/10, 0, 100);
+      pinEl.style.left = newX + '%';
+      pinEl.style.top  = newY + '%';
+      active._newX = newX;
+      active._newY = newY;
+    }
+  });
+
+  pinEl.addEventListener('pointerup', (e) => {
+    if (!active) return;
+    try { pinEl.releasePointerCapture(e.pointerId); } catch (_) {}
+    if (active.dragging) {
+      loc.x = active._newX;
+      loc.y = active._newY;
+      pinEl.classList.remove('dragging');
+      pinEl.style.cursor = 'grab';
+      scheduleSave();              // hook lands in Task 9; for now this is a no-op (status update)
+      // If this pin is selected, refresh the inspector's coord fields
+      if (selectedEntity && selectedEntity.type==='location' && selectedEntity.id===loc.id) {
+        const xIn = inspectorScope().qs('loc-x'); if (xIn) xIn.value = loc.x;
+        const yIn = inspectorScope().qs('loc-y'); if (yIn) yIn.value = loc.y;
+      }
+    } else {
+      // click without drag → select
+      selectLocation(loc.id);
+    }
+    active = null;
+  });
+
+  pinEl.addEventListener('pointercancel', () => {
+    if (active && active.dragging) {
+      pinEl.classList.remove('dragging');
+      pinEl.style.cursor = 'grab';
+    }
+    active = null;
+  });
+}
 
 // ══════════════════════════════════════════════════════════════
 //  MOVE MODE — drag handlers
