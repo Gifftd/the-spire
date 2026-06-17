@@ -238,8 +238,6 @@ body{overflow:hidden}
 .map-controls{position:absolute;bottom:1rem;right:1rem;display:flex;flex-direction:column;gap:4px;z-index:20}
 .map-btn{width:30px;height:30px;background:rgba(19,16,10,0.9);border:1px solid var(--border-light);border-radius:var(--radius);color:var(--ink-dim);font-size:0.9rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
 .map-btn:hover{border-color:var(--gold);color:var(--gold)}
-.map-hint{position:absolute;top:0.6rem;left:50%;transform:translateX(-50%);background:linear-gradient(180deg,rgba(184,134,11,0.22),rgba(184,134,11,0.08));border:1px solid var(--gold-faint);border-radius:var(--radius);padding:6px 14px;font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.12em;color:var(--gold-light);z-index:20;pointer-events:none;text-transform:uppercase;box-shadow:0 2px 10px rgba(0,0,0,0.5)}
-.map-hint .esc-hint{margin-left:10px;padding-left:10px;border-left:1px solid var(--gold-faint);color:var(--ink-dim);font-size:0.62rem;letter-spacing:0.08em;text-transform:none}
 
 /* ── Pins & zones (DM view) ── */
 .pin{position:absolute;transform:translate(-50%,-100%);cursor:pointer;z-index:10;transition:transform 0.15s}
@@ -298,122 +296,10 @@ body{overflow:hidden}
 .map-container.move-mode .zone:active{cursor:grabbing}
 .map-container.move-mode .poly-zone{cursor:grab}
 
-/* ──────────────────────────────────────────────────────────
-   EXPANDED EDITOR
-   Slide-out drawer that overlays the map. Toggled by the
-   "⛶ Expand editor" button in the topbar. Esc collapses it.
-   ────────────────────────────────────────────────────────── */
-.editor-scrim{
-  position:fixed;
-  top:var(--topbar);left:0;right:0;bottom:0;
-  background:rgba(0,0,0,0.55);
-  backdrop-filter:blur(4px);
-  -webkit-backdrop-filter:blur(4px);
-  z-index:90;
-  opacity:0;
-  pointer-events:none;
-  transition:opacity 240ms cubic-bezier(0.16,1,0.3,1);
-}
-body.editor-expanded .editor-scrim{opacity:1;pointer-events:auto}
-
-body.editor-expanded .editor-col{
-  position:fixed;
-  top:var(--topbar);
-  right:0;
-  bottom:0;
-  width:min(900px,100vw);
-  max-width:100vw;
-  z-index:100;
-  border-left:1px solid var(--gold-faint);
-  box-shadow:0 0 0 1px rgba(184,134,11,0.18),0 0 60px rgba(0,0,0,0.55),-12px 0 40px rgba(184,134,11,0.07);
-  animation:editor-slide-in 280ms cubic-bezier(0.16,1,0.3,1);
-}
-@keyframes editor-slide-in{
-  from{transform:translateX(40px);opacity:0}
-  to{transform:translateX(0);opacity:1}
-}
-
-/* Roomy form treatment inside the pop-out */
-body.editor-expanded .editor-pane{padding:1.4rem 1.8rem}
-body.editor-expanded .field{margin-bottom:1rem}
-body.editor-expanded .field input,
-body.editor-expanded .field textarea,
-body.editor-expanded .field select{font-size:0.98rem;padding:8px 11px;line-height:1.5}
-body.editor-expanded .field textarea{min-height:100px}
-body.editor-expanded .field-row{gap:12px}
-body.editor-expanded .field label{font-size:0.62rem;margin-bottom:5px}
-body.editor-expanded .section-header{font-size:0.68rem;margin:1.4rem 0 0.6rem}
-body.editor-expanded .visibleto-chip,
-body.editor-expanded .ed-chip{font-size:0.78rem;padding:5px 12px}
-body.editor-expanded .editor-tabs .editor-tab{padding:13px 8px 11px;font-size:0.66rem}
-
-/* Two-column layout for chip grids in pop-out, where space allows */
-@media(min-width:720px){
-  body.editor-expanded .visibleto-chips{gap:6px}
-}
-
-/* When expanded, the toggle button shows collapse state */
-body.editor-expanded #expand-editor-btn{background:var(--gold);color:var(--bg)}
-
-/* ──────────────────────────────────────────────────────────
-   DETAIL SIDE-PANEL (NPCs / Players / Timeline)
-   When a record is being edited in pop-out mode, the detail
-   form pulls out to a fixed-position panel on the right side
-   so the user doesn't have to scroll past the entire list to
-   reach it. The list stays scrollable on the left.
-   ────────────────────────────────────────────────────────── */
-body.editor-expanded #pane-npcs:has(> #npc-detail:not([style*="none"])),
-body.editor-expanded #pane-characters:has(> #char-detail:not([style*="none"])),
-body.editor-expanded #pane-timeline:has(> #tl-detail:not([style*="none"])){
-  padding-right:520px;
-}
-body.editor-expanded #pane-npcs > #npc-detail:not([style*="none"]),
-body.editor-expanded #pane-characters > #char-detail:not([style*="none"]),
-body.editor-expanded #pane-timeline > #tl-detail:not([style*="none"]){
-  position:fixed;
-  top:calc(var(--topbar) + 38px); /* topbar + editor-tabs */
-  right:0;
-  bottom:0;
-  width:500px;
-  margin:0 !important;
-  overflow-y:auto;
-  padding:1.2rem 1.4rem 1.4rem;
-  border-left:1px solid var(--gold-faint);
-  background:var(--surface);
-  box-shadow:-14px 0 36px rgba(0,0,0,0.50), -1px 0 0 rgba(184,134,11,0.10);
-  z-index:110;
-  animation:detail-slide-in 240ms cubic-bezier(0.16,1,0.3,1);
-}
-@keyframes detail-slide-in{
-  from{transform:translateX(28px);opacity:0}
-  to{transform:translateX(0);opacity:1}
-}
-
-/* Close-detail button injected into each side panel via JS */
-.detail-close-btn{
-  position:sticky;top:-1.2rem;float:right;
-  background:transparent;border:1px solid var(--border-light);border-radius:3px;
-  color:var(--ink-faint);cursor:pointer;
-  font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.12em;
-  padding:4px 10px;margin-left:8px;margin-bottom:6px;
-  text-transform:uppercase;z-index:5;
-  transition:color 120ms,border-color 120ms,background 120ms;
-}
-.detail-close-btn:hover{color:var(--ink);border-color:var(--ink-dim);background:var(--surface2)}
-
-/* Narrower viewports — let the side panel become wider/full instead of pushing the list off */
-@media(max-width:1200px){
-  body.editor-expanded #pane-npcs:has(> #npc-detail:not([style*="none"])),
-  body.editor-expanded #pane-characters:has(> #char-detail:not([style*="none"])),
-  body.editor-expanded #pane-timeline:has(> #tl-detail:not([style*="none"])){
-    padding-right:0;
-  }
-  body.editor-expanded #pane-npcs > #npc-detail:not([style*="none"]),
-  body.editor-expanded #pane-characters > #char-detail:not([style*="none"]),
-  body.editor-expanded #pane-timeline > #tl-detail:not([style*="none"]){
-    width:min(550px,90vw);
-  }
-}
+/* Task 17: removed EXPANDED EDITOR block (.editor-scrim, body.editor-expanded
+   rules, .detail-close-btn) — the legacy two-column pop-out drawer is fully
+   replaced by the v2 floating inspector panel. toggleEditorExpand and
+   ensureEditorExpanded are now no-ops. */
 
 /* ── Editor panel (legacy rules removed in v2 — see "Legacy editor markup" hide rule below) ── */
 
@@ -683,7 +569,7 @@ body.editor-expanded #pane-timeline > #tl-detail:not([style*="none"]){
 }
 
 /* Legacy editor markup — hidden during v2 transition; removed in Task 17 */
-.editor-col,.editor-tabs,.editor-pane,.dm-breadcrumb,.sync-status,.in-submap-banner,.editor-scrim,#loc-modal{display:none!important}
+.editor-col,.editor-tabs,.editor-pane,.dm-breadcrumb,.sync-status,.in-submap-banner{display:none!important}
 </style>
 </head>
 <body>
@@ -703,9 +589,6 @@ body.editor-expanded #pane-timeline > #tl-detail:not([style*="none"]){
     ▲ Publish<span class="tc-publish-count" id="tc-publish-count" hidden>0</span>
   </button>
 </div>
-<!-- Click-outside scrim for the expanded editor -->
-<div class="editor-scrim" id="editor-scrim" onclick="toggleEditorExpand()" aria-hidden="true"></div>
-
 <!-- FULL-BLEED MAP CANVAS -->
 <main id="canvas" class="canvas">
   <div id="map-stage" class="map-stage">
@@ -755,8 +638,6 @@ body.editor-expanded #pane-timeline > #tl-detail:not([style*="none"]){
   <span id="bs-counts">—</span>
 </div>
 
-<!-- CONSTRUCTION BANNER (remove in Task 18) -->
-<div id="v2-banner" style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(184,134,11,0.18);border:1px solid var(--gold-faint);border-radius:3px;padding:5px 12px;font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.12em;color:var(--gold-light);z-index:8000;text-transform:uppercase">⚠ Atlas v2 — under construction</div>
 
 <!-- IMPORT MODAL -->
 <div class="modal-backdrop hidden" id="import-modal">
@@ -798,132 +679,105 @@ body.editor-expanded #pane-timeline > #tl-detail:not([style*="none"]){
   </div>
 </div>
 
-<!-- LOCATION EDITOR MODAL -->
-<div class="modal-backdrop hidden" id="loc-modal">
-  <div class="modal">
-    <div class="modal-header">
-      <h2 id="loc-modal-title">Edit Location</h2>
-      <button class="modal-close" onclick="closeLocModal()" aria-label="Close location dialog">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="editor-tabs" style="margin:-0.8rem -1rem 0.8rem;border-radius:0">
-        <button class="editor-tab active" id="ltab-info"   onclick="switchLocTab('info')">INFO</button>
-        <button class="editor-tab" id="ltab-lore"   onclick="switchLocTab('lore')">LORE</button>
-        <button class="editor-tab" id="ltab-npcs"   onclick="switchLocTab('npcs')">NPCs</button>
-        <button class="editor-tab" id="ltab-quests" onclick="switchLocTab('quests')">QUESTS</button>
-        <button class="editor-tab" id="ltab-submap" onclick="switchLocTab('submap')">SUB-MAP</button>
-        <button class="editor-tab" id="ltab-dm"     onclick="switchLocTab('dm')">DM NOTES</button>
-      </div>
-
-      <!-- INFO -->
-      <div class="editor-pane active" id="lpane-info">
-        <div class="field"><label>LOCATION NAME</label><input type="text" id="loc-name" placeholder="Ironhaven…"></div>
-        <div class="field-row">
-          <div class="field"><label>TYPE</label>
-            <select id="loc-type">
-              <option value="city">City</option>
-              <option value="dungeon">Dungeon</option>
-              <option value="wilderness">Wilderness</option>
-              <option value="ruin">Ruin</option>
-              <option value="port">Port</option>
-              <option value="fort">Fort</option>
-              <option value="default">Other</option>
-            </select>
-          </div>
-          <div class="field"><label>ID (URL slug)</label><input type="text" id="loc-id" placeholder="ironhaven"></div>
-        </div>
-        <div class="field"><label>SHORT DESCRIPTION (shown on hover)</label><textarea id="loc-shortDesc" rows="2"></textarea></div>
-        <details class="loc-advanced">
-          <summary>Advanced — pin position</summary>
-          <div class="field-row" style="margin-top:0.5rem">
-            <div class="field"><label>X POS (%)</label><input type="number" id="loc-x" min="0" max="100" step="0.5"></div>
-            <div class="field"><label>Y POS (%)</label><input type="number" id="loc-y" min="0" max="100" step="0.5"></div>
-          </div>
-          <div style="font-size:0.72rem;color:var(--ink-faint);font-style:italic;margin-top:-0.2rem">Tip: enable ✥ Move mode and drag the pin instead.</div>
-        </details>
-        <div class="field"><label>SUB-MAP IMAGE URL (optional)</label><input type="text" id="loc-mapImage" placeholder="https://… or leave blank"></div>
-        <div class="field"><label>CONNECTED LOCATIONS</label>
-          <div class="visibleto-chips" id="loc-connected-chips"></div>
-        </div>
-        <div class="toggle-row">
-          <input type="checkbox" id="loc-visible" checked>
-          <label for="loc-visible">Visible to players</label>
-        </div>
-        <div class="field">
-          <label>VISIBLE TO (leave empty = everyone)</label>
-          <div class="visibleto-chips" id="loc-visibleto-chips"></div>
-          <div class="visibleto-hint">Click to toggle. If no chips are selected, every logged-in player sees this location.</div>
-        </div>
-      </div>
-
-      <!-- LORE -->
-      <div class="editor-pane" id="lpane-lore">
-        <div class="field"><label>PLAYER-FACING LORE</label><textarea id="loc-lore" rows="12" placeholder="What the players know or can learn about this place…"></textarea></div>
-      </div>
-
-      <!-- NPCs (first-class — managed in the NPCs tab) -->
-      <div class="editor-pane" id="lpane-npcs">
-        <div style="font-size:0.8rem;color:var(--ink-dim);line-height:1.5;margin-bottom:0.6rem">
-          NPCs are tracked separately now — see the <strong style="color:var(--gold-light)">NPCs</strong> tab. This list shows everyone currently here.
-        </div>
-        <div style="display:flex;gap:5px;margin-bottom:0.6rem">
-          <button class="btn btn-gold btn-sm" type="button" onclick="quickAddNPCAtLocation()">+ New NPC here</button>
-          <button class="btn btn-ghost btn-sm" type="button" onclick="switchTab('npcs')">Open NPCs tab ↗</button>
-        </div>
-        <div id="loc-npcs-here"></div>
-      </div>
-
-      <!-- QUESTS -->
-      <div class="editor-pane" id="lpane-quests">
-        <button class="btn btn-gold btn-sm" style="margin-bottom:0.6rem" onclick="addQuest()">+ Add quest hook</button>
-        <div id="quest-editor-list"></div>
-      </div>
-
-      <!-- SUB-MAP -->
-      <div class="editor-pane" id="lpane-submap">
-        <div style="font-size:0.82rem;color:var(--ink-dim);line-height:1.5;margin-bottom:0.6rem">
-          Attach a detail map to this location (a city plan, a dungeon level, a tavern floor). After saving the image + dimensions, click <strong style="color:var(--gold-light)">Open editor</strong> to place pins, draw zones, and write secrets that follow the same visibility rules as the world map.
-        </div>
-        <div class="field"><label>SUB-MAP IMAGE URL</label><input type="text" id="loc-subMap-image" placeholder="./maps/ironhaven-streets.png"></div>
-        <div class="field-row">
-          <div class="field"><label>WIDTH (px)</label><input type="number" id="loc-subMap-width" value="1200" min="200"></div>
-          <div class="field"><label>HEIGHT (px)</label><input type="number" id="loc-subMap-height" value="800" min="200"></div>
-        </div>
-        <div style="display:flex;gap:5px;align-items:center;margin-top:0.6rem">
-          <button class="btn btn-gold btn-sm" type="button" onclick="openSubMapEditor()">Open editor ↗</button>
-          <button class="btn btn-ghost btn-sm" type="button" onclick="resetSubMap()" id="reset-submap-btn" style="display:none">Reset sub-map</button>
-          <span id="submap-stat" style="margin-left:auto;font-size:0.7rem;color:var(--ink-faint)"></span>
-        </div>
-      </div>
-
-      <!-- DM NOTES -->
-      <div class="editor-pane" id="lpane-dm">
-        <div class="dm-note-area">
-          <div class="dm-note-label">🔒 DM ONLY — NOT PUBLISHED TO PLAYERS</div>
-          <textarea id="loc-dmNotes" rows="12" style="width:100%;background:transparent;border:none;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.9rem;outline:none;resize:vertical;line-height:1.5" placeholder="Secret notes, monster stats, plot hooks, treasure…"></textarea>
-        </div>
-        <div id="loc-encounters-panel" style="margin-top:1rem;padding:8px;border:1px solid var(--c-border-light);border-radius:3px">
-          <div style="font-family:Cinzel,serif;font-size:0.66rem;letter-spacing:0.1em;color:var(--c-brass);margin-bottom:6px;text-transform:uppercase">Encounters here</div>
-          <div id="loc-encounters-list">—</div>
-          <button onclick="newEncounterAtCurrentLocation()" style="margin-top:6px">+ New encounter here</button>
-        </div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-red btn-sm" onclick="deleteLocation()">Delete</button>
-      <button class="btn btn-ghost" onclick="closeLocModal()">Cancel</button>
-      <button class="btn btn-gold" onclick="saveLocation()">Save location</button>
-    </div>
-  </div>
-</div>
-
 <!-- LEGACY-TEMPLATE STASH (Task 12+)
      Inspector panels clone *children* of these blocks. The stash itself is
      permanently hidden — the legacy `editNPCEntity` / `saveNPCEntity` etc.
      functions still target these ids, but `inspectorScope().qs()` finds the
      inspector clones FIRST when the inspector is open. The `!important` rule
-     defeats any inline `style.display = 'block'` writes from legacy code. -->
+     defeats any inline `style.display = 'block'` writes from legacy code.
+     Task 17: the location editor's tab-panes (#lpane-*) were moved here when
+     the #loc-modal shell was removed. Location inspector clones their
+     children via buildLocTabFragment(). -->
 <div id="legacy-templates" style="display:none !important" aria-hidden="true">
+  <!-- LOCATION EDITOR PANES (cloned by renderLocationInspectorBody / buildLocTabFragment) -->
+  <div class="editor-pane active" id="lpane-info">
+    <div class="field"><label>LOCATION NAME</label><input type="text" id="loc-name" placeholder="Ironhaven…"></div>
+    <div class="field-row">
+      <div class="field"><label>TYPE</label>
+        <select id="loc-type">
+          <option value="city">City</option>
+          <option value="dungeon">Dungeon</option>
+          <option value="wilderness">Wilderness</option>
+          <option value="ruin">Ruin</option>
+          <option value="port">Port</option>
+          <option value="fort">Fort</option>
+          <option value="default">Other</option>
+        </select>
+      </div>
+      <div class="field"><label>ID (URL slug)</label><input type="text" id="loc-id" placeholder="ironhaven"></div>
+    </div>
+    <div class="field"><label>SHORT DESCRIPTION (shown on hover)</label><textarea id="loc-shortDesc" rows="2"></textarea></div>
+    <details class="loc-advanced">
+      <summary>Advanced — pin position</summary>
+      <div class="field-row" style="margin-top:0.5rem">
+        <div class="field"><label>X POS (%)</label><input type="number" id="loc-x" min="0" max="100" step="0.5"></div>
+        <div class="field"><label>Y POS (%)</label><input type="number" id="loc-y" min="0" max="100" step="0.5"></div>
+      </div>
+      <div style="font-size:0.72rem;color:var(--ink-faint);font-style:italic;margin-top:-0.2rem">Tip: drag the pin on the map to reposition.</div>
+    </details>
+    <div class="field"><label>SUB-MAP IMAGE URL (optional)</label><input type="text" id="loc-mapImage" placeholder="https://… or leave blank"></div>
+    <div class="field"><label>CONNECTED LOCATIONS</label>
+      <div class="visibleto-chips" id="loc-connected-chips"></div>
+    </div>
+    <div class="toggle-row">
+      <input type="checkbox" id="loc-visible" checked>
+      <label for="loc-visible">Visible to players</label>
+    </div>
+    <div class="field">
+      <label>VISIBLE TO (leave empty = everyone)</label>
+      <div class="visibleto-chips" id="loc-visibleto-chips"></div>
+      <div class="visibleto-hint">Click to toggle. If no chips are selected, every logged-in player sees this location.</div>
+    </div>
+  </div>
+
+  <div class="editor-pane" id="lpane-lore">
+    <div class="field"><label>PLAYER-FACING LORE</label><textarea id="loc-lore" rows="12" placeholder="What the players know or can learn about this place…"></textarea></div>
+  </div>
+
+  <div class="editor-pane" id="lpane-npcs">
+    <div style="font-size:0.8rem;color:var(--ink-dim);line-height:1.5;margin-bottom:0.6rem">
+      NPCs are tracked separately now — see the <strong style="color:var(--gold-light)">NPCs</strong> tab. This list shows everyone currently here.
+    </div>
+    <div style="display:flex;gap:5px;margin-bottom:0.6rem">
+      <button class="btn btn-gold btn-sm" type="button" onclick="quickAddNPCAtLocation()">+ New NPC here</button>
+      <button class="btn btn-ghost btn-sm" type="button" onclick="switchTab('npcs')">Open NPCs tab ↗</button>
+    </div>
+    <div id="loc-npcs-here"></div>
+  </div>
+
+  <div class="editor-pane" id="lpane-quests">
+    <button class="btn btn-gold btn-sm" style="margin-bottom:0.6rem" onclick="addQuest()">+ Add quest hook</button>
+    <div id="quest-editor-list"></div>
+  </div>
+
+  <div class="editor-pane" id="lpane-submap">
+    <div style="font-size:0.82rem;color:var(--ink-dim);line-height:1.5;margin-bottom:0.6rem">
+      Attach a detail map to this location (a city plan, a dungeon level, a tavern floor). After saving the image + dimensions, click <strong style="color:var(--gold-light)">Open editor</strong> to place pins, draw zones, and write secrets that follow the same visibility rules as the world map.
+    </div>
+    <div class="field"><label>SUB-MAP IMAGE URL</label><input type="text" id="loc-subMap-image" placeholder="./maps/ironhaven-streets.png"></div>
+    <div class="field-row">
+      <div class="field"><label>WIDTH (px)</label><input type="number" id="loc-subMap-width" value="1200" min="200"></div>
+      <div class="field"><label>HEIGHT (px)</label><input type="number" id="loc-subMap-height" value="800" min="200"></div>
+    </div>
+    <div style="display:flex;gap:5px;align-items:center;margin-top:0.6rem">
+      <button class="btn btn-gold btn-sm" type="button" onclick="openSubMapEditor()">Open editor ↗</button>
+      <button class="btn btn-ghost btn-sm" type="button" onclick="resetSubMap()" id="reset-submap-btn" style="display:none">Reset sub-map</button>
+      <span id="submap-stat" style="margin-left:auto;font-size:0.7rem;color:var(--ink-faint)"></span>
+    </div>
+  </div>
+
+  <div class="editor-pane" id="lpane-dm">
+    <div class="dm-note-area">
+      <div class="dm-note-label">🔒 DM ONLY — NOT PUBLISHED TO PLAYERS</div>
+      <textarea id="loc-dmNotes" rows="12" style="width:100%;background:transparent;border:none;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.9rem;outline:none;resize:vertical;line-height:1.5" placeholder="Secret notes, monster stats, plot hooks, treasure…"></textarea>
+    </div>
+    <div id="loc-encounters-panel" style="margin-top:1rem;padding:8px;border:1px solid var(--c-border-light);border-radius:3px">
+      <div style="font-family:Cinzel,serif;font-size:0.66rem;letter-spacing:0.1em;color:var(--c-brass);margin-bottom:6px;text-transform:uppercase">Encounters here</div>
+      <div id="loc-encounters-list">—</div>
+      <button onclick="newEncounterAtCurrentLocation()" style="margin-top:6px">+ New encounter here</button>
+    </div>
+  </div>
+
   <!-- NPC EDITOR (cloned by renderNPCInspector) -->
   <div id="npc-detail">
     <div class="section-header" id="npc-detail-header">EDIT NPC</div>
@@ -1626,15 +1480,13 @@ async function resetSubMap() {
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   // Modals first
-  const locModalOpen    = !document.getElementById('loc-modal').classList.contains('hidden');
+  // #loc-modal was removed in Task 17 (legacy panes moved into #legacy-templates);
+  // the inspector handles location editing now, so only the import modal still gates Esc.
+  const locModalOpen    = false;
   const importModalOpen = !document.getElementById('import-modal')?.classList.contains('hidden');
   if (locModalOpen || importModalOpen) return;
-  // Pop-out editor next
-  if (document.body.classList.contains('editor-expanded')) {
-    toggleEditorExpand();
-    return;
-  }
-  // Active map modes next
+  // Active map modes next (Task 17: kept defensively — no UI activates these
+  // modes in v2, but the state vars + exitAnyMode are still defined.)
   if (moveMode || placeMode || polyDrawMode) {
     exitAnyMode();
     return;
@@ -1648,25 +1500,12 @@ document.addEventListener('keydown', e => {
   if (inSubMap()) exitToWorld();
 });
 
-// ── Pop-out editor toggle ──
-function toggleEditorExpand() {
-  const body = document.body;
-  const btn  = document.getElementById('expand-editor-btn');
-  const on   = body.classList.toggle('editor-expanded');
-  if (btn) {
-    btn.textContent = on ? '✕ Collapse editor' : '⛶ Expand editor';
-    btn.setAttribute('aria-label', on ? 'Collapse editor' : 'Expand editor for more room');
-  }
-}
-
-// Auto-expand the editor when a record's detail form opens, so the form
-// shows in a side panel instead of below a long list. The CSS does the
-// heavy lifting — JS just toggles the body class.
-function ensureEditorExpanded() {
-  if (!document.body.classList.contains('editor-expanded')) {
-    toggleEditorExpand();
-  }
-}
+// ── Pop-out editor (Task 17: dead) ──
+// The "expand editor" feature was a legacy two-column layout toggle that's
+// now obsolete — the v2 floating inspector replaced it. Kept as no-ops so
+// the many legacy callers (addCharacter, edit*Entity, etc.) don't break.
+function toggleEditorExpand() { /* no-op (legacy) */ }
+function ensureEditorExpanded() { /* no-op (legacy) */ }
 
 // Inject a "✕ Close" button into a detail panel the first time it opens
 // in pop-out mode. The button hides the panel so the list takes full width.
@@ -1739,7 +1578,6 @@ function buildMap() {
 
     g.appendChild(poly); g.appendChild(label);
     g.addEventListener('click', e => { e.stopPropagation(); if (!moveDragTarget) selectZone(zone.id); });
-    if (moveMode) attachPolyMoveDrag(g, zone);
     svg.appendChild(g);
   });
 
@@ -1755,7 +1593,6 @@ function buildMap() {
     label.textContent=zone.name;
     el.appendChild(label);
     el.addEventListener('click', e => { e.stopPropagation(); if (!moveDragTarget) selectZone(zone.id); });
-    if (moveMode) attachRectZoneMoveDrag(el, zone);
     canvas.appendChild(el);
   });
 
@@ -2344,34 +2181,13 @@ function duplicateLocation(id) {
 
 // ══════════════════════════════════════════════════════════════
 //  MOVE MODE — drag handlers
+//  Task 17: attachPinMoveDrag / attachRectZoneMoveDrag / attachPolyMoveDrag
+//  were removed (never called in v2 — pin dragging is now handled by
+//  attachPinGesture, and zone-drag UX was deferred). The global
+//  mousemove / mouseup handlers below remain because cancelPolyDraw and
+//  the moveDragTarget state are still referenced by the legacy onMapClick
+//  guards; making them harmless no-ops costs nothing.
 // ══════════════════════════════════════════════════════════════
-function attachPinMoveDrag(pinEl, loc) {
-  pinEl.style.cursor = 'grab';
-  pinEl.addEventListener('mousedown', e => {
-    e.stopPropagation(); e.preventDefault();
-    moveDragTarget = { type:'pin', id:loc.id, origX:loc.x, origY:loc.y, mouseStartX:e.clientX, mouseStartY:e.clientY };
-    pinEl.style.cursor = 'grabbing';
-    pinEl.style.filter = 'drop-shadow(0 0 8px var(--gold))';
-  });
-}
-
-function attachRectZoneMoveDrag(el, zone) {
-  el.style.cursor = 'grab';
-  el.addEventListener('mousedown', e => {
-    e.stopPropagation(); e.preventDefault();
-    moveDragTarget = { type:'rectzone', id:zone.id, origX:zone.x, origY:zone.y, mouseStartX:e.clientX, mouseStartY:e.clientY };
-    el.style.cursor = 'grabbing';
-  });
-}
-
-function attachPolyMoveDrag(gEl, zone) {
-  gEl.style.cursor = 'grab';
-  gEl.addEventListener('mousedown', e => {
-    e.stopPropagation(); e.preventDefault();
-    moveDragTarget = { type:'polyzone', id:zone.id, origPoints:zone.points.map(p=>({...p})), mouseStartX:e.clientX, mouseStartY:e.clientY };
-    gEl.style.cursor = 'grabbing';
-  });
-}
 
 // Global mousemove / mouseup for move drags
 window.addEventListener('mousemove', e => {
@@ -2498,13 +2314,14 @@ function updateModeUI() {
     polyBtn.style.color         = polyDrawMode ? '#8e8' : '';
   }
 
-  container.classList.toggle('move-mode', moveMode);
+  if (container) container.classList.toggle('move-mode', moveMode);
 
+  // Task 17: #map-hint was removed from the DOM. updateModeUI is still called
+  // from switchTab() during init, so null-guard the hint writes.
   const esc = '<span class="esc-hint">Esc to exit</span>';
   if (moveMode) {
-    hint.innerHTML = '✥ Move mode — drag pins and zones to reposition' + esc;
-    hint.style.display='block';
-    container.style.cursor = 'default';
+    if (hint) { hint.innerHTML = '✥ Move mode — drag pins and zones to reposition' + esc; hint.style.display='block'; }
+    if (container) container.style.cursor = 'default';
   } else if (polyDrawMode) {
     const remaining = Math.max(0, 3 - polyPoints.length);
     const msg = polyPoints.length===0
@@ -2512,16 +2329,14 @@ function updateModeUI() {
       : polyPoints.length < 3
         ? `${remaining} more point${remaining>1?'s':''} needed to close`
         : 'Click near the first point (●) to close the polygon';
-    hint.innerHTML = msg + esc;
-    hint.style.display='block';
-    container.style.cursor = 'crosshair';
+    if (hint) { hint.innerHTML = msg + esc; hint.style.display='block'; }
+    if (container) container.style.cursor = 'crosshair';
   } else if (placeMode) {
-    hint.innerHTML = '📍 Click map to place a new location pin' + esc;
-    hint.style.display='block';
-    container.style.cursor = 'crosshair';
+    if (hint) { hint.innerHTML = '📍 Click map to place a new location pin' + esc; hint.style.display='block'; }
+    if (container) container.style.cursor = 'crosshair';
   } else {
-    hint.style.display='none';
-    container.style.cursor = 'grab';
+    if (hint) hint.style.display='none';
+    if (container) container.style.cursor = 'grab';
   }
 }
 
@@ -2837,10 +2652,11 @@ function renderLocationInspectorBody(loc) {
     <button class="btn btn-gold btn-sm" type="button" onclick="saveLocation()">Save</button>
   `;
   body.appendChild(footer);
-  // After the clone is in the DOM, let the legacy openLocModal populate field values.
-  // inspectorScope() picks the inspector's clones (they're inside #fp-right-body,
-  // which precedes #loc-modal in DOM order, so even raw getElementById falls back to
-  // the clone — but the helper guarantees this even if DOM order changes later).
+  // After the clone is in the DOM, let openLocModal populate field values.
+  // inspectorScope() picks the inspector's clones first (they're inside
+  // #fp-right-body, which precedes #legacy-templates in DOM order). The
+  // helper falls back to document.getElementById, so a missing inspector
+  // clone still resolves to the stashed template.
   if (typeof openLocModal === 'function') openLocModal(loc.id);
 }
 
@@ -3335,10 +3151,13 @@ function openLocModal(id, defaultX, defaultY) {
   renderNPCEditor(); renderQuestEditor(); renderVisibleToChips(); renderConnectedChips();
   renderLocationNPCsHere(loc?.id);
   // switchLocTab targets legacy DOM; the inspector tracks its own tab state.
-  // Skip it when the inspector is the host.
+  // Skip it when the inspector is the host. (Task 17: #loc-modal removed —
+  // the legacy branch is now effectively dead but kept defensively in case a
+  // future tab adds a non-inspector edit path.)
   if (!document.getElementById('fp-right-body')?.contains($.qs('loc-name'))) {
     switchLocTab('info');
-    document.getElementById('loc-modal').classList.remove('hidden');
+    const m = document.getElementById('loc-modal');
+    if (m) m.classList.remove('hidden');
   }
   renderLocEncounters(loc || null);
   const nameInput = $.qs('loc-name');
@@ -3350,7 +3169,13 @@ function openLocModal(id, defaultX, defaultY) {
   }
 }
 
-function closeLocModal() { document.getElementById('loc-modal').classList.add('hidden'); editingLocId=null; }
+function closeLocModal() {
+  // Task 17: #loc-modal was removed; null-guard so legacy callers (enterSubMap,
+  // saveLocation, deleteLocation) still work in the inspector-driven flow.
+  const m = document.getElementById('loc-modal');
+  if (m) m.classList.add('hidden');
+  editingLocId = null;
+}
 
 // ── Encounters here (Task 5.1) ──────────────────────────────────
 async function ensureEncountersLoaded() {
