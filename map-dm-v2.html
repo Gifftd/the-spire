@@ -2106,6 +2106,10 @@ function addZoneAt(x, y) {
     buildMap();
     if (typeof renderZoneList === 'function') renderZoneList();
   }
+  if (z && typeof selectZoneV2 === 'function') {
+    selectZoneV2(z.id);
+    if (typeof renderFpLeftBody === 'function') renderFpLeftBody();
+  }
 }
 
 // Duplicate an existing location (deep clone, offset by ~3% on x/y).
@@ -2407,7 +2411,63 @@ function renderInspector() {
 }
 
 // Stubs — implemented in later tasks
-function renderZoneInspector()      { /* Task 11 */ }
+function renderZoneInspector() {
+  const z = data.zones.find(zz => zz.id === selectedEntity.id);
+  if (!z) { closeInspector(); return; }
+  const header = document.getElementById('fp-right-header');
+  header.innerHTML = `
+    <span class="fp-row-glyph" style="color:${z.color}">◆</span>
+    <span>${escapeHtml(z.name||'(unnamed)')}</span>
+    <button class="fp-close" type="button" onclick="closeInspector()">×</button>
+  `;
+  const tabs = document.getElementById('fp-right-tabs');
+  tabs.innerHTML = '';   // single-pane editor
+
+  const body = document.getElementById('fp-right-body');
+  const isPoly = z.shape === 'polygon';
+  body.innerHTML = `
+    <div class="field"><label>NAME</label>
+      <input type="text" value="${escapeHtml(z.name||'')}" data-zfield="name">
+    </div>
+    ${isPoly ?
+      `<div style="font-size:0.78rem;color:var(--ink-faint);font-style:italic;margin-bottom:0.6rem">${z.points?.length||0} polygon points — drag the zone to move it.</div>`
+      :
+      `<div class="field-row">
+        <div class="field"><label>X %</label><input type="number" value="${z.x}" min="0" max="100" data-zfield="x"></div>
+        <div class="field"><label>Y %</label><input type="number" value="${z.y}" min="0" max="100" data-zfield="y"></div>
+        <div class="field"><label>W %</label><input type="number" value="${z.width}"  min="1" max="100" data-zfield="width"></div>
+        <div class="field"><label>H %</label><input type="number" value="${z.height}" min="1" max="100" data-zfield="height"></div>
+      </div>`
+    }
+    <div class="field-row">
+      <div class="field"><label>COLOR</label><input type="color" value="${z.color}" data-zfield="color" style="height:32px;padding:2px"></div>
+      <div class="field"><label>OPACITY</label><input type="range" min="0.05" max="0.5" step="0.01" value="${z.opacity}" data-zfield="opacity"></div>
+    </div>
+    <div class="toggle-row">
+      <input type="checkbox" id="z-vis" ${z.visible!==false?'checked':''} data-zfield="visible">
+      <label for="z-vis">Visible to players</label>
+    </div>
+    <div style="margin-top:1rem;display:flex;gap:6px">
+      <button class="btn btn-red btn-sm" onclick="deleteZoneV2('${z.id}')">Delete zone</button>
+    </div>
+  `;
+  body.querySelectorAll('[data-zfield]').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const k = inp.dataset.zfield;
+      let v = inp.type === 'checkbox' ? inp.checked : inp.value;
+      if (inp.type === 'number' || inp.type === 'range') v = +v;
+      z[k] = v;
+      scheduleSave(); buildMap(); renderFpLeftBody();
+      if (k === 'name') document.querySelector('#fp-right-header span:nth-child(2)').textContent = z.name||'(unnamed)';
+    });
+  });
+}
+
+async function deleteZoneV2(id) {
+  if (!(await confirmDialog('Delete this zone?'))) return;
+  data.zones = data.zones.filter(z => z.id !== id);
+  closeInspector(); scheduleSave(); buildMap(); renderFpLeftBody();
+}
 function renderNPCInspector()       { /* Task 12 */ }
 function renderCharacterInspector() { /* Task 13 */ }
 function renderTimelineInspector()  { /* Task 14 */ }
@@ -2615,7 +2675,41 @@ function renderLocationsListV2(body) {
   });
 }
 
-function renderZonesListV2(body)      { body.innerHTML = '<div class="empty-state">Coming in Task 11.</div>'; }
+function renderZonesListV2(body) {
+  if (!data || !Array.isArray(data.zones) || data.zones.length === 0) {
+    body.innerHTML = '<div class="empty-state">No zones yet. Right-click the map to add one.</div>';
+    return;
+  }
+  const q = listSearchQuery.trim().toLowerCase();
+  const filtered = !q ? data.zones : data.zones.filter(z =>
+    (z.name||'').toLowerCase().includes(q) ||
+    (z.id||'').toLowerCase().includes(q) ||
+    (z.shape||'').toLowerCase().includes(q)
+  );
+  if (filtered.length === 0) {
+    body.innerHTML = '<div class="empty-state">No matches.</div>';
+    return;
+  }
+  body.innerHTML = filtered.map(z => {
+    const sel = selectedEntity && selectedEntity.type === 'zone' && selectedEntity.id === z.id;
+    return `
+      <div class="fp-row ${sel?'selected':''}" data-id="${z.id}">
+        <span class="fp-row-glyph" style="color:${z.color}">◆</span>
+        <span class="fp-row-name">${escapeHtml(z.name||'(unnamed)')}</span>
+        <span class="fp-row-type">${z.shape==='polygon'?'POLY':'RECT'}</span>
+        ${z.visible===false?'<span class="fp-row-tag">hidden</span>':''}
+      </div>`;
+  }).join('');
+  body.querySelectorAll('.fp-row').forEach(row => {
+    row.addEventListener('click', () => selectZoneV2(row.dataset.id));
+  });
+}
+
+function selectZoneV2(id) {
+  openInspector({ type:'zone', id });
+  if (typeof selectedZoneId !== 'undefined') selectedZoneId = id;
+  buildMap();
+}
 function renderNPCsListV2(body)       { body.innerHTML = '<div class="empty-state">Coming in Task 12.</div>'; }
 function renderTimelineListV2(body)   { body.innerHTML = '<div class="empty-state">Coming in Task 14.</div>'; }
 function renderCharactersListV2(body) { body.innerHTML = '<div class="empty-state">Coming in Task 13.</div>'; }
