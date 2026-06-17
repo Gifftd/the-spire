@@ -99,10 +99,96 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 .toast.visible{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.error{border-color:var(--red);color:#f0c8c8}
 
-/* ── Layout ── */
-.main{flex:1;display:grid;grid-template-columns:1fr 320px;overflow:hidden}
-.map-col{position:relative;overflow:hidden;display:flex;flex-direction:column}
-.editor-col{background:var(--surface);border-left:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column}
+/* ── v2 Layout ── full-bleed map, floating panels overlaid ── */
+body{overflow:hidden}
+.canvas{position:fixed;inset:0;z-index:0;overflow:hidden}
+.map-stage{position:absolute;inset:0;cursor:grab}
+.map-stage:active{cursor:grabbing}
+.map-canvas{position:absolute;top:0;left:0;transform-origin:0 0;user-select:none}
+
+/* Floating panels — shared */
+.fp{
+  position:fixed;
+  background:rgba(13,8,4,0.94);
+  border:1px solid var(--border);
+  border-radius:6px;
+  backdrop-filter:blur(4px);
+  -webkit-backdrop-filter:blur(4px);
+  box-shadow:0 6px 22px rgba(0,0,0,0.55);
+  z-index:60;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+.fp[hidden]{display:none}
+.fp-header{padding:9px 12px 8px;border-bottom:1px solid var(--border);font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.10em;color:var(--gold-light);display:flex;align-items:center;gap:6px;text-transform:uppercase;flex-shrink:0}
+.fp-header .fp-close{margin-left:auto;background:transparent;border:none;color:var(--ink-faint);font-size:1rem;cursor:pointer;padding:0 4px}
+.fp-header .fp-close:hover{color:var(--gold)}
+.fp-tabs{display:flex;gap:2px;padding:5px 8px;border-bottom:1px solid var(--border);flex-wrap:wrap;flex-shrink:0;background:rgba(13,8,4,0.4)}
+.fp-tab{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;padding:4px 8px;color:var(--ink-faint);background:transparent;border:none;border-radius:3px;cursor:pointer;transition:background 120ms,color 120ms}
+.fp-tab:hover{color:var(--ink-dim);background:rgba(255,255,255,0.03)}
+.fp-tab.active{color:var(--gold-light);background:rgba(184,134,11,0.10)}
+.fp-toolbar{padding:6px 10px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;gap:6px;align-items:center}
+.fp-body{flex:1;overflow-y:auto;padding:8px 10px}
+.fp-resize{position:absolute;top:36%;bottom:36%;width:6px;cursor:ew-resize;background:transparent;z-index:1}
+.fp-resize:hover{background:rgba(184,134,11,0.15)}
+.fp-resize-right{right:-3px}
+.fp-resize-left{left:-3px}
+
+/* Geometry — defaults; resize logic in Task 10 may overwrite via inline style */
+.fp-left {top:60px;left:12px;bottom:38px;width:240px}
+.fp-right{top:60px;right:12px;bottom:38px;width:320px}
+
+/* Top action cluster */
+.top-cluster{
+  position:fixed;top:10px;left:50%;transform:translateX(-50%);
+  z-index:70;display:flex;gap:8px;align-items:center;
+  background:rgba(13,8,4,0.94);border:1px solid var(--border);
+  border-radius:5px;padding:5px 10px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+  box-shadow:0 4px 14px rgba(0,0,0,0.5);
+}
+.top-cluster .tc-btn{
+  background:transparent;border:1px solid transparent;color:var(--ink-dim);
+  font-family:'Cinzel',serif;font-size:0.78rem;letter-spacing:0.04em;
+  padding:4px 9px;cursor:pointer;border-radius:3px;text-decoration:none;
+  transition:background 120ms,color 120ms,border-color 120ms;
+  display:inline-flex;align-items:center;gap:4px;
+}
+.top-cluster .tc-btn:hover{background:rgba(255,255,255,0.04);color:var(--ink)}
+.top-cluster .tc-btn:disabled{opacity:0.35;cursor:default}
+.top-cluster .tc-btn:disabled:hover{background:transparent;color:var(--ink-dim)}
+.top-cluster .tc-sep{width:1px;height:14px;background:var(--border-light);opacity:0.6}
+.top-cluster .tc-sync{display:inline-flex;align-items:center;gap:6px;font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.10em;color:var(--ink-faint);text-transform:uppercase}
+.top-cluster .tc-sync-dot{width:8px;height:8px;border-radius:50%;background:var(--ink-faint);box-shadow:0 0 6px currentColor}
+.top-cluster .tc-sync.live   .tc-sync-dot{color:var(--ink-faint)}
+.top-cluster .tc-sync.saving .tc-sync-dot{color:var(--amber);animation:tc-pulse 1s ease-in-out infinite}
+.top-cluster .tc-sync.synced .tc-sync-dot{color:var(--green-light)}
+.top-cluster .tc-sync.fail   .tc-sync-dot{color:var(--red)}
+@keyframes tc-pulse{0%,100%{opacity:0.45}50%{opacity:1}}
+.top-cluster .tc-publish{
+  background:var(--gold-dim);border:1px solid var(--gold);color:var(--gold-light);
+  font-family:'Cinzel',serif;font-size:0.68rem;letter-spacing:0.10em;
+  padding:5px 12px;cursor:pointer;border-radius:3px;text-transform:uppercase;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.top-cluster .tc-publish:hover:not(:disabled){background:var(--gold);color:var(--bg)}
+.top-cluster .tc-publish:disabled{opacity:0.5;cursor:wait}
+.top-cluster .tc-publish-count{background:var(--gold);color:var(--bg);font-size:0.55rem;border-radius:8px;padding:0 6px;min-width:14px;text-align:center;line-height:1.5}
+
+/* Bottom status strip */
+.bottom-strip{
+  position:fixed;bottom:10px;left:260px;right:340px;
+  z-index:60;display:flex;justify-content:space-between;align-items:center;
+  font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.10em;color:var(--ink-faint);
+  background:rgba(13,8,4,0.85);border:1px solid var(--border);border-radius:3px;
+  padding:4px 12px;text-transform:uppercase;
+  pointer-events:none;
+}
+
+/* Collapsed-panel handle (Task 10) */
+.fp.collapsed{width:24px!important;padding:0;cursor:pointer;overflow:hidden}
+.fp.collapsed .fp-tabs,.fp.collapsed .fp-header,.fp.collapsed .fp-toolbar,.fp.collapsed .fp-body,.fp.collapsed .fp-resize{display:none}
+.fp.collapsed::after{content:attr(data-collapsed-glyph);position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1rem;color:var(--gold-faint)}
 
 /* ── Map ── */
 .map-container{flex:1;position:relative;overflow:hidden;cursor:crosshair}
@@ -287,19 +373,7 @@ body.editor-expanded #pane-timeline > #tl-detail:not([style*="none"]){
   }
 }
 
-/* ── Editor panel ── */
-.editor-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;background:rgba(13,8,4,0.4)}
-.editor-tab{
-  flex:1;font-family:'Cinzel',serif;font-size:0.62rem;font-weight:500;letter-spacing:0.14em;
-  padding:11px 4px 9px;text-align:center;cursor:pointer;
-  color:var(--ink-faint);border:none;background:transparent;border-bottom:2px solid transparent;
-  margin-bottom:-1px;
-  transition:color 120ms,border-color 120ms,background 120ms;text-transform:uppercase;
-}
-.editor-tab.active{color:var(--gold-light);border-bottom-color:var(--gold);background:rgba(184,134,11,0.06)}
-.editor-tab:hover:not(.active){color:var(--ink-dim);background:rgba(255,255,255,0.02)}
-.editor-pane{display:none;flex:1;overflow-y:auto;padding:1rem}
-.editor-pane.active{display:block}
+/* ── Editor panel (legacy rules removed in v2 — see "Legacy editor markup" hide rule below) ── */
 
 .field{margin-bottom:0.8rem}
 .field label{
@@ -565,293 +639,74 @@ body.editor-expanded #pane-timeline > #tl-detail:not([style*="none"]){
   .main{grid-template-columns:1fr}
   .editor-col{max-height:45vh;border-left:none;border-top:1px solid var(--border)}
 }
+
+/* Legacy editor markup — hidden during v2 transition; removed in Task 17 */
+.editor-col,.editor-tabs,.editor-pane,.dm-breadcrumb,.sync-status,.in-submap-banner,.editor-scrim{display:none!important}
 </style>
 </head>
 <body>
 
-<!-- TOPBAR -->
-<div class="topbar">
-  <h1 id="topbar-title">⚔ World Map — DM Editor</h1>
-  <div class="dm-breadcrumb" id="dm-breadcrumb" style="display:none">
-    <a href="#" onclick="exitToWorld();return false">⌫ Back to World</a>
-    <span class="sep">›</span>
-    <span id="dm-breadcrumb-loc">—</span>
-  </div>
-  <button class="btn btn-ghost btn-sm" id="move-mode-btn" onclick="toggleMoveMode()">✥ Move mode</button>
-  <button class="btn btn-purple btn-sm" onclick="openImport()">⬇ Import</button>
-  <button class="btn btn-green" onclick="publishData()">▲ Publish to players</button>
-  <button class="btn btn-ghost btn-sm" onclick="window.open('map.html','_blank')" title="Open the player view in a new tab">Preview as player ↗</button>
-  <button class="btn btn-gold btn-sm" id="expand-editor-btn" onclick="toggleEditorExpand()" title="Expand the editor for more room (Esc to collapse)" aria-label="Expand editor for more room">⛶ Expand editor</button>
-  <a class="btn btn-ghost btn-sm" href="home.html" style="text-decoration:none">⌂ Home</a>
-  <div class="sync-status" id="sync-status">—</div>
+<!-- TOP ACTION CLUSTER -->
+<div class="top-cluster" id="top-cluster">
+  <a href="home.html" class="tc-btn" title="Home" aria-label="Home">⌂</a>
+  <span class="tc-sep"></span>
+  <button class="tc-btn" id="tc-undo" disabled title="Undo (coming soon)">↶</button>
+  <button class="tc-btn" id="tc-redo" disabled title="Redo (coming soon)">↷</button>
+  <span class="tc-sep"></span>
+  <span class="tc-sync" id="tc-sync" title="DM-blob sync status">
+    <span class="tc-sync-dot"></span><span class="tc-sync-label">live</span>
+  </span>
+  <span class="tc-sep"></span>
+  <button class="tc-publish" id="tc-publish" title="Publish to players">
+    ▲ Publish<span class="tc-publish-count" id="tc-publish-count" hidden>0</span>
+  </button>
 </div>
 <!-- Click-outside scrim for the expanded editor -->
 <div class="editor-scrim" id="editor-scrim" onclick="toggleEditorExpand()" aria-hidden="true"></div>
 
-<main class="main" id="main">
-  <!-- MAP -->
-  <div class="map-col">
-    <div class="map-container" id="map-container">
-      <div class="map-canvas" id="map-canvas"></div>
-    </div>
-    <div class="map-controls">
-      <button class="map-btn" onclick="mapZoom(1.2)" title="Zoom in" aria-label="Zoom in">+</button>
-      <button class="map-btn" onclick="mapZoom(0.8)" title="Zoom out" aria-label="Zoom out">−</button>
-      <button class="map-btn" onclick="mapReset()" title="Reset view" aria-label="Reset view">⌂</button>
-    </div>
-    <div class="map-hint" id="map-hint">Click map to place a new location pin</div>
-    <div class="map-legend" id="map-legend"></div>
-    <div class="pin-info-panel" id="pin-info-panel">
-      <div class="pin-info-type" id="pin-info-type"></div>
-      <div class="pin-info-name" id="pin-info-name"></div>
-      <div class="pin-info-desc" id="pin-info-desc"></div>
-    </div>
+<!-- FULL-BLEED MAP CANVAS -->
+<main id="canvas" class="canvas">
+  <div id="map-stage" class="map-stage">
+    <div id="map-canvas" class="map-canvas"></div>
   </div>
-
-  <!-- EDITOR -->
-  <div class="editor-col">
-    <div class="editor-tabs">
-      <button class="editor-tab active" id="tab-locations" onclick="switchTab('locations')">LOCATIONS</button>
-      <button class="editor-tab" id="tab-zones" onclick="switchTab('zones')">ZONES</button>
-      <button class="editor-tab" id="tab-characters" onclick="switchTab('characters')">PLAYERS</button>
-      <button class="editor-tab" id="tab-npcs" onclick="switchTab('npcs')">NPCs</button>
-      <button class="editor-tab" id="tab-timeline" onclick="switchTab('timeline')">TIMELINE</button>
-      <button class="editor-tab" id="tab-world" onclick="switchTab('world')">WORLD</button>
-    </div>
-
-    <!-- LOCATIONS TAB -->
-    <div class="editor-pane active" id="pane-locations">
-      <div style="display:flex;gap:6px;margin-bottom:0.6rem;flex-wrap:wrap;align-items:center">
-        <button class="btn btn-gold btn-sm" onclick="addLocation()">+ Add location</button>
-        <button class="btn btn-ghost btn-sm" id="place-mode-btn" onclick="togglePlaceMode()">📍 Click to place</button>
-        <input type="text" id="loc-search" placeholder="Search…" style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:4px 7px;font-family:'Crimson Text',serif;font-size:0.82rem" oninput="renderLocList()">
-      </div>
-      <div class="loc-list" id="loc-list"></div>
-    </div>
-
-    <!-- ZONES TAB -->
-    <div class="editor-pane" id="pane-zones">
-      <div style="display:flex;gap:6px;margin-bottom:0.6rem;flex-wrap:wrap;align-items:center">
-        <button class="btn btn-gold btn-sm" onclick="addZone()">+ Rectangle zone</button>
-        <button class="btn btn-ghost btn-sm" id="poly-draw-btn" onclick="togglePolyDraw()">✏ Draw polygon</button>
-        <input type="text" id="zone-search" placeholder="Search…" style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:4px 7px;font-family:'Crimson Text',serif;font-size:0.82rem" oninput="renderZoneList()">
-      </div>
-      <div id="zone-list"></div>
-    </div>
-
-    <!-- CHARACTERS TAB -->
-    <div class="editor-pane" id="pane-characters">
-      <div style="display:flex;gap:6px;margin-bottom:0.6rem;flex-wrap:wrap">
-        <button class="btn btn-gold btn-sm" onclick="addCharacter()">+ Add character</button>
-        <button class="btn btn-ghost btn-sm" onclick="reloadCharacters()" title="Refetch from cloud">↻ Refresh</button>
-      </div>
-      <div class="section-header" style="margin-top:0.2rem">CHARACTERS</div>
-      <div id="char-list"></div>
-
-      <div id="char-detail" style="display:none;margin-top:0.8rem">
-        <div class="section-header" id="char-detail-header">EDIT CHARACTER</div>
-        <div class="field"><label>NAME</label><input type="text" id="char-name" placeholder="Aldric Stoneveil"></div>
-        <div class="field-row">
-          <div class="field"><label>PLAYER (optional)</label><input type="text" id="char-player" placeholder="Bob"></div>
-          <div class="field"><label>ID (auto)</label><input type="text" id="char-id" readonly style="opacity:0.6"></div>
-        </div>
-        <div class="field">
-          <label>CLAIM CODE</label>
-          <div style="display:flex;gap:5px">
-            <input type="text" id="char-code" style="flex:1;letter-spacing:0.2em;text-transform:uppercase;font-family:'Cinzel',serif">
-            <button class="btn btn-ghost btn-sm" onclick="regenCharCode()" title="Generate new code">⟳</button>
-            <button class="btn btn-ghost btn-sm" onclick="copyCharCode()" title="Copy">⧉</button>
-          </div>
-        </div>
-        <div class="field"><label>DM NOTES</label><textarea id="char-dmNotes" rows="3" placeholder="Anything you want to remember about this character"></textarea></div>
-        <div style="display:flex;gap:5px;margin-bottom:0.8rem">
-          <button class="btn btn-gold btn-sm" onclick="saveCharacter()">Save</button>
-          <button class="btn btn-ghost btn-sm" onclick="cancelCharEdit()">Cancel</button>
-          <button class="btn btn-red btn-sm" style="margin-left:auto" onclick="deleteCharacter()">Delete</button>
-        </div>
-
-        <div class="whisper-composer">
-          <div class="whisper-composer-title">⬑ SEND WHISPER (only this character sees it)</div>
-          <div class="field"><label>TITLE</label><input type="text" id="whisper-title" placeholder="A note in your pocket…"></div>
-          <div class="field"><label>BODY</label><textarea id="whisper-body" rows="4" placeholder="The whisper text…"></textarea></div>
-          <button class="btn btn-purple btn-sm" onclick="postWhisper()">Post whisper</button>
-        </div>
-
-        <div class="section-header" style="margin-top:0.8rem">WHISPERS SENT</div>
-        <div class="whisper-history" id="whisper-history"></div>
-      </div>
-    </div>
-
-    <!-- NPCs TAB -->
-    <div class="editor-pane" id="pane-npcs">
-      <div style="display:flex;gap:6px;margin-bottom:0.6rem;flex-wrap:wrap;align-items:center">
-        <button class="btn btn-gold btn-sm" onclick="addNPCEntity()">+ Add NPC</button>
-        <input type="text" id="npc-search" placeholder="Search…" style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:4px 7px;font-family:'Crimson Text',serif;font-size:0.82rem" oninput="renderNPCList()">
-        <select id="npc-filter-location" onchange="renderNPCList()" style="background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:4px 7px;font-size:0.78rem">
-          <option value="">All locations</option>
-        </select>
-      </div>
-      <div class="section-header" style="margin-top:0.2rem">ROSTER <span id="npc-count" style="color:var(--ink-faint);font-weight:normal">(0)</span></div>
-      <div id="npc-list"></div>
-
-      <div id="npc-detail" style="display:none;margin-top:0.8rem">
-        <div class="section-header" id="npc-detail-header">EDIT NPC</div>
-        <div class="field"><label>NAME</label><input type="text" id="npce-name" placeholder="Sera Mott"></div>
-        <div class="field-row">
-          <div class="field"><label>ROLE</label><input type="text" id="npce-role" placeholder="Fence & broker"></div>
-          <div class="field"><label>STATUS</label>
-            <select id="npce-status">
-              <option value="alive">Alive</option>
-              <option value="dead">Dead</option>
-              <option value="missing">Missing</option>
-              <option value="unknown">Unknown</option>
-            </select>
-          </div>
-        </div>
-        <div class="field"><label>CURRENT LOCATION</label>
-          <select id="npce-location"><option value="">— unknown / off-map —</option></select>
-        </div>
-        <div class="field"><label>CURRENT ACTIVITY</label><input type="text" id="npce-activity" placeholder="Working the Tallow & Wick most evenings"></div>
-        <div class="field"><label>PUBLIC DESCRIPTION (visible to players who know them)</label><textarea id="npce-description" rows="3"></textarea></div>
-        <div class="field"><label>PUBLIC NOTES (visible to players)</label><textarea id="npce-notes" rows="3" placeholder="Mannerisms, anything players might recall"></textarea></div>
-
-        <div class="field">
-          <label>KNOWN TO (which characters have encountered them)</label>
-          <div class="visibleto-chips" id="npce-knownto-chips"></div>
-          <div class="visibleto-hint">Click to toggle. Only the selected characters see this NPC on their roster.</div>
-        </div>
-
-        <div class="dm-note-area">
-          <div class="dm-note-label">🔒 DM ONLY — NOT SHOWN TO PLAYERS</div>
-          <textarea id="npce-dmNotes" rows="3" style="width:100%;background:transparent;border:none;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.9rem;outline:none;resize:vertical;line-height:1.5" placeholder="True motives, stat block, plot hooks…"></textarea>
-        </div>
-
-        <div style="display:flex;gap:5px;margin-top:0.8rem;margin-bottom:0.8rem">
-          <button class="btn btn-gold btn-sm" onclick="saveNPCEntity()">Save</button>
-          <button class="btn btn-ghost btn-sm" onclick="cancelNPCEdit()">Cancel</button>
-          <button class="btn btn-red btn-sm" style="margin-left:auto" onclick="deleteNPCEntity()">Delete</button>
-        </div>
-
-        <div class="whisper-composer">
-          <div class="whisper-composer-title">⇄ MOVE / LOG ACTIVITY (appends to history)</div>
-          <div class="field-row">
-            <div class="field"><label>NEW LOCATION (optional)</label>
-              <select id="npce-move-location"><option value="">— keep current —</option></select>
-            </div>
-            <div class="field"><label>DATE</label><input type="date" id="npce-move-date"></div>
-          </div>
-          <div class="field"><label>NEW ACTIVITY (optional)</label><input type="text" id="npce-move-activity" placeholder="Spotted in the docks at midnight"></div>
-          <div class="field"><label>NOTE</label><input type="text" id="npce-move-note" placeholder="Witnessed by Aldric"></div>
-          <div style="display:flex;gap:5px;align-items:center">
-            <button class="btn btn-purple btn-sm" onclick="logNPCMovement()">Log entry</button>
-            <label style="font-size:0.72rem;color:var(--ink-faint);display:flex;align-items:center;gap:4px"><input type="checkbox" id="npce-move-dmOnly" style="accent-color:var(--purple)"> DM-only entry</label>
-          </div>
-        </div>
-
-        <div class="section-header" style="margin-top:0.8rem">HISTORY</div>
-        <div id="npce-history-list"></div>
-      </div>
-    </div>
-
-    <!-- TIMELINE TAB -->
-    <div class="editor-pane" id="pane-timeline">
-      <div style="display:flex;gap:6px;margin-bottom:0.6rem;flex-wrap:wrap;align-items:center">
-        <button class="btn btn-gold btn-sm" onclick="addTimelineEntry()">+ Add entry</button>
-        <input type="text" id="tl-search" placeholder="Search…" style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:4px 7px;font-family:'Crimson Text',serif;font-size:0.82rem" oninput="renderTimelineList()">
-        <select id="tl-filter-kind" onchange="renderTimelineList()" style="background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:4px 7px;font-size:0.78rem">
-          <option value="">All kinds</option>
-          <option value="session">Sessions</option>
-          <option value="event">Events</option>
-          <option value="milestone">Milestones</option>
-          <option value="planned">Planned (DM)</option>
-        </select>
-      </div>
-      <div class="section-header" style="margin-top:0.2rem">CHRONICLE <span id="tl-count" style="color:var(--ink-faint);font-weight:normal">(0)</span></div>
-      <div id="tl-list"></div>
-
-      <div id="tl-detail" style="display:none;margin-top:0.8rem">
-        <div class="section-header" id="tl-detail-header">EDIT ENTRY</div>
-        <div class="field"><label>TITLE</label><input type="text" id="tle-title" placeholder="The duke's banquet"></div>
-        <div class="field-row">
-          <div class="field"><label>KIND</label>
-            <select id="tle-kind">
-              <option value="session">Session</option>
-              <option value="event">Event</option>
-              <option value="milestone">Milestone</option>
-              <option value="planned">Planned (DM-only)</option>
-            </select>
-          </div>
-          <div class="field"><label>IN-GAME DATE (free text)</label><input type="text" id="tle-dateInGame" placeholder="12 Mirtul, 1492 DR"></div>
-        </div>
-        <div class="field-row">
-          <div class="field"><label>SORT KEY (YYYY-MM-DD, optional)</label><input type="date" id="tle-dateSort"></div>
-          <div class="field"><label>REAL-WORLD DATE</label><input type="date" id="tle-dateReal"></div>
-        </div>
-        <div class="field"><label>BODY (player-facing)</label><textarea id="tle-body" rows="6" placeholder="What happened…"></textarea></div>
-
-        <!-- Attached combats (from initiative exports) -->
-        <div id="tle-combats-box" class="field" style="display:none">
-          <label>ATTACHED COMBATS</label>
-          <div id="tle-combats-list"></div>
-        </div>
-
-        <!-- Editable loot -->
-        <div class="field">
-          <label>LOOT (item · qty · who got it)</label>
-          <div id="tle-loot-rows"></div>
-          <button class="btn btn-ghost btn-sm" type="button" onclick="addTLLootRow()" style="margin-top:4px">+ Add loot</button>
-          <datalist id="tle-loot-recipients"></datalist>
-        </div>
-
-        <div class="field">
-          <label>LINKED LOCATIONS</label>
-          <div class="visibleto-chips" id="tle-loc-chips"></div>
-        </div>
-        <div class="field">
-          <label>LINKED CHARACTERS</label>
-          <div class="visibleto-chips" id="tle-char-chips"></div>
-        </div>
-        <div class="field">
-          <label>LINKED NPCs</label>
-          <div class="visibleto-chips" id="tle-npc-chips"></div>
-        </div>
-        <div class="field">
-          <label>VISIBLE TO (leave empty = all players who can read the chronicle)</label>
-          <div class="visibleto-chips" id="tle-visibleto-chips"></div>
-          <div class="visibleto-hint">Planned entries are DM-only regardless of this setting.</div>
-        </div>
-
-        <div class="dm-note-area">
-          <div class="dm-note-label">🔒 DM ONLY — NOT SHOWN TO PLAYERS</div>
-          <textarea id="tle-dmNotes" rows="3" style="width:100%;background:transparent;border:none;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.9rem;outline:none;resize:vertical;line-height:1.5" placeholder="Planning notes, intended outcomes, what's behind the scenes…"></textarea>
-        </div>
-
-        <div style="display:flex;gap:5px;margin-top:0.8rem">
-          <button class="btn btn-gold btn-sm" onclick="saveTimelineEntry()">Save</button>
-          <button class="btn btn-ghost btn-sm" onclick="cancelTimelineEdit()">Cancel</button>
-          <button class="btn btn-red btn-sm" style="margin-left:auto" onclick="deleteTimelineEntry()">Delete</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- WORLD TAB -->
-    <div class="editor-pane" id="pane-world">
-      <div class="field"><label>WORLD NAME</label><input type="text" id="world-name" placeholder="The Realm…"></div>
-      <div class="field"><label>REGION MAP IMAGE URL</label><input type="text" id="world-mapImage" placeholder="https://… or leave blank"></div>
-      <div class="field-row">
-        <div class="field"><label>MAP WIDTH (px)</label><input type="number" id="world-mapWidth" value="1200"></div>
-        <div class="field"><label>MAP HEIGHT (px)</label><input type="number" id="world-mapHeight" value="800"></div>
-      </div>
-      <button class="btn btn-gold" onclick="saveWorldSettings()">Save world settings</button>
-    </div>
-
-    <div class="publish-section">
-      <button class="btn btn-green" style="width:100%;margin-bottom:5px" onclick="publishData()">▲ Publish to players</button>
-      <button class="btn btn-ghost" style="width:100%;font-size:0.62rem" onclick="saveToKV().then(()=>{setSyncStatus('ok','✦ DM data saved to cloud');setTimeout(()=>setSyncStatus('',''),3000)})">☁ Save DM data to cloud</button>
-      <div style="margin-top:4px;text-align:center" id="publish-status" class="sync-status">Unpublished changes</div>
-    </div>
+  <div id="map-controls" class="map-controls">
+    <button class="map-btn" onclick="mapZoom(1.2)" title="Zoom in" aria-label="Zoom in">+</button>
+    <button class="map-btn" onclick="mapZoom(0.8)" title="Zoom out" aria-label="Zoom out">−</button>
+    <button class="map-btn" onclick="mapReset()" title="Reset view" aria-label="Reset view">⌂</button>
+  </div>
+  <div id="map-legend" class="map-legend"></div>
+  <div id="pin-info-panel" class="pin-info-panel">
+    <div class="pin-info-type" id="pin-info-type"></div>
+    <div class="pin-info-name" id="pin-info-name"></div>
+    <div class="pin-info-desc" id="pin-info-desc"></div>
   </div>
 </main>
+
+<!-- LEFT PANEL: LIST (skeleton — populated in Task 4) -->
+<aside class="fp fp-left" id="fp-left" aria-label="Catalog">
+  <nav class="fp-tabs" id="fp-left-tabs"></nav>
+  <div class="fp-toolbar" id="fp-left-toolbar"></div>
+  <div class="fp-body" id="fp-left-body"></div>
+  <div class="fp-resize fp-resize-right" data-resize="left"></div>
+</aside>
+
+<!-- RIGHT PANEL: INSPECTOR (hidden until selection — populated in Task 5) -->
+<aside class="fp fp-right" id="fp-right" aria-label="Inspector" hidden>
+  <header class="fp-header" id="fp-right-header"></header>
+  <nav class="fp-tabs" id="fp-right-tabs"></nav>
+  <div class="fp-body" id="fp-right-body"></div>
+  <div class="fp-resize fp-resize-left" data-resize="right"></div>
+</aside>
+
+<!-- BOTTOM STATUS STRIP -->
+<div class="bottom-strip" id="bottom-strip">
+  <span id="bs-coords">—</span>
+  <span id="bs-zoom">100%</span>
+  <span id="bs-counts">—</span>
+</div>
+
+<!-- CONSTRUCTION BANNER (remove in Task 18) -->
+<div id="v2-banner" style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(184,134,11,0.18);border:1px solid var(--gold-faint);border-radius:3px;padding:5px 12px;font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.12em;color:var(--gold-light);z-index:8000;text-transform:uppercase">⚠ Atlas v2 — under construction</div>
 
 <!-- IMPORT MODAL -->
 <div class="modal-backdrop hidden" id="import-modal">
