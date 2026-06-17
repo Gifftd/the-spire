@@ -2347,9 +2347,13 @@ function openLocModal(id, defaultX, defaultY) {
     document.getElementById('loc-modal').classList.remove('hidden');
   }
   renderLocEncounters(loc || null);
-  $.qs('loc-name').addEventListener('input', function() {
-    if (!editingLocId) $.qs('loc-id').value = this.value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-  });
+  const nameInput = $.qs('loc-name');
+  if (nameInput && !nameInput.__slugWired) {
+    nameInput.addEventListener('input', function() {
+      if (!editingLocId) $.qs('loc-id').value = this.value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+    });
+    nameInput.__slugWired = true;
+  }
 }
 
 function closeLocModal() { document.getElementById('loc-modal').classList.add('hidden'); editingLocId=null; }
