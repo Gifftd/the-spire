@@ -1695,7 +1695,7 @@ function cancelPolyDraw() {
 //  MAP PAN / ZOOM
 // ══════════════════════════════════════════════════════════════
 function resetMapView() {
-  const container = document.getElementById('map-container');
+  const container = document.getElementById('map-stage');
   const W = data.world.mapWidth||1200, H = data.world.mapHeight||800;
   const cw = container.clientWidth||800, ch = container.clientHeight||600;
   mapScale = Math.min(cw/W, ch/H)*0.88;
@@ -1704,7 +1704,7 @@ function resetMapView() {
 }
 function mapReset() { resetMapView(); }
 function mapZoom(f) {
-  const container = document.getElementById('map-container');
+  const container = document.getElementById('map-stage');
   const cx=container.clientWidth/2, cy=container.clientHeight/2;
   const ns = Math.min(Math.max(mapScale*f,0.15),4);
   mapX=cx-(cx-mapX)*(ns/mapScale); mapY=cy-(cy-mapY)*(ns/mapScale); mapScale=ns; applyTransform();
@@ -1725,7 +1725,7 @@ function updateBottomStrip() {
 }
 
 function setupMapDrag() {
-  const container = document.getElementById('map-container');
+  const container = document.getElementById('map-stage');
   container.onmousedown = e => {
     if (moveMode) return;   // move mode uses its own drag handlers on pins/zones
     if (polyDrawMode) return;
@@ -1903,7 +1903,7 @@ function togglePolyDraw() {
 }
 
 function updateModeUI() {
-  const container = document.getElementById('map-container');
+  const container = document.getElementById('map-stage');
   const moveBtn   = document.getElementById('move-mode-btn');
   const placeBtn  = document.getElementById('place-mode-btn');
   const polyBtn   = document.getElementById('poly-draw-btn');
