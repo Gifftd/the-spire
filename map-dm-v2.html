@@ -1828,12 +1828,14 @@ function attachPinGesture(pinEl, loc) {
     if (!active) return;
     const dx = e.clientX - active.startX;
     const dy = e.clientY - active.startY;
-    if (!active.dragging && (Math.abs(dx) > PIN_DRAG_THRESHOLD || Math.abs(dy) > PIN_DRAG_THRESHOLD)) {
+    const threshold = e.pointerType === 'touch' ? 10 : PIN_DRAG_THRESHOLD;
+    if (!active.dragging && (Math.abs(dx) > threshold || Math.abs(dy) > threshold)) {
       active.dragging = true;
       pinEl.classList.add('dragging');
       pinEl.style.cursor = 'grabbing';
     }
     if (active.dragging) {
+      if (!mapScale || mapScale <= 0) return;     // guard against zero-scale edge case
       const W = data.world.mapWidth||1200, H = data.world.mapHeight||800;
       const dxPct = (dx / (W * mapScale)) * 100;
       const dyPct = (dy / (H * mapScale)) * 100;
