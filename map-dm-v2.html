@@ -187,6 +187,7 @@ body{overflow:hidden}
 .top-cluster .tc-sync{display:inline-flex;align-items:center;gap:6px;font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.10em;color:var(--ink-faint);text-transform:uppercase}
 .top-cluster .tc-sync-dot{width:8px;height:8px;border-radius:50%;background:var(--ink-faint);box-shadow:0 0 6px currentColor}
 .top-cluster .tc-sync.live   .tc-sync-dot{color:var(--ink-faint)}
+.top-cluster .tc-sync.pending .tc-sync-dot{color:var(--gold-faint)}
 .top-cluster .tc-sync.saving .tc-sync-dot{color:var(--amber);animation:tc-pulse 1s ease-in-out infinite}
 .top-cluster .tc-sync.synced .tc-sync-dot{color:var(--green-light)}
 .top-cluster .tc-sync.fail   .tc-sync-dot{color:var(--red)}
@@ -1849,15 +1850,19 @@ function setSyncState(s) {
 async function doSaveNow() {
   if (!worldData) return;
   setSyncState('saving');
+  saveLocal();
+  // Call dmPost directly (not saveToKV — which swallows errors) so we can
+  // surface real network failures via the sync indicator.
   try {
-    // saveAll() in this file is sync (writes localStorage + queues a debounced
-    // KV write via saveToKV). For a "force save" we also want to push to KV now
-    // and surface the network result, so call saveToKV directly and await it.
-    saveLocal();
-    await saveToKV();
-    setSyncState('synced');
-    window.__unpublishedCount = (window.__unpublishedCount || 0) + 1;
-    updateTopClusterPublish();
+    const res = await dmPost({ type: 'map_data_dm', payload: worldData });
+    if (res && res.ok) {
+      setSyncState('synced');
+      window.__unpublishedCount = (window.__unpublishedCount || 0) + 1;
+      updateTopClusterPublish();
+    } else {
+      setSyncState('fail');
+      console.warn('Auto-save: server rejected payload', res);
+    }
   } catch (err) {
     setSyncState('fail');
     console.error('Auto-save failed', err);
