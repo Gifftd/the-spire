@@ -84,6 +84,19 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 .dm-breadcrumb a{color:var(--gold-light);text-decoration:none;cursor:pointer;transition:color 120ms}
 .dm-breadcrumb a:hover{color:var(--gold-light);text-shadow:0 0 8px rgba(212,168,32,0.35)}
 .dm-breadcrumb .sep{color:var(--ink-faint);opacity:0.6}
+.canvas-breadcrumb{
+  position:absolute;top:64px;left:50%;transform:translateX(-50%);
+  background:linear-gradient(180deg,rgba(184,134,11,0.16),rgba(184,134,11,0.04));
+  border:1px solid var(--gold-faint);border-radius:3px;
+  padding:5px 14px;
+  font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.10em;
+  color:var(--ink-dim);text-transform:uppercase;z-index:65;
+  display:flex;gap:8px;align-items:center;
+  box-shadow:0 2px 10px rgba(0,0,0,0.5);
+}
+.canvas-breadcrumb a{color:var(--gold-light);text-decoration:none}
+.canvas-breadcrumb a:hover{text-shadow:0 0 8px rgba(212,168,32,0.45)}
+.canvas-breadcrumb .sep{opacity:0.6}
 .in-submap-banner{background:linear-gradient(90deg,rgba(180,134,11,0.18) 0%,rgba(180,134,11,0.02) 100%);border-bottom:1px solid var(--gold-faint)}
 .sync-status.ok{color:var(--green-light)}.sync-status.fail{color:var(--red)}.sync-status.ing{color:var(--amber)}
 
@@ -697,6 +710,11 @@ body.editor-expanded #pane-timeline > #tl-detail:not([style*="none"]){
 <main id="canvas" class="canvas">
   <div id="map-stage" class="map-stage">
     <div id="map-canvas" class="map-canvas"></div>
+  </div>
+  <div class="canvas-breadcrumb" id="canvas-breadcrumb" hidden>
+    <a href="#" onclick="exitToWorld(); return false">⌫ Back to world</a>
+    <span class="sep">›</span>
+    <span id="canvas-breadcrumb-loc">—</span>
   </div>
   <div id="map-controls" class="map-controls">
     <button class="map-btn" onclick="mapZoom(1.2)" title="Zoom in" aria-label="Zoom in">+</button>
@@ -1521,6 +1539,17 @@ function enterSubMap(locationId) {
   if (typeof renderFpLeftBody === 'function') renderFpLeftBody();
   loadWorldFields();
   saveAll();
+  // v2 canvas breadcrumb
+  const bc  = document.getElementById('canvas-breadcrumb');
+  const txt = document.getElementById('canvas-breadcrumb-loc');
+  if (bc && txt) {
+    txt.textContent = (worldData.locations.find(l => l.id === editingLocId)?.name)
+                   || (worldData.locations.find(l => l.id === locationId)?.name)
+                   || '—';
+    bc.hidden = false;
+  }
+  if (typeof renderFpLeftBody === 'function') renderFpLeftBody();
+  if (typeof closeInspector === 'function') closeInspector();
 }
 
 function exitToWorld() {
@@ -1538,23 +1567,30 @@ function exitToWorld() {
   if (typeof renderFpLeftBody === 'function') renderFpLeftBody();
   loadWorldFields();
   saveAll();
+  // v2 canvas breadcrumb
+  const bc = document.getElementById('canvas-breadcrumb');
+  if (bc) bc.hidden = true;
+  if (typeof renderFpLeftBody === 'function') renderFpLeftBody();
+  if (typeof closeInspector === 'function') closeInspector();
 }
 
 function refreshSubMapUI() {
+  // Legacy elements (only present in map-dm.html) — guard so v2 doesn't null-deref.
   const breadcrumb = document.getElementById('dm-breadcrumb');
-  const title = document.getElementById('topbar-title');
-  const hint = document.getElementById('map-hint');
+  const bcLoc      = document.getElementById('dm-breadcrumb-loc');
+  const title      = document.getElementById('topbar-title');
+  const hint       = document.getElementById('map-hint');
   document.body.classList.toggle('in-submap', inSubMap());
   if (inSubMap()) {
     const parent = currentParentLocation();
-    breadcrumb.style.display = '';
-    document.getElementById('dm-breadcrumb-loc').textContent = parent?.name || 'Sub-map';
-    title.innerHTML = `⚔ Sub-map — <span style="color:var(--gold-light)">${escapeHtml(parent?.name||'')}</span>`;
-    if (hint) hint.textContent = 'Click to place a pin on this sub-map · Esc returns to World';
+    if (breadcrumb) breadcrumb.style.display = '';
+    if (bcLoc)      bcLoc.textContent = parent?.name || 'Sub-map';
+    if (title)      title.innerHTML = `⚔ Sub-map — <span style="color:var(--gold-light)">${escapeHtml(parent?.name||'')}</span>`;
+    if (hint)       hint.textContent = 'Click to place a pin on this sub-map · Esc returns to World';
   } else {
-    breadcrumb.style.display = 'none';
-    title.innerHTML = '⚔ World Map — DM Editor';
-    if (hint) hint.textContent = 'Click map to place a new location pin';
+    if (breadcrumb) breadcrumb.style.display = 'none';
+    if (title)      title.innerHTML = '⚔ World Map — DM Editor';
+    if (hint)       hint.textContent = 'Click map to place a new location pin';
   }
 }
 
@@ -1601,6 +1637,11 @@ document.addEventListener('keydown', e => {
   // Active map modes next
   if (moveMode || placeMode || polyDrawMode) {
     exitAnyMode();
+    return;
+  }
+  // v2 inspector (floating panel) next
+  if (selectedEntity) {
+    closeInspector();
     return;
   }
   // Sub-map drill-down last
