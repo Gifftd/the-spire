@@ -1774,7 +1774,7 @@ function setupMapDrag() {
     if (moveMode) return;   // move mode uses its own drag handlers on pins/zones
     if (polyDrawMode) return;
     if (placeMode) return;
-    if (e.target.closest('.pin')||e.target.closest('.zone')||e.target.closest('.poly-zone')) return;
+    if (e.target.closest('.pin, .zone, .poly-zone, .fp, .top-cluster, .bottom-strip, .ctx-menu, .map-controls')) return;
     isMapDragging=true; dragStartX=e.clientX; dragStartY=e.clientY; dragOriginX=mapX; dragOriginY=mapY;
   };
   window.addEventListener('mousemove', e => {
@@ -1783,6 +1783,8 @@ function setupMapDrag() {
   });
   window.addEventListener('mouseup', ()=>{ isMapDragging=false; });
   container.addEventListener('wheel', e => {
+    // Scoped wheel: ignore if over any floating chrome.
+    if (e.target.closest('.fp, .top-cluster, .bottom-strip, .ctx-menu, .map-controls')) return;
     e.preventDefault();
     const f=e.deltaY<0?1.1:0.9, rect=container.getBoundingClientRect();
     const cx=e.clientX-rect.left, cy=e.clientY-rect.top;
