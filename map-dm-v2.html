@@ -3339,7 +3339,9 @@ function addZone() {
 function selectZone(id) { selectedZoneId=id; selectedLocId=null; buildMap(); renderZoneList(); }
 
 function renderZoneList() {
-  const list=document.getElementById('zone-list'); list.innerHTML='';
+  const list=document.getElementById('zone-list');
+  if (!list) return;   // v2: legacy #zone-list is gone; renderFpLeftBody owns the list
+  list.innerHTML='';
   if (data.zones.length===0) {
     list.innerHTML='<div style="color:var(--ink-faint);font-style:italic;font-size:0.82rem;padding:0.5rem 0">No zones yet. Add a rectangle or draw a polygon.</div>';
     return;
@@ -3401,10 +3403,12 @@ async function deleteZone(id) {
 //  WORLD SETTINGS
 // ══════════════════════════════════════════════════════════════
 function loadWorldFields() {
-  document.getElementById('world-name').value      = data.world.name||'';
-  document.getElementById('world-mapImage').value  = data.world.mapImage||'';
-  document.getElementById('world-mapWidth').value  = data.world.mapWidth||1200;
-  document.getElementById('world-mapHeight').value = data.world.mapHeight||800;
+  // v2: legacy #world-* inputs were removed; renderWorldPanelV2 owns these now.
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  set('world-name',      data.world.name||'');
+  set('world-mapImage',  data.world.mapImage||'');
+  set('world-mapWidth',  data.world.mapWidth||1200);
+  set('world-mapHeight', data.world.mapHeight||800);
 }
 function saveWorldSettings() {
   data.world.name      = document.getElementById('world-name').value.trim();
