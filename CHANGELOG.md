@@ -9,26 +9,6 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-16
 
-### Maps — Atlas Workshop v2 cleanup pass (Task 17)
-
-- **map-dm-v2: stripped dead Move/Place/Polygon mode + legacy modal DOM.**
-  Final cleanup of the redesigned page. Removed the `#loc-modal` shell
-  (its six `#lpane-*` tab-pane divs were moved into `#legacy-templates`
-  so the location inspector keeps cloning them via
-  `buildLocTabFragment`); removed the `#v2-banner` "under construction"
-  notice; removed the `#editor-scrim` element and its companion
-  `body.editor-expanded` CSS block (~110 lines of CSS) along with the
-  detail side-panel rules and the `.map-hint` styles. Deleted the
-  three never-called drag attachers (`attachPinMoveDrag`,
-  `attachRectZoneMoveDrag`, `attachPolyMoveDrag`) and reduced
-  `toggleEditorExpand` + `ensureEditorExpanded` to no-ops (still
-  referenced by legacy edit functions). Added null-guards to
-  `updateModeUI`, `closeLocModal`, `openLocModal`, and the Esc handler
-  so residual references survive the now-missing elements. Net result:
-  5051 → 4876 lines (-175, -3.5%), 313 deletions / 138 insertions. Mode
-  state vars and toggle functions left in place — conservative bias,
-  in case a future task re-exposes a drag UX.
-
 ### Maps — UX cleanup pass (round 4)
 
 - **DM map: styled confirm dialog for destructive operations.** Replaced
