@@ -1962,6 +1962,15 @@ function attachPinGesture(pinEl, loc) {
 
   pinEl.addEventListener('pointermove', (e) => {
     if (!active) return;
+    // If no mouse button is held, the user has released — bail out even if
+    // pointerup never reached us (e.g. when buildMap rebuilds the pin DOM
+    // during selectLocation, the browser sometimes drops the up event).
+    if (e.buttons === 0) {
+      pinEl.classList.remove('dragging');
+      pinEl.style.cursor = 'grab';
+      active = null;
+      return;
+    }
     const dx = e.clientX - active.startX;
     const dy = e.clientY - active.startY;
     const threshold = e.pointerType === 'touch' ? 10 : PIN_DRAG_THRESHOLD;
