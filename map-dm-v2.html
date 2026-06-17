@@ -1,0 +1,3749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World Map — DM Editor</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+/* Alias theme.css token names to this page's existing palette so any theme component classes inherit the local look. */
+:root{
+  --c-bg:var(--bg);
+  --c-bg-elevated:var(--panel-deep,var(--surface,var(--bg)));
+  --c-surface:var(--panel,var(--surface));
+  --c-surface-2:var(--panel-light,var(--surface2));
+  --c-surface-3:var(--panel-light,var(--surface3,var(--surface2)));
+  --c-border:var(--border);
+  --c-border-light:var(--border-light);
+  --c-brass:var(--brass,var(--gold));
+  --c-brass-bright:var(--brass-bright,var(--gold-light));
+  --c-brass-deep:var(--gold-faint,rgba(184,138,90,0.55));
+  --c-teal:var(--teal,#4a9595);
+  --c-teal-bright:var(--teal-bright,#7ec5c5);
+  --c-teal-deep:var(--teal-deep,#2a5454);
+  --c-ink:var(--ink);
+  --c-ink-light:var(--ink-light,var(--ink-dim));
+  --c-ink-faint:var(--ink-faint);
+  --c-ink-dim:var(--ink-faint);
+  --c-error:var(--rust,var(--red,#c4604c));
+  --c-success:var(--green-light,#5fb381);
+  --c-warn:var(--amber,#c89a4a);
+}
+:root{
+  --bg:#0a0806;--surface:#13100a;--surface2:#1c1810;--surface3:#242018;--border:#2e2510;--border-light:#3e3418;
+  --gold:#b8860b;--gold-light:#d4a820;--gold-faint:#6b4f08;--gold-dim:#4a3606;
+  --ink:#e8dfc0;--ink-dim:#a09070;--ink-faint:#6a5a40;
+  --red:#8b2020;--red-bg:#2a0f0d;--green:#2d6a3f;--green-bg:#0d1f12;--green-light:#4a9a60;
+  --purple:#5a3e9b;--purple-bg:#18102a;--amber:#c87800;
+  --pc-accent:#2e5a8a;--enemy-accent:#8a2e2e;
+  --radius:4px;--topbar:48px;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,serif;display:flex;flex-direction:column;background-image:radial-gradient(ellipse at 20% 10%, rgba(184,134,11,0.05) 0%, transparent 55%)}
+
+/* ── Topbar ── */
+.topbar{
+  height:52px;background:var(--surface);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 1rem;gap:0.6rem;flex-shrink:0;z-index:50;flex-wrap:wrap;
+  box-shadow:0 1px 0 rgba(184,134,11,0.06), 0 2px 12px rgba(0,0,0,0.35);
+}
+.topbar h1{font-family:'Cinzel',serif;font-size:0.92rem;font-weight:600;letter-spacing:0.18em;color:var(--gold-light);text-transform:uppercase;flex:1;min-width:80px}
+.btn{
+  font-family:'Cinzel',serif;font-size:0.68rem;font-weight:500;letter-spacing:0.12em;
+  border:1px solid;border-radius:3px;padding:6px 12px;cursor:pointer;
+  transition:background 120ms cubic-bezier(0.16,1,0.3,1),border-color 120ms cubic-bezier(0.16,1,0.3,1),color 120ms cubic-bezier(0.16,1,0.3,1),transform 120ms cubic-bezier(0.16,1,0.3,1),box-shadow 120ms cubic-bezier(0.16,1,0.3,1);
+  white-space:nowrap;background:var(--surface2);text-transform:uppercase;display:inline-flex;align-items:center;gap:6px;
+}
+.btn:active{transform:translateY(1px)}
+.btn-gold{background:var(--gold-dim);border-color:var(--gold);color:var(--gold-light)}
+.btn-gold:hover{background:var(--gold);color:var(--bg);box-shadow:0 0 16px rgba(184,134,11,0.25)}
+.btn-green{background:var(--green-bg);border-color:var(--green);color:#9e9}
+.btn-green:hover{background:var(--green);color:#fff;box-shadow:0 0 14px rgba(45,106,63,0.30)}
+.btn-red{background:var(--red-bg);border-color:var(--red);color:#e9a}
+.btn-red:hover{background:var(--red);color:#fff;box-shadow:0 0 14px rgba(139,32,32,0.35)}
+.btn-purple{background:var(--purple-bg);border-color:var(--purple);color:#c0a0f0}
+.btn-purple:hover{background:var(--purple);color:#fff;box-shadow:0 0 14px rgba(90,62,155,0.35)}
+.btn-ghost{background:transparent;border-color:var(--border-light);color:var(--ink-dim)}
+.btn-ghost:hover{background:var(--surface2);border-color:var(--ink-dim);color:var(--ink)}
+.btn-sm{font-size:0.6rem;padding:4px 9px;letter-spacing:0.10em}
+.sync-status{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.12em;color:var(--ink-faint);text-transform:uppercase;display:inline-flex;align-items:center;gap:6px}
+.sync-status::before{content:'';width:8px;height:8px;border-radius:50%;background:currentColor;opacity:0.7;box-shadow:0 0 6px currentColor;flex-shrink:0}
+.sync-status.ing::before{animation:sync-pulse 1s ease-in-out infinite}
+@keyframes sync-pulse{0%,100%{opacity:0.4}50%{opacity:1}}
+.dm-breadcrumb{
+  display:flex;align-items:center;gap:8px;
+  font-family:'Cinzel',serif;font-size:0.68rem;letter-spacing:0.12em;color:var(--ink-dim);
+  padding:6px 12px;
+  background:linear-gradient(180deg,rgba(80,50,15,0.22),rgba(80,50,15,0.10));
+  border:1px solid var(--gold-faint);border-radius:3px;
+  text-transform:uppercase;
+}
+.dm-breadcrumb a{color:var(--gold-light);text-decoration:none;cursor:pointer;transition:color 120ms}
+.dm-breadcrumb a:hover{color:var(--gold-light);text-shadow:0 0 8px rgba(212,168,32,0.35)}
+.dm-breadcrumb .sep{color:var(--ink-faint);opacity:0.6}
+.in-submap-banner{background:linear-gradient(90deg,rgba(180,134,11,0.18) 0%,rgba(180,134,11,0.02) 100%);border-bottom:1px solid var(--gold-faint)}
+.sync-status.ok{color:var(--green-light)}.sync-status.fail{color:var(--red)}.sync-status.ing{color:var(--amber)}
+
+/* Styled confirm dialog — replaces native confirm() for destructive ops */
+.confirm-overlay{position:fixed;inset:0;background:rgba(5,4,3,0.78);backdrop-filter:blur(3px);z-index:9000;display:none;align-items:center;justify-content:center;padding:1rem;opacity:0;transition:opacity 140ms ease}
+.confirm-overlay.visible{display:flex;opacity:1}
+.confirm-modal{background:var(--surface);border:1px solid var(--gold-faint);border-radius:var(--radius);padding:1.3rem 1.4rem;max-width:440px;width:100%;box-shadow:0 14px 44px rgba(0,0,0,0.7)}
+.confirm-msg{font-family:'Crimson Text',serif;font-size:1rem;color:var(--ink);line-height:1.55;margin-bottom:1.1rem;white-space:pre-wrap}
+.confirm-actions{display:flex;gap:8px;justify-content:flex-end}
+
+/* Toast — non-blocking validation/info messages */
+.toast{position:fixed;left:50%;bottom:1.6rem;transform:translateX(-50%) translateY(40px);background:var(--surface);border:1px solid var(--gold-faint);border-radius:var(--radius);padding:10px 18px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.95rem;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.6);opacity:0;pointer-events:none;transition:opacity 180ms ease, transform 180ms ease;max-width:90vw}
+.toast.visible{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.error{border-color:var(--red);color:#f0c8c8}
+
+/* ── Layout ── */
+.main{flex:1;display:grid;grid-template-columns:1fr 320px;overflow:hidden}
+.map-col{position:relative;overflow:hidden;display:flex;flex-direction:column}
+.editor-col{background:var(--surface);border-left:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column}
+
+/* ── Map ── */
+.map-container{flex:1;position:relative;overflow:hidden;cursor:crosshair}
+.map-canvas{position:absolute;top:0;left:0;transform-origin:0 0;user-select:none}
+.map-img{display:block;max-width:none;pointer-events:none}
+.map-placeholder{background:linear-gradient(135deg,#0d1a0d,#0a1a14,#0d1510);display:flex;align-items:center;justify-content:center;color:var(--ink-faint);font-style:italic;font-size:0.9rem;border:1px dashed var(--border);flex-direction:column;gap:8px}
+.map-controls{position:absolute;bottom:1rem;right:1rem;display:flex;flex-direction:column;gap:4px;z-index:20}
+.map-btn{width:30px;height:30px;background:rgba(19,16,10,0.9);border:1px solid var(--border-light);border-radius:var(--radius);color:var(--ink-dim);font-size:0.9rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+.map-btn:hover{border-color:var(--gold);color:var(--gold)}
+.map-hint{position:absolute;top:0.6rem;left:50%;transform:translateX(-50%);background:linear-gradient(180deg,rgba(184,134,11,0.22),rgba(184,134,11,0.08));border:1px solid var(--gold-faint);border-radius:var(--radius);padding:6px 14px;font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.12em;color:var(--gold-light);z-index:20;pointer-events:none;text-transform:uppercase;box-shadow:0 2px 10px rgba(0,0,0,0.5)}
+.map-hint .esc-hint{margin-left:10px;padding-left:10px;border-left:1px solid var(--gold-faint);color:var(--ink-dim);font-size:0.62rem;letter-spacing:0.08em;text-transform:none}
+
+/* ── Pins & zones (DM view) ── */
+.pin{position:absolute;transform:translate(-50%,-100%);cursor:pointer;z-index:10;transition:transform 0.15s}
+.pin:hover{transform:translate(-50%,-100%) scale(1.18);z-index:11}
+.pin-icon{width:28px;height:36px;display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.6))}
+.pin-marker{width:22px;height:22px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid rgba(248,245,238,0.92);box-shadow:inset 0 -2px 4px rgba(0,0,0,0.28),inset 0 2px 3px rgba(255,255,255,0.18)}
+.pin-tail{width:2px;height:10px;margin-top:1px;opacity:0.85}
+.pin.type-city       .pin-marker{background:#3a6fd0}.pin.type-city       .pin-tail{background:#3a6fd0}
+.pin.type-dungeon    .pin-marker{background:#c43838}.pin.type-dungeon    .pin-tail{background:#c43838}
+.pin.type-wilderness .pin-marker{background:#4ca050}.pin.type-wilderness .pin-tail{background:#4ca050}
+.pin.type-ruin       .pin-marker{background:#a89478}.pin.type-ruin       .pin-tail{background:#a89478}
+.pin.type-port       .pin-marker{background:#16b5a0}.pin.type-port       .pin-tail{background:#16b5a0}
+.pin.type-fort       .pin-marker{background:#b060d0}.pin.type-fort       .pin-tail{background:#b060d0}
+.pin.type-default    .pin-marker{background:#e0a830}.pin.type-default    .pin-tail{background:#e0a830}
+.pin.hidden-pin   .pin-marker{opacity:0.45;border-style:dashed}
+.pin.selected-pin{filter:drop-shadow(0 0 6px var(--gold))}
+.pin-label{position:absolute;top:calc(100% + 4px);left:50%;transform:translateX(-50%);white-space:nowrap;font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.05em;color:var(--ink);background:rgba(10,8,6,0.88);padding:2px 6px;border-radius:2px;border:1px solid var(--border);pointer-events:none;opacity:0;transition:opacity 0.15s}
+.pin:hover .pin-label{opacity:1}
+
+/* Legend */
+.map-legend{position:absolute;bottom:1rem;left:1rem;background:rgba(19,16,10,0.94);border:1px solid var(--border-light);border-radius:var(--radius);padding:12px 14px;z-index:20;min-width:140px;box-shadow:0 4px 12px rgba(0,0,0,0.45)}
+.legend-title{font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.14em;color:var(--gold);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.legend-item{display:flex;align-items:center;gap:10px;font-family:'Cinzel',serif;font-size:0.78rem;letter-spacing:0.04em;color:var(--ink);margin-bottom:6px}
+.legend-item:last-child{margin-bottom:0}
+.legend-pin{width:16px;height:20px;flex-shrink:0;display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.5))}
+
+/* Pin info panel (right side of map area, on hover) */
+.pin-info-panel{position:absolute;top:1rem;right:1rem;width:280px;max-width:calc(100% - 2rem);background:rgba(19,16,10,0.96);border:1px solid var(--gold-faint);border-radius:var(--radius);padding:13px 15px;z-index:25;pointer-events:none;opacity:0;transform:translateY(-4px);transition:opacity 0.15s,transform 0.15s;box-shadow:0 6px 18px rgba(0,0,0,0.6)}
+.pin-info-panel.visible{opacity:1;transform:translateY(0)}
+.pin-info-type{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.16em;color:var(--gold-faint);margin-bottom:4px;text-transform:uppercase}
+.pin-info-name{font-family:'Cinzel',serif;font-size:1.05rem;letter-spacing:0.05em;color:var(--gold-light);margin-bottom:7px;line-height:1.25}
+.pin-info-desc{font-size:0.92rem;line-height:1.5;color:var(--ink)}
+.pin-info-desc.empty{color:var(--ink-faint);font-style:italic;font-size:0.85rem}
+.zone{position:absolute;border-radius:6px;border:2px solid;cursor:pointer;transition:opacity 0.2s}
+.zone:hover{outline:2px solid var(--gold)}
+.zone.selected-zone{outline:2px solid var(--gold)}
+.zone-label{font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.08em;text-align:center;pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,0.8);padding:2px 6px;width:100%;display:flex;align-items:center;justify-content:center;height:100%}
+
+/* ── SVG polygon overlay ── */
+.map-svg-overlay{position:absolute;top:0;left:0;pointer-events:none;overflow:visible}
+.poly-zone{cursor:pointer;pointer-events:all}
+.poly-zone:hover .poly-fill{opacity:1}
+.poly-zone.selected-poly .poly-fill{stroke:var(--gold)!important;stroke-width:2.5}
+.poly-label-text{pointer-events:none;font-family:'Cinzel',serif;font-size:11px;letter-spacing:0.06em;text-shadow:0 1px 3px rgba(0,0,0,0.9)}
+
+/* ── Polygon draw preview ── */
+.poly-preview-dot{position:absolute;width:10px;height:10px;border-radius:50%;background:var(--gold);border:2px solid #fff;transform:translate(-50%,-50%);pointer-events:none;z-index:30}
+.poly-preview-dot.first-dot{width:14px;height:14px;border-color:var(--gold-light);box-shadow:0 0 6px var(--gold)}
+
+/* ── Move mode ── */
+.map-container.move-mode .pin{cursor:grab}
+.map-container.move-mode .pin:active{cursor:grabbing}
+.map-container.move-mode .zone{cursor:grab}
+.map-container.move-mode .zone:active{cursor:grabbing}
+.map-container.move-mode .poly-zone{cursor:grab}
+
+/* ──────────────────────────────────────────────────────────
+   EXPANDED EDITOR
+   Slide-out drawer that overlays the map. Toggled by the
+   "⛶ Expand editor" button in the topbar. Esc collapses it.
+   ────────────────────────────────────────────────────────── */
+.editor-scrim{
+  position:fixed;
+  top:var(--topbar);left:0;right:0;bottom:0;
+  background:rgba(0,0,0,0.55);
+  backdrop-filter:blur(4px);
+  -webkit-backdrop-filter:blur(4px);
+  z-index:90;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity 240ms cubic-bezier(0.16,1,0.3,1);
+}
+body.editor-expanded .editor-scrim{opacity:1;pointer-events:auto}
+
+body.editor-expanded .editor-col{
+  position:fixed;
+  top:var(--topbar);
+  right:0;
+  bottom:0;
+  width:min(900px,100vw);
+  max-width:100vw;
+  z-index:100;
+  border-left:1px solid var(--gold-faint);
+  box-shadow:0 0 0 1px rgba(184,134,11,0.18),0 0 60px rgba(0,0,0,0.55),-12px 0 40px rgba(184,134,11,0.07);
+  animation:editor-slide-in 280ms cubic-bezier(0.16,1,0.3,1);
+}
+@keyframes editor-slide-in{
+  from{transform:translateX(40px);opacity:0}
+  to{transform:translateX(0);opacity:1}
+}
+
+/* Roomy form treatment inside the pop-out */
+body.editor-expanded .editor-pane{padding:1.4rem 1.8rem}
+body.editor-expanded .field{margin-bottom:1rem}
+body.editor-expanded .field input,
+body.editor-expanded .field textarea,
+body.editor-expanded .field select{font-size:0.98rem;padding:8px 11px;line-height:1.5}
+body.editor-expanded .field textarea{min-height:100px}
+body.editor-expanded .field-row{gap:12px}
+body.editor-expanded .field label{font-size:0.62rem;margin-bottom:5px}
+body.editor-expanded .section-header{font-size:0.68rem;margin:1.4rem 0 0.6rem}
+body.editor-expanded .visibleto-chip,
+body.editor-expanded .ed-chip{font-size:0.78rem;padding:5px 12px}
+body.editor-expanded .editor-tabs .editor-tab{padding:13px 8px 11px;font-size:0.66rem}
+
+/* Two-column layout for chip grids in pop-out, where space allows */
+@media(min-width:720px){
+  body.editor-expanded .visibleto-chips{gap:6px}
+}
+
+/* When expanded, the toggle button shows collapse state */
+body.editor-expanded #expand-editor-btn{background:var(--gold);color:var(--bg)}
+
+/* ──────────────────────────────────────────────────────────
+   DETAIL SIDE-PANEL (NPCs / Players / Timeline)
+   When a record is being edited in pop-out mode, the detail
+   form pulls out to a fixed-position panel on the right side
+   so the user doesn't have to scroll past the entire list to
+   reach it. The list stays scrollable on the left.
+   ────────────────────────────────────────────────────────── */
+body.editor-expanded #pane-npcs:has(> #npc-detail:not([style*="none"])),
+body.editor-expanded #pane-characters:has(> #char-detail:not([style*="none"])),
+body.editor-expanded #pane-timeline:has(> #tl-detail:not([style*="none"])){
+  padding-right:520px;
+}
+body.editor-expanded #pane-npcs > #npc-detail:not([style*="none"]),
+body.editor-expanded #pane-characters > #char-detail:not([style*="none"]),
+body.editor-expanded #pane-timeline > #tl-detail:not([style*="none"]){
+  position:fixed;
+  top:calc(var(--topbar) + 38px); /* topbar + editor-tabs */
+  right:0;
+  bottom:0;
+  width:500px;
+  margin:0 !important;
+  overflow-y:auto;
+  padding:1.2rem 1.4rem 1.4rem;
+  border-left:1px solid var(--gold-faint);
+  background:var(--surface);
+  box-shadow:-14px 0 36px rgba(0,0,0,0.50), -1px 0 0 rgba(184,134,11,0.10);
+  z-index:110;
+  animation:detail-slide-in 240ms cubic-bezier(0.16,1,0.3,1);
+}
+@keyframes detail-slide-in{
+  from{transform:translateX(28px);opacity:0}
+  to{transform:translateX(0);opacity:1}
+}
+
+/* Close-detail button injected into each side panel via JS */
+.detail-close-btn{
+  position:sticky;top:-1.2rem;float:right;
+  background:transparent;border:1px solid var(--border-light);border-radius:3px;
+  color:var(--ink-faint);cursor:pointer;
+  font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.12em;
+  padding:4px 10px;margin-left:8px;margin-bottom:6px;
+  text-transform:uppercase;z-index:5;
+  transition:color 120ms,border-color 120ms,background 120ms;
+}
+.detail-close-btn:hover{color:var(--ink);border-color:var(--ink-dim);background:var(--surface2)}
+
+/* Narrower viewports — let the side panel become wider/full instead of pushing the list off */
+@media(max-width:1200px){
+  body.editor-expanded #pane-npcs:has(> #npc-detail:not([style*="none"])),
+  body.editor-expanded #pane-characters:has(> #char-detail:not([style*="none"])),
+  body.editor-expanded #pane-timeline:has(> #tl-detail:not([style*="none"])){
+    padding-right:0;
+  }
+  body.editor-expanded #pane-npcs > #npc-detail:not([style*="none"]),
+  body.editor-expanded #pane-characters > #char-detail:not([style*="none"]),
+  body.editor-expanded #pane-timeline > #tl-detail:not([style*="none"]){
+    width:min(550px,90vw);
+  }
+}
+
+/* ── Editor panel ── */
+.editor-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;background:rgba(13,8,4,0.4)}
+.editor-tab{
+  flex:1;font-family:'Cinzel',serif;font-size:0.62rem;font-weight:500;letter-spacing:0.14em;
+  padding:11px 4px 9px;text-align:center;cursor:pointer;
+  color:var(--ink-faint);border:none;background:transparent;border-bottom:2px solid transparent;
+  margin-bottom:-1px;
+  transition:color 120ms,border-color 120ms,background 120ms;text-transform:uppercase;
+}
+.editor-tab.active{color:var(--gold-light);border-bottom-color:var(--gold);background:rgba(184,134,11,0.06)}
+.editor-tab:hover:not(.active){color:var(--ink-dim);background:rgba(255,255,255,0.02)}
+.editor-pane{display:none;flex:1;overflow-y:auto;padding:1rem}
+.editor-pane.active{display:block}
+
+.field{margin-bottom:0.8rem}
+.field label{
+  font-family:'Cinzel',serif;font-size:0.58rem;font-weight:500;letter-spacing:0.14em;text-transform:uppercase;
+  color:var(--ink-faint);display:block;margin-bottom:4px;
+}
+.field input,.field textarea,.field select{
+  width:100%;background:var(--bg);border:1px solid var(--border-light);border-radius:3px;
+  color:var(--ink);font-family:'Crimson Text',serif;font-size:0.92rem;padding:6px 9px;
+  outline:none;line-height:1.45;
+  transition:border-color 120ms,box-shadow 120ms,background 120ms;
+}
+.field input:focus,.field textarea:focus,.field select:focus{
+  border-color:var(--gold);box-shadow:0 0 0 3px rgba(184,134,11,0.16);
+}
+.field input::placeholder,.field textarea::placeholder{color:var(--ink-faint);opacity:0.6;font-style:italic}
+.field textarea{resize:vertical;min-height:64px;line-height:1.5}
+.field select{cursor:pointer}
+.field-row{display:flex;gap:8px}.field-row .field{flex:1}
+.loc-advanced{margin-bottom:0.8rem;border:1px solid var(--border-light);border-radius:3px;background:rgba(255,255,255,0.02);padding:0 0.7rem}
+.loc-advanced > summary{cursor:pointer;font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.12em;color:var(--ink-faint);text-transform:uppercase;padding:0.55rem 0;outline:none;user-select:none;list-style:none}
+.loc-advanced > summary::-webkit-details-marker{display:none}
+.loc-advanced > summary::before{content:'▸ ';color:var(--gold-faint);display:inline-block;transition:transform 0.12s;transform-origin:center}
+.loc-advanced[open] > summary::before{content:'▾ '}
+.loc-advanced > summary:hover{color:var(--gold-light)}
+.loc-advanced[open]{padding-bottom:0.6rem}
+.toggle-row{display:flex;align-items:center;gap:8px;margin-bottom:0.7rem}
+.toggle-row label{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.12em;color:var(--ink-dim);cursor:pointer;text-transform:uppercase}
+.toggle-row input[type=checkbox]{accent-color:var(--gold);width:14px;height:14px;cursor:pointer}
+
+.section-header{
+  font-family:'Cinzel',serif;font-size:0.62rem;font-weight:500;letter-spacing:0.18em;color:var(--gold-light);
+  margin:1.1rem 0 0.45rem;padding-bottom:4px;border-bottom:1px solid var(--border);
+  text-transform:uppercase;display:flex;align-items:center;justify-content:space-between;gap:8px;
+}
+.item-card{background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:9px 11px;margin-bottom:6px;transition:border-color 120ms,background 120ms}
+.item-card:hover{border-color:var(--border-light);background:var(--surface3)}
+.item-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.item-card-title{font-family:'Cinzel',serif;font-size:0.78rem;letter-spacing:0.04em;color:var(--ink)}
+.item-card-del{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:0.9rem;padding:0 4px;line-height:1;transition:color 120ms}
+.item-card-del:hover{color:var(--red)}
+
+.loc-list{display:flex;flex-direction:column;gap:5px}
+.loc-list-item{
+  background:var(--surface2);border:1px solid var(--border);border-radius:3px;
+  padding:8px 11px;cursor:pointer;display:flex;align-items:center;gap:8px;
+  transition:border-color 120ms,background 120ms,transform 120ms;
+}
+.loc-list-item:hover{border-color:var(--border-light);background:var(--surface3);transform:translateX(1px)}
+.loc-list-item.selected{border-color:var(--gold);background:rgba(184,134,11,0.06);box-shadow:0 0 0 1px rgba(184,134,11,0.30)}
+.loc-list-name{font-family:'Cinzel',serif;font-size:0.80rem;letter-spacing:0.04em;color:var(--ink);flex:1}
+.loc-list-type{font-size:0.66rem;color:var(--ink-faint);letter-spacing:0.06em;text-transform:uppercase;font-family:'Cinzel',serif}
+.hidden-tag{font-size:0.55rem;padding:2px 6px;border-radius:8px;border:1px solid #3a6060;color:#80c0c0;background:rgba(58,96,96,0.15);font-family:'Cinzel',serif;letter-spacing:0.08em;text-transform:uppercase}
+
+.dm-note-area{
+  background:linear-gradient(180deg,rgba(90,62,155,0.10),rgba(90,62,155,0.04));
+  border:1px solid #3a2a6a;border-radius:3px;padding:10px 11px;margin-top:0.6rem;
+}
+.dm-note-label{font-family:'Cinzel',serif;font-size:0.58rem;letter-spacing:0.14em;color:#a890e8;margin-bottom:5px;text-transform:uppercase}
+
+.publish-section{padding:0.8rem;border-top:1px solid var(--border);flex-shrink:0}
+
+/* ── Characters tab ── */
+.char-card{
+  background:var(--surface2);border:1px solid var(--border);border-radius:3px;
+  padding:10px 12px;margin-bottom:7px;
+  transition:border-color 120ms,background 120ms;
+}
+.char-card:hover{border-color:var(--border-light);background:var(--surface3)}
+.char-card.selected{border-color:var(--gold);background:rgba(184,134,11,0.06);box-shadow:0 0 0 1px rgba(184,134,11,0.30)}
+.char-card-row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.char-card-name{font-family:'Cinzel',serif;font-size:0.86rem;font-weight:500;letter-spacing:0.04em;color:var(--ink);flex:1}
+.char-card-player{font-size:0.72rem;color:var(--ink-faint);font-style:italic}
+.char-code-pill{
+  font-family:'Cinzel',serif;font-size:0.74rem;font-weight:500;letter-spacing:0.20em;
+  background:var(--bg);border:1px solid var(--gold-faint);color:var(--gold-light);
+  padding:4px 11px;border-radius:3px;cursor:pointer;text-transform:uppercase;user-select:all;
+  transition:all 120ms;
+}
+.char-code-pill:hover{border-color:var(--gold);color:var(--gold-light);box-shadow:0 0 12px rgba(184,134,11,0.20)}
+.char-actions{display:flex;gap:4px;margin-left:auto}
+.char-action-btn{
+  background:transparent;border:1px solid var(--border-light);color:var(--ink-faint);
+  border-radius:3px;padding:3px 8px;font-size:0.7rem;cursor:pointer;font-family:'Cinzel',serif;letter-spacing:0.10em;
+  transition:all 120ms;text-transform:uppercase;
+}
+.char-action-btn:hover{border-color:var(--gold);color:var(--gold-light)}
+.char-action-btn.danger:hover{border-color:var(--red);color:#e9a}
+
+/* visibleTo chips (location modal) */
+.visibleto-chips{display:flex;flex-wrap:wrap;gap:5px;padding:6px 4px}
+.visibleto-chip{font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.06em;padding:3px 10px;border-radius:10px;border:1px solid var(--border-light);color:var(--ink-faint);background:var(--surface2);cursor:pointer;transition:all 0.15s;user-select:none}
+.visibleto-chip:hover{border-color:var(--ink-dim);color:var(--ink-dim)}
+.visibleto-chip.on{border-color:var(--gold);color:var(--gold);background:var(--gold-dim)}
+.visibleto-empty{font-size:0.78rem;color:var(--ink-faint);font-style:italic;padding:4px 0}
+.visibleto-hint{font-size:0.72rem;color:var(--ink-faint);font-style:italic;margin-top:2px}
+
+/* Whispers composer */
+.whisper-composer{background:#181020;border:1px solid #3a2a6a;border-radius:var(--radius);padding:0.7rem 0.8rem;margin-top:0.6rem}
+.whisper-composer-title{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.14em;color:#a080d0;margin-bottom:6px}
+.whisper-history{margin-top:0.6rem;display:flex;flex-direction:column;gap:5px}
+.whisper-history-card{background:var(--surface2);border:1px solid var(--border);border-left:3px solid #6a4ec0;border-radius:var(--radius);padding:6px 8px;font-size:0.82rem}
+.whisper-history-meta{font-size:0.65rem;color:var(--ink-faint);font-family:'Cinzel',serif;letter-spacing:0.08em;margin-bottom:3px;display:flex;justify-content:space-between;align-items:center}
+.whisper-history-title{font-family:'Cinzel',serif;color:var(--ink);font-size:0.78rem;margin-bottom:2px}
+.whisper-history-body{color:var(--ink-dim);font-size:0.8rem;line-height:1.4;white-space:pre-wrap}
+.whisper-del-btn{background:transparent;border:none;color:var(--ink-faint);cursor:pointer;font-size:0.8rem;padding:0 3px}
+.whisper-del-btn:hover{color:var(--red)}
+
+/* Timeline cards (DM list) */
+.tl-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;margin-bottom:6px;cursor:pointer;transition:border-color 0.15s;border-left:3px solid var(--border-light)}
+.tl-card:hover{border-color:var(--border-light)}
+.tl-card.selected{border-color:var(--gold)}
+.tl-card.kind-session   {border-left-color:#4a80c0}
+.tl-card.kind-event     {border-left-color:#c87800}
+.tl-card.kind-milestone {border-left-color:var(--gold)}
+.tl-card.kind-planned   {border-left-color:var(--purple);background:linear-gradient(90deg,rgba(90,62,155,0.08),var(--surface2))}
+.tl-card-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.tl-card-kind{font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.16em;text-transform:uppercase;padding:1px 6px;border-radius:8px;color:var(--ink-dim);border:1px solid var(--border-light)}
+.tl-card.kind-session   .tl-card-kind{color:#8fbceb;border-color:#4a80c0}
+.tl-card.kind-event     .tl-card-kind{color:#f0b076;border-color:#c87800}
+.tl-card.kind-milestone .tl-card-kind{color:var(--gold-light);border-color:var(--gold)}
+.tl-card.kind-planned   .tl-card-kind{color:#c0a0f0;border-color:var(--purple)}
+.tl-card-title{font-family:'Cinzel',serif;font-size:0.86rem;letter-spacing:0.04em;color:var(--ink);flex:1}
+.tl-card-date{font-size:0.7rem;color:var(--ink-faint);font-family:'Cinzel',serif;letter-spacing:0.08em}
+.tl-card-body{font-size:0.78rem;color:var(--ink-dim);margin-top:5px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tl-card-meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;font-size:0.7rem;color:var(--ink-faint)}
+.tl-card-meta-chip{background:rgba(0,0,0,0.25);border:1px solid var(--border-light);padding:1px 6px;border-radius:8px}
+/* Timeline editor: loot rows + attached combats */
+.tl-loot-row{display:flex;gap:5px;align-items:center;margin-bottom:5px}
+.tl-loot-row input{background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.84rem;padding:4px 7px;outline:none}
+.tl-loot-row input:focus{border-color:var(--gold)}
+.tl-loot-row .tl-loot-item{flex:1;min-width:0}
+.tl-loot-row .tl-loot-qty{width:48px;flex-shrink:0}
+.tl-loot-row .tl-loot-who{width:110px;flex-shrink:0}
+.tl-loot-row .tl-loot-del{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:0.85rem;padding:0 3px;flex-shrink:0}
+.tl-loot-row .tl-loot-del:hover{color:var(--red)}
+.tl-combat-item{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-left:3px solid #4a80c0;border-radius:var(--radius);padding:6px 9px;margin-bottom:5px;font-size:0.82rem}
+.tl-combat-item .tl-combat-name{flex:1;font-family:'Cinzel',serif;color:var(--ink);font-size:0.78rem}
+.tl-combat-item .tl-combat-sub{color:var(--ink-faint);font-size:0.72rem}
+.tl-combat-item .tl-combat-del{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:0.85rem;padding:0 3px}
+.tl-combat-item .tl-combat-del:hover{color:var(--red)}
+
+/* NPC roster cards */
+.npc-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:9px 10px;margin-bottom:6px;cursor:pointer;transition:border-color 0.15s}
+.npc-card:hover{border-color:var(--border-light)}
+.npc-card.selected{border-color:var(--gold)}
+.npc-card-row{display:flex;align-items:center;gap:8px}
+.npc-card-name{font-family:'Cinzel',serif;font-size:0.84rem;letter-spacing:0.04em;color:var(--ink);flex:1}
+.npc-card-role{font-size:0.7rem;color:var(--ink-faint);font-style:italic}
+.npc-card-meta{display:flex;align-items:center;gap:8px;margin-top:3px;font-size:0.72rem;color:var(--ink-dim)}
+.npc-status{font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid}
+.npc-status.alive   {color:var(--green-light);border-color:var(--green);background:var(--green-bg)}
+.npc-status.dead    {color:#e88;border-color:var(--red);background:var(--red-bg)}
+.npc-status.missing {color:#c0a0f0;border-color:var(--purple);background:var(--purple-bg)}
+.npc-status.unknown {color:var(--ink-faint);border-color:var(--border-light)}
+.npc-card-loc{font-size:0.72rem;color:var(--ink-dim);display:flex;align-items:center;gap:4px}
+.npc-card-loc::before{content:'📍';font-size:0.85em}
+.npc-card-activity{font-size:0.78rem;color:var(--ink-dim);margin-top:4px;font-style:italic;line-height:1.35}
+
+.npc-history-card{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--gold-faint);border-radius:var(--radius);padding:7px 9px;margin-bottom:5px;font-size:0.82rem}
+.npc-history-card.dm-only{border-left-color:var(--purple)}
+.npc-history-meta{font-size:0.65rem;color:var(--ink-faint);font-family:'Cinzel',serif;letter-spacing:0.08em;margin-bottom:3px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.npc-history-loc{font-family:'Cinzel',serif;color:var(--ink);font-size:0.76rem;margin-bottom:2px}
+.npc-history-body{color:var(--ink-dim);font-size:0.8rem;line-height:1.4}
+.npc-history-del{background:transparent;border:none;color:var(--ink-faint);cursor:pointer;font-size:0.8rem;padding:0 3px}
+.npc-history-del:hover{color:var(--red)}
+
+/* DM Token modal */
+.dm-token-overlay{
+  position:fixed;inset:0;
+  background:rgba(5,4,3,0.78);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  z-index:300;display:none;align-items:center;justify-content:center;padding:1rem;
+}
+.dm-token-overlay.visible{display:flex;animation:dm-token-fade 200ms cubic-bezier(0.16,1,0.3,1)}
+@keyframes dm-token-fade{from{opacity:0}to{opacity:1}}
+@keyframes dm-token-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.dm-token-modal{
+  background:var(--surface);
+  border:1px solid var(--gold-faint);
+  border-radius:6px;
+  padding:1.6rem 1.5rem 1.3rem;max-width:460px;width:100%;
+  box-shadow:0 16px 48px rgba(0,0,0,0.65), 0 0 0 1px rgba(184,134,11,0.18), 0 0 30px rgba(184,134,11,0.08);
+  animation:dm-token-rise 280ms cubic-bezier(0.16,1,0.3,1);
+}
+.dm-token-title{font-family:'Cinzel',serif;font-size:1.1rem;font-weight:600;letter-spacing:0.14em;color:var(--gold-light);margin-bottom:0.4rem;text-transform:uppercase}
+.dm-token-desc{font-size:0.9rem;color:var(--ink-dim);line-height:1.55;margin-bottom:1rem}
+.dm-token-desc code{background:var(--bg);padding:2px 7px;border-radius:3px;color:var(--gold-light);font-size:0.85rem;font-family:ui-monospace,Menlo,Consolas,monospace}
+.dm-token-input{
+  width:100%;background:var(--bg);border:1px solid var(--border-light);border-radius:3px;
+  color:var(--ink);font-family:'Crimson Text',serif;font-size:0.96rem;padding:8px 11px;outline:none;margin-bottom:0.8rem;
+  transition:border-color 120ms,box-shadow 120ms;
+}
+.dm-token-input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(184,134,11,0.16)}
+.dm-token-actions{display:flex;gap:8px;justify-content:flex-end}
+
+/* ── Import modal ── */
+.import-drop-zone {
+  border: 2px dashed var(--border-light);
+  border-radius: var(--radius);
+  padding: 2rem 1rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  margin-bottom: 1rem;
+}
+.import-drop-zone:hover, .import-drop-zone.drag-over {
+  border-color: var(--purple);
+  background: var(--purple-bg);
+}
+.import-drop-zone-icon { font-size: 2rem; margin-bottom: 0.4rem; opacity: 0.6; }
+.import-drop-label { font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.08em; color: var(--ink-dim); }
+.import-drop-sub { font-size: 0.78rem; color: var(--ink-faint); margin-top: 0.3rem; font-style: italic; }
+.import-file-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 1rem; max-height: 120px; overflow-y: auto; }
+.import-file-item { display: flex; align-items: center; gap: 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 5px 8px; font-size: 0.82rem; }
+.import-file-item .fi-icon { font-size: 0.9rem; flex-shrink: 0; }
+.import-file-item .fi-name { flex: 1; color: var(--ink-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.import-file-item .fi-type { font-family: 'Cinzel', serif; font-size: 0.58rem; letter-spacing: 0.08em; padding: 1px 5px; border-radius: 8px; flex-shrink: 0; }
+.fi-type.location { background: rgba(74,128,192,0.15); color: #4a80c0; border: 1px solid rgba(74,128,192,0.3); }
+.fi-type.npc      { background: rgba(138,112,64,0.15);  color: #8a7040; border: 1px solid rgba(138,112,64,0.3); }
+.fi-type.unknown  { background: var(--surface); color: var(--ink-faint); border: 1px solid var(--border); }
+.import-file-item .fi-del { background: none; border: none; color: var(--ink-faint); cursor: pointer; font-size: 0.8rem; padding: 0 2px; flex-shrink: 0; }
+.import-file-item .fi-del:hover { color: var(--red); }
+
+/* Import preview */
+.import-preview { margin-bottom: 1rem; }
+.import-preview-title { font-family: 'Cinzel', serif; font-size: 0.65rem; letter-spacing: 0.1em; color: var(--gold-faint); margin-bottom: 0.5rem; }
+.import-loc-card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; margin-bottom: 6px; }
+.import-loc-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.import-loc-name { font-family: 'Cinzel', serif; font-size: 0.8rem; color: var(--ink); flex: 1; }
+.import-loc-badge { font-family: 'Cinzel', serif; font-size: 0.58rem; padding: 1px 6px; border-radius: 8px; }
+.import-loc-details { font-size: 0.78rem; color: var(--ink-faint); line-height: 1.4; }
+.import-loc-details span { display: inline-block; margin-right: 10px; }
+.conflict-badge { background: rgba(200,120,0,0.15); color: #c87800; border: 1px solid rgba(200,120,0,0.4); font-family: 'Cinzel', serif; font-size: 0.58rem; padding: 1px 6px; border-radius: 8px; }
+
+/* Conflict resolution row */
+.conflict-row { background: rgba(200,120,0,0.08); border: 1px solid rgba(200,120,0,0.3); border-radius: var(--radius); padding: 8px 10px; margin-bottom: 6px; }
+.conflict-row-title { font-family: 'Cinzel', serif; font-size: 0.72rem; color: #c87800; margin-bottom: 6px; }
+.conflict-opts { display: flex; gap: 6px; flex-wrap: wrap; }
+.conflict-opt { font-family: 'Cinzel', serif; font-size: 0.62rem; padding: 4px 10px; border-radius: var(--radius); border: 1px solid; cursor: pointer; transition: all 0.15s; background: transparent; }
+.conflict-opt.merge   { border-color: var(--green);  color: #8e8; }
+.conflict-opt.merge.selected   { background: var(--green);  color: white; }
+.conflict-opt.replace { border-color: var(--amber);  color: #c87800; }
+.conflict-opt.replace.selected { background: var(--amber);  color: var(--bg); }
+.conflict-opt.skip    { border-color: var(--border-light); color: var(--ink-faint); }
+.conflict-opt.skip.selected    { background: var(--border-light); color: var(--ink); }
+
+.import-summary { font-size: 0.82rem; color: var(--ink-dim); margin-bottom: 0.8rem; line-height: 1.5; }
+.import-summary strong { color: var(--ink); }
+
+/* Modal */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:200;padding:1rem}
+.modal-backdrop.hidden{display:none}
+.modal{background:var(--surface);border:1px solid var(--border-light);border-radius:var(--radius);max-width:480px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.8)}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:0.8rem 1rem;border-bottom:1px solid var(--border)}
+.modal-header h2{font-family:'Cinzel',serif;font-size:0.85rem;letter-spacing:0.08em;color:var(--gold)}
+.modal-close{background:none;border:none;color:var(--ink-faint);font-size:1.1rem;cursor:pointer;padding:2px 6px}
+.modal-close:hover{color:var(--ink)}
+.modal-body{padding:0.8rem 1rem;overflow-y:auto;flex:1}
+.modal-footer{padding:0.7rem 1rem;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+
+@media(max-width:800px){
+  .main{grid-template-columns:1fr}
+  .editor-col{max-height:45vh;border-left:none;border-top:1px solid var(--border)}
+}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <h1 id="topbar-title">⚔ World Map — DM Editor</h1>
+  <div class="dm-breadcrumb" id="dm-breadcrumb" style="display:none">
+    <a href="#" onclick="exitToWorld();return false">⌫ Back to World</a>
+    <span class="sep">›</span>
+    <span id="dm-breadcrumb-loc">—</span>
+  </div>
+  <button class="btn btn-ghost btn-sm" id="move-mode-btn" onclick="toggleMoveMode()">✥ Move mode</button>
+  <button class="btn btn-purple btn-sm" onclick="openImport()">⬇ Import</button>
+  <button class="btn btn-green" onclick="publishData()">▲ Publish to players</button>
+  <button class="btn btn-ghost btn-sm" onclick="window.open('map.html','_blank')" title="Open the player view in a new tab">Preview as player ↗</button>
+  <button class="btn btn-gold btn-sm" id="expand-editor-btn" onclick="toggleEditorExpand()" title="Expand the editor for more room (Esc to collapse)" aria-label="Expand editor for more room">⛶ Expand editor</button>
+  <a class="btn btn-ghost btn-sm" href="home.html" style="text-decoration:none">⌂ Home</a>
+  <div class="sync-status" id="sync-status">—</div>
+</div>
+<!-- Click-outside scrim for the expanded editor -->
+<div class="editor-scrim" id="editor-scrim" onclick="toggleEditorExpand()" aria-hidden="true"></div>
+
+<main class="main" id="main">
+  <!-- MAP -->
+  <div class="map-col">
+    <div class="map-container" id="map-container">
+      <div class="map-canvas" id="map-canvas"></div>
+    </div>
+    <div class="map-controls">
+      <button class="map-btn" onclick="mapZoom(1.2)" title="Zoom in" aria-label="Zoom in">+</button>
+      <button class="map-btn" onclick="mapZoom(0.8)" title="Zoom out" aria-label="Zoom out">−</button>
+      <button class="map-btn" onclick="mapReset()" title="Reset view" aria-label="Reset view">⌂</button>
+    </div>
+    <div class="map-hint" id="map-hint">Click map to place a new location pin</div>
+    <div class="map-legend" id="map-legend"></div>
+    <div class="pin-info-panel" id="pin-info-panel">
+      <div class="pin-info-type" id="pin-info-type"></div>
+      <div class="pin-info-name" id="pin-info-name"></div>
+      <div class="pin-info-desc" id="pin-info-desc"></div>
+    </div>
+  </div>
+
+  <!-- EDITOR -->
+  <div class="editor-col">
+    <div class="editor-tabs">
+      <button class="editor-tab active" id="tab-locations" onclick="switchTab('locations')">LOCATIONS</button>
+      <button class="editor-tab" id="tab-zones" onclick="switchTab('zones')">ZONES</button>
+      <button class="editor-tab" id="tab-characters" onclick="switchTab('characters')">PLAYERS</button>
+      <button class="editor-tab" id="tab-npcs" onclick="switchTab('npcs')">NPCs</button>
+      <button class="editor-tab" id="tab-timeline" onclick="switchTab('timeline')">TIMELINE</button>
+      <button class="editor-tab" id="tab-world" onclick="switchTab('world')">WORLD</button>
+    </div>
+
+    <!-- LOCATIONS TAB -->
+    <div class="editor-pane active" id="pane-locations">
+      <div style="display:flex;gap:6px;margin-bottom:0.6rem;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-gold btn-sm" onclick="addLocation()">+ Add location</button>
+        <button class="btn btn-ghost btn-sm" id="place-mode-btn" onclick="togglePlaceMode()">📍 Click to place</button>
+        <input type="text" id="loc-search" placeholder="Search…" style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:4px 7px;font-family:'Crimson Text',serif;font-size:0.82rem" oninput="renderLocList()">
+      </div>
+      <div class="loc-list" id="loc-list"></div>
+    </div>
+
+    <!-- ZONES TAB -->
+    <div class="editor-pane" id="pane-zones">
+      <div style="display:flex;gap:6px;margin-bottom:0.6rem;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-gold btn-sm" onclick="addZone()">+ Rectangle zone</button>
+        <button class="btn btn-ghost btn-sm" id="poly-draw-btn" onclick="togglePolyDraw()">✏ Draw polygon</button>
+        <input type="text" id="zone-search" placeholder="Search…" style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:4px 7px;font-family:'Crimson Text',serif;font-size:0.82rem" oninput="renderZoneList()">
+      </div>
+      <div id="zone-list"></div>
+    </div>
+
+    <!-- CHARACTERS TAB -->
+    <div class="editor-pane" id="pane-characters">
+      <div style="display:flex;gap:6px;margin-bottom:0.6rem;flex-wrap:wrap">
+        <button class="btn btn-gold btn-sm" onclick="addCharacter()">+ Add character</button>
+        <button class="btn btn-ghost btn-sm" onclick="reloadCharacters()" title="Refetch from cloud">↻ Refresh</button>
+      </div>
+      <div class="section-header" style="margin-top:0.2rem">CHARACTERS</div>
+      <div id="char-list"></div>
+
+      <div id="char-detail" style="display:none;margin-top:0.8rem">
+        <div class="section-header" id="char-detail-header">EDIT CHARACTER</div>
+        <div class="field"><label>NAME</label><input type="text" id="char-name" placeholder="Aldric Stoneveil"></div>
+        <div class="field-row">
+          <div class="field"><label>PLAYER (optional)</label><input type="text" id="char-player" placeholder="Bob"></div>
+          <div class="field"><label>ID (auto)</label><input type="text" id="char-id" readonly style="opacity:0.6"></div>
+        </div>
+        <div class="field">
+          <label>CLAIM CODE</label>
+          <div style="display:flex;gap:5px">
+            <input type="text" id="char-code" style="flex:1;letter-spacing:0.2em;text-transform:uppercase;font-family:'Cinzel',serif">
+            <button class="btn btn-ghost btn-sm" onclick="regenCharCode()" title="Generate new code">⟳</button>
+            <button class="btn btn-ghost btn-sm" onclick="copyCharCode()" title="Copy">⧉</button>
+          </div>
+        </div>
+        <div class="field"><label>DM NOTES</label><textarea id="char-dmNotes" rows="3" placeholder="Anything you want to remember about this character"></textarea></div>
+        <div style="display:flex;gap:5px;margin-bottom:0.8rem">
+          <button class="btn btn-gold btn-sm" onclick="saveCharacter()">Save</button>
+          <button class="btn btn-ghost btn-sm" onclick="cancelCharEdit()">Cancel</button>
+          <button class="btn btn-red btn-sm" style="margin-left:auto" onclick="deleteCharacter()">Delete</button>
+        </div>
+
+        <div class="whisper-composer">
+          <div class="whisper-composer-title">⬑ SEND WHISPER (only this character sees it)</div>
+          <div class="field"><label>TITLE</label><input type="text" id="whisper-title" placeholder="A note in your pocket…"></div>
+          <div class="field"><label>BODY</label><textarea id="whisper-body" rows="4" placeholder="The whisper text…"></textarea></div>
+          <button class="btn btn-purple btn-sm" onclick="postWhisper()">Post whisper</button>
+        </div>
+
+        <div class="section-header" style="margin-top:0.8rem">WHISPERS SENT</div>
+        <div class="whisper-history" id="whisper-history"></div>
+      </div>
+    </div>
+
+    <!-- NPCs TAB -->
+    <div class="editor-pane" id="pane-npcs">
+      <div style="display:flex;gap:6px;margin-bottom:0.6rem;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-gold btn-sm" onclick="addNPCEntity()">+ Add NPC</button>
+        <input type="text" id="npc-search" placeholder="Search…" style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:4px 7px;font-family:'Crimson Text',serif;font-size:0.82rem" oninput="renderNPCList()">
+        <select id="npc-filter-location" onchange="renderNPCList()" style="background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:4px 7px;font-size:0.78rem">
+          <option value="">All locations</option>
+        </select>
+      </div>
+      <div class="section-header" style="margin-top:0.2rem">ROSTER <span id="npc-count" style="color:var(--ink-faint);font-weight:normal">(0)</span></div>
+      <div id="npc-list"></div>
+
+      <div id="npc-detail" style="display:none;margin-top:0.8rem">
+        <div class="section-header" id="npc-detail-header">EDIT NPC</div>
+        <div class="field"><label>NAME</label><input type="text" id="npce-name" placeholder="Sera Mott"></div>
+        <div class="field-row">
+          <div class="field"><label>ROLE</label><input type="text" id="npce-role" placeholder="Fence & broker"></div>
+          <div class="field"><label>STATUS</label>
+            <select id="npce-status">
+              <option value="alive">Alive</option>
+              <option value="dead">Dead</option>
+              <option value="missing">Missing</option>
+              <option value="unknown">Unknown</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>CURRENT LOCATION</label>
+          <select id="npce-location"><option value="">— unknown / off-map —</option></select>
+        </div>
+        <div class="field"><label>CURRENT ACTIVITY</label><input type="text" id="npce-activity" placeholder="Working the Tallow & Wick most evenings"></div>
+        <div class="field"><label>PUBLIC DESCRIPTION (visible to players who know them)</label><textarea id="npce-description" rows="3"></textarea></div>
+        <div class="field"><label>PUBLIC NOTES (visible to players)</label><textarea id="npce-notes" rows="3" placeholder="Mannerisms, anything players might recall"></textarea></div>
+
+        <div class="field">
+          <label>KNOWN TO (which characters have encountered them)</label>
+          <div class="visibleto-chips" id="npce-knownto-chips"></div>
+          <div class="visibleto-hint">Click to toggle. Only the selected characters see this NPC on their roster.</div>
+        </div>
+
+        <div class="dm-note-area">
+          <div class="dm-note-label">🔒 DM ONLY — NOT SHOWN TO PLAYERS</div>
+          <textarea id="npce-dmNotes" rows="3" style="width:100%;background:transparent;border:none;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.9rem;outline:none;resize:vertical;line-height:1.5" placeholder="True motives, stat block, plot hooks…"></textarea>
+        </div>
+
+        <div style="display:flex;gap:5px;margin-top:0.8rem;margin-bottom:0.8rem">
+          <button class="btn btn-gold btn-sm" onclick="saveNPCEntity()">Save</button>
+          <button class="btn btn-ghost btn-sm" onclick="cancelNPCEdit()">Cancel</button>
+          <button class="btn btn-red btn-sm" style="margin-left:auto" onclick="deleteNPCEntity()">Delete</button>
+        </div>
+
+        <div class="whisper-composer">
+          <div class="whisper-composer-title">⇄ MOVE / LOG ACTIVITY (appends to history)</div>
+          <div class="field-row">
+            <div class="field"><label>NEW LOCATION (optional)</label>
+              <select id="npce-move-location"><option value="">— keep current —</option></select>
+            </div>
+            <div class="field"><label>DATE</label><input type="date" id="npce-move-date"></div>
+          </div>
+          <div class="field"><label>NEW ACTIVITY (optional)</label><input type="text" id="npce-move-activity" placeholder="Spotted in the docks at midnight"></div>
+          <div class="field"><label>NOTE</label><input type="text" id="npce-move-note" placeholder="Witnessed by Aldric"></div>
+          <div style="display:flex;gap:5px;align-items:center">
+            <button class="btn btn-purple btn-sm" onclick="logNPCMovement()">Log entry</button>
+            <label style="font-size:0.72rem;color:var(--ink-faint);display:flex;align-items:center;gap:4px"><input type="checkbox" id="npce-move-dmOnly" style="accent-color:var(--purple)"> DM-only entry</label>
+          </div>
+        </div>
+
+        <div class="section-header" style="margin-top:0.8rem">HISTORY</div>
+        <div id="npce-history-list"></div>
+      </div>
+    </div>
+
+    <!-- TIMELINE TAB -->
+    <div class="editor-pane" id="pane-timeline">
+      <div style="display:flex;gap:6px;margin-bottom:0.6rem;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-gold btn-sm" onclick="addTimelineEntry()">+ Add entry</button>
+        <input type="text" id="tl-search" placeholder="Search…" style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:4px 7px;font-family:'Crimson Text',serif;font-size:0.82rem" oninput="renderTimelineList()">
+        <select id="tl-filter-kind" onchange="renderTimelineList()" style="background:var(--bg);border:1px solid var(--border-light);border-radius:2px;color:var(--ink);padding:4px 7px;font-size:0.78rem">
+          <option value="">All kinds</option>
+          <option value="session">Sessions</option>
+          <option value="event">Events</option>
+          <option value="milestone">Milestones</option>
+          <option value="planned">Planned (DM)</option>
+        </select>
+      </div>
+      <div class="section-header" style="margin-top:0.2rem">CHRONICLE <span id="tl-count" style="color:var(--ink-faint);font-weight:normal">(0)</span></div>
+      <div id="tl-list"></div>
+
+      <div id="tl-detail" style="display:none;margin-top:0.8rem">
+        <div class="section-header" id="tl-detail-header">EDIT ENTRY</div>
+        <div class="field"><label>TITLE</label><input type="text" id="tle-title" placeholder="The duke's banquet"></div>
+        <div class="field-row">
+          <div class="field"><label>KIND</label>
+            <select id="tle-kind">
+              <option value="session">Session</option>
+              <option value="event">Event</option>
+              <option value="milestone">Milestone</option>
+              <option value="planned">Planned (DM-only)</option>
+            </select>
+          </div>
+          <div class="field"><label>IN-GAME DATE (free text)</label><input type="text" id="tle-dateInGame" placeholder="12 Mirtul, 1492 DR"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>SORT KEY (YYYY-MM-DD, optional)</label><input type="date" id="tle-dateSort"></div>
+          <div class="field"><label>REAL-WORLD DATE</label><input type="date" id="tle-dateReal"></div>
+        </div>
+        <div class="field"><label>BODY (player-facing)</label><textarea id="tle-body" rows="6" placeholder="What happened…"></textarea></div>
+
+        <!-- Attached combats (from initiative exports) -->
+        <div id="tle-combats-box" class="field" style="display:none">
+          <label>ATTACHED COMBATS</label>
+          <div id="tle-combats-list"></div>
+        </div>
+
+        <!-- Editable loot -->
+        <div class="field">
+          <label>LOOT (item · qty · who got it)</label>
+          <div id="tle-loot-rows"></div>
+          <button class="btn btn-ghost btn-sm" type="button" onclick="addTLLootRow()" style="margin-top:4px">+ Add loot</button>
+          <datalist id="tle-loot-recipients"></datalist>
+        </div>
+
+        <div class="field">
+          <label>LINKED LOCATIONS</label>
+          <div class="visibleto-chips" id="tle-loc-chips"></div>
+        </div>
+        <div class="field">
+          <label>LINKED CHARACTERS</label>
+          <div class="visibleto-chips" id="tle-char-chips"></div>
+        </div>
+        <div class="field">
+          <label>LINKED NPCs</label>
+          <div class="visibleto-chips" id="tle-npc-chips"></div>
+        </div>
+        <div class="field">
+          <label>VISIBLE TO (leave empty = all players who can read the chronicle)</label>
+          <div class="visibleto-chips" id="tle-visibleto-chips"></div>
+          <div class="visibleto-hint">Planned entries are DM-only regardless of this setting.</div>
+        </div>
+
+        <div class="dm-note-area">
+          <div class="dm-note-label">🔒 DM ONLY — NOT SHOWN TO PLAYERS</div>
+          <textarea id="tle-dmNotes" rows="3" style="width:100%;background:transparent;border:none;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.9rem;outline:none;resize:vertical;line-height:1.5" placeholder="Planning notes, intended outcomes, what's behind the scenes…"></textarea>
+        </div>
+
+        <div style="display:flex;gap:5px;margin-top:0.8rem">
+          <button class="btn btn-gold btn-sm" onclick="saveTimelineEntry()">Save</button>
+          <button class="btn btn-ghost btn-sm" onclick="cancelTimelineEdit()">Cancel</button>
+          <button class="btn btn-red btn-sm" style="margin-left:auto" onclick="deleteTimelineEntry()">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- WORLD TAB -->
+    <div class="editor-pane" id="pane-world">
+      <div class="field"><label>WORLD NAME</label><input type="text" id="world-name" placeholder="The Realm…"></div>
+      <div class="field"><label>REGION MAP IMAGE URL</label><input type="text" id="world-mapImage" placeholder="https://… or leave blank"></div>
+      <div class="field-row">
+        <div class="field"><label>MAP WIDTH (px)</label><input type="number" id="world-mapWidth" value="1200"></div>
+        <div class="field"><label>MAP HEIGHT (px)</label><input type="number" id="world-mapHeight" value="800"></div>
+      </div>
+      <button class="btn btn-gold" onclick="saveWorldSettings()">Save world settings</button>
+    </div>
+
+    <div class="publish-section">
+      <button class="btn btn-green" style="width:100%;margin-bottom:5px" onclick="publishData()">▲ Publish to players</button>
+      <button class="btn btn-ghost" style="width:100%;font-size:0.62rem" onclick="saveToKV().then(()=>{setSyncStatus('ok','✦ DM data saved to cloud');setTimeout(()=>setSyncStatus('',''),3000)})">☁ Save DM data to cloud</button>
+      <div style="margin-top:4px;text-align:center" id="publish-status" class="sync-status">Unpublished changes</div>
+    </div>
+  </div>
+</main>
+
+<!-- IMPORT MODAL -->
+<div class="modal-backdrop hidden" id="import-modal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <h2>⬇ Import from Obsidian</h2>
+      <button class="modal-close" onclick="closeImport()" aria-label="Close import dialog">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- STEP 1: Drop files -->
+      <div id="import-step-1">
+        <div class="import-drop-zone" id="import-drop-zone"
+             onclick="document.getElementById('import-file-input').click()"
+             ondragover="event.preventDefault();this.classList.add('drag-over')"
+             ondragleave="this.classList.remove('drag-over')"
+             ondrop="handleImportDrop(event)">
+          <div class="import-drop-zone-icon">📂</div>
+          <div class="import-drop-label">Drop .md files here or click to browse</div>
+          <div class="import-drop-sub">Drop location files and NPC files together — they'll be linked automatically</div>
+        </div>
+        <input type="file" id="import-file-input" accept=".md" multiple style="display:none" onchange="handleImportFiles(this.files)">
+        <div class="import-file-list" id="import-file-list"></div>
+        <p class="import-summary" id="import-file-summary" style="display:none"></p>
+      </div>
+
+      <!-- STEP 2: Preview & conflicts -->
+      <div id="import-step-2" style="display:none">
+        <p class="import-summary" id="import-preview-summary"></p>
+        <div class="import-preview" id="import-preview-list"></div>
+      </div>
+
+    </div>
+    <div class="modal-footer" id="import-footer">
+      <button class="btn btn-ghost" onclick="closeImport()">Cancel</button>
+      <button class="btn btn-purple" id="import-next-btn" onclick="importStep2()" style="display:none">Preview import →</button>
+      <button class="btn btn-gold" id="import-confirm-btn" onclick="confirmImport()" style="display:none">Import into map</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOCATION EDITOR MODAL -->
+<div class="modal-backdrop hidden" id="loc-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="loc-modal-title">Edit Location</h2>
+      <button class="modal-close" onclick="closeLocModal()" aria-label="Close location dialog">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="editor-tabs" style="margin:-0.8rem -1rem 0.8rem;border-radius:0">
+        <button class="editor-tab active" id="ltab-info"   onclick="switchLocTab('info')">INFO</button>
+        <button class="editor-tab" id="ltab-lore"   onclick="switchLocTab('lore')">LORE</button>
+        <button class="editor-tab" id="ltab-npcs"   onclick="switchLocTab('npcs')">NPCs</button>
+        <button class="editor-tab" id="ltab-quests" onclick="switchLocTab('quests')">QUESTS</button>
+        <button class="editor-tab" id="ltab-submap" onclick="switchLocTab('submap')">SUB-MAP</button>
+        <button class="editor-tab" id="ltab-dm"     onclick="switchLocTab('dm')">DM NOTES</button>
+      </div>
+
+      <!-- INFO -->
+      <div class="editor-pane active" id="lpane-info">
+        <div class="field"><label>LOCATION NAME</label><input type="text" id="loc-name" placeholder="Ironhaven…"></div>
+        <div class="field-row">
+          <div class="field"><label>TYPE</label>
+            <select id="loc-type">
+              <option value="city">City</option>
+              <option value="dungeon">Dungeon</option>
+              <option value="wilderness">Wilderness</option>
+              <option value="ruin">Ruin</option>
+              <option value="port">Port</option>
+              <option value="fort">Fort</option>
+              <option value="default">Other</option>
+            </select>
+          </div>
+          <div class="field"><label>ID (URL slug)</label><input type="text" id="loc-id" placeholder="ironhaven"></div>
+        </div>
+        <div class="field"><label>SHORT DESCRIPTION (shown on hover)</label><textarea id="loc-shortDesc" rows="2"></textarea></div>
+        <details class="loc-advanced">
+          <summary>Advanced — pin position</summary>
+          <div class="field-row" style="margin-top:0.5rem">
+            <div class="field"><label>X POS (%)</label><input type="number" id="loc-x" min="0" max="100" step="0.5"></div>
+            <div class="field"><label>Y POS (%)</label><input type="number" id="loc-y" min="0" max="100" step="0.5"></div>
+          </div>
+          <div style="font-size:0.72rem;color:var(--ink-faint);font-style:italic;margin-top:-0.2rem">Tip: enable ✥ Move mode and drag the pin instead.</div>
+        </details>
+        <div class="field"><label>SUB-MAP IMAGE URL (optional)</label><input type="text" id="loc-mapImage" placeholder="https://… or leave blank"></div>
+        <div class="field"><label>CONNECTED LOCATIONS</label>
+          <div class="visibleto-chips" id="loc-connected-chips"></div>
+        </div>
+        <div class="toggle-row">
+          <input type="checkbox" id="loc-visible" checked>
+          <label for="loc-visible">Visible to players</label>
+        </div>
+        <div class="field">
+          <label>VISIBLE TO (leave empty = everyone)</label>
+          <div class="visibleto-chips" id="loc-visibleto-chips"></div>
+          <div class="visibleto-hint">Click to toggle. If no chips are selected, every logged-in player sees this location.</div>
+        </div>
+      </div>
+
+      <!-- LORE -->
+      <div class="editor-pane" id="lpane-lore">
+        <div class="field"><label>PLAYER-FACING LORE</label><textarea id="loc-lore" rows="12" placeholder="What the players know or can learn about this place…"></textarea></div>
+      </div>
+
+      <!-- NPCs (first-class — managed in the NPCs tab) -->
+      <div class="editor-pane" id="lpane-npcs">
+        <div style="font-size:0.8rem;color:var(--ink-dim);line-height:1.5;margin-bottom:0.6rem">
+          NPCs are tracked separately now — see the <strong style="color:var(--gold-light)">NPCs</strong> tab. This list shows everyone currently here.
+        </div>
+        <div style="display:flex;gap:5px;margin-bottom:0.6rem">
+          <button class="btn btn-gold btn-sm" type="button" onclick="quickAddNPCAtLocation()">+ New NPC here</button>
+          <button class="btn btn-ghost btn-sm" type="button" onclick="switchTab('npcs')">Open NPCs tab ↗</button>
+        </div>
+        <div id="loc-npcs-here"></div>
+      </div>
+
+      <!-- QUESTS -->
+      <div class="editor-pane" id="lpane-quests">
+        <button class="btn btn-gold btn-sm" style="margin-bottom:0.6rem" onclick="addQuest()">+ Add quest hook</button>
+        <div id="quest-editor-list"></div>
+      </div>
+
+      <!-- SUB-MAP -->
+      <div class="editor-pane" id="lpane-submap">
+        <div style="font-size:0.82rem;color:var(--ink-dim);line-height:1.5;margin-bottom:0.6rem">
+          Attach a detail map to this location (a city plan, a dungeon level, a tavern floor). After saving the image + dimensions, click <strong style="color:var(--gold-light)">Open editor</strong> to place pins, draw zones, and write secrets that follow the same visibility rules as the world map.
+        </div>
+        <div class="field"><label>SUB-MAP IMAGE URL</label><input type="text" id="loc-subMap-image" placeholder="./maps/ironhaven-streets.png"></div>
+        <div class="field-row">
+          <div class="field"><label>WIDTH (px)</label><input type="number" id="loc-subMap-width" value="1200" min="200"></div>
+          <div class="field"><label>HEIGHT (px)</label><input type="number" id="loc-subMap-height" value="800" min="200"></div>
+        </div>
+        <div style="display:flex;gap:5px;align-items:center;margin-top:0.6rem">
+          <button class="btn btn-gold btn-sm" type="button" onclick="openSubMapEditor()">Open editor ↗</button>
+          <button class="btn btn-ghost btn-sm" type="button" onclick="resetSubMap()" id="reset-submap-btn" style="display:none">Reset sub-map</button>
+          <span id="submap-stat" style="margin-left:auto;font-size:0.7rem;color:var(--ink-faint)"></span>
+        </div>
+      </div>
+
+      <!-- DM NOTES -->
+      <div class="editor-pane" id="lpane-dm">
+        <div class="dm-note-area">
+          <div class="dm-note-label">🔒 DM ONLY — NOT PUBLISHED TO PLAYERS</div>
+          <textarea id="loc-dmNotes" rows="12" style="width:100%;background:transparent;border:none;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.9rem;outline:none;resize:vertical;line-height:1.5" placeholder="Secret notes, monster stats, plot hooks, treasure…"></textarea>
+        </div>
+        <div id="loc-encounters-panel" style="margin-top:1rem;padding:8px;border:1px solid var(--c-border-light);border-radius:3px">
+          <div style="font-family:Cinzel,serif;font-size:0.66rem;letter-spacing:0.1em;color:var(--c-brass);margin-bottom:6px;text-transform:uppercase">Encounters here</div>
+          <div id="loc-encounters-list">—</div>
+          <button onclick="newEncounterAtCurrentLocation()" style="margin-top:6px">+ New encounter here</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-red btn-sm" onclick="deleteLocation()">Delete</button>
+      <button class="btn btn-ghost" onclick="closeLocModal()">Cancel</button>
+      <button class="btn btn-gold" onclick="saveLocation()">Save location</button>
+    </div>
+  </div>
+</div>
+
+<!-- DM TOKEN MODAL -->
+<div class="dm-token-overlay" id="dm-token-overlay">
+  <div class="dm-token-modal">
+    <div class="dm-token-title">DM Token Required</div>
+    <div class="dm-token-desc" id="dm-token-desc">
+      The Worker is configured with a <code>DM_TOKEN</code> secret. Paste it here so the DM tools can save data. It'll be remembered in this browser only (localStorage).
+    </div>
+    <input class="dm-token-input" id="dm-token-input" type="password" placeholder="Paste DM token…" autocomplete="off" onkeydown="if(event.key==='Enter')submitDMToken()">
+    <div id="dm-token-error" style="color:var(--red);font-size:0.85rem;min-height:1.1em;margin-bottom:0.5rem"></div>
+    <div class="dm-token-actions">
+      <button class="btn btn-ghost btn-sm" onclick="closeDMTokenModal()">Cancel</button>
+      <button class="btn btn-gold btn-sm" onclick="submitDMToken()">Save token</button>
+    </div>
+  </div>
+</div>
+
+<script src="auth.js"></script>
+<script src="encounter-schema.js"></script>
+<script>//<![CDATA[
+// ══════════════════════════════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════════════════════════════
+const WORKER_URL = (window.Auth && window.Auth.WORKER_URL) || 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+
+// Page is DM-only — bounce non-DMs to the homepage before doing anything else.
+if (!window.Auth || !Auth.requireRole('dm', { reason: 'The world map editor is for the DM only.' })) {
+  throw new Error('Unauthorized — redirecting to home.');
+}
+
+const TYPE_ICONS  = { city:'🏙',dungeon:'⚔',wilderness:'🌲',ruin:'🏚',port:'⚓',fort:'🏰',default:'📍' };
+const TYPE_LABELS = { city:'City',dungeon:'Dungeon',wilderness:'Wilderness',ruin:'Ruin',port:'Port',fort:'Fort',default:'Location' };
+const TYPE_COLORS = { city:'#3a6fd0',dungeon:'#c43838',wilderness:'#4ca050',ruin:'#a89478',port:'#16b5a0',fort:'#b060d0',default:'#e0a830' };
+const ZONE_COLORS = ['#6a5a40','#2d6a3f','#2e4a7a','#8a3030','#5a3e9b','#4a6060'];
+
+// ══════════════════════════════════════════════════════════════
+//  DATA
+//  worldData = canonical root persisted to KV.
+//  data      = currently-edited scope. When at the world level,
+//              `data === worldData`. When the DM drills into a
+//              location's sub-map, `data` points at that location's
+//              `subMap` object embedded inside worldData. Mutations
+//              to `data.locations` / `data.zones` therefore land in
+//              the right place without any copying.
+// ══════════════════════════════════════════════════════════════
+let worldData = {
+  world:{ name:'Velemere', mapImage:'./maps/Velmere.jpeg', mapWidth:1456, mapHeight:816 },
+  locations:[], zones:[]
+};
+let data = worldData;
+let subMapStack = [];   // [{parentLocationId, prevData}] — supports nested entry/exit
+function inSubMap() { return subMapStack.length > 0; }
+function currentParentLocation() {
+  return subMapStack.length ? worldData.locations.find(l => l.id === subMapStack[subMapStack.length-1].parentLocationId) : null;
+}
+
+let selectedLocId  = null;
+let selectedZoneId = null;
+let placeMode      = false;
+let moveMode       = false;
+let polyDrawMode   = false;
+let polyPoints     = [];      // [{x,y}] percentage points being drawn
+let editingLocId   = null;
+let tempNPCs       = [];
+let tempQuests     = [];
+let tempVisibleTo  = [];      // ids of characters who can see the location currently being edited
+let tempConnected  = [];      // ids of locations connected to the location currently being edited
+let characters     = [];      // [{id,name,player,code,dmNotes}]
+let journals       = [];      // [{id,characterId,title,body,date,unread}]
+let npcs           = [];      // [{id,name,role,description,currentLocationId,currentActivity,status,notes,dmNotes,knownTo,history,tags}]
+let timeline       = [];      // [{id,title,body,kind,dateInGame,dateSort,dateReal,locationIds,characterIds,npcIds,visibleTo,dmNotes}]
+let editingCharId  = null;
+let editingNPCId   = null;
+let editingTLId    = null;
+let tempTLLocs     = [];
+let tempTLChars    = [];
+let tempTLNpcs     = [];
+let tempTLVisibleTo= [];
+let tempTLLoot     = [];      // working copy of loot rows being edited
+let tempTLCombats  = [];      // working copy of attached combats (editable: removal)
+let tempNPCKnownTo = [];      // ids of characters who know the NPC being edited
+let pendingDMSave  = null;    // queued save retry after token is provided
+
+// ── DM auth (delegated to shared auth.js) ────────────────────
+function dmHeaders() { return Auth.dmHeaders(); }
+
+// Wrapped POST for DM-protected writes. On 401, the stored DM creds are invalid
+// (DM was deleted, password changed, etc.) — log out and bounce to home.
+async function dmPost(payload /* , retryFn (unused with shared auth) */) {
+  const res = await fetch(WORKER_URL, { method:'POST', headers: dmHeaders(), body: JSON.stringify(payload) });
+  if (res.status === 401) {
+    Auth.logout();
+    window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.'));
+    return { ok:false, needsToken:true };
+  }
+  if (!res.ok) return { ok:false };
+  let body = {};
+  try { body = await res.json(); } catch {}
+  return { ok:true, body };
+}
+
+// Legacy modal kept in the DOM but no longer triggered — these are
+// safe no-ops to avoid breaking any stray references.
+function openDMTokenModal() { /* deprecated — handled by shared auth */ }
+function closeDMTokenModal() { document.getElementById('dm-token-overlay')?.classList.remove('visible'); }
+function submitDMToken() { closeDMTokenModal(); }
+
+// ── Map pan/zoom ──────────────────────────────────────────────
+let mapScale=1, mapX=0, mapY=0;
+let isMapDragging=false, dragStartX, dragStartY, dragOriginX, dragOriginY;
+
+// ── Move drag state ───────────────────────────────────────────
+let moveDragTarget=null;   // { type:'pin'|'rectzone'|'polyzone', id, origX, origY, origPoints, mouseStartX, mouseStartY }
+
+// ══════════════════════════════════════════════════════════════
+//  PERSISTENCE — localStorage (fast cache) + KV (persistent backup)
+// ══════════════════════════════════════════════════════════════
+function saveLocal() {
+  localStorage.setItem('dm_map_data', JSON.stringify(worldData));
+}
+
+function loadLocal() {
+  try {
+    const d = JSON.parse(localStorage.getItem('dm_map_data') || 'null');
+    if (d && d.locations) { worldData = d; if (!inSubMap()) data = worldData; }
+  } catch {}
+}
+
+// Save full DM data (including notes) to KV via the Worker
+async function saveToKV() {
+  try {
+    await dmPost({ type: 'map_data_dm', payload: worldData }, saveToKV);
+  } catch {
+    // Silently fail — localStorage is the fallback
+  }
+}
+
+// Load full DM data from KV on startup
+async function loadFromKV() {
+  try {
+    const res = await fetch(WORKER_URL + '?type=map_data_dm', { cache: 'no-store', headers: Auth.dmHeaders() });
+    if (res.status === 401) {
+      Auth.logout();
+      window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.'));
+      return false;
+    }
+    if (!res.ok) return false;
+    const d = await res.json();
+    if (d && d.locations && d.locations.length > 0) {
+      worldData = d;
+      if (!inSubMap()) data = worldData;
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
+// Characters: save + load
+async function saveCharactersKV() {
+  await dmPost({ type: 'characters', payload: characters }, saveCharactersKV);
+  saveCharactersLocal();
+}
+function saveCharactersLocal() {
+  localStorage.setItem('dm_characters', JSON.stringify(characters));
+}
+async function loadCharactersKV() {
+  try {
+    const res = await fetch(WORKER_URL + '?type=characters', {
+      cache: 'no-store',
+      headers: Auth.dmHeaders()
+    });
+    if (res.status === 401) {
+      Auth.logout();
+      window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.'));
+      return false;
+    }
+    if (!res.ok) return false;
+    const arr = await res.json();
+    if (Array.isArray(arr)) { characters = arr; saveCharactersLocal(); return true; }
+  } catch {}
+  return false;
+}
+function loadCharactersLocal() {
+  try {
+    const arr = JSON.parse(localStorage.getItem('dm_characters') || 'null');
+    if (Array.isArray(arr)) characters = arr;
+  } catch {}
+}
+
+// Journals: save + load
+async function saveJournalsKV() {
+  await dmPost({ type: 'journals', payload: journals }, saveJournalsKV);
+  saveJournalsLocal();
+}
+function saveJournalsLocal() {
+  localStorage.setItem('dm_journals', JSON.stringify(journals));
+}
+async function loadJournalsKV() {
+  try {
+    const res = await fetch(WORKER_URL + '?type=journals', {
+      cache: 'no-store',
+      headers: Auth.dmHeaders()
+    });
+    if (res.status === 401) return false; // already handled by loadCharactersKV path
+    if (!res.ok) return false;
+    const arr = await res.json();
+    if (Array.isArray(arr)) { journals = arr; saveJournalsLocal(); return true; }
+  } catch {}
+  return false;
+}
+function loadJournalsLocal() {
+  try {
+    const arr = JSON.parse(localStorage.getItem('dm_journals') || 'null');
+    if (Array.isArray(arr)) journals = arr;
+  } catch {}
+}
+
+async function reloadCharacters() {
+  await loadCharactersKV();
+  await loadJournalsKV();
+  renderCharacterList();
+  if (editingCharId) renderWhisperHistory(editingCharId);
+}
+
+// ── Timeline: load + save ────────────────────────────────────
+async function saveTimelineKV() {
+  await dmPost({ type: 'timeline', payload: timeline }, saveTimelineKV);
+  saveTimelineLocal();
+}
+function saveTimelineLocal() { localStorage.setItem('dm_timeline', JSON.stringify(timeline)); }
+async function loadTimelineKV() {
+  try {
+    const res = await fetch(WORKER_URL + '?type=timeline_dm', { cache: 'no-store', headers: Auth.dmHeaders() });
+    if (res.status === 401) return false;
+    if (!res.ok) return false;
+    const arr = await res.json();
+    if (Array.isArray(arr)) { timeline = arr; saveTimelineLocal(); return true; }
+  } catch {}
+  return false;
+}
+function loadTimelineLocal() {
+  try {
+    const arr = JSON.parse(localStorage.getItem('dm_timeline') || 'null');
+    if (Array.isArray(arr)) timeline = arr;
+  } catch {}
+}
+
+// ── NPCs: load + save ────────────────────────────────────────
+async function saveNPCsKV() {
+  await dmPost({ type: 'npcs', payload: npcs }, saveNPCsKV);
+  saveNPCsLocal();
+}
+function saveNPCsLocal() { localStorage.setItem('dm_npcs', JSON.stringify(npcs)); }
+async function loadNPCsKV() {
+  try {
+    const res = await fetch(WORKER_URL + '?type=npcs', { cache: 'no-store', headers: Auth.dmHeaders() });
+    if (res.status === 401) {
+      Auth.logout();
+      window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.'));
+      return false;
+    }
+    if (!res.ok) return false;
+    const arr = await res.json();
+    if (Array.isArray(arr)) { npcs = arr; saveNPCsLocal(); return true; }
+  } catch {}
+  return false;
+}
+function loadNPCsLocal() {
+  try {
+    const arr = JSON.parse(localStorage.getItem('dm_npcs') || 'null');
+    if (Array.isArray(arr)) npcs = arr;
+  } catch {}
+}
+
+// One-time migration: promote nested Location.npcs into first-class records.
+// Idempotent: only runs if global npcs[] is empty AND any location has nested
+// npcs[]. Sets currentLocationId on the new NPC, leaves knownTo empty (DM grants).
+async function migrateNestedNPCs() {
+  if (npcs.length > 0) return false;
+  const locsWithNested = (worldData.locations || []).filter(l => Array.isArray(l.npcs) && l.npcs.length > 0);
+  if (locsWithNested.length === 0) return false;
+
+  const used = new Set();
+  function uniqueId(base) {
+    let id = base, n = 1;
+    while (used.has(id)) id = `${base}-${++n}`;
+    used.add(id);
+    return id;
+  }
+
+  const newNpcs = [];
+  locsWithNested.forEach(loc => {
+    loc.npcs.forEach(n => {
+      const baseId = slugify(n.name || 'npc');
+      const id = uniqueId(baseId);
+      newNpcs.push({
+        id,
+        name: n.name || '(Unnamed)',
+        role: n.role || '',
+        description: n.desc || n.description || '',
+        currentLocationId: loc.id,
+        currentActivity: '',
+        status: 'alive',
+        notes: '',
+        dmNotes: '',
+        knownTo: [],
+        history: [{
+          id: 'h' + Date.now() + Math.floor(Math.random()*1000),
+          locationId: loc.id,
+          activity: 'First recorded here',
+          date: new Date().toISOString().slice(0,10),
+          note: 'Auto-migrated from nested location data.',
+          dmOnly: true
+        }],
+        tags: []
+      });
+    });
+    loc.npcs = []; // clear nested array
+  });
+  npcs = newNpcs;
+  console.info(`[NPC migration] Promoted ${newNpcs.length} nested NPCs from ${locsWithNested.length} locations to first-class.`);
+  await saveNPCsKV();
+  saveAll();
+  return true;
+}
+
+// Called after every edit — saves locally immediately, queues KV save
+let kvSaveTimer = null;
+function saveAll() {
+  saveLocal();
+  clearTimeout(kvSaveTimer);
+  kvSaveTimer = setTimeout(saveToKV, 1500); // debounce KV writes
+  setPublishStatus('', 'Unsaved changes');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  PUBLISH
+// ══════════════════════════════════════════════════════════════
+async function publishData() {
+  setSyncStatus('ing','⟳ Publishing…');
+  // Always publish the world root, regardless of whether we're currently
+  // editing a sub-map. Strip dmNotes from every location AND from every
+  // sub-map pin so private notes never reach the player payload.
+  const sanitizeLoc = loc => {
+    const { dmNotes, subMap, ...rest } = loc;
+    let cleanSubMap = subMap;
+    if (subMap && typeof subMap === 'object') {
+      const pins  = Array.isArray(subMap.locations) ? subMap.locations.map(p => { const { dmNotes, ...r } = p; return r; }) : [];
+      const zones = Array.isArray(subMap.zones)     ? subMap.zones                                                          : [];
+      cleanSubMap = { ...subMap, locations: pins, zones };
+    }
+    return { ...rest, subMap: cleanSubMap };
+  };
+  const playerData = {
+    world: worldData.world,
+    zones: worldData.zones,
+    locations: (worldData.locations || []).map(sanitizeLoc)
+  };
+  try {
+    const res = await dmPost({ type:'map_data', payload: playerData }, publishData);
+    if (res.ok) { setSyncStatus('ok','✦ Published'); setPublishStatus('ok','✦ Published to players'); }
+    else if (!res.needsToken) { setSyncStatus('fail','⚠ Failed'); setPublishStatus('fail','⚠ Publish failed'); }
+  } catch { setSyncStatus('fail','⚠ Offline'); setPublishStatus('fail','⚠ Could not reach server'); }
+}
+function setSyncStatus(type, msg) { const el=document.getElementById('sync-status'); el.className=`sync-status ${type}`; el.textContent=msg; }
+function setPublishStatus(type, msg) { const el=document.getElementById('publish-status'); el.className=`sync-status ${type}`; el.textContent=msg; }
+
+// ══════════════════════════════════════════════════════════════
+//  TABS
+// ══════════════════════════════════════════════════════════════
+function switchTab(name) {
+  ['locations','zones','characters','npcs','timeline','world'].forEach(t => {
+    document.getElementById(`tab-${t}`).classList.toggle('active', t===name);
+    document.getElementById(`pane-${t}`).classList.toggle('active', t===name);
+  });
+  // Leaving zones tab cancels polygon draw
+  if (name !== 'zones' && polyDrawMode) cancelPolyDraw();
+  placeMode = (name === 'locations') && !moveMode;
+  if (name === 'characters') renderCharacterList();
+  if (name === 'npcs')       { populateNPCLocationFilters(); renderNPCList(); }
+  if (name === 'timeline')   renderTimelineList();
+  updateModeUI();
+}
+function switchLocTab(name) {
+  ['info','lore','npcs','quests','submap','dm'].forEach(t => {
+    document.getElementById(`ltab-${t}`).classList.toggle('active', t===name);
+    document.getElementById(`lpane-${t}`).classList.toggle('active', t===name);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SUB-MAP MODE
+//  Swap `data` to point at a location's subMap embedded in worldData.
+//  All editor functions (place mode, move mode, zones, polygon draw)
+//  then operate against the sub-map's pins/zones by reference. Saving
+//  still writes worldData.
+// ══════════════════════════════════════════════════════════════
+function enterSubMap(locationId) {
+  // First make sure the location form's pending changes are flushed.
+  if (editingLocId) { try { saveLocation(); } catch {} }
+  closeLocModal();
+
+  const loc = worldData.locations.find(l => l.id === locationId);
+  if (!loc) { toast('Location not found.'); return; }
+  if (!loc.subMap) {
+    toast('Set a sub-map image first.');
+    return;
+  }
+  // Ensure shape — locations[] and zones[] are the arrays the editor mutates.
+  if (!Array.isArray(loc.subMap.locations)) loc.subMap.locations = [];
+  if (!Array.isArray(loc.subMap.zones))     loc.subMap.zones     = [];
+
+  subMapStack.push({ parentLocationId: locationId, prevData: data });
+  data = loc.subMap;
+  selectedLocId = null; selectedZoneId = null;
+  if (polyDrawMode) cancelPolyDraw();
+  if (moveMode)     toggleMoveMode();
+  refreshSubMapUI();
+  switchTab('locations');
+  buildMap();
+  renderLocList();
+  renderZoneList();
+  loadWorldFields();
+  saveAll();
+}
+
+function exitToWorld() {
+  if (!inSubMap()) return;
+  const ctx = subMapStack.pop();
+  data = ctx.prevData;
+  selectedLocId = null; selectedZoneId = null;
+  if (polyDrawMode) cancelPolyDraw();
+  if (moveMode)     toggleMoveMode();
+  refreshSubMapUI();
+  switchTab('locations');
+  buildMap();
+  renderLocList();
+  renderZoneList();
+  loadWorldFields();
+  saveAll();
+}
+
+function refreshSubMapUI() {
+  const breadcrumb = document.getElementById('dm-breadcrumb');
+  const title = document.getElementById('topbar-title');
+  const hint = document.getElementById('map-hint');
+  document.body.classList.toggle('in-submap', inSubMap());
+  if (inSubMap()) {
+    const parent = currentParentLocation();
+    breadcrumb.style.display = '';
+    document.getElementById('dm-breadcrumb-loc').textContent = parent?.name || 'Sub-map';
+    title.innerHTML = `⚔ Sub-map — <span style="color:var(--gold-light)">${escapeHtml(parent?.name||'')}</span>`;
+    if (hint) hint.textContent = 'Click to place a pin on this sub-map · Esc returns to World';
+  } else {
+    breadcrumb.style.display = 'none';
+    title.innerHTML = '⚔ World Map — DM Editor';
+    if (hint) hint.textContent = 'Click map to place a new location pin';
+  }
+}
+
+function openSubMapEditor() {
+  // Persist whatever's currently in the form, then enter sub-map mode for this location.
+  const id = editingLocId;
+  if (!id) {
+    toast('Save the location first, then open its sub-map.');
+    return;
+  }
+  const subImage = document.getElementById('loc-subMap-image').value.trim();
+  if (!subImage) {
+    toast('Set a sub-map image URL first.');
+    return;
+  }
+  saveLocation();
+  enterSubMap(id);
+}
+
+async function resetSubMap() {
+  if (!editingLocId) return;
+  if (!(await confirmDialog('Delete this location\'s entire sub-map (image + pins + zones)? Cannot be undone.'))) return;
+  const loc = worldData.locations.find(l => l.id === editingLocId);
+  if (!loc) return;
+  loc.subMap = null;
+  document.getElementById('loc-subMap-image').value = '';
+  document.getElementById('submap-stat').textContent = 'No sub-map yet';
+  document.getElementById('reset-submap-btn').style.display = 'none';
+  saveAll();
+}
+
+// Esc handler — closes any open layer in priority order.
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  // Modals first
+  const locModalOpen    = !document.getElementById('loc-modal').classList.contains('hidden');
+  const importModalOpen = !document.getElementById('import-modal')?.classList.contains('hidden');
+  if (locModalOpen || importModalOpen) return;
+  // Pop-out editor next
+  if (document.body.classList.contains('editor-expanded')) {
+    toggleEditorExpand();
+    return;
+  }
+  // Active map modes next
+  if (moveMode || placeMode || polyDrawMode) {
+    exitAnyMode();
+    return;
+  }
+  // Sub-map drill-down last
+  if (inSubMap()) exitToWorld();
+});
+
+// ── Pop-out editor toggle ──
+function toggleEditorExpand() {
+  const body = document.body;
+  const btn  = document.getElementById('expand-editor-btn');
+  const on   = body.classList.toggle('editor-expanded');
+  if (btn) {
+    btn.textContent = on ? '✕ Collapse editor' : '⛶ Expand editor';
+    btn.setAttribute('aria-label', on ? 'Collapse editor' : 'Expand editor for more room');
+  }
+}
+
+// Auto-expand the editor when a record's detail form opens, so the form
+// shows in a side panel instead of below a long list. The CSS does the
+// heavy lifting — JS just toggles the body class.
+function ensureEditorExpanded() {
+  if (!document.body.classList.contains('editor-expanded')) {
+    toggleEditorExpand();
+  }
+}
+
+// Inject a "✕ Close" button into a detail panel the first time it opens
+// in pop-out mode. The button hides the panel so the list takes full width.
+function ensureDetailCloseBtn(detailEl, cancelFn) {
+  if (!detailEl || detailEl.querySelector('.detail-close-btn')) return;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'detail-close-btn';
+  btn.innerHTML = '✕ Close';
+  btn.title = 'Close edit panel';
+  btn.setAttribute('aria-label', 'Close edit panel');
+  btn.addEventListener('click', cancelFn);
+  detailEl.insertBefore(btn, detailEl.firstChild);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MAP BUILD & RENDER
+// ══════════════════════════════════════════════════════════════
+function buildMap() {
+  const canvas = document.getElementById('map-canvas');
+  // Preserve transform — only rebuild children
+  const savedTransform = canvas.style.transform;
+  canvas.innerHTML = '';
+  const W = data.world.mapWidth  || 1200;
+  const H = data.world.mapHeight || 800;
+
+  // Background
+  if (data.world.mapImage) {
+    const img = document.createElement('img');
+    img.className='map-img'; img.src=data.world.mapImage; img.width=W; img.height=H;
+    canvas.appendChild(img);
+  } else {
+    const ph = document.createElement('div');
+    ph.className='map-placeholder'; ph.style.cssText=`width:${W}px;height:${H}px`;
+    ph.innerHTML=`<span>📍 Click anywhere to place a location</span><small style="color:var(--ink-faint);font-size:0.75rem">Set a map image in the World tab</small>`;
+    canvas.appendChild(ph);
+  }
+
+  // ── SVG overlay for polygons ──────────────────────────────
+  const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('width', W); svg.setAttribute('height', H);
+  svg.classList.add('map-svg-overlay');
+  svg.style.cssText = `position:absolute;top:0;left:0;width:${W}px;height:${H}px`;
+
+  (data.zones||[]).filter(z => z.shape === 'polygon').forEach(zone => {
+    if (!zone.points || zone.points.length < 3) return;
+    const pts = zone.points.map(p => `${p.x/100*W},${p.y/100*H}`).join(' ');
+    const cx  = zone.points.reduce((s,p)=>s+p.x,0)/zone.points.length/100*W;
+    const cy  = zone.points.reduce((s,p)=>s+p.y,0)/zone.points.length/100*H;
+
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.classList.add('poly-zone');
+    if (zone.id === selectedZoneId) g.classList.add('selected-poly');
+
+    const poly = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+    poly.setAttribute('points', pts);
+    poly.classList.add('poly-fill');
+    poly.setAttribute('fill', zone.color);
+    poly.setAttribute('fill-opacity', zone.opacity);
+    poly.setAttribute('stroke', zone.id===selectedZoneId ? 'var(--gold)' : zone.color);
+    poly.setAttribute('stroke-width', zone.id===selectedZoneId ? '2.5' : '1.5');
+    poly.setAttribute('stroke-opacity','0.7');
+
+    const label = document.createElementNS('http://www.w3.org/2000/svg','text');
+    label.setAttribute('x', cx); label.setAttribute('y', cy);
+    label.setAttribute('text-anchor','middle'); label.setAttribute('dominant-baseline','middle');
+    label.classList.add('poly-label-text');
+    label.setAttribute('fill', zone.color);
+    label.textContent = zone.name;
+
+    g.appendChild(poly); g.appendChild(label);
+    g.addEventListener('click', e => { e.stopPropagation(); if (!moveDragTarget) selectZone(zone.id); });
+    if (moveMode) attachPolyMoveDrag(g, zone);
+    svg.appendChild(g);
+  });
+
+  canvas.appendChild(svg);
+
+  // ── Rectangle zones ───────────────────────────────────────
+  (data.zones||[]).filter(z => z.shape !== 'polygon').forEach(zone => {
+    const el = document.createElement('div');
+    el.className = `zone${zone.id===selectedZoneId?' selected-zone':''}`;
+    el.style.cssText=`left:${zone.x}%;top:${zone.y}%;width:${zone.width}%;height:${zone.height}%;background:${zone.color};opacity:${zone.opacity};border-color:${zone.color};position:absolute`;
+    const label = document.createElement('div');
+    label.className='zone-label'; label.style.color=zone.color; label.style.opacity=1/zone.opacity*0.7;
+    label.textContent=zone.name;
+    el.appendChild(label);
+    el.addEventListener('click', e => { e.stopPropagation(); if (!moveDragTarget) selectZone(zone.id); });
+    if (moveMode) attachRectZoneMoveDrag(el, zone);
+    canvas.appendChild(el);
+  });
+
+  // ── Pins ─────────────────────────────────────────────────
+  (data.locations||[]).forEach(loc => {
+    const type = loc.type||'default';
+    const pin = document.createElement('div');
+    pin.className = `pin type-${type}${loc.visible===false?' hidden-pin':''}${loc.id===selectedLocId?' selected-pin':''}`;
+    pin.style.cssText=`left:${loc.x}%;top:${loc.y}%`;
+    pin.innerHTML=`
+      <div class="pin-icon">
+        <div class="pin-marker"></div>
+        <div class="pin-tail"></div>
+      </div>
+      <div class="pin-label">${loc.name}${loc.visible===false?' 🙈':''}</div>
+    `;
+    if (moveMode) {
+      attachPinMoveDrag(pin, loc);
+    } else {
+      pin.addEventListener('click', e => { e.stopPropagation(); selectLocation(loc.id); });
+    }
+    pin.addEventListener('mouseenter', () => showPinInfo(loc));
+    pin.addEventListener('mouseleave', hidePinInfo);
+    canvas.appendChild(pin);
+  });
+
+  // ── Polygon draw preview dots ─────────────────────────────
+  if (polyDrawMode) renderPolyPreviewDots();
+
+  canvas.removeEventListener('click', onMapClick);
+  canvas.removeEventListener('mousemove', onMapMouseMove);
+  canvas.addEventListener('click', onMapClick);
+  canvas.addEventListener('mousemove', onMapMouseMove);
+
+  if (savedTransform && savedTransform !== canvas.style.transform) {
+    canvas.style.transform = savedTransform;
+  }
+
+  setupMapDrag();
+  buildLegend();
+}
+
+// ── Legend ────────────────────────────────────────────────────
+function legendPinSVG(color) {
+  return `<svg class="legend-pin" viewBox="0 0 16 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M8 1 C4.1 1 1 4.1 1 8 C1 13 8 19 8 19 C8 19 15 13 15 8 C15 4.1 11.9 1 8 1 Z"
+      fill="${color}" stroke="rgba(248,245,238,0.9)" stroke-width="1.4"/>
+  </svg>`;
+}
+function buildLegend() {
+  const types = [...new Set((data.locations||[]).filter(l => l.visible !== false).map(l => l.type||'default'))];
+  const legend = document.getElementById('map-legend');
+  if (!legend) return;
+  if (types.length === 0) { legend.style.display = 'none'; return; }
+  legend.style.display = '';
+  legend.innerHTML = `<div class="legend-title">LEGEND</div>` +
+    types.map(t => `<div class="legend-item">${legendPinSVG(TYPE_COLORS[t]||TYPE_COLORS.default)}<span>${TYPE_LABELS[t]||t}</span></div>`).join('');
+}
+
+// ── Pin info panel (hover) ───────────────────────────────────
+function showPinInfo(loc) {
+  const type = loc.type||'default';
+  document.getElementById('pin-info-type').textContent = (TYPE_LABELS[type]||type) + (loc.visible===false?' · Hidden':'');
+  document.getElementById('pin-info-name').textContent = loc.name || '(Unnamed)';
+  const descEl = document.getElementById('pin-info-desc');
+  if (loc.shortDesc) {
+    descEl.textContent = loc.shortDesc;
+    descEl.classList.remove('empty');
+  } else {
+    descEl.textContent = 'No description yet';
+    descEl.classList.add('empty');
+  }
+  document.getElementById('pin-info-panel').classList.add('visible');
+}
+function hidePinInfo() {
+  document.getElementById('pin-info-panel').classList.remove('visible');
+}
+
+// ── Polygon preview dots ──────────────────────────────────────
+function renderPolyPreviewDots() {
+  const canvas = document.getElementById('map-canvas');
+  polyPoints.forEach((p, i) => {
+    const dot = document.createElement('div');
+    dot.className = `poly-preview-dot${i===0?' first-dot':''}`;
+    dot.style.left = p.x + '%';
+    dot.style.top  = p.y + '%';
+    dot.style.position = 'absolute';
+    dot.style.zIndex = '30';
+    canvas.appendChild(dot);
+  });
+}
+
+// ── SVG preview line while drawing ───────────────────────────
+let polyMousePos = null;
+function onMapMouseMove(e) {
+  if (!polyDrawMode || polyPoints.length === 0) return;
+  const canvas = document.getElementById('map-canvas');
+  const rect = canvas.getBoundingClientRect();
+  const W = data.world.mapWidth||1200, H = data.world.mapHeight||800;
+  polyMousePos = {
+    x: ((e.clientX - rect.left) / (W * mapScale)) * 100,
+    y: ((e.clientY - rect.top)  / (H * mapScale)) * 100
+  };
+  renderPolyPreviewLine();
+}
+
+function renderPolyPreviewLine() {
+  const existing = document.getElementById('poly-preview-svg');
+  if (existing) existing.remove();
+  if (!polyDrawMode || polyPoints.length < 1 || !polyMousePos) return;
+  const canvas = document.getElementById('map-canvas');
+  const W = data.world.mapWidth||1200, H = data.world.mapHeight||800;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.id = 'poly-preview-svg';
+  svg.style.cssText=`position:absolute;top:0;left:0;width:${W}px;height:${H}px;pointer-events:none;z-index:25`;
+  const pts = [...polyPoints, polyMousePos].map(p=>`${p.x/100*W},${p.y/100*H}`).join(' ');
+  const poly = document.createElementNS('http://www.w3.org/2000/svg','polyline');
+  poly.setAttribute('points',pts);
+  poly.setAttribute('fill','none');
+  poly.setAttribute('stroke','var(--gold)');
+  poly.setAttribute('stroke-width','1.5');
+  poly.setAttribute('stroke-dasharray','6,4');
+  poly.setAttribute('stroke-opacity','0.8');
+  svg.appendChild(poly);
+  canvas.appendChild(svg);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MAP CLICK HANDLER (place mode + polygon draw)
+// ══════════════════════════════════════════════════════════════
+function onMapClick(e) {
+  if (moveMode) return;
+  if (moveDragTarget) { moveDragTarget = null; return; }
+
+  const canvas = document.getElementById('map-canvas');
+  const rect = canvas.getBoundingClientRect();
+  const W = data.world.mapWidth||1200, H = data.world.mapHeight||800;
+  const xPct = ((e.clientX - rect.left) / (W * mapScale)) * 100;
+  const yPct = ((e.clientY - rect.top)  / (H * mapScale)) * 100;
+
+  // ── Polygon draw ──────────────────────────────────────────
+  if (polyDrawMode) {
+    if (e.target.closest('.pin') || e.target.closest('.zone')) return;
+    // Close polygon if click near first point
+    if (polyPoints.length >= 3) {
+      const first = polyPoints[0];
+      const dx = xPct - first.x, dy = yPct - first.y;
+      const distPx = Math.sqrt(dx*dx+dy*dy) / 100 * W * mapScale;
+      if (distPx < 14) {
+        finishPolygon();
+        return;
+      }
+    }
+    polyPoints.push({ x: Math.round(xPct*10)/10, y: Math.round(yPct*10)/10 });
+    buildMap();
+    renderPolyPreviewLine();
+    return;
+  }
+
+  // ── Place pin ─────────────────────────────────────────────
+  if (placeMode) {
+    if (e.target.closest('.pin') || e.target.closest('.zone') || e.target.closest('.poly-zone')) return;
+    openLocModal(null, Math.round(xPct*10)/10, Math.round(yPct*10)/10);
+  }
+}
+
+function finishPolygon() {
+  if (polyPoints.length < 3) { cancelPolyDraw(); return; }
+  const id    = 'zone_' + Date.now();
+  const color = ZONE_COLORS[data.zones.length % ZONE_COLORS.length];
+  data.zones.push({ id, name:'New Region', shape:'polygon', points:[...polyPoints], color, opacity:0.18, visible:true });
+  polyPoints = [];
+  saveAll(); renderZoneList(); buildMap();
+  setPublishStatus('','Unpublished changes');
+  cancelPolyDraw();
+  selectZone(id);
+  switchTab('zones');
+}
+
+function cancelPolyDraw() {
+  polyDrawMode = false;
+  polyPoints   = [];
+  polyMousePos = null;
+  const el = document.getElementById('poly-preview-svg');
+  if (el) el.remove();
+  updateModeUI();
+  buildMap();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MAP PAN / ZOOM
+// ══════════════════════════════════════════════════════════════
+function resetMapView() {
+  const container = document.getElementById('map-container');
+  const W = data.world.mapWidth||1200, H = data.world.mapHeight||800;
+  const cw = container.clientWidth||800, ch = container.clientHeight||600;
+  mapScale = Math.min(cw/W, ch/H)*0.88;
+  mapX = (cw - W*mapScale)/2; mapY = (ch - H*mapScale)/2;
+  applyTransform();
+}
+function mapReset() { resetMapView(); }
+function mapZoom(f) {
+  const container = document.getElementById('map-container');
+  const cx=container.clientWidth/2, cy=container.clientHeight/2;
+  const ns = Math.min(Math.max(mapScale*f,0.15),4);
+  mapX=cx-(cx-mapX)*(ns/mapScale); mapY=cy-(cy-mapY)*(ns/mapScale); mapScale=ns; applyTransform();
+}
+function applyTransform() {
+  document.getElementById('map-canvas').style.transform=`translate(${mapX}px,${mapY}px) scale(${mapScale})`;
+}
+
+function setupMapDrag() {
+  const container = document.getElementById('map-container');
+  container.onmousedown = e => {
+    if (moveMode) return;   // move mode uses its own drag handlers on pins/zones
+    if (polyDrawMode) return;
+    if (placeMode) return;
+    if (e.target.closest('.pin')||e.target.closest('.zone')||e.target.closest('.poly-zone')) return;
+    isMapDragging=true; dragStartX=e.clientX; dragStartY=e.clientY; dragOriginX=mapX; dragOriginY=mapY;
+  };
+  window.addEventListener('mousemove', e => {
+    if (!isMapDragging) return;
+    mapX=dragOriginX+(e.clientX-dragStartX); mapY=dragOriginY+(e.clientY-dragStartY); applyTransform();
+  });
+  window.addEventListener('mouseup', ()=>{ isMapDragging=false; });
+  container.addEventListener('wheel', e => {
+    e.preventDefault();
+    const f=e.deltaY<0?1.1:0.9, rect=container.getBoundingClientRect();
+    const cx=e.clientX-rect.left, cy=e.clientY-rect.top;
+    const ns=Math.min(Math.max(mapScale*f,0.15),4);
+    mapX=cx-(cx-mapX)*(ns/mapScale); mapY=cy-(cy-mapY)*(ns/mapScale); mapScale=ns; applyTransform();
+  },{passive:false});
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MOVE MODE — drag handlers
+// ══════════════════════════════════════════════════════════════
+function attachPinMoveDrag(pinEl, loc) {
+  pinEl.style.cursor = 'grab';
+  pinEl.addEventListener('mousedown', e => {
+    e.stopPropagation(); e.preventDefault();
+    moveDragTarget = { type:'pin', id:loc.id, origX:loc.x, origY:loc.y, mouseStartX:e.clientX, mouseStartY:e.clientY };
+    pinEl.style.cursor = 'grabbing';
+    pinEl.style.filter = 'drop-shadow(0 0 8px var(--gold))';
+  });
+}
+
+function attachRectZoneMoveDrag(el, zone) {
+  el.style.cursor = 'grab';
+  el.addEventListener('mousedown', e => {
+    e.stopPropagation(); e.preventDefault();
+    moveDragTarget = { type:'rectzone', id:zone.id, origX:zone.x, origY:zone.y, mouseStartX:e.clientX, mouseStartY:e.clientY };
+    el.style.cursor = 'grabbing';
+  });
+}
+
+function attachPolyMoveDrag(gEl, zone) {
+  gEl.style.cursor = 'grab';
+  gEl.addEventListener('mousedown', e => {
+    e.stopPropagation(); e.preventDefault();
+    moveDragTarget = { type:'polyzone', id:zone.id, origPoints:zone.points.map(p=>({...p})), mouseStartX:e.clientX, mouseStartY:e.clientY };
+    gEl.style.cursor = 'grabbing';
+  });
+}
+
+// Global mousemove / mouseup for move drags
+window.addEventListener('mousemove', e => {
+  if (!moveDragTarget) return;
+  const W = data.world.mapWidth||1200, H = data.world.mapHeight||800;
+  // Convert pixel delta to percentage delta (accounting for zoom)
+  const dxPct = ((e.clientX - moveDragTarget.mouseStartX) / (W * mapScale)) * 100;
+  const dyPct = ((e.clientY - moveDragTarget.mouseStartY) / (H * mapScale)) * 100;
+
+  const clamp = (v,min,max) => Math.max(min,Math.min(max,v));
+
+  if (moveDragTarget.type === 'pin') {
+    const loc = data.locations.find(l=>l.id===moveDragTarget.id);
+    if (loc) {
+      loc.x = clamp(Math.round((moveDragTarget.origX + dxPct)*10)/10, 0, 100);
+      loc.y = clamp(Math.round((moveDragTarget.origY + dyPct)*10)/10, 0, 100);
+      // Move the DOM pin directly for smooth feedback (no full rebuild during drag)
+      const pinEl = document.querySelector(`.pin[style*="left:${moveDragTarget.origX}"]`) ||
+                    document.querySelector(`.selected-pin`);
+      const allPins = document.querySelectorAll('.pin');
+      allPins.forEach(p => {
+        if (p.dataset && p.dataset.locid === moveDragTarget.id) {
+          p.style.left = loc.x + '%'; p.style.top = loc.y + '%';
+        }
+      });
+      // Fast-path: update the specific pin by matching data attribute set below
+      const targetPin = document.querySelector(`.pin[data-moveid="${moveDragTarget.id}"]`);
+      if (targetPin) { targetPin.style.left = loc.x+'%'; targetPin.style.top = loc.y+'%'; }
+    }
+  } else if (moveDragTarget.type === 'rectzone') {
+    const zone = data.zones.find(z=>z.id===moveDragTarget.id);
+    if (zone) {
+      zone.x = clamp(Math.round((moveDragTarget.origX + dxPct)*10)/10, 0, 100-zone.width);
+      zone.y = clamp(Math.round((moveDragTarget.origY + dyPct)*10)/10, 0, 100-zone.height);
+      const el = document.querySelector(`.zone[data-moveid="${moveDragTarget.id}"]`);
+      if (el) { el.style.left = zone.x+'%'; el.style.top = zone.y+'%'; }
+    }
+  } else if (moveDragTarget.type === 'polyzone') {
+    const zone = data.zones.find(z=>z.id===moveDragTarget.id);
+    if (zone) {
+      zone.points = moveDragTarget.origPoints.map(p => ({
+        x: clamp(Math.round((p.x + dxPct)*10)/10, 0, 100),
+        y: clamp(Math.round((p.y + dyPct)*10)/10, 0, 100)
+      }));
+      // Rebuild SVG for polygon (lightweight — only re-renders SVG overlay)
+      rebuildPolySVG();
+    }
+  }
+});
+
+window.addEventListener('mouseup', e => {
+  if (!moveDragTarget) return;
+  saveAll();
+  renderLocList();
+  renderZoneList();
+  buildMap();
+  setPublishStatus('','Unpublished changes');
+  moveDragTarget = null;
+});
+
+// Fast polygon SVG rebuild during drag (avoids full buildMap)
+function rebuildPolySVG() {
+  const canvas = document.getElementById('map-canvas');
+  const existingSvg = canvas.querySelector('.map-svg-overlay');
+  if (!existingSvg) return;
+  const W = data.world.mapWidth||1200, H = data.world.mapHeight||800;
+  (data.zones||[]).filter(z=>z.shape==='polygon').forEach(zone => {
+    if (!zone.points||zone.points.length<3) return;
+    const g = existingSvg.querySelector(`[data-polyzid="${zone.id}"]`);
+    if (!g) return;
+    const pts = zone.points.map(p=>`${p.x/100*W},${p.y/100*H}`).join(' ');
+    const poly = g.querySelector('polygon');
+    if (poly) poly.setAttribute('points',pts);
+    const cx=zone.points.reduce((s,p)=>s+p.x,0)/zone.points.length/100*W;
+    const cy=zone.points.reduce((s,p)=>s+p.y,0)/zone.points.length/100*H;
+    const txt=g.querySelector('text');
+    if (txt) { txt.setAttribute('x',cx); txt.setAttribute('y',cy); }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MODE BUTTONS
+// ══════════════════════════════════════════════════════════════
+function toggleMoveMode() {
+  moveMode = !moveMode;
+  if (moveMode) { placeMode=false; polyDrawMode=false; polyPoints=[]; }
+  updateModeUI();
+  buildMap();
+}
+
+function togglePolyDraw() {
+  polyDrawMode = !polyDrawMode;
+  if (polyDrawMode) { moveMode=false; placeMode=false; polyPoints=[]; switchTab('zones'); }
+  updateModeUI();
+  buildMap();
+}
+
+function updateModeUI() {
+  const container = document.getElementById('map-container');
+  const moveBtn   = document.getElementById('move-mode-btn');
+  const placeBtn  = document.getElementById('place-mode-btn');
+  const polyBtn   = document.getElementById('poly-draw-btn');
+  const hint      = document.getElementById('map-hint');
+
+  // Move mode
+  if (moveBtn) {
+    moveBtn.style.background    = moveMode ? 'var(--amber)' : '';
+    moveBtn.style.borderColor   = moveMode ? 'var(--amber)' : '';
+    moveBtn.style.color         = moveMode ? '#000' : '';
+  }
+
+  // Place mode
+  if (placeBtn) {
+    placeBtn.style.background   = placeMode ? 'var(--gold-dim)' : '';
+    placeBtn.style.borderColor  = placeMode ? 'var(--gold)' : '';
+    placeBtn.style.color        = placeMode ? 'var(--gold-light)' : '';
+  }
+
+  // Polygon draw mode
+  if (polyBtn) {
+    polyBtn.style.background    = polyDrawMode ? 'var(--green-bg)' : '';
+    polyBtn.style.borderColor   = polyDrawMode ? 'var(--green)' : '';
+    polyBtn.style.color         = polyDrawMode ? '#8e8' : '';
+  }
+
+  container.classList.toggle('move-mode', moveMode);
+
+  const esc = '<span class="esc-hint">Esc to exit</span>';
+  if (moveMode) {
+    hint.innerHTML = '✥ Move mode — drag pins and zones to reposition' + esc;
+    hint.style.display='block';
+    container.style.cursor = 'default';
+  } else if (polyDrawMode) {
+    const remaining = Math.max(0, 3 - polyPoints.length);
+    const msg = polyPoints.length===0
+      ? '✏ Click to place polygon points — click near the first point to close'
+      : polyPoints.length < 3
+        ? `${remaining} more point${remaining>1?'s':''} needed to close`
+        : 'Click near the first point (●) to close the polygon';
+    hint.innerHTML = msg + esc;
+    hint.style.display='block';
+    container.style.cursor = 'crosshair';
+  } else if (placeMode) {
+    hint.innerHTML = '📍 Click map to place a new location pin' + esc;
+    hint.style.display='block';
+    container.style.cursor = 'crosshair';
+  } else {
+    hint.style.display='none';
+    container.style.cursor = 'grab';
+  }
+}
+
+function exitAnyMode() {
+  if (moveMode)     toggleMoveMode();
+  if (placeMode)    togglePlaceMode();
+  if (polyDrawMode) togglePolyDraw();
+}
+
+// Legacy place mode toggle (for the Locations tab button)
+function togglePlaceMode() {
+  placeMode = !placeMode;
+  if (placeMode) { moveMode=false; polyDrawMode=false; }
+  updateModeUI();
+  buildMap();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  LOCATION LIST
+// ══════════════════════════════════════════════════════════════
+function renderLocList() {
+  const list = document.getElementById('loc-list');
+  list.innerHTML = '';
+  if (data.locations.length === 0) {
+    list.innerHTML='<div style="color:var(--ink-faint);font-style:italic;font-size:0.82rem;padding:0.5rem 0">No locations yet. Click the map or use + Add location.</div>';
+    return;
+  }
+  const q = (document.getElementById('loc-search')?.value || '').trim().toLowerCase();
+  const filtered = !q ? data.locations : data.locations.filter(l =>
+    (l.name||'').toLowerCase().includes(q) ||
+    (l.id||'').toLowerCase().includes(q) ||
+    (l.type||'').toLowerCase().includes(q) ||
+    (l.shortDesc||'').toLowerCase().includes(q)
+  );
+  if (filtered.length === 0) {
+    list.innerHTML='<div style="color:var(--ink-faint);font-style:italic;font-size:0.82rem;padding:0.5rem 0">No matches.</div>';
+    return;
+  }
+  filtered.forEach(loc => {
+    const el = document.createElement('div');
+    el.className = `loc-list-item${loc.id===selectedLocId?' selected':''}`;
+    el.innerHTML = `
+      <span style="font-size:0.85rem">${TYPE_ICONS[loc.type||'default']||'📍'}</span>
+      <span class="loc-list-name">${loc.name}</span>
+      <span class="loc-list-type">${TYPE_LABELS[loc.type||'default']||loc.type}</span>
+      ${loc.visible===false?'<span class="hidden-tag">HIDDEN</span>':''}
+    `;
+    el.addEventListener('click', () => selectLocation(loc.id));
+    list.appendChild(el);
+  });
+}
+
+function selectLocation(id) {
+  selectedLocId = id; selectedZoneId = null;
+  renderLocList(); buildMap(); openLocModal(id);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  LOCATION MODAL
+// ══════════════════════════════════════════════════════════════
+function addLocation() { openLocModal(null, 50, 50); }
+
+function openLocModal(id, defaultX, defaultY) {
+  editingLocId = id;
+  const loc = id ? data.locations.find(l=>l.id===id) : null;
+  document.getElementById('loc-modal-title').textContent = loc ? `Edit: ${loc.name}` : 'New Location';
+  document.getElementById('loc-name').value       = loc?.name || '';
+  document.getElementById('loc-id').value         = loc?.id   || '';
+  document.getElementById('loc-type').value       = loc?.type || 'default';
+  document.getElementById('loc-x').value          = loc?.x    ?? defaultX ?? 50;
+  document.getElementById('loc-y').value          = loc?.y    ?? defaultY ?? 50;
+  document.getElementById('loc-shortDesc').value  = loc?.shortDesc || '';
+  document.getElementById('loc-lore').value       = loc?.lore || '';
+  document.getElementById('loc-mapImage').value   = loc?.mapImage || '';
+  tempConnected = Array.isArray(loc?.connected) ? loc.connected.slice() : [];
+  document.getElementById('loc-visible').checked  = loc?.visible !== false;
+  document.getElementById('loc-dmNotes').value    = loc?.dmNotes || '';
+  tempNPCs   = JSON.parse(JSON.stringify(loc?.npcs   || []));
+  tempQuests = JSON.parse(JSON.stringify(loc?.quests || []));
+  tempVisibleTo = Array.isArray(loc?.visibleTo) ? loc.visibleTo.slice() : [];
+  // Sub-map fields
+  const sub = loc?.subMap || null;
+  document.getElementById('loc-subMap-image').value  = sub?.world?.mapImage || sub?.image || '';
+  document.getElementById('loc-subMap-width').value  = sub?.world?.mapWidth  || sub?.width  || 1200;
+  document.getElementById('loc-subMap-height').value = sub?.world?.mapHeight || sub?.height || 800;
+  const stat = document.getElementById('submap-stat');
+  if (sub && Array.isArray(sub.locations)) {
+    stat.textContent = `${sub.locations.length} pin${sub.locations.length===1?'':'s'} · ${(sub.zones||[]).length} zone${(sub.zones||[]).length===1?'':'s'}`;
+    document.getElementById('reset-submap-btn').style.display = '';
+  } else {
+    stat.textContent = 'No sub-map yet';
+    document.getElementById('reset-submap-btn').style.display = 'none';
+  }
+  // The sub-map tab is meaningless when editing a sub-pin (no recursive sub-maps).
+  document.getElementById('ltab-submap').style.display = inSubMap() ? 'none' : '';
+  document.getElementById('ltab-npcs').style.display   = inSubMap() ? 'none' : '';
+  renderNPCEditor(); renderQuestEditor(); renderVisibleToChips(); renderConnectedChips();
+  renderLocationNPCsHere(loc?.id);
+  switchLocTab('info');
+  document.getElementById('loc-modal').classList.remove('hidden');
+  renderLocEncounters(loc || null);
+  document.getElementById('loc-name').addEventListener('input', function() {
+    if (!editingLocId) document.getElementById('loc-id').value = this.value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+  });
+}
+
+function closeLocModal() { document.getElementById('loc-modal').classList.add('hidden'); editingLocId=null; }
+
+// ── Encounters here (Task 5.1) ──────────────────────────────────
+async function ensureEncountersLoaded() {
+  if (window.allEncounters) return window.allEncounters;
+  const r = await fetch(WORKER_URL + '?type=encounters', { headers: Auth.dmHeaders(), cache: 'no-store' });
+  const arr = r.ok ? await r.json() : [];
+  window.allEncounters = (arr || []).map(EncounterSchema.migrateInMemory);
+  return window.allEncounters;
+}
+
+async function renderLocEncounters(loc) {
+  if (!loc) {
+    document.getElementById('loc-encounters-list').textContent = 'Save the location first to bind encounters.';
+    return;
+  }
+  const requestedLocId = loc.id;  // capture at call time
+  const all = await ensureEncountersLoaded();
+  // If the user opened a different location while we were awaiting, abort.
+  if (editingLocId !== requestedLocId) return;
+  const ref = inSubMap()
+    ? { kind: 'submap', parentLocationId: subMapStack[subMapStack.length - 1]?.parentLocationId, locationId: loc.id }
+    : { kind: 'world', locationId: loc.id };
+  const matches = all.filter(e => EncounterSchema.equalLocationRefs(e.locationRef, ref));
+  const root = document.getElementById('loc-encounters-list');
+  if (!matches.length) {
+    root.innerHTML = '<em>None yet.</em>';
+    return;
+  }
+  root.innerHTML = matches.map(e => `
+    <div style="padding:4px 0">
+      <a href="encounter-dm.html?id=${encodeURIComponent(e.id)}" style="color:var(--c-brass)">${escapeHtml(e.name || '(untitled)')}</a>
+      <span style="font-size:0.7rem;color:var(--c-ink-faint);margin-left:6px">${e.status} · ${e.picks.length} monster${e.picks.length === 1 ? '' : 's'}</span>
+    </div>
+  `).join('');
+}
+
+function newEncounterAtCurrentLocation() {
+  if (!editingLocId) { toast('Save the location first.'); return; }
+  const inSub = inSubMap();
+  const parent = inSub ? subMapStack[subMapStack.length - 1]?.parentLocationId : '';
+  const param = inSub ? `submap:${parent}:${editingLocId}` : `world::${editingLocId}`;
+  location.href = 'encounter-dm.html?newAt=' + encodeURIComponent(param);
+}
+// ────────────────────────────────────────────────────────────────
+
+function saveLocation() {
+  const name = document.getElementById('loc-name').value.trim();
+  const id   = document.getElementById('loc-id').value.trim().replace(/[^a-z0-9-]/g,'');
+  if (!name||!id) { toast('Name and ID are required.'); return; }
+  // Preserve existing sub-map data (pins, zones) — read sub-map fields from the
+  // form only when at the world level. Pin records (inside a sub-map) can't have
+  // sub-maps themselves in this phase.
+  const existing = data.locations.find(l => l.id === editingLocId) || {};
+  let subMap = existing.subMap || null;
+  if (!inSubMap()) {
+    const subImage  = document.getElementById('loc-subMap-image').value.trim();
+    const subWidth  = parseInt(document.getElementById('loc-subMap-width').value, 10) || 1200;
+    const subHeight = parseInt(document.getElementById('loc-subMap-height').value, 10) || 800;
+    if (subImage || (subMap && (subMap.locations?.length || subMap.zones?.length))) {
+      // Persist sub-map structure. Keep existing pins/zones; just update world meta.
+      subMap = {
+        world: { name: name + ' (sub-map)', mapImage: subImage, mapWidth: subWidth, mapHeight: subHeight },
+        locations: subMap?.locations || [],
+        zones:     subMap?.zones     || []
+      };
+    } else {
+      subMap = null;
+    }
+  }
+  const locData = {
+    id, name,
+    type:      document.getElementById('loc-type').value,
+    x:         parseFloat(document.getElementById('loc-x').value)||50,
+    y:         parseFloat(document.getElementById('loc-y').value)||50,
+    visible:   document.getElementById('loc-visible').checked,
+    shortDesc: document.getElementById('loc-shortDesc').value.trim(),
+    lore:      document.getElementById('loc-lore').value.trim(),
+    mapImage:  document.getElementById('loc-mapImage').value.trim(),
+    connected: tempConnected.slice(),
+    npcs:      [],                 // NPCs are first-class now; managed in the NPCs tab
+    quests:    tempQuests,
+    dmNotes:   document.getElementById('loc-dmNotes').value.trim(),
+    visibleTo: tempVisibleTo.slice(),
+    subMap:    subMap,
+  };
+  const idx = data.locations.findIndex(l=>l.id===editingLocId);
+  if (idx>=0) data.locations[idx]=locData; else data.locations.push(locData);
+  selectedLocId=id; saveAll(); renderLocList(); buildMap(); closeLocModal();
+  setPublishStatus('','Unpublished changes');
+}
+
+async function deleteLocation() {
+  if (!editingLocId) return;
+  if (!(await confirmDialog(`Delete ${data.locations.find(l=>l.id===editingLocId)?.name}?`))) return;
+  data.locations=data.locations.filter(l=>l.id!==editingLocId);
+  selectedLocId=null; saveAll(); renderLocList(); buildMap(); closeLocModal();
+  setPublishStatus('','Unpublished changes');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  NPC & QUEST EDITORS
+// ══════════════════════════════════════════════════════════════
+function addNPC() { tempNPCs.push({name:'',role:'',desc:''}); renderNPCEditor(); }
+function removeNPC(i) { tempNPCs.splice(i,1); renderNPCEditor(); }
+function renderNPCEditor() {
+  // The location modal's old inline NPC editor was replaced by the "NPCs
+  // currently here" read-only view when NPCs were promoted to first-class.
+  // The #npc-editor-list element no longer exists; bail out so callers that
+  // still try to render here don't blow up the whole modal.
+  const list=document.getElementById('npc-editor-list');
+  if (!list) return;
+  list.innerHTML='';
+  tempNPCs.forEach((n,i) => {
+    const card=document.createElement('div'); card.className='item-card';
+    card.innerHTML=`
+      <div class="item-card-header"><span class="item-card-title">NPC ${i+1}</span><button class="item-card-del" onclick="removeNPC(${i})">✕</button></div>
+      <div class="field"><label>NAME</label><input type="text" value="${n.name}" oninput="tempNPCs[${i}].name=this.value" placeholder="Aldric Vane…"></div>
+      <div class="field"><label>ROLE</label><input type="text" value="${n.role}" oninput="tempNPCs[${i}].role=this.value" placeholder="Captain of the Guard…"></div>
+      <div class="field"><label>DESCRIPTION</label><textarea oninput="tempNPCs[${i}].desc=this.value" rows="2" placeholder="Brief player-facing description…">${n.desc}</textarea></div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+function addQuest() { tempQuests.push({title:'',desc:''}); renderQuestEditor(); }
+function removeQuest(i) { tempQuests.splice(i,1); renderQuestEditor(); }
+function renderQuestEditor() {
+  const list=document.getElementById('quest-editor-list'); list.innerHTML='';
+  tempQuests.forEach((q,i) => {
+    const card=document.createElement('div'); card.className='item-card';
+    card.innerHTML=`
+      <div class="item-card-header"><span class="item-card-title">Quest hook ${i+1}</span><button class="item-card-del" onclick="removeQuest(${i})">✕</button></div>
+      <div class="field"><label>TITLE</label><input type="text" value="${q.title}" oninput="tempQuests[${i}].title=this.value" placeholder="The Missing Shipment…"></div>
+      <div class="field"><label>DESCRIPTION</label><textarea oninput="tempQuests[${i}].desc=this.value" rows="3" placeholder="What the players know or hear…">${q.desc}</textarea></div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  ZONES
+// ══════════════════════════════════════════════════════════════
+function addZone() {
+  const id='zone_'+Date.now();
+  const color=ZONE_COLORS[data.zones.length%ZONE_COLORS.length];
+  data.zones.push({ id, name:'New Zone', shape:'rect', x:20, y:20, width:30, height:25, color, opacity:0.18, visible:true });
+  saveAll(); renderZoneList(); buildMap();
+  setPublishStatus('','Unpublished changes');
+}
+
+function selectZone(id) { selectedZoneId=id; selectedLocId=null; buildMap(); renderZoneList(); }
+
+function renderZoneList() {
+  const list=document.getElementById('zone-list'); list.innerHTML='';
+  if (data.zones.length===0) {
+    list.innerHTML='<div style="color:var(--ink-faint);font-style:italic;font-size:0.82rem;padding:0.5rem 0">No zones yet. Add a rectangle or draw a polygon.</div>';
+    return;
+  }
+  const q = (document.getElementById('zone-search')?.value || '').trim().toLowerCase();
+  const filtered = !q ? data.zones : data.zones.filter(z =>
+    (z.name||'').toLowerCase().includes(q) ||
+    (z.id||'').toLowerCase().includes(q) ||
+    (z.shape||'').toLowerCase().includes(q)
+  );
+  if (filtered.length === 0) {
+    list.innerHTML='<div style="color:var(--ink-faint);font-style:italic;font-size:0.82rem;padding:0.5rem 0">No matches.</div>';
+    return;
+  }
+  filtered.forEach((zone) => {
+    const card=document.createElement('div'); card.className='item-card';
+    card.style.borderLeft=`3px solid ${zone.color}`;
+    const isPoly = zone.shape==='polygon';
+    const posFields = isPoly
+      ? `<div style="font-size:0.75rem;color:var(--ink-faint);font-style:italic">${zone.points?.length||0} polygon points — move with ✥ Move mode</div>`
+      : `<div class="field-row">
+          <div class="field"><label>X %</label><input type="number" value="${zone.x}" min="0" max="100" oninput="updateZone('${zone.id}','x',+this.value)"></div>
+          <div class="field"><label>Y %</label><input type="number" value="${zone.y}" min="0" max="100" oninput="updateZone('${zone.id}','y',+this.value)"></div>
+          <div class="field"><label>W %</label><input type="number" value="${zone.width}" min="1" max="100" oninput="updateZone('${zone.id}','width',+this.value)"></div>
+          <div class="field"><label>H %</label><input type="number" value="${zone.height}" min="1" max="100" oninput="updateZone('${zone.id}','height',+this.value)"></div>
+        </div>`;
+    card.innerHTML=`
+      <div class="item-card-header">
+        <span class="item-card-title">${zone.name} <span style="font-size:0.65rem;color:var(--ink-faint)">${isPoly?'polygon':'rect'}</span></span>
+        <button class="item-card-del" onclick="deleteZone('${zone.id}')">✕</button>
+      </div>
+      <div class="field"><label>NAME</label><input type="text" value="${zone.name}" oninput="updateZone('${zone.id}','name',this.value)"></div>
+      ${posFields}
+      <div class="field-row">
+        <div class="field"><label>COLOR</label><input type="color" value="${zone.color}" oninput="updateZone('${zone.id}','color',this.value)" style="height:32px;padding:2px"></div>
+        <div class="field"><label>OPACITY</label><input type="range" min="0.05" max="0.5" step="0.01" value="${zone.opacity}" oninput="updateZone('${zone.id}','opacity',+this.value)"></div>
+      </div>
+      <div class="toggle-row">
+        <input type="checkbox" id="zone-vis-${zone.id}" ${zone.visible!==false?'checked':''} onchange="updateZone('${zone.id}','visible',this.checked)">
+        <label for="zone-vis-${zone.id}">Visible to players</label>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+function updateZone(id,key,val) {
+  const z=data.zones.find(z=>z.id===id); if(!z) return;
+  z[key]=val; saveAll(); buildMap();
+  setPublishStatus('','Unpublished changes');
+}
+async function deleteZone(id) {
+  if (!(await confirmDialog('Delete this zone?'))) return;
+  data.zones=data.zones.filter(z=>z.id!==id);
+  saveAll(); renderZoneList(); buildMap();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  WORLD SETTINGS
+// ══════════════════════════════════════════════════════════════
+function loadWorldFields() {
+  document.getElementById('world-name').value      = data.world.name||'';
+  document.getElementById('world-mapImage').value  = data.world.mapImage||'';
+  document.getElementById('world-mapWidth').value  = data.world.mapWidth||1200;
+  document.getElementById('world-mapHeight').value = data.world.mapHeight||800;
+}
+function saveWorldSettings() {
+  data.world.name      = document.getElementById('world-name').value.trim();
+  data.world.mapImage  = document.getElementById('world-mapImage').value.trim();
+  data.world.mapWidth  = parseInt(document.getElementById('world-mapWidth').value)||1200;
+  data.world.mapHeight = parseInt(document.getElementById('world-mapHeight').value)||800;
+  saveAll(); buildMap();
+  setPublishStatus('','Unpublished changes');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  INIT — load from KV first, fall back to localStorage
+// ══════════════════════════════════════════════════════════════
+async function init() {
+  // Show loading state
+  setSyncStatus('ing', '⟳ Loading map data…');
+
+  // Try KV first (most up-to-date, works across devices)
+  const kvLoaded = await loadFromKV();
+
+  if (!kvLoaded) {
+    // Fall back to localStorage (same browser/device)
+    loadLocal();
+    setSyncStatus('', kvLoaded ? '' : '');
+  } else {
+    // KV loaded — sync localStorage to match
+    saveLocal();
+    setSyncStatus('ok', '✦ Loaded from cloud');
+    setTimeout(() => setSyncStatus('', ''), 3000);
+  }
+
+  // Characters + journals + NPCs + timeline (cached locally first, then refreshed from KV)
+  loadCharactersLocal();
+  loadJournalsLocal();
+  loadNPCsLocal();
+  loadTimelineLocal();
+  await loadCharactersKV();
+  await loadJournalsKV();
+  await loadNPCsKV();
+  await loadTimelineKV();
+
+  // One-shot migration of nested NPCs → first-class records.
+  await migrateNestedNPCs();
+
+  loadWorldFields();
+  buildMap();
+  renderLocList();
+  renderZoneList();
+  renderCharacterList();
+  renderNPCList();
+  renderTimelineList();
+  updateModeUI();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CHARACTERS TAB
+// ══════════════════════════════════════════════════════════════
+function genCode(len = 6) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I/O/0/1 — easier to read
+  let out = '';
+  for (let i = 0; i < len; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  return out;
+}
+function slugify(s) { return (s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); }
+
+function renderCharacterList() {
+  const list = document.getElementById('char-list');
+  if (!list) return;
+  if (characters.length === 0) {
+    list.innerHTML = '<div class="visibleto-empty">No characters yet. Add one to give a player a claim code.</div>';
+    return;
+  }
+  list.innerHTML = characters.map(c => `
+    <div class="char-card ${c.id===editingCharId?'selected':''}">
+      <div class="char-card-row">
+        <span class="char-card-name">${escapeHtml(c.name)}</span>
+        ${c.player ? `<span class="char-card-player">${escapeHtml(c.player)}</span>` : ''}
+      </div>
+      <div class="char-card-row">
+        <span class="char-code-pill" title="Click to select" onclick="event.stopPropagation();selectText(this)">${escapeHtml(c.code || '—')}</span>
+        <div class="char-actions">
+          <button class="char-action-btn" onclick="editCharacter('${c.id}')">Edit</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function escapeHtml(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+let _toastTimer = null;
+function toast(msg, kind) {
+  let el = document.getElementById('toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'toast'; el.className = 'toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.className = `toast visible${kind==='error'?' error':''}`;
+  if (_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { el.className = el.className.replace(' visible',''); }, 2800);
+}
+
+// Styled confirm dialog. Returns Promise<boolean>. Replaces native confirm() for
+// destructive operations so the UI stays in-character with the rest of the page.
+function confirmDialog(message, opts) {
+  const { confirmLabel = 'Delete', cancelLabel = 'Cancel' } = opts || {};
+  return new Promise(resolve => {
+    let overlay = document.getElementById('confirm-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'confirm-overlay';
+      overlay.className = 'confirm-overlay';
+      overlay.innerHTML = `
+        <div class="confirm-modal" role="dialog" aria-modal="true">
+          <div class="confirm-msg"></div>
+          <div class="confirm-actions">
+            <button class="btn btn-ghost btn-sm confirm-cancel" type="button"></button>
+            <button class="btn btn-red btn-sm confirm-ok" type="button"></button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+    }
+    const okBtn = overlay.querySelector('.confirm-ok');
+    const cancelBtn = overlay.querySelector('.confirm-cancel');
+    overlay.querySelector('.confirm-msg').textContent = message;
+    okBtn.textContent = confirmLabel;
+    cancelBtn.textContent = cancelLabel;
+    overlay.classList.add('visible');
+    const cleanup = (val) => {
+      overlay.classList.remove('visible');
+      okBtn.onclick = cancelBtn.onclick = overlay.onclick = null;
+      document.removeEventListener('keydown', onKey, true);
+      resolve(val);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.stopPropagation(); cleanup(false); }
+      else if (e.key === 'Enter') { e.preventDefault(); cleanup(true); }
+    };
+    okBtn.onclick = () => cleanup(true);
+    cancelBtn.onclick = () => cleanup(false);
+    overlay.onclick = (e) => { if (e.target === overlay) cleanup(false); };
+    document.addEventListener('keydown', onKey, true);
+    setTimeout(() => cancelBtn.focus(), 30);  // focus cancel by default — safer
+  });
+}
+
+function selectText(el) {
+  const r = document.createRange(); r.selectNodeContents(el);
+  const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+}
+
+function addCharacter() {
+  ensureEditorExpanded();
+  ensureDetailCloseBtn(document.getElementById('char-detail'), cancelCharEdit);
+  editingCharId = '__new__';
+  document.getElementById('char-detail-header').textContent = 'NEW CHARACTER';
+  document.getElementById('char-name').value = '';
+  document.getElementById('char-player').value = '';
+  document.getElementById('char-id').value = '';
+  document.getElementById('char-code').value = genCode();
+  document.getElementById('char-dmNotes').value = '';
+  document.getElementById('whisper-title').value = '';
+  document.getElementById('whisper-body').value = '';
+  document.getElementById('whisper-history').innerHTML = '<div class="visibleto-empty">Save the character first to enable whispers.</div>';
+  document.getElementById('char-detail').style.display = 'block';
+  document.getElementById('char-name').focus();
+  // Auto-fill id on name change
+  document.getElementById('char-name').oninput = function() {
+    if (editingCharId === '__new__') document.getElementById('char-id').value = slugify(this.value);
+  };
+}
+
+function editCharacter(id) {
+  const c = characters.find(x => x.id === id);
+  if (!c) return;
+  ensureEditorExpanded();
+  ensureDetailCloseBtn(document.getElementById('char-detail'), cancelCharEdit);
+  editingCharId = id;
+  document.getElementById('char-detail-header').textContent = 'EDIT CHARACTER';
+  document.getElementById('char-name').value = c.name || '';
+  document.getElementById('char-player').value = c.player || '';
+  document.getElementById('char-id').value = c.id;
+  document.getElementById('char-code').value = c.code || '';
+  document.getElementById('char-dmNotes').value = c.dmNotes || '';
+  document.getElementById('whisper-title').value = '';
+  document.getElementById('whisper-body').value = '';
+  renderWhisperHistory(id);
+  document.getElementById('char-detail').style.display = 'block';
+  renderCharacterList();
+}
+
+async function saveCharacter() {
+  const name = document.getElementById('char-name').value.trim();
+  if (!name) { toast('Character needs a name.'); return; }
+  const player = document.getElementById('char-player').value.trim();
+  const code = document.getElementById('char-code').value.trim().toUpperCase();
+  const dmNotes = document.getElementById('char-dmNotes').value.trim();
+  if (!code) { toast('Need a claim code (click ⟳ to generate one).'); return; }
+
+  if (editingCharId === '__new__') {
+    let id = slugify(document.getElementById('char-id').value) || slugify(name);
+    // ensure uniqueness
+    let base = id, n = 1;
+    while (characters.some(c => c.id === id)) { id = `${base}-${++n}`; }
+    characters.push({ id, name, player, code, dmNotes });
+    editingCharId = id;
+  } else {
+    const idx = characters.findIndex(c => c.id === editingCharId);
+    if (idx < 0) return;
+    characters[idx] = { ...characters[idx], name, player, code, dmNotes };
+  }
+  await saveCharactersKV();
+  renderCharacterList();
+  document.getElementById('char-detail-header').textContent = 'EDIT CHARACTER';
+  renderWhisperHistory(editingCharId);
+  setSyncStatus('ok','✦ Character saved');
+  setTimeout(()=>setSyncStatus('',''), 2000);
+}
+
+function cancelCharEdit() {
+  editingCharId = null;
+  document.getElementById('char-detail').style.display = 'none';
+  renderCharacterList();
+}
+
+async function deleteCharacter() {
+  if (!editingCharId || editingCharId === '__new__') { cancelCharEdit(); return; }
+  const c = characters.find(x => x.id === editingCharId);
+  if (!c) return;
+  if (!(await confirmDialog(`Delete ${c.name}? Their claim code will stop working and their whispers will also be removed.`))) return;
+  characters = characters.filter(x => x.id !== editingCharId);
+  // also drop their journal entries
+  journals = journals.filter(j => j.characterId !== editingCharId);
+  // also strip from any location.visibleTo
+  data.locations.forEach(loc => {
+    if (Array.isArray(loc.visibleTo)) loc.visibleTo = loc.visibleTo.filter(id => id !== editingCharId);
+  });
+  editingCharId = null;
+  document.getElementById('char-detail').style.display = 'none';
+  await saveCharactersKV();
+  await saveJournalsKV();
+  saveAll();
+  renderCharacterList();
+}
+
+function regenCharCode() { document.getElementById('char-code').value = genCode(); }
+function copyCharCode() {
+  const v = document.getElementById('char-code').value;
+  if (!v) return;
+  navigator.clipboard?.writeText(v);
+  setSyncStatus('ok','Code copied');
+  setTimeout(()=>setSyncStatus('',''), 1500);
+}
+
+// Whispers composer
+async function postWhisper() {
+  if (!editingCharId || editingCharId === '__new__') { toast('Save the character first.'); return; }
+  const title = document.getElementById('whisper-title').value.trim();
+  const body  = document.getElementById('whisper-body').value.trim();
+  if (!title && !body) { toast('Whisper needs a title or body.'); return; }
+  const entry = {
+    id: 'w' + Date.now() + Math.floor(Math.random()*1000),
+    characterId: editingCharId,
+    title, body,
+    date: new Date().toISOString().slice(0,10),
+    unread: true
+  };
+  journals.push(entry);
+  await saveJournalsKV();
+  document.getElementById('whisper-title').value = '';
+  document.getElementById('whisper-body').value = '';
+  renderWhisperHistory(editingCharId);
+  setSyncStatus('ok','✦ Whisper posted');
+  setTimeout(()=>setSyncStatus('',''), 2000);
+}
+
+function renderWhisperHistory(charId) {
+  const list = document.getElementById('whisper-history');
+  if (!charId || charId === '__new__') { list.innerHTML = ''; return; }
+  const items = journals.filter(j => j.characterId === charId).sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  if (items.length === 0) { list.innerHTML = '<div class="visibleto-empty">No whispers sent yet.</div>'; return; }
+  list.innerHTML = items.map(j => `
+    <div class="whisper-history-card">
+      <div class="whisper-history-meta">
+        <span>${escapeHtml(j.date)} ${j.unread ? '· unread' : ''}</span>
+        <button class="whisper-del-btn" onclick="deleteWhisper('${j.id}')" title="Delete">✕</button>
+      </div>
+      <div class="whisper-history-title">${escapeHtml(j.title) || '(no title)'}</div>
+      <div class="whisper-history-body">${escapeHtml(j.body)}</div>
+    </div>
+  `).join('');
+}
+
+async function deleteWhisper(jid) {
+  if (!(await confirmDialog('Delete this whisper? The player will no longer see it.'))) return;
+  journals = journals.filter(j => j.id !== jid);
+  await saveJournalsKV();
+  if (editingCharId) renderWhisperHistory(editingCharId);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  NPCs TAB
+// ══════════════════════════════════════════════════════════════
+function locationName(id) {
+  // NPCs reference top-level world locations only.
+  const loc = (worldData.locations || []).find(l => l.id === id);
+  return loc ? loc.name : '';
+}
+
+function populateNPCLocationFilters() {
+  const filter = document.getElementById('npc-filter-location');
+  const editLoc = document.getElementById('npce-location');
+  const moveLoc = document.getElementById('npce-move-location');
+  if (!filter) return;
+
+  const opts = (worldData.locations || [])
+    .slice()
+    .sort((a,b) => (a.name||'').localeCompare(b.name||''))
+    .map(l => `<option value="${l.id}">${escapeHtml(l.name)}</option>`)
+    .join('');
+
+  // Preserve current selection where possible
+  const curFilter = filter.value;
+  filter.innerHTML = '<option value="">All locations</option>' + opts;
+  filter.value = curFilter;
+
+  if (editLoc) {
+    const curEdit = editLoc.value;
+    editLoc.innerHTML = '<option value="">— unknown / off-map —</option>' + opts;
+    editLoc.value = curEdit;
+  }
+  if (moveLoc) {
+    const curMove = moveLoc.value;
+    moveLoc.innerHTML = '<option value="">— keep current —</option>' + opts;
+    moveLoc.value = curMove;
+  }
+}
+
+function renderNPCList() {
+  const list = document.getElementById('npc-list');
+  const count = document.getElementById('npc-count');
+  if (!list) return;
+  const query = (document.getElementById('npc-search')?.value || '').trim().toLowerCase();
+  const locFilter = document.getElementById('npc-filter-location')?.value || '';
+
+  const filtered = npcs.filter(n => {
+    if (locFilter && (n.currentLocationId || '') !== locFilter) return false;
+    if (!query) return true;
+    return (n.name||'').toLowerCase().includes(query)
+        || (n.role||'').toLowerCase().includes(query)
+        || (n.currentActivity||'').toLowerCase().includes(query)
+        || (n.tags||[]).some(t => (t||'').toLowerCase().includes(query));
+  });
+  count.textContent = `(${filtered.length}${filtered.length !== npcs.length ? ` / ${npcs.length}` : ''})`;
+
+  if (filtered.length === 0) {
+    list.innerHTML = npcs.length === 0
+      ? '<div class="visibleto-empty">No NPCs yet. Add one to start tracking.</div>'
+      : '<div class="visibleto-empty">No NPCs match those filters.</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(n => {
+    const loc = n.currentLocationId ? escapeHtml(locationName(n.currentLocationId)) : '—';
+    const status = (n.status || 'alive').toLowerCase();
+    return `<div class="npc-card ${n.id===editingNPCId?'selected':''}" onclick="editNPCEntity('${n.id}')">
+      <div class="npc-card-row">
+        <span class="npc-card-name">${escapeHtml(n.name)}</span>
+        ${n.role ? `<span class="npc-card-role">${escapeHtml(n.role)}</span>` : ''}
+        <span class="npc-status ${status}">${status}</span>
+      </div>
+      <div class="npc-card-meta">
+        <span class="npc-card-loc">${loc}</span>
+        <span style="color:var(--ink-faint)">·</span>
+        <span>known to ${(n.knownTo||[]).length}/${characters.length}</span>
+      </div>
+      ${n.currentActivity ? `<div class="npc-card-activity">${escapeHtml(n.currentActivity)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function addNPCEntity() {
+  ensureEditorExpanded();
+  ensureDetailCloseBtn(document.getElementById('npc-detail'), cancelNPCEdit);
+  editingNPCId = '__new__';
+  tempNPCKnownTo = [];
+  populateNPCLocationFilters();
+  document.getElementById('npc-detail-header').textContent = 'NEW NPC';
+  document.getElementById('npce-name').value = '';
+  document.getElementById('npce-role').value = '';
+  document.getElementById('npce-status').value = 'alive';
+  document.getElementById('npce-location').value = '';
+  document.getElementById('npce-activity').value = '';
+  document.getElementById('npce-description').value = '';
+  document.getElementById('npce-notes').value = '';
+  document.getElementById('npce-dmNotes').value = '';
+  document.getElementById('npce-move-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('npce-move-activity').value = '';
+  document.getElementById('npce-move-note').value = '';
+  document.getElementById('npce-move-dmOnly').checked = false;
+  document.getElementById('npce-history-list').innerHTML = '<div class="visibleto-empty">Save the NPC first to log history.</div>';
+  renderNPCKnownToChips();
+  document.getElementById('npc-detail').style.display = 'block';
+  document.getElementById('npce-name').focus();
+}
+
+function editNPCEntity(id) {
+  const n = npcs.find(x => x.id === id);
+  if (!n) return;
+  ensureEditorExpanded();
+  ensureDetailCloseBtn(document.getElementById('npc-detail'), cancelNPCEdit);
+  editingNPCId = id;
+  tempNPCKnownTo = Array.isArray(n.knownTo) ? n.knownTo.slice() : [];
+  populateNPCLocationFilters();
+  document.getElementById('npc-detail-header').textContent = 'EDIT NPC';
+  document.getElementById('npce-name').value = n.name || '';
+  document.getElementById('npce-role').value = n.role || '';
+  document.getElementById('npce-status').value = n.status || 'alive';
+  document.getElementById('npce-location').value = n.currentLocationId || '';
+  document.getElementById('npce-activity').value = n.currentActivity || '';
+  document.getElementById('npce-description').value = n.description || '';
+  document.getElementById('npce-notes').value = n.notes || '';
+  document.getElementById('npce-dmNotes').value = n.dmNotes || '';
+  document.getElementById('npce-move-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('npce-move-activity').value = '';
+  document.getElementById('npce-move-note').value = '';
+  document.getElementById('npce-move-dmOnly').checked = false;
+  renderNPCKnownToChips();
+  renderNPCHistory(id);
+  document.getElementById('npc-detail').style.display = 'block';
+  renderNPCList();
+}
+
+async function saveNPCEntity() {
+  const name = document.getElementById('npce-name').value.trim();
+  if (!name) { toast('NPC needs a name.'); return; }
+  const fields = {
+    name,
+    role: document.getElementById('npce-role').value.trim(),
+    status: document.getElementById('npce-status').value,
+    currentLocationId: document.getElementById('npce-location').value || null,
+    currentActivity: document.getElementById('npce-activity').value.trim(),
+    description: document.getElementById('npce-description').value.trim(),
+    notes: document.getElementById('npce-notes').value.trim(),
+    dmNotes: document.getElementById('npce-dmNotes').value.trim(),
+    knownTo: tempNPCKnownTo.slice(),
+  };
+
+  if (editingNPCId === '__new__') {
+    const used = new Set(npcs.map(n => n.id));
+    let id = slugify(name) || 'npc';
+    let base = id, n = 1;
+    while (used.has(id)) id = `${base}-${++n}`;
+    npcs.push({ id, ...fields, history: [], tags: [] });
+    editingNPCId = id;
+  } else {
+    const idx = npcs.findIndex(n => n.id === editingNPCId);
+    if (idx < 0) return;
+    npcs[idx] = { ...npcs[idx], ...fields };
+  }
+  await saveNPCsKV();
+  renderNPCList();
+  renderNPCHistory(editingNPCId);
+  document.getElementById('npc-detail-header').textContent = 'EDIT NPC';
+  setSyncStatus('ok','✦ NPC saved');
+  setTimeout(()=>setSyncStatus('',''), 2000);
+}
+
+function cancelNPCEdit() {
+  editingNPCId = null;
+  document.getElementById('npc-detail').style.display = 'none';
+  renderNPCList();
+}
+
+async function deleteNPCEntity() {
+  if (!editingNPCId || editingNPCId === '__new__') { cancelNPCEdit(); return; }
+  const n = npcs.find(x => x.id === editingNPCId);
+  if (!n) return;
+  if (!(await confirmDialog(`Delete ${n.name}? Their history will be lost and players who knew them will no longer see them.`))) return;
+  npcs = npcs.filter(x => x.id !== editingNPCId);
+  editingNPCId = null;
+  document.getElementById('npc-detail').style.display = 'none';
+  await saveNPCsKV();
+  renderNPCList();
+}
+
+function renderNPCKnownToChips() {
+  const wrap = document.getElementById('npce-knownto-chips');
+  if (!wrap) return;
+  if (characters.length === 0) {
+    wrap.innerHTML = '<div class="visibleto-empty">No characters yet — set them up in the Players tab.</div>';
+    return;
+  }
+  wrap.innerHTML = characters.map(c => {
+    const on = tempNPCKnownTo.includes(c.id);
+    return `<span class="visibleto-chip ${on?'on':''}" onclick="toggleNPCKnownTo('${c.id}')">${escapeHtml(c.name)}</span>`;
+  }).join('');
+}
+function toggleNPCKnownTo(id) {
+  const i = tempNPCKnownTo.indexOf(id);
+  if (i >= 0) tempNPCKnownTo.splice(i,1); else tempNPCKnownTo.push(id);
+  renderNPCKnownToChips();
+}
+
+async function logNPCMovement() {
+  if (!editingNPCId || editingNPCId === '__new__') { toast('Save the NPC first.'); return; }
+  const idx = npcs.findIndex(n => n.id === editingNPCId);
+  if (idx < 0) return;
+  const newLoc      = document.getElementById('npce-move-location').value;
+  const newActivity = document.getElementById('npce-move-activity').value.trim();
+  const note        = document.getElementById('npce-move-note').value.trim();
+  const date        = document.getElementById('npce-move-date').value || new Date().toISOString().slice(0,10);
+  const dmOnly      = document.getElementById('npce-move-dmOnly').checked;
+  if (!newLoc && !newActivity && !note) { toast('Add at least one of: new location, new activity, or a note.'); return; }
+
+  const entry = {
+    id: 'h' + Date.now() + Math.floor(Math.random()*1000),
+    locationId: newLoc || npcs[idx].currentLocationId || null,
+    activity: newActivity || npcs[idx].currentActivity || '',
+    date, note, dmOnly
+  };
+  npcs[idx].history = npcs[idx].history || [];
+  npcs[idx].history.push(entry);
+  // Apply changes as the current state too
+  if (newLoc)      npcs[idx].currentLocationId = newLoc;
+  if (newActivity) npcs[idx].currentActivity   = newActivity;
+
+  await saveNPCsKV();
+  // Update form display
+  document.getElementById('npce-location').value = npcs[idx].currentLocationId || '';
+  document.getElementById('npce-activity').value = npcs[idx].currentActivity || '';
+  document.getElementById('npce-move-location').value = '';
+  document.getElementById('npce-move-activity').value = '';
+  document.getElementById('npce-move-note').value = '';
+  document.getElementById('npce-move-dmOnly').checked = false;
+  renderNPCHistory(editingNPCId);
+  renderNPCList();
+  setSyncStatus('ok','✦ History entry logged');
+  setTimeout(()=>setSyncStatus('',''), 2000);
+}
+
+function renderNPCHistory(npcId) {
+  const list = document.getElementById('npce-history-list');
+  if (!list) return;
+  const n = npcs.find(x => x.id === npcId);
+  if (!n) { list.innerHTML = ''; return; }
+  const items = (n.history || []).slice().sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  if (items.length === 0) { list.innerHTML = '<div class="visibleto-empty">No history yet.</div>'; return; }
+  list.innerHTML = items.map(h => `
+    <div class="npc-history-card ${h.dmOnly?'dm-only':''}">
+      <div class="npc-history-meta">
+        <span>${escapeHtml(h.date)}${h.dmOnly?' · DM only':''}</span>
+        <button class="npc-history-del" onclick="deleteNPCHistoryEntry('${h.id}')" title="Delete">✕</button>
+      </div>
+      ${h.locationId ? `<div class="npc-history-loc">📍 ${escapeHtml(locationName(h.locationId))}</div>` : ''}
+      ${h.activity   ? `<div class="npc-history-body" style="font-style:italic">${escapeHtml(h.activity)}</div>` : ''}
+      ${h.note       ? `<div class="npc-history-body">${escapeHtml(h.note)}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+async function deleteNPCHistoryEntry(hId) {
+  if (!editingNPCId) return;
+  if (!(await confirmDialog('Delete this history entry?'))) return;
+  const idx = npcs.findIndex(n => n.id === editingNPCId);
+  if (idx < 0) return;
+  npcs[idx].history = (npcs[idx].history || []).filter(h => h.id !== hId);
+  await saveNPCsKV();
+  renderNPCHistory(editingNPCId);
+}
+
+function renderLocationNPCsHere(locId) {
+  const wrap = document.getElementById('loc-npcs-here');
+  if (!wrap) return;
+  if (!locId || inSubMap()) {
+    wrap.innerHTML = inSubMap()
+      ? '<div class="visibleto-empty">NPCs attach to world locations, not sub-map pins. Exit the sub-map editor to manage NPCs here.</div>'
+      : '<div class="visibleto-empty">Save this location first, then add NPCs here.</div>';
+    return;
+  }
+  const here = npcs.filter(n => n.currentLocationId === locId);
+  if (here.length === 0) {
+    wrap.innerHTML = '<div class="visibleto-empty">No NPCs currently here.</div>';
+    return;
+  }
+  wrap.innerHTML = here.map(n => `
+    <div class="npc-card" onclick="closeLocModal();switchTab('npcs');editNPCEntity('${n.id}')">
+      <div class="npc-card-row">
+        <span class="npc-card-name">${escapeHtml(n.name)}</span>
+        ${n.role ? `<span class="npc-card-role">${escapeHtml(n.role)}</span>` : ''}
+        <span class="npc-status ${(n.status||'alive').toLowerCase()}">${(n.status||'alive').toLowerCase()}</span>
+      </div>
+      ${n.currentActivity ? `<div class="npc-card-activity">${escapeHtml(n.currentActivity)}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TIMELINE TAB
+// ══════════════════════════════════════════════════════════════
+const TL_KIND_LABELS = { session:'Session', event:'Event', milestone:'Milestone', planned:'Planned' };
+
+function tlSortKey(e) { return (e.dateSort || '') + '~' + (e.id || ''); }
+function timelineSorted() {
+  return timeline.slice().sort((a,b) => tlSortKey(b).localeCompare(tlSortKey(a)));
+}
+
+function renderTimelineList() {
+  const list = document.getElementById('tl-list');
+  if (!list) return;
+  const query = (document.getElementById('tl-search')?.value || '').trim().toLowerCase();
+  const kindFilter = document.getElementById('tl-filter-kind')?.value || '';
+
+  const filtered = timelineSorted().filter(e => {
+    if (kindFilter && e.kind !== kindFilter) return false;
+    if (!query) return true;
+    return (e.title||'').toLowerCase().includes(query)
+        || (e.body||'').toLowerCase().includes(query)
+        || (e.dateInGame||'').toLowerCase().includes(query);
+  });
+
+  document.getElementById('tl-count').textContent = `(${filtered.length}${filtered.length !== timeline.length ? ` / ${timeline.length}` : ''})`;
+
+  if (filtered.length === 0) {
+    list.innerHTML = timeline.length === 0
+      ? '<div class="visibleto-empty">No timeline entries yet. Add one to start the chronicle.</div>'
+      : '<div class="visibleto-empty">No entries match those filters.</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(e => {
+    const kind = e.kind || 'event';
+    const kindLabel = TL_KIND_LABELS[kind] || kind;
+    const metaChips = [];
+    (e.locationIds||[]).forEach(id => { const l = worldData.locations.find(x => x.id === id); if (l) metaChips.push('📍 ' + escapeHtml(l.name)); });
+    (e.characterIds||[]).forEach(id => { const c = characters.find(x => x.id === id); if (c) metaChips.push('★ ' + escapeHtml(c.name)); });
+    (e.npcIds||[]).forEach(id => { const n = npcs.find(x => x.id === id); if (n) metaChips.push('☉ ' + escapeHtml(n.name)); });
+    return `<div class="tl-card kind-${kind} ${e.id===editingTLId?'selected':''}" onclick="editTimelineEntry('${e.id}')">
+      <div class="tl-card-row">
+        <span class="tl-card-kind">${escapeHtml(kindLabel)}</span>
+        <span class="tl-card-title">${escapeHtml(e.title||'(Untitled)')}</span>
+        <span class="tl-card-date">${escapeHtml(e.dateInGame||e.dateSort||'')}</span>
+      </div>
+      ${e.body ? `<div class="tl-card-body">${escapeHtml(e.body)}</div>` : ''}
+      ${metaChips.length ? `<div class="tl-card-meta">${metaChips.map(c => `<span class="tl-card-meta-chip">${c}</span>`).join('')}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function addTimelineEntry() {
+  ensureEditorExpanded();
+  ensureDetailCloseBtn(document.getElementById('tl-detail'), cancelTimelineEdit);
+  editingTLId = '__new__';
+  tempTLLocs = []; tempTLChars = []; tempTLNpcs = []; tempTLVisibleTo = [];
+  tempTLLoot = []; tempTLCombats = [];
+  document.getElementById('tl-detail-header').textContent = 'NEW ENTRY';
+  document.getElementById('tle-title').value = '';
+  document.getElementById('tle-kind').value = 'session';
+  document.getElementById('tle-dateInGame').value = '';
+  document.getElementById('tle-dateSort').value = '';
+  document.getElementById('tle-dateReal').value = new Date().toISOString().slice(0,10);
+  document.getElementById('tle-body').value = '';
+  document.getElementById('tle-dmNotes').value = '';
+  renderTLChips();
+  renderTLLoot();
+  renderTLCombats();
+  document.getElementById('tl-detail').style.display = 'block';
+  document.getElementById('tle-title').focus();
+}
+
+function editTimelineEntry(id) {
+  const e = timeline.find(x => x.id === id);
+  if (!e) return;
+  ensureEditorExpanded();
+  ensureDetailCloseBtn(document.getElementById('tl-detail'), cancelTimelineEdit);
+  editingTLId = id;
+  tempTLLocs      = Array.isArray(e.locationIds)  ? e.locationIds.slice()  : [];
+  tempTLChars     = Array.isArray(e.characterIds) ? e.characterIds.slice() : [];
+  tempTLNpcs      = Array.isArray(e.npcIds)       ? e.npcIds.slice()       : [];
+  tempTLVisibleTo = Array.isArray(e.visibleTo)    ? e.visibleTo.slice()    : [];
+  document.getElementById('tl-detail-header').textContent = 'EDIT ENTRY';
+  document.getElementById('tle-title').value      = e.title || '';
+  document.getElementById('tle-kind').value       = e.kind || 'session';
+  document.getElementById('tle-dateInGame').value = e.dateInGame || '';
+  document.getElementById('tle-dateSort').value   = e.dateSort || '';
+  document.getElementById('tle-dateReal').value   = e.dateReal || new Date().toISOString().slice(0,10);
+  document.getElementById('tle-body').value       = e.body || '';
+  document.getElementById('tle-dmNotes').value    = e.dmNotes || '';
+  tempTLLoot    = Array.isArray(e.loot)    ? JSON.parse(JSON.stringify(e.loot))    : [];
+  tempTLCombats = Array.isArray(e.combats) ? JSON.parse(JSON.stringify(e.combats)) : [];
+  renderTLChips();
+  renderTLLoot();
+  renderTLCombats();
+  document.getElementById('tl-detail').style.display = 'block';
+  renderTimelineList();
+}
+
+// ── Editable loot rows in the timeline editor ────────────────
+function tlLootRecipientOptions() {
+  const dl = document.getElementById('tle-loot-recipients');
+  if (!dl) return;
+  const names = ['Party', ...characters.map(c => c.name)];
+  dl.innerHTML = names.map(n => `<option value="${escapeHtml(n)}">`).join('');
+}
+
+function renderTLLoot() {
+  const wrap = document.getElementById('tle-loot-rows');
+  if (!wrap) return;
+  tlLootRecipientOptions();
+  if (tempTLLoot.length === 0) {
+    wrap.innerHTML = '<div class="visibleto-empty">No loot recorded. Add rows below or attach from the initiative tracker.</div>';
+    return;
+  }
+  wrap.innerHTML = tempTLLoot.map((l, i) => `
+    <div class="tl-loot-row">
+      <input class="tl-loot-item" type="text" placeholder="Item" value="${escapeHtml(l.item||'')}" oninput="tempTLLoot[${i}].item=this.value">
+      <input class="tl-loot-qty"  type="text" placeholder="Qty"  value="${escapeHtml(String(l.qty||'1'))}" oninput="tempTLLoot[${i}].qty=this.value">
+      <input class="tl-loot-who"  type="text" placeholder="Who" list="tle-loot-recipients" value="${escapeHtml(l.recipient||'')}" oninput="tempTLLoot[${i}].recipient=this.value">
+      <button class="tl-loot-del" type="button" onclick="removeTLLootRow(${i})" title="Remove">✕</button>
+    </div>
+  `).join('');
+}
+
+function addTLLootRow() {
+  tempTLLoot.push({ id: 'lt_' + Date.now() + Math.floor(Math.random()*100000), item: '', qty: '1', recipient: '' });
+  renderTLLoot();
+  // focus the new item input
+  const rows = document.querySelectorAll('#tle-loot-rows .tl-loot-row .tl-loot-item');
+  if (rows.length) rows[rows.length-1].focus();
+}
+
+function removeTLLootRow(i) {
+  tempTLLoot.splice(i, 1);
+  renderTLLoot();
+}
+
+// ── Attached combats (removable) ─────────────────────────────
+function renderTLCombats() {
+  const box  = document.getElementById('tle-combats-box');
+  const list = document.getElementById('tle-combats-list');
+  if (!box || !list) return;
+  if (tempTLCombats.length === 0) { box.style.display = 'none'; list.innerHTML = ''; return; }
+  box.style.display = '';
+  list.innerHTML = tempTLCombats.map((c, i) => `
+    <div class="tl-combat-item">
+      <span class="tl-combat-name">⚔ ${escapeHtml(c.title||'Combat')}</span>
+      <span class="tl-combat-sub">${escapeHtml(c.outcome||'')}${c.rounds?` · ${escapeHtml(String(c.rounds))} rds`:''}</span>
+      <button class="tl-combat-del" type="button" onclick="removeTLCombat(${i})" title="Detach this combat">✕</button>
+    </div>
+  `).join('');
+}
+
+async function removeTLCombat(i) {
+  const c = tempTLCombats[i];
+  if (!(await confirmDialog(`Detach combat "${c?.title||'Combat'}" from this entry? Its log and summary are removed from the Chronicle.`))) return;
+  tempTLCombats.splice(i, 1);
+  renderTLCombats();
+}
+
+function renderTLChips() {
+  const locWrap  = document.getElementById('tle-loc-chips');
+  const charWrap = document.getElementById('tle-char-chips');
+  const npcWrap  = document.getElementById('tle-npc-chips');
+  const visWrap  = document.getElementById('tle-visibleto-chips');
+
+  if (locWrap) {
+    const locs = (worldData.locations || []).slice().sort((a,b) => (a.name||'').localeCompare(b.name||''));
+    locWrap.innerHTML = locs.length === 0
+      ? '<div class="visibleto-empty">No locations yet.</div>'
+      : locs.map(l => `<span class="visibleto-chip ${tempTLLocs.includes(l.id)?'on':''}" onclick="toggleTLChip('loc','${l.id}')">${escapeHtml(l.name)}</span>`).join('');
+  }
+  if (charWrap) {
+    charWrap.innerHTML = characters.length === 0
+      ? '<div class="visibleto-empty">No characters yet.</div>'
+      : characters.map(c => `<span class="visibleto-chip ${tempTLChars.includes(c.id)?'on':''}" onclick="toggleTLChip('char','${c.id}')">${escapeHtml(c.name)}</span>`).join('');
+  }
+  if (npcWrap) {
+    npcWrap.innerHTML = npcs.length === 0
+      ? '<div class="visibleto-empty">No NPCs yet.</div>'
+      : npcs.slice().sort((a,b) => (a.name||'').localeCompare(b.name||''))
+          .map(n => `<span class="visibleto-chip ${tempTLNpcs.includes(n.id)?'on':''}" onclick="toggleTLChip('npc','${n.id}')">${escapeHtml(n.name)}</span>`).join('');
+  }
+  if (visWrap) {
+    visWrap.innerHTML = characters.length === 0
+      ? '<div class="visibleto-empty">No characters to grant visibility to.</div>'
+      : characters.map(c => `<span class="visibleto-chip ${tempTLVisibleTo.includes(c.id)?'on':''}" onclick="toggleTLChip('vis','${c.id}')">${escapeHtml(c.name)}</span>`).join('');
+  }
+}
+
+function toggleTLChip(which, id) {
+  const arr = which==='loc' ? tempTLLocs
+            : which==='char'? tempTLChars
+            : which==='npc' ? tempTLNpcs
+            : which==='vis' ? tempTLVisibleTo
+            : null;
+  if (!arr) return;
+  const i = arr.indexOf(id);
+  if (i >= 0) arr.splice(i,1); else arr.push(id);
+  renderTLChips();
+}
+
+async function saveTimelineEntry() {
+  const title = document.getElementById('tle-title').value.trim();
+  if (!title) { toast('Entry needs a title.'); return; }
+  const fields = {
+    title,
+    kind:        document.getElementById('tle-kind').value || 'event',
+    dateInGame:  document.getElementById('tle-dateInGame').value.trim(),
+    dateSort:    document.getElementById('tle-dateSort').value || '',
+    dateReal:    document.getElementById('tle-dateReal').value || new Date().toISOString().slice(0,10),
+    body:        document.getElementById('tle-body').value.trim(),
+    dmNotes:     document.getElementById('tle-dmNotes').value.trim(),
+    locationIds: tempTLLocs.slice(),
+    characterIds:tempTLChars.slice(),
+    npcIds:      tempTLNpcs.slice(),
+    visibleTo:   tempTLVisibleTo.slice(),
+    // Drop blank loot rows; preserve attached combats (minus any detached).
+    loot:        tempTLLoot.filter(l => (l.item||'').trim()).map(l => ({
+                   id: l.id || ('lt_'+Date.now()+Math.floor(Math.random()*100000)),
+                   item: (l.item||'').trim(),
+                   qty: (l.qty||'1').toString().trim() || '1',
+                   recipient: (l.recipient||'').trim() || 'Party'
+                 })),
+    combats:     tempTLCombats.slice(),
+  };
+
+  if (editingTLId === '__new__') {
+    const id = 'tl_' + Date.now() + Math.floor(Math.random()*1000);
+    timeline.push({ id, ...fields });
+    editingTLId = id;
+  } else {
+    const idx = timeline.findIndex(e => e.id === editingTLId);
+    if (idx < 0) return;
+    timeline[idx] = { ...timeline[idx], ...fields };
+  }
+  await saveTimelineKV();
+  renderTimelineList();
+  document.getElementById('tl-detail-header').textContent = 'EDIT ENTRY';
+  setSyncStatus('ok','✦ Entry saved');
+  setTimeout(()=>setSyncStatus('',''), 2000);
+}
+
+function cancelTimelineEdit() {
+  editingTLId = null;
+  document.getElementById('tl-detail').style.display = 'none';
+  renderTimelineList();
+}
+
+async function deleteTimelineEntry() {
+  if (!editingTLId || editingTLId === '__new__') { cancelTimelineEdit(); return; }
+  const e = timeline.find(x => x.id === editingTLId);
+  if (!e) return;
+  if (!(await confirmDialog(`Delete entry "${e.title}"? Cannot be undone.`))) return;
+  timeline = timeline.filter(x => x.id !== editingTLId);
+  editingTLId = null;
+  document.getElementById('tl-detail').style.display = 'none';
+  await saveTimelineKV();
+  renderTimelineList();
+}
+
+function quickAddNPCAtLocation() {
+  const locId = editingLocId;
+  if (!locId) {
+    toast('Save this location first, then add NPCs here.');
+    return;
+  }
+  // Close the location modal and jump to the NPCs tab with currentLocation pre-filled
+  closeLocModal();
+  switchTab('npcs');
+  addNPCEntity();
+  const select = document.getElementById('npce-location');
+  if (select) select.value = locId;
+}
+
+// VisibleTo chips inside location modal
+function renderVisibleToChips() {
+  const wrap = document.getElementById('loc-visibleto-chips');
+  if (!wrap) return;
+  if (characters.length === 0) {
+    wrap.innerHTML = '<div class="visibleto-empty">No characters created yet — set them up in the Players tab.</div>';
+    return;
+  }
+  wrap.innerHTML = characters.map(c => {
+    const on = tempVisibleTo.includes(c.id);
+    return `<span class="visibleto-chip ${on?'on':''}" onclick="toggleVisibleTo('${c.id}')">${escapeHtml(c.name)}</span>`;
+  }).join('');
+}
+function toggleVisibleTo(id) {
+  const i = tempVisibleTo.indexOf(id);
+  if (i >= 0) tempVisibleTo.splice(i,1); else tempVisibleTo.push(id);
+  renderVisibleToChips();
+}
+
+// Connected-locations chips inside location modal
+function renderConnectedChips() {
+  const wrap = document.getElementById('loc-connected-chips');
+  if (!wrap) return;
+  const others = (data.locations || []).filter(l => l.id !== editingLocId);
+  if (others.length === 0) {
+    wrap.innerHTML = '<div class="visibleto-empty">No other locations yet.</div>';
+    return;
+  }
+  wrap.innerHTML = others.map(l => {
+    const on = tempConnected.includes(l.id);
+    return `<span class="visibleto-chip ${on?'on':''}" onclick="toggleConnected('${l.id}')">${escapeHtml(l.name)}</span>`;
+  }).join('');
+}
+function toggleConnected(id) {
+  const i = tempConnected.indexOf(id);
+  if (i >= 0) tempConnected.splice(i,1); else tempConnected.push(id);
+  renderConnectedChips();
+}
+
+init();
+// ══════════════════════════════════════════════════════════════
+//  OBSIDIAN IMPORT
+// ══════════════════════════════════════════════════════════════
+
+let importFiles   = [];   // { name, content, parsed }
+let importParsed  = [];   // final parsed locations ready to preview
+let conflictChoices = {}; // { locId: 'merge'|'replace'|'skip' }
+
+// ── Open / close ─────────────────────────────────────────────
+function openImport() {
+  importFiles  = [];
+  importParsed = [];
+  conflictChoices = {};
+  document.getElementById('import-file-list').innerHTML = '';
+  document.getElementById('import-file-summary').style.display = 'none';
+  document.getElementById('import-step-1').style.display = 'block';
+  document.getElementById('import-step-2').style.display = 'none';
+  document.getElementById('import-next-btn').style.display = 'none';
+  document.getElementById('import-confirm-btn').style.display = 'none';
+  document.getElementById('import-file-input').value = '';
+  document.getElementById('import-modal').classList.remove('hidden');
+}
+function closeImport() {
+  document.getElementById('import-modal').classList.add('hidden');
+}
+
+// ── File drop / select ────────────────────────────────────────
+function handleImportDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  handleImportFiles(e.dataTransfer.files);
+}
+
+function handleImportFiles(fileList) {
+  const mdFiles = Array.from(fileList).filter(f => f.name.endsWith('.md'));
+  if (!mdFiles.length) return;
+
+  const readers = mdFiles.map(file => new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => resolve({ name: file.name, content: e.target.result });
+    reader.readAsText(file);
+  }));
+
+  Promise.all(readers).then(loaded => {
+    loaded.forEach(f => {
+      if (!importFiles.find(x => x.name === f.name)) {
+        importFiles.push({ ...f, parsed: parseObsidianNote(f.name, f.content) });
+      }
+    });
+    renderImportFileList();
+  });
+}
+
+function removeImportFile(name) {
+  importFiles = importFiles.filter(f => f.name !== name);
+  renderImportFileList();
+}
+
+function renderImportFileList() {
+  const list = document.getElementById('import-file-list');
+  const summary = document.getElementById('import-file-summary');
+  const nextBtn = document.getElementById('import-next-btn');
+  list.innerHTML = '';
+
+  if (importFiles.length === 0) {
+    summary.style.display = 'none';
+    nextBtn.style.display = 'none';
+    return;
+  }
+
+  importFiles.forEach(f => {
+    const type = f.parsed.noteType;
+    const typeLabel = type === 'location' ? 'Location' : type === 'npc' ? 'NPC' : '?';
+    const typeClass = type === 'location' ? 'location' : type === 'npc' ? 'npc' : 'unknown';
+    const icon = type === 'location' ? '📍' : type === 'npc' ? '👤' : '📄';
+    const el = document.createElement('div');
+    el.className = 'import-file-item';
+    el.innerHTML = `
+      <span class="fi-icon">${icon}</span>
+      <span class="fi-name">${f.name}</span>
+      <span class="fi-type ${typeClass}">${typeLabel}</span>
+      <button class="fi-del" onclick="removeImportFile('${f.name}')">✕</button>
+    `;
+    list.appendChild(el);
+  });
+
+  const locs = importFiles.filter(f => f.parsed.noteType === 'location').length;
+  const npcs = importFiles.filter(f => f.parsed.noteType === 'npc').length;
+  const unknown = importFiles.filter(f => f.parsed.noteType === 'unknown').length;
+  summary.innerHTML = `<strong>${importFiles.length}</strong> file${importFiles.length !== 1 ? 's' : ''} loaded — <strong>${locs}</strong> location${locs !== 1 ? 's' : ''}, <strong>${npcs}</strong> NPC${npcs !== 1 ? 's' : ''}${unknown ? `, <strong>${unknown}</strong> unrecognised` : ''}`;
+  summary.style.display = 'block';
+  nextBtn.style.display = importFiles.length > 0 ? '' : 'none';
+}
+
+// ── YAML frontmatter parser ───────────────────────────────────
+function parseFrontmatter(content) {
+  const fm = {};
+  const match = content.match(/^---\s*\n([\s\S]*?)\n---/);
+  if (!match) return { fm, body: content.trim() };
+
+  const yamlText = match[1];
+  const body = content.slice(match[0].length).trim();
+
+  yamlText.split('\n').forEach(line => {
+    const colonIdx = line.indexOf(':');
+    if (colonIdx < 0) return;
+    const key = line.slice(0, colonIdx).trim();
+    let val = line.slice(colonIdx + 1).trim();
+
+    // Handle YAML lists (- item)
+    if (!val) {
+      // Multi-line list — collect following indented lines
+      return;
+    }
+    // Strip quotes
+    val = val.replace(/^["']|["']$/g, '');
+    fm[key] = val;
+  });
+
+  // Second pass for YAML lists
+  const listMatches = yamlText.matchAll(/^(\w[\w_-]*):\s*\n((?:\s+-[^\n]+\n?)+)/gm);
+  for (const m of listMatches) {
+    const key = m[1];
+    const items = m[2].match(/-\s*(.+)/g)?.map(s => s.replace(/^-\s*/, '').trim()) || [];
+    fm[key] = items;
+  }
+
+  return { fm, body };
+}
+
+// ── Parse a single .md note ───────────────────────────────────
+function parseObsidianNote(filename, content) {
+  const { fm, body } = parseFrontmatter(content);
+  const baseName = filename.replace(/\.md$/, '');
+
+  // Determine note type from frontmatter tags or fields
+  const tags = (fm.tags || fm.tag || '').toString().toLowerCase();
+  const obsidianType = (fm.type || '').toLowerCase(); // Obsidian data type (place, NPC, faction, shop…)
+  const isExplicitLocation = ['place','location','city','town','village','settlement','dungeon','cave','ruin','ruins','wilderness','forest','port','harbour','harbor','fort','fortress','castle','keep','stronghold'].includes(obsidianType);
+  const isExplicitNPC     = obsidianType === 'npc' || obsidianType === 'character';
+  const isExplicitOther   = ['faction','shop'].includes(obsidianType); // skip these
+  const hasLocationType   = fm.type && ['city','dungeon','wilderness','ruin','port','fort','location','settlement','town','village'].includes(obsidianType);
+  const isNPCByTag = tags.includes('npc') || tags.includes('character') || tags.includes('person');
+  const isLocByTag = tags.includes('location') || tags.includes('place') || tags.includes('settlement');
+  const hasRole = !!fm.role;
+  // Only use hasLocationField as NPC signal when the note isn't explicitly a location
+  const hasLocationField = !isExplicitLocation && !!(fm.location || fm.Location);
+
+  let noteType = 'unknown';
+  if (isExplicitOther) noteType = 'unknown'; // faction/shop — skip
+  else if (isExplicitLocation) noteType = 'location';
+  else if (isExplicitNPC || hasRole || isNPCByTag || hasLocationField) noteType = 'npc';
+  else if (hasLocationType || isLocByTag || fm.shortDesc || fm.lore) noteType = 'location';
+  else if (body.match(/^#{1,3} (NPCs?|Characters?|Inhabitants)/m)) noteType = 'location';
+  else if (fm.name && !hasRole) noteType = 'location'; // default guess
+
+  if (noteType === 'npc') {
+    return parseNPCNote(baseName, fm, body);
+  } else if (noteType === 'location') {
+    return parseLocationNote(baseName, fm, body);
+  }
+  return { noteType: 'unknown', name: baseName, raw: { fm, body } };
+}
+
+// ── Parse location note ───────────────────────────────────────
+function parseLocationNote(baseName, fm, body) {
+  const name = fm.name || fm.title || baseName;
+  const id   = (fm.id || name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+  // Extract sections from markdown body
+  const sections = extractMarkdownSections(body);
+
+  // Lore: everything before the first heading, or a ## Description / ## About section
+  const lore = sections['description'] || sections['about'] || sections['lore'] || sections['overview'] || sections['_intro'] || '';
+
+  // Quest hooks from YAML list or ## Quests section
+  let quests = [];
+  if (Array.isArray(fm.quests)) {
+    quests = fm.quests.map(q => typeof q === 'string' ? { title: q, desc: '' } : q);
+  }
+  const questSection = sections['quests'] || sections['quest hooks'] || sections['hooks'] || '';
+  if (questSection) {
+    questSection.split('\n').filter(l => l.trim().startsWith('-')).forEach(line => {
+      const text = line.replace(/^-\s*/, '').trim();
+      if (text) quests.push({ title: text, desc: '' });
+    });
+  }
+
+  // Connected locations from YAML or body wiki links
+  let connected = [];
+  if (fm.connected) connected = Array.isArray(fm.connected) ? fm.connected : fm.connected.split(',').map(s => s.trim());
+  const wikiLinks = [...body.matchAll(/\[\[([^\]|#]+?)(?:\|[^\]]*)?\]\]/g)].map(m => m[1].trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+  connected = [...new Set([...connected, ...wikiLinks])].filter(Boolean);
+
+  // DM notes from ## DM Notes / ## Secrets section
+  const dmNotes = [
+    sections['dm notes'] || sections['dm'] || sections['secrets'] || sections['secret'] || '',
+    fm.secret || fm.secrets || '',
+    fm.statblock || ''
+  ].filter(Boolean).join('\n\n').trim();
+
+  // Map type — prefer explicit map_type field, fall back to type field
+  const rawType = (fm.map_type || fm.mapType || fm.type || '').toLowerCase();
+  const typeMap = { city:'city', town:'city', village:'city', settlement:'city', dungeon:'dungeon', cave:'dungeon', ruins:'ruin', ruin:'ruin', wilderness:'wilderness', forest:'wilderness', port:'port', harbour:'port', harbor:'port', fort:'fort', fortress:'fort', castle:'fort', keep:'fort', stronghold:'fort' };
+  const locType = typeMap[rawType] || 'default';
+
+  return {
+    noteType: 'location',
+    name,
+    id,
+    type:      locType,
+    shortDesc: fm.shortDesc || fm.description || fm.desc || fm.summary || '',
+    lore:      lore.trim(),
+    mapImage:  fm.mapImage || fm.map || '',
+    connected,
+    quests,
+    visible:   fm.visible !== 'false' && fm.visible !== false,
+    x:         parseFloat(fm.x) || null,
+    y:         parseFloat(fm.y) || null,
+    dmNotes,
+    npcs:      [],  // filled in later from NPC files
+  };
+}
+
+// ── Parse NPC note ────────────────────────────────────────────
+function parseNPCNote(baseName, fm, body) {
+  const name = fm.name || fm.title || baseName;
+
+  // Location link: frontmatter field OR wiki link in body
+  let locationRef = fm.location || fm.Location || fm.place || '';
+  if (!locationRef) {
+    const wikiMatch = body.match(/\[\[([^\]|#]+?)(?:\|[^\]]*)?\]\]/);
+    if (wikiMatch) locationRef = wikiMatch[1].trim();
+  }
+  const locationId = locationRef ? locationRef.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : '';
+
+  // Description: frontmatter desc or body intro
+  const { _intro } = extractMarkdownSections(body);
+  const desc = fm.description || fm.desc || fm.bio || _intro || '';
+
+  // DM notes: statblock + secrets
+  const dmParts = [fm.statblock, fm.secrets, fm.secret, fm.notes].filter(Boolean);
+  const dmNotes = dmParts.join('\n\n').trim();
+
+  return {
+    noteType:   'npc',
+    name,
+    role:       fm.role || fm.title || fm.occupation || '',
+    desc:       desc.trim(),
+    faction:    fm.faction || fm.affiliation || '',
+    locationId,
+    dmNotes,
+  };
+}
+
+// ── Extract ## sections from markdown body ────────────────────
+function extractMarkdownSections(body) {
+  const sections = {};
+  const lines = body.split('\n');
+  let currentKey = '_intro';
+  let buffer = [];
+
+  lines.forEach(line => {
+    const headingMatch = line.match(/^#{1,4}\s+(.+)/);
+    if (headingMatch) {
+      sections[currentKey] = buffer.join('\n').trim();
+      currentKey = headingMatch[1].trim().toLowerCase();
+      buffer = [];
+    } else {
+      buffer.push(line);
+    }
+  });
+  sections[currentKey] = buffer.join('\n').trim();
+  return sections;
+}
+
+// ── Step 2: build preview ─────────────────────────────────────
+function importStep2() {
+  // Stitch NPCs into their locations
+  const locationNotes = importFiles.filter(f => f.parsed.noteType === 'location').map(f => ({ ...f.parsed }));
+  const npcNotes      = importFiles.filter(f => f.parsed.noteType === 'npc').map(f => f.parsed);
+
+  // Build a lookup of location id → location
+  const locById   = {};
+  const locByName = {};
+  locationNotes.forEach(loc => {
+    locById[loc.id] = loc;
+    locByName[loc.name.toLowerCase()] = loc;
+  });
+
+  // Also check existing map locations for NPC assignment
+  data.locations.forEach(loc => {
+    if (!locById[loc.id]) locById[loc.id] = loc;
+    if (!locByName[loc.name.toLowerCase()]) locByName[loc.name.toLowerCase()] = loc;
+  });
+
+  npcNotes.forEach(npc => {
+    const targetLoc = locById[npc.locationId] || locByName[npc.locationId] || locByName[npc.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')];
+    if (targetLoc) {
+      if (!targetLoc.npcs) targetLoc.npcs = [];
+      const npcEntry = { name: npc.name, role: npc.role, desc: npc.desc + (npc.faction ? ` (${npc.faction})` : '') };
+      if (!targetLoc.npcs.find(n => n.name === npc.name)) {
+        targetLoc.npcs.push(npcEntry);
+      }
+      // DM notes from NPC go into location DM notes
+      if (npc.dmNotes) {
+        targetLoc.dmNotes = (targetLoc.dmNotes ? targetLoc.dmNotes + '\n\n' : '') + `## ${npc.name}\n${npc.dmNotes}`;
+      }
+    }
+  });
+
+  importParsed = locationNotes;
+  conflictChoices = {};
+
+  // Build preview
+  const previewList = document.getElementById('import-preview-list');
+  const previewSummary = document.getElementById('import-preview-summary');
+  previewList.innerHTML = '';
+
+  const conflicts   = importParsed.filter(loc => data.locations.find(e => e.id === loc.id));
+  const newLocs     = importParsed.filter(loc => !data.locations.find(e => e.id === loc.id));
+  const unlinkedNPCs = npcNotes.filter(npc => !locById[npc.locationId] && !locByName[(npc.locationId||'').toLowerCase()]);
+
+  previewSummary.innerHTML = `Importing <strong>${importParsed.length}</strong> location${importParsed.length !== 1 ? 's' : ''} (<strong>${newLocs.length}</strong> new, <strong>${conflicts.length}</strong> conflict${conflicts.length !== 1 ? 's' : ''}) with <strong>${npcNotes.length}</strong> NPC${npcNotes.length !== 1 ? 's' : ''}.${unlinkedNPCs.length ? ` <span style="color:#c87800">${unlinkedNPCs.length} NPC${unlinkedNPCs.length !== 1 ? 's' : ''} could not be matched to a location.</span>` : ''}`;
+
+  // Conflicts first
+  conflicts.forEach(loc => {
+    conflictChoices[loc.id] = 'merge'; // default
+    const existing = data.locations.find(e => e.id === loc.id);
+    const card = document.createElement('div');
+    card.className = 'conflict-row';
+    card.innerHTML = `
+      <div class="conflict-row-title">⚠ Conflict — "${loc.name}" already exists on the map</div>
+      <div style="font-size:0.78rem;color:var(--ink-faint);margin-bottom:6px">
+        Existing: ${existing.npcs?.length||0} NPCs, ${existing.quests?.length||0} quests &nbsp;|&nbsp;
+        Importing: ${loc.npcs?.length||0} NPCs, ${loc.quests?.length||0} quests
+      </div>
+      <div class="conflict-opts">
+        <button class="conflict-opt merge selected" id="co-merge-${loc.id}" onclick="setConflict('${loc.id}','merge')">Merge — add new data, keep existing</button>
+        <button class="conflict-opt replace" id="co-replace-${loc.id}" onclick="setConflict('${loc.id}','replace')">Replace — overwrite completely</button>
+        <button class="conflict-opt skip" id="co-skip-${loc.id}" onclick="setConflict('${loc.id}','skip')">Skip — leave unchanged</button>
+      </div>
+    `;
+    previewList.appendChild(card);
+  });
+
+  // New locations
+  if (newLocs.length) {
+    const header = document.createElement('div');
+    header.className = 'import-preview-title';
+    header.textContent = `NEW LOCATIONS (${newLocs.length})`;
+    previewList.appendChild(header);
+  }
+  newLocs.forEach(loc => {
+    const typeColor = TYPE_COLORS[loc.type] || TYPE_COLORS.default;
+    const card = document.createElement('div');
+    card.className = 'import-loc-card';
+    card.innerHTML = `
+      <div class="import-loc-header">
+        <span class="import-loc-name">${TYPE_ICONS[loc.type]||'📍'} ${loc.name}</span>
+        <span class="import-loc-badge" style="background:${typeColor}22;color:${typeColor};border:1px solid ${typeColor}44">${loc.type}</span>
+      </div>
+      <div class="import-loc-details">
+        ${loc.shortDesc ? `<span>${loc.shortDesc.slice(0,80)}${loc.shortDesc.length>80?'…':''}</span>` : ''}
+        ${loc.npcs?.length ? `<span>👤 ${loc.npcs.length} NPC${loc.npcs.length!==1?'s':''}</span>` : ''}
+        ${loc.quests?.length ? `<span>✦ ${loc.quests.length} quest${loc.quests.length!==1?'s':''}</span>` : ''}
+        ${loc.lore ? `<span>📜 Lore</span>` : ''}
+        ${loc.dmNotes ? `<span>🔒 DM notes</span>` : ''}
+      </div>
+    `;
+    previewList.appendChild(card);
+  });
+
+  // Unlinked NPCs warning
+  if (unlinkedNPCs.length) {
+    const warn = document.createElement('div');
+    warn.style.cssText = 'background:rgba(200,120,0,0.08);border:1px solid rgba(200,120,0,0.3);border-radius:4px;padding:8px 10px;margin-top:8px;font-size:0.78rem;color:#c87800;font-family:Cinzel,serif;font-size:0.65rem;letter-spacing:0.06em';
+    warn.innerHTML = `⚠ UNMATCHED NPCs — no location found:<br><span style="font-family:inherit;color:var(--ink-faint);font-size:0.75rem">${unlinkedNPCs.map(n=>n.name).join(', ')}</span>`;
+    previewList.appendChild(warn);
+  }
+
+  document.getElementById('import-step-1').style.display = 'none';
+  document.getElementById('import-step-2').style.display = 'block';
+  document.getElementById('import-next-btn').style.display = 'none';
+  document.getElementById('import-confirm-btn').style.display = '';
+}
+
+function setConflict(locId, choice) {
+  conflictChoices[locId] = choice;
+  ['merge','replace','skip'].forEach(opt => {
+    const btn = document.getElementById(`co-${opt}-${locId}`);
+    if (btn) btn.classList.toggle('selected', opt === choice);
+  });
+}
+
+// ── Commit the import ─────────────────────────────────────────
+function confirmImport() {
+  let added = 0, merged = 0, replaced = 0, skipped = 0;
+
+  importParsed.forEach(loc => {
+    const existingIdx = data.locations.findIndex(e => e.id === loc.id);
+
+    if (existingIdx >= 0) {
+      const choice = conflictChoices[loc.id] || 'merge';
+      if (choice === 'skip') { skipped++; return; }
+
+      if (choice === 'replace') {
+        // Keep map position if already placed
+        const existing = data.locations[existingIdx];
+        data.locations[existingIdx] = {
+          ...loc,
+          x: loc.x ?? existing.x,
+          y: loc.y ?? existing.y,
+          visible: existing.visible,
+        };
+        replaced++;
+      } else { // merge
+        const existing = data.locations[existingIdx];
+        // Merge NPCs (no duplicates by name)
+        const existingNPCNames = new Set((existing.npcs||[]).map(n => n.name));
+        const newNPCs = (loc.npcs||[]).filter(n => !existingNPCNames.has(n.name));
+        // Merge quests (no duplicates by title)
+        const existingQuestTitles = new Set((existing.quests||[]).map(q => q.title));
+        const newQuests = (loc.quests||[]).filter(q => !existingQuestTitles.has(q.title));
+        data.locations[existingIdx] = {
+          ...existing,
+          shortDesc: loc.shortDesc || existing.shortDesc,
+          lore:      loc.lore      || existing.lore,
+          npcs:      [...(existing.npcs||[]), ...newNPCs],
+          quests:    [...(existing.quests||[]), ...newQuests],
+          dmNotes:   [existing.dmNotes, loc.dmNotes].filter(Boolean).join('\n\n'),
+          connected: [...new Set([...(existing.connected||[]), ...(loc.connected||[])])],
+        };
+        merged++;
+      }
+    } else {
+      // New location — place at a sensible random position if not specified
+      data.locations.push({
+        ...loc,
+        x:       loc.x ?? Math.round(10 + Math.random() * 80),
+        y:       loc.y ?? Math.round(10 + Math.random() * 80),
+        npcs:    loc.npcs   || [],
+        quests:  loc.quests || [],
+        visible: loc.visible !== false,
+      });
+      added++;
+    }
+  });
+
+  saveAll();
+  renderLocList();
+  buildMap();
+  closeImport();
+
+  const parts = [];
+  if (added)    parts.push(`${added} added`);
+  if (merged)   parts.push(`${merged} merged`);
+  if (replaced) parts.push(`${replaced} replaced`);
+  if (skipped)  parts.push(`${skipped} skipped`);
+  setSyncStatus('ok', `✦ Import done — ${parts.join(', ')}`);
+  setTimeout(() => setSyncStatus('', ''), 5000);
+}
+
+//]]></script>
+</body>
+</html>
