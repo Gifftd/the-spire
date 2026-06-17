@@ -964,6 +964,40 @@ body.editor-expanded #pane-timeline > #tl-detail:not([style*="none"]){
     <div class="section-header" style="margin-top:0.8rem">HISTORY</div>
     <div id="npce-history-list"></div>
   </div>
+
+  <!-- CHARACTER EDITOR (cloned by renderCharacterInspector) -->
+  <div id="char-detail">
+    <div class="section-header" id="char-detail-header">EDIT CHARACTER</div>
+    <div class="field"><label>NAME</label><input type="text" id="char-name" placeholder="Aldric Stoneveil"></div>
+    <div class="field-row">
+      <div class="field"><label>PLAYER (optional)</label><input type="text" id="char-player" placeholder="Bob"></div>
+      <div class="field"><label>ID (auto)</label><input type="text" id="char-id" readonly style="opacity:0.6"></div>
+    </div>
+    <div class="field">
+      <label>CLAIM CODE</label>
+      <div style="display:flex;gap:5px">
+        <input type="text" id="char-code" style="flex:1;letter-spacing:0.2em;text-transform:uppercase;font-family:'Cinzel',serif">
+        <button class="btn btn-ghost btn-sm" type="button" onclick="regenCharCode()" title="Generate new code">⟳</button>
+        <button class="btn btn-ghost btn-sm" type="button" onclick="copyCharCode()" title="Copy">⧉</button>
+      </div>
+    </div>
+    <div class="field"><label>DM NOTES</label><textarea id="char-dmNotes" rows="3" placeholder="Anything you want to remember about this character"></textarea></div>
+    <div style="display:flex;gap:5px;margin-bottom:0.8rem">
+      <button class="btn btn-gold btn-sm" type="button" onclick="saveCharacter()">Save</button>
+      <button class="btn btn-ghost btn-sm" type="button" onclick="cancelCharEdit()">Cancel</button>
+      <button class="btn btn-red btn-sm" type="button" style="margin-left:auto" onclick="deleteCharacter()">Delete</button>
+    </div>
+
+    <div class="whisper-composer">
+      <div class="whisper-composer-title">⬑ SEND WHISPER (only this character sees it)</div>
+      <div class="field"><label>TITLE</label><input type="text" id="whisper-title" placeholder="A note in your pocket…"></div>
+      <div class="field"><label>BODY</label><textarea id="whisper-body" rows="4" placeholder="The whisper text…"></textarea></div>
+      <button class="btn btn-purple btn-sm" type="button" onclick="postWhisper()">Post whisper</button>
+    </div>
+
+    <div class="section-header" style="margin-top:0.8rem">WHISPERS SENT</div>
+    <div class="whisper-history" id="whisper-history"></div>
+  </div>
 </div>
 
 <!-- DM TOKEN MODAL -->
@@ -2567,7 +2601,34 @@ function renderNPCInspector() {
   if (typeof editNPCEntity === 'function') editNPCEntity(n.id);
 }
 
-function renderCharacterInspector() { /* Task 13 */ }
+// Task 13: clone the legacy #char-detail editor into the inspector body, then
+// call the legacy `editCharacter(id)` to populate the cloned fields.
+// inspectorScope() makes editor helpers pick up the inspector clones first.
+function renderCharacterInspector() {
+  const c = characters.find(x => x.id === selectedEntity.id);
+  if (!c) { closeInspector(); return; }
+
+  const header = document.getElementById('fp-right-header');
+  if (header) {
+    header.innerHTML = `
+      <span class="fp-row-glyph">⚔</span>
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(c.name||'(unnamed)')}</span>
+      <button class="fp-close" type="button" title="Close" aria-label="Close" onclick="closeInspector()">×</button>
+    `;
+  }
+  const tabs = document.getElementById('fp-right-tabs');
+  if (tabs) tabs.innerHTML = '';   // single-pane inspector
+
+  const body = document.getElementById('fp-right-body');
+  if (!body) return;
+  body.innerHTML = '';
+  const src = document.getElementById('char-detail');
+  if (src) {
+    Array.from(src.children).forEach(ch => body.appendChild(ch.cloneNode(true)));
+  }
+  // Populate the freshly-cloned fields via the legacy editor.
+  if (typeof editCharacter === 'function') editCharacter(c.id);
+}
 function renderTimelineInspector()  { /* Task 14 */ }
 
 // Scope helper — used by entity editors to find inspector-cloned fields
@@ -2714,7 +2775,7 @@ function renderFpLeftToolbar() {
     zones:     'addZone()',
     npcs:      'addNPCv2()',
     timeline:  'addTimelineEntry()',
-    characters:'addCharacter()',
+    characters:'addCharacterV2()',
   }[activeTab];
   wrap.innerHTML = `
     <input type="text" id="fp-search" placeholder="Search…" value="${escapeHtml(listSearchQuery)}"
@@ -2867,7 +2928,62 @@ function addNPCv2() {
   selectNPCV2(newNpc.id);
 }
 function renderTimelineListV2(body)   { body.innerHTML = '<div class="empty-state">Coming in Task 14.</div>'; }
-function renderCharactersListV2(body) { body.innerHTML = '<div class="empty-state">Coming in Task 13.</div>'; }
+
+function renderCharactersListV2(body) {
+  if (!Array.isArray(characters) || characters.length === 0) {
+    body.innerHTML = '<div class="empty-state">No characters yet. + Character to add one.</div>';
+    return;
+  }
+  const q = listSearchQuery.trim().toLowerCase();
+  const filtered = !q ? characters : characters.filter(c =>
+    (c.name||'').toLowerCase().includes(q) ||
+    (c.player||'').toLowerCase().includes(q)
+  );
+  if (filtered.length === 0) { body.innerHTML = '<div class="empty-state">No matches.</div>'; return; }
+  body.innerHTML = filtered.map(c => {
+    const sel = selectedEntity && selectedEntity.type === 'character' && selectedEntity.id === c.id;
+    return `
+      <div class="fp-row ${sel?'selected':''}" data-id="${c.id}">
+        <span class="fp-row-glyph">⚔</span>
+        <span class="fp-row-name">${escapeHtml(c.name||'(unnamed)')}</span>
+        <span class="fp-row-type">${escapeHtml(c.player||'')}</span>
+      </div>`;
+  }).join('');
+  body.querySelectorAll('.fp-row').forEach(row => {
+    row.addEventListener('click', () => selectCharacterV2(row.dataset.id));
+  });
+}
+
+function selectCharacterV2(id) {
+  openInspector({ type:'character', id });
+  // openInspector → renderInspector → renderCharacterInspector handles the
+  // legacy populate call (editCharacter). No need to invoke it again here.
+}
+
+// First-class character creation for the v2 toolbar (+ Character button).
+// The legacy `addCharacter()` only primes a hidden form with editingCharId='__new__'
+// and never pushes to the array until Save. The v2 flow needs the row to appear
+// in the left list immediately, so we push a stub record and open the inspector.
+function addCharacterV2() {
+  if (!Array.isArray(characters)) characters = [];
+  // build a unique id from the placeholder name
+  const base = 'new-character';
+  let id = base, n = 1;
+  while (characters.some(c => c.id === id)) id = `${base}-${++n}`;
+  const newChar = {
+    id,
+    name: 'New Character',
+    player: '',
+    code: (typeof genCode === 'function') ? genCode() : '',
+    dmNotes: ''
+  };
+  characters.push(newChar);
+  if (typeof scheduleSave === 'function') scheduleSave();
+  else if (typeof saveCharactersKV === 'function') saveCharactersKV();
+  renderFpLeftBody();
+  selectCharacterV2(newChar.id);
+}
+
 function renderWorldPanelV2(body)     { body.innerHTML = '<div class="empty-state">Coming in Task 15.</div>'; }
 
 // ══════════════════════════════════════════════════════════════
@@ -3411,22 +3527,28 @@ function selectText(el) {
 
 function addCharacter() {
   ensureEditorExpanded();
-  ensureDetailCloseBtn(document.getElementById('char-detail'), cancelCharEdit);
+  // v2: the inspector provides its own close button. Skip the legacy close-btn
+  // injection so we don't end up cloning a dead button into the inspector.
   editingCharId = '__new__';
-  document.getElementById('char-detail-header').textContent = 'NEW CHARACTER';
-  document.getElementById('char-name').value = '';
-  document.getElementById('char-player').value = '';
-  document.getElementById('char-id').value = '';
-  document.getElementById('char-code').value = genCode();
-  document.getElementById('char-dmNotes').value = '';
-  document.getElementById('whisper-title').value = '';
-  document.getElementById('whisper-body').value = '';
-  document.getElementById('whisper-history').innerHTML = '<div class="visibleto-empty">Save the character first to enable whispers.</div>';
-  document.getElementById('char-detail').style.display = 'block';
-  document.getElementById('char-name').focus();
+  const $ = inspectorScope();
+  const hdr = $.qs('char-detail-header'); if (hdr) hdr.textContent = 'NEW CHARACTER';
+  if ($.qs('char-name'))   $.qs('char-name').value = '';
+  if ($.qs('char-player')) $.qs('char-player').value = '';
+  if ($.qs('char-id'))     $.qs('char-id').value = '';
+  if ($.qs('char-code'))   $.qs('char-code').value = genCode();
+  if ($.qs('char-dmNotes')) $.qs('char-dmNotes').value = '';
+  if ($.qs('whisper-title')) $.qs('whisper-title').value = '';
+  if ($.qs('whisper-body'))  $.qs('whisper-body').value = '';
+  if ($.qs('whisper-history')) $.qs('whisper-history').innerHTML = '<div class="visibleto-empty">Save the character first to enable whispers.</div>';
+  const detail = document.getElementById('char-detail'); if (detail) detail.style.display = 'block';
+  if ($.qs('char-name')) $.qs('char-name').focus();
   // Auto-fill id on name change
-  document.getElementById('char-name').oninput = function() {
-    if (editingCharId === '__new__') document.getElementById('char-id').value = slugify(this.value);
+  const nameInp = $.qs('char-name');
+  if (nameInp) nameInp.oninput = function() {
+    if (editingCharId === '__new__') {
+      const idInp = inspectorScope().qs('char-id');
+      if (idInp) idInp.value = slugify(this.value);
+    }
   };
 }
 
@@ -3434,31 +3556,33 @@ function editCharacter(id) {
   const c = characters.find(x => x.id === id);
   if (!c) return;
   ensureEditorExpanded();
-  ensureDetailCloseBtn(document.getElementById('char-detail'), cancelCharEdit);
+  // v2: inspector owns the close button; don't inject the legacy one.
   editingCharId = id;
-  document.getElementById('char-detail-header').textContent = 'EDIT CHARACTER';
-  document.getElementById('char-name').value = c.name || '';
-  document.getElementById('char-player').value = c.player || '';
-  document.getElementById('char-id').value = c.id;
-  document.getElementById('char-code').value = c.code || '';
-  document.getElementById('char-dmNotes').value = c.dmNotes || '';
-  document.getElementById('whisper-title').value = '';
-  document.getElementById('whisper-body').value = '';
+  const $ = inspectorScope();
+  const hdr = $.qs('char-detail-header'); if (hdr) hdr.textContent = 'EDIT CHARACTER';
+  if ($.qs('char-name'))    $.qs('char-name').value = c.name || '';
+  if ($.qs('char-player'))  $.qs('char-player').value = c.player || '';
+  if ($.qs('char-id'))      $.qs('char-id').value = c.id;
+  if ($.qs('char-code'))    $.qs('char-code').value = c.code || '';
+  if ($.qs('char-dmNotes')) $.qs('char-dmNotes').value = c.dmNotes || '';
+  if ($.qs('whisper-title')) $.qs('whisper-title').value = '';
+  if ($.qs('whisper-body'))  $.qs('whisper-body').value = '';
   renderWhisperHistory(id);
-  document.getElementById('char-detail').style.display = 'block';
+  const detail = document.getElementById('char-detail'); if (detail) detail.style.display = 'block';
   renderCharacterList();
 }
 
 async function saveCharacter() {
-  const name = document.getElementById('char-name').value.trim();
+  const $ = inspectorScope();
+  const name = ($.qs('char-name')?.value || '').trim();
   if (!name) { toast('Character needs a name.'); return; }
-  const player = document.getElementById('char-player').value.trim();
-  const code = document.getElementById('char-code').value.trim().toUpperCase();
-  const dmNotes = document.getElementById('char-dmNotes').value.trim();
+  const player = ($.qs('char-player')?.value || '').trim();
+  const code = ($.qs('char-code')?.value || '').trim().toUpperCase();
+  const dmNotes = ($.qs('char-dmNotes')?.value || '').trim();
   if (!code) { toast('Need a claim code (click ⟳ to generate one).'); return; }
 
   if (editingCharId === '__new__') {
-    let id = slugify(document.getElementById('char-id').value) || slugify(name);
+    let id = slugify($.qs('char-id')?.value || '') || slugify(name);
     // ensure uniqueness
     let base = id, n = 1;
     while (characters.some(c => c.id === id)) { id = `${base}-${++n}`; }
@@ -3471,16 +3595,25 @@ async function saveCharacter() {
   }
   await saveCharactersKV();
   renderCharacterList();
-  document.getElementById('char-detail-header').textContent = 'EDIT CHARACTER';
+  const hdr2 = $.qs('char-detail-header'); if (hdr2) hdr2.textContent = 'EDIT CHARACTER';
   renderWhisperHistory(editingCharId);
+  // Refresh v2 list + inspector header so the new name shows immediately.
+  if (typeof renderFpLeftBody === 'function') renderFpLeftBody();
+  if (selectedEntity && selectedEntity.type === 'character') {
+    selectedEntity.id = editingCharId;
+    const hdrName = document.querySelector('#fp-right-header span:nth-child(2)');
+    if (hdrName) hdrName.textContent = name || '(unnamed)';
+  }
   setSyncStatus('ok','✦ Character saved');
   setTimeout(()=>setSyncStatus('',''), 2000);
 }
 
 function cancelCharEdit() {
   editingCharId = null;
-  document.getElementById('char-detail').style.display = 'none';
+  const detail = document.getElementById('char-detail'); if (detail) detail.style.display = 'none';
   renderCharacterList();
+  // v2: also close the inspector if it's hosting a character.
+  if (selectedEntity && selectedEntity.type === 'character') closeInspector();
 }
 
 async function deleteCharacter() {
@@ -3488,24 +3621,32 @@ async function deleteCharacter() {
   const c = characters.find(x => x.id === editingCharId);
   if (!c) return;
   if (!(await confirmDialog(`Delete ${c.name}? Their claim code will stop working and their whispers will also be removed.`))) return;
-  characters = characters.filter(x => x.id !== editingCharId);
+  const deletedId = editingCharId;
+  characters = characters.filter(x => x.id !== deletedId);
   // also drop their journal entries
-  journals = journals.filter(j => j.characterId !== editingCharId);
+  journals = journals.filter(j => j.characterId !== deletedId);
   // also strip from any location.visibleTo
   data.locations.forEach(loc => {
-    if (Array.isArray(loc.visibleTo)) loc.visibleTo = loc.visibleTo.filter(id => id !== editingCharId);
+    if (Array.isArray(loc.visibleTo)) loc.visibleTo = loc.visibleTo.filter(id => id !== deletedId);
   });
   editingCharId = null;
-  document.getElementById('char-detail').style.display = 'none';
+  const detail = document.getElementById('char-detail'); if (detail) detail.style.display = 'none';
   await saveCharactersKV();
   await saveJournalsKV();
   saveAll();
   renderCharacterList();
+  // v2: drop the inspector and refresh the list.
+  if (selectedEntity && selectedEntity.type === 'character' && selectedEntity.id === deletedId) closeInspector();
+  if (typeof renderFpLeftBody === 'function') renderFpLeftBody();
 }
 
-function regenCharCode() { document.getElementById('char-code').value = genCode(); }
+function regenCharCode() {
+  const code = inspectorScope().qs('char-code');
+  if (code) code.value = genCode();
+}
 function copyCharCode() {
-  const v = document.getElementById('char-code').value;
+  const code = inspectorScope().qs('char-code');
+  const v = code ? code.value : '';
   if (!v) return;
   navigator.clipboard?.writeText(v);
   setSyncStatus('ok','Code copied');
@@ -3515,8 +3656,9 @@ function copyCharCode() {
 // Whispers composer
 async function postWhisper() {
   if (!editingCharId || editingCharId === '__new__') { toast('Save the character first.'); return; }
-  const title = document.getElementById('whisper-title').value.trim();
-  const body  = document.getElementById('whisper-body').value.trim();
+  const $ = inspectorScope();
+  const title = ($.qs('whisper-title')?.value || '').trim();
+  const body  = ($.qs('whisper-body')?.value || '').trim();
   if (!title && !body) { toast('Whisper needs a title or body.'); return; }
   const entry = {
     id: 'w' + Date.now() + Math.floor(Math.random()*1000),
@@ -3527,15 +3669,16 @@ async function postWhisper() {
   };
   journals.push(entry);
   await saveJournalsKV();
-  document.getElementById('whisper-title').value = '';
-  document.getElementById('whisper-body').value = '';
+  if ($.qs('whisper-title')) $.qs('whisper-title').value = '';
+  if ($.qs('whisper-body'))  $.qs('whisper-body').value = '';
   renderWhisperHistory(editingCharId);
   setSyncStatus('ok','✦ Whisper posted');
   setTimeout(()=>setSyncStatus('',''), 2000);
 }
 
 function renderWhisperHistory(charId) {
-  const list = document.getElementById('whisper-history');
+  const list = inspectorScope().qs('whisper-history');
+  if (!list) return;
   if (!charId || charId === '__new__') { list.innerHTML = ''; return; }
   const items = journals.filter(j => j.characterId === charId).sort((a,b) => (b.date||'').localeCompare(a.date||''));
   if (items.length === 0) { list.innerHTML = '<div class="visibleto-empty">No whispers sent yet.</div>'; return; }
