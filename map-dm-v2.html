@@ -1719,7 +1719,7 @@ function finishPolygon() {
   data.zones.push({ id, name:'New Region', shape:'polygon', points:[...polyPoints], color, opacity:0.18, visible:true });
   polyPoints = [];
   saveAll(); renderZoneList(); buildMap();
-  setPublishStatus('','Unpublished changes');
+  scheduleSave();
   cancelPolyDraw();
   selectZone(id);
   switchTab('zones');
@@ -1822,14 +1822,76 @@ function wireCoordsReadout() {
 wireCoordsReadout();
 
 // ══════════════════════════════════════════════════════════════
-//  v2 PIN GESTURE — always-on click-vs-drag (replaces Move mode)
+//  v2 AUTO-SAVE — debounced KV write + sync state machine (Task 9)
 // ══════════════════════════════════════════════════════════════
-// Stub replaced with the debounced auto-save in Task 9. For now it just
-// surfaces the legacy "Unpublished changes" status so the user still gets
-// feedback that a write happened.
+function debounce(fn, ms) {
+  let t = null;
+  return function(...args) {
+    if (t) clearTimeout(t);
+    t = setTimeout(() => { t = null; fn.apply(this, args); }, ms);
+  };
+}
+
+let _saveState = 'live';   // 'live' | 'pending' | 'saving' | 'synced' | 'fail'
+
+function setSyncState(s) {
+  _saveState = s;
+  const wrap = document.getElementById('tc-sync');
+  if (!wrap) return;
+  wrap.classList.remove('live','pending','saving','synced','fail');
+  wrap.classList.add(s);
+  const label = wrap.querySelector('.tc-sync-label');
+  if (label) label.textContent = {
+    live:'live', pending:'pending', saving:'saving…', synced:'saved', fail:'save failed'
+  }[s];
+}
+
+async function doSaveNow() {
+  if (!worldData) return;
+  setSyncState('saving');
+  try {
+    // saveAll() in this file is sync (writes localStorage + queues a debounced
+    // KV write via saveToKV). For a "force save" we also want to push to KV now
+    // and surface the network result, so call saveToKV directly and await it.
+    saveLocal();
+    await saveToKV();
+    setSyncState('synced');
+    window.__unpublishedCount = (window.__unpublishedCount || 0) + 1;
+    updateTopClusterPublish();
+  } catch (err) {
+    setSyncState('fail');
+    console.error('Auto-save failed', err);
+  }
+}
+const _debouncedSave = debounce(doSaveNow, 600);
+
 let scheduleSave = function() {
-  if (typeof setPublishStatus === 'function') setPublishStatus('', 'Unpublished changes');
+  setSyncState('pending');
+  _debouncedSave();
 };
+
+// Keyboard shortcuts: Cmd/Ctrl+S = force save, / = focus list search,
+// Cmd/Ctrl+Shift+P = focus + confirm Publish.
+document.addEventListener('keydown', (e) => {
+  // Skip "/" focus if user is typing in an input/textarea/contentEditable
+  const inField = e.target && e.target.matches && e.target.matches('input, textarea, select, [contenteditable]');
+  if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    doSaveNow();
+    return;
+  }
+  if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'p') {
+    e.preventDefault();
+    const btn = document.getElementById('tc-publish');
+    if (btn) { btn.focus(); btn.click(); }
+    return;
+  }
+  if (!inField && e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    e.preventDefault();
+    const s = document.getElementById('fp-search');
+    if (s) s.focus();
+  }
+});
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
@@ -2025,7 +2087,6 @@ function addLocationAt(x, y) {
   if (typeof renderLocList === 'function') renderLocList();
   if (typeof renderFpLeftBody === 'function') renderFpLeftBody();
   selectLocation(id);
-  if (typeof setPublishStatus === 'function') setPublishStatus('', 'Unpublished changes');
 }
 
 // Create a new zone centered (roughly) at the given map-% coords.
@@ -2063,7 +2124,6 @@ function duplicateLocation(id) {
   if (typeof renderLocList === 'function') renderLocList();
   if (typeof renderFpLeftBody === 'function') renderFpLeftBody();
   selectLocation(copy.id);
-  if (typeof setPublishStatus === 'function') setPublishStatus('', 'Unpublished changes');
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -2153,7 +2213,7 @@ window.addEventListener('mouseup', e => {
   renderZoneList();
   if (typeof renderFpLeftBody === 'function') renderFpLeftBody();
   buildMap();
-  setPublishStatus('','Unpublished changes');
+  scheduleSave();
   moveDragTarget = null;
 });
 
@@ -2721,7 +2781,7 @@ function saveLocation() {
     selectedEntity.id = id;
     renderInspector();
   }
-  setPublishStatus('','Unpublished changes');
+  scheduleSave();
 }
 
 async function deleteLocation() {
@@ -2729,7 +2789,7 @@ async function deleteLocation() {
   if (!(await confirmDialog(`Delete ${data.locations.find(l=>l.id===editingLocId)?.name}?`))) return;
   data.locations=data.locations.filter(l=>l.id!==editingLocId);
   selectedLocId=null; saveAll(); renderLocList(); if (typeof renderFpLeftBody === 'function') renderFpLeftBody(); buildMap(); closeLocModal();
-  setPublishStatus('','Unpublished changes');
+  scheduleSave();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -2780,7 +2840,7 @@ function addZone() {
   const color=ZONE_COLORS[data.zones.length%ZONE_COLORS.length];
   data.zones.push({ id, name:'New Zone', shape:'rect', x:20, y:20, width:30, height:25, color, opacity:0.18, visible:true });
   saveAll(); renderZoneList(); buildMap();
-  setPublishStatus('','Unpublished changes');
+  scheduleSave();
 }
 
 function selectZone(id) { selectedZoneId=id; selectedLocId=null; buildMap(); renderZoneList(); }
@@ -2836,7 +2896,7 @@ function renderZoneList() {
 function updateZone(id,key,val) {
   const z=data.zones.find(z=>z.id===id); if(!z) return;
   z[key]=val; saveAll(); buildMap();
-  setPublishStatus('','Unpublished changes');
+  scheduleSave();
 }
 async function deleteZone(id) {
   if (!(await confirmDialog('Delete this zone?'))) return;
@@ -2859,7 +2919,7 @@ function saveWorldSettings() {
   data.world.mapWidth  = parseInt(document.getElementById('world-mapWidth').value)||1200;
   data.world.mapHeight = parseInt(document.getElementById('world-mapHeight').value)||800;
   saveAll(); buildMap();
-  setPublishStatus('','Unpublished changes');
+  scheduleSave();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -2909,6 +2969,9 @@ async function init() {
   renderFpLeftTabs();
   renderFpLeftToolbar();
   renderFpLeftBody();
+
+  // Idle sync indicator
+  setSyncState('live');
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>map-dm-v2 helpers</title></head>
+<body>
+<pre id="out"></pre>
+<script>
+const log = (msg) => document.getElementById('out').textContent += msg + '\n';
+let failed = 0;
+function check(cond, label) {
+  if (cond) log('✓ ' + label);
+  else { log('✗ ' + label); failed++; }
+}
+
+// --- debounce ---
+function debounce(fn, ms) {
+  let t = null;
+  return function(...args) {
+    if (t) clearTimeout(t);
+    t = setTimeout(() => { t = null; fn.apply(this, args); }, ms);
+  };
+}
+async function testDebounce() {
+  let calls = 0;
+  const d = debounce(() => calls++, 50);
+  d(); d(); d();
+  await new Promise(r => setTimeout(r, 30));
+  check(calls === 0, 'debounce: not called before delay elapses');
+  await new Promise(r => setTimeout(r, 50));
+  check(calls === 1, 'debounce: called exactly once after delay');
+}
+
+// --- clamp + click-vs-drag threshold ---
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function passesDragThreshold(dx, dy, t) { return Math.abs(dx) > t || Math.abs(dy) > t; }
+
+function testClampAndDrag() {
+  check(clamp(50, 0, 100) === 50, 'clamp: in-range value passes through');
+  check(clamp(-5, 0, 100) === 0,  'clamp: below min returns min');
+  check(clamp(200,0, 100) === 100,'clamp: above max returns max');
+  check(passesDragThreshold(5, 0, 4) === true,  'drag threshold: 5px exceeds 4');
+  check(passesDragThreshold(3, 0, 4) === false, 'drag threshold: 3px under 4');
+  check(passesDragThreshold(0, 5, 4) === true,  'drag threshold: y-axis works');
+}
+
+(async () => {
+  testClampAndDrag();
+  await testDebounce();
+  log(failed === 0 ? '\nALL PASS' : `\n${failed} FAILED`);
+  document.title = failed === 0 ? '✓ pass' : `✗ ${failed} fail`;
+})();
+</script>
+</body></html>
