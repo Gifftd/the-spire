@@ -143,6 +143,24 @@ body{overflow:hidden}
 .fp-resize-right{right:-3px}
 .fp-resize-left{left:-3px}
 
+/* Right-click context menu (Task 7) */
+.ctx-menu{
+  position:fixed;z-index:9500;
+  background:rgba(13,8,4,0.97);
+  border:1px solid var(--gold-faint);
+  border-radius:3px;padding:3px 0;
+  font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.06em;
+  color:var(--ink);
+  box-shadow:0 6px 18px rgba(0,0,0,0.65);
+  min-width:170px;
+}
+.ctx-menu[hidden]{display:none}
+.ctx-menu-item{padding:6px 14px;cursor:pointer;display:flex;align-items:center;gap:8px}
+.ctx-menu-item:hover{background:rgba(184,134,11,0.15);color:var(--gold-light)}
+.ctx-menu-item.danger{color:#e9a}
+.ctx-menu-item.danger:hover{color:#fff;background:rgba(139,32,32,0.35)}
+.ctx-menu-sep{height:1px;background:var(--border);margin:3px 0}
+
 /* Geometry — defaults; resize logic in Task 10 may overwrite via inline style */
 .fp-left {top:60px;left:12px;bottom:38px;width:240px}
 .fp-right{top:60px;right:12px;bottom:38px;width:320px}
@@ -707,6 +725,9 @@ body.editor-expanded #pane-timeline > #tl-detail:not([style*="none"]){
   <div class="fp-body" id="fp-right-body"></div>
   <div class="fp-resize fp-resize-left" data-resize="right"></div>
 </aside>
+
+<!-- RIGHT-CLICK CONTEXT MENU (Task 7) -->
+<div class="ctx-menu" id="ctx-menu" hidden></div>
 
 <!-- BOTTOM STATUS STRIP -->
 <div class="bottom-strip" id="bottom-strip">
@@ -1876,6 +1897,171 @@ function attachPinGesture(pinEl, loc) {
     }
     active = null;
   });
+
+  // Right-click → per-pin context menu (Task 7)
+  pinEl.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    showCtxMenu(e.clientX, e.clientY, [
+      { label: '✎ Edit',         action: () => selectLocation(loc.id) },
+      { label: '⎘ Duplicate',    action: () => duplicateLocation(loc.id) },
+      { label: (loc.visible === false) ? '◉ Show to players' : '◎ Hide from players',
+        action: () => {
+          loc.visible = (loc.visible === false);   // flip current state
+          scheduleSave();
+          buildMap();
+          if (typeof renderFpLeftBody === 'function') renderFpLeftBody();
+          if (selectedEntity && selectedEntity.type === 'location' && selectedEntity.id === loc.id) {
+            renderInspector();
+          }
+        } },
+      { sep: true },
+      { label: '✕ Delete', danger: true,
+        action: async () => {
+          if (!(await confirmDialog(`Delete ${loc.name}?`))) return;
+          data.locations = data.locations.filter(l => l.id !== loc.id);
+          if (selectedEntity && selectedEntity.id === loc.id) closeInspector();
+          scheduleSave();
+          buildMap();
+          if (typeof renderFpLeftBody === 'function') renderFpLeftBody();
+          if (typeof renderLocList === 'function') renderLocList();
+        } },
+    ]);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CONTEXT MENU (Task 7) — right-click on map / pins
+// ══════════════════════════════════════════════════════════════
+function showCtxMenu(clientX, clientY, items) {
+  const menu = document.getElementById('ctx-menu');
+  if (!menu) return;
+  menu.innerHTML = items.map((it, i) => {
+    if (it.sep) return '<div class="ctx-menu-sep"></div>';
+    return `<div class="ctx-menu-item${it.danger?' danger':''}" data-i="${i}">${it.label}</div>`;
+  }).join('');
+  menu.style.left = clientX + 'px';
+  menu.style.top  = clientY + 'px';
+  menu.hidden = false;
+  // Clamp to viewport
+  const r = menu.getBoundingClientRect();
+  if (r.right  > window.innerWidth)  menu.style.left = (window.innerWidth  - r.width  - 8) + 'px';
+  if (r.bottom > window.innerHeight) menu.style.top  = (window.innerHeight - r.height - 8) + 'px';
+
+  menu.querySelectorAll('.ctx-menu-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const i = +el.dataset.i;
+      const it = items[i];
+      hideCtxMenu();
+      if (it && typeof it.action === 'function') it.action();
+    });
+  });
+}
+function hideCtxMenu() {
+  const m = document.getElementById('ctx-menu');
+  if (m) m.hidden = true;
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.ctx-menu')) hideCtxMenu();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') hideCtxMenu();
+});
+
+// Convert a viewport (clientX,clientY) point to map-% coords, accounting for pan+zoom.
+function clientToMapPct(clientX, clientY) {
+  const stage = document.getElementById('map-stage');
+  const rect = stage.getBoundingClientRect();
+  const W = data.world.mapWidth  || 1200;
+  const H = data.world.mapHeight || 800;
+  const localX = (clientX - rect.left - mapX) / (mapScale || 1);
+  const localY = (clientY - rect.top  - mapY) / (mapScale || 1);
+  return { x: clamp((localX / W) * 100, 0, 100), y: clamp((localY / H) * 100, 0, 100) };
+}
+
+// Right-click on the map background → Add location/zone here.
+document.addEventListener('DOMContentLoaded', () => {
+  const stage = document.getElementById('map-stage');
+  if (!stage) return;
+  stage.addEventListener('contextmenu', (e) => {
+    // Skip if the click landed on a pin/zone or a floating UI element
+    // (they wire their own context menus, or shouldn't trigger one).
+    if (e.target.closest('.pin') ||
+        e.target.closest('.zone') ||
+        e.target.closest('.poly-zone') ||
+        e.target.closest('.fp') ||
+        e.target.closest('.top-cluster') ||
+        e.target.closest('.bottom-strip') ||
+        e.target.closest('.ctx-menu')) return;
+    e.preventDefault();
+    const { x, y } = clientToMapPct(e.clientX, e.clientY);
+    showCtxMenu(e.clientX, e.clientY, [
+      { label: '📍 Add location here', action: () => addLocationAt(x, y) },
+      { label: '◇ Add zone here',           action: () => addZoneAt(x, y) },
+    ]);
+  });
+});
+
+// Create a new location at the given map-% coords and open the inspector for it.
+function addLocationAt(x, y) {
+  const id = 'loc_' + Date.now();
+  data.locations.push({
+    id, name: 'New Location',
+    type: 'default',
+    x: Math.round(x * 10) / 10,
+    y: Math.round(y * 10) / 10,
+    visible: true,
+    shortDesc: '', lore: '', mapImage: '',
+    connected: [],
+    npcs: [], quests: [],
+    dmNotes: '',
+    visibleTo: [],
+    subMap: null,
+  });
+  scheduleSave();
+  buildMap();
+  if (typeof renderLocList === 'function') renderLocList();
+  if (typeof renderFpLeftBody === 'function') renderFpLeftBody();
+  selectLocation(id);
+  if (typeof setPublishStatus === 'function') setPublishStatus('', 'Unpublished changes');
+}
+
+// Create a new zone centered (roughly) at the given map-% coords.
+function addZoneAt(x, y) {
+  if (typeof addZone !== 'function') return;
+  addZone();
+  const z = data.zones && data.zones[data.zones.length - 1];
+  if (z && z.shape !== 'polygon') {
+    z.x = clamp(x - z.width  / 2, 0, 100 - z.width);
+    z.y = clamp(y - z.height / 2, 0, 100 - z.height);
+    scheduleSave();
+    buildMap();
+    if (typeof renderZoneList === 'function') renderZoneList();
+  }
+}
+
+// Duplicate an existing location (deep clone, offset by ~3% on x/y).
+function duplicateLocation(id) {
+  const src = data.locations.find(l => l.id === id);
+  if (!src) return;
+  const copy = JSON.parse(JSON.stringify(src));
+  // Ensure id uniqueness — append -copy, then -copy-2, -copy-3… if needed.
+  let newId = (src.id || 'loc') + '-copy';
+  let n = 2;
+  while (data.locations.some(l => l.id === newId)) {
+    newId = (src.id || 'loc') + '-copy-' + n++;
+  }
+  copy.id = newId;
+  copy.name = src.name + ' (copy)';
+  copy.x = clamp(Math.round((src.x + 3) * 10) / 10, 0, 100);
+  copy.y = clamp(Math.round((src.y + 3) * 10) / 10, 0, 100);
+  data.locations.push(copy);
+  scheduleSave();
+  buildMap();
+  if (typeof renderLocList === 'function') renderLocList();
+  if (typeof renderFpLeftBody === 'function') renderFpLeftBody();
+  selectLocation(copy.id);
+  if (typeof setPublishStatus === 'function') setPublishStatus('', 'Unpublished changes');
 }
 
 // ══════════════════════════════════════════════════════════════
