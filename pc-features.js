@@ -423,12 +423,82 @@
     },
   };
 
+  const SHIELD = {
+    id: 'shield',
+    name: 'Shield',
+    source: 'builtin',
+    category: ['defense'],
+    classHint: 'wizard',
+    summary: 'Reaction: +5 AC vs a hit (consumes a 1st-level slot).',
+
+    deriveParams(identityOrPm) {
+      const level = (identityOrPm && identityOrPm.level) || (identityOrPm && identityOrPm.identity && identityOrPm.identity.level) || 5;
+      let slots = {1:4};
+      for (let l = level; l >= 1; l--) {
+        if (FULL_CASTER_SLOTS_BY_LEVEL[l]) { slots = FULL_CASTER_SLOTS_BY_LEVEL[l]; break; }
+      }
+      return { slotsByLevel: { ...slots }, acBonus: 5 };
+    },
+
+    modePolicy: {
+      nova:      { triggerRound: 1, threshold: 'whileSlotsLeft' },
+      sustained: { triggerRound: 1, threshold: 3 },
+      defensive: { triggerRound: 1, threshold: 'wouldDrop' },
+    },
+
+    initialState() { return { slotsLeft: {} }; },
+
+    hooks: {
+      onCombatStart(self, ctx) {
+        const ref = self.pm.features.find(f => f.id === 'shield');
+        const params = (ref && ref.params) || this.deriveParams(self.pm);
+        self.featureState.shield.slotsLeft = { ...(params.slotsByLevel || {}) };
+      },
+
+      onAttackAttempt(self, action, target, rollCtx) {
+        if (!self.reactionAvailableThisRound) return;
+        const state = self.featureState.shield;
+        if (!state || !rollCtx.hits) return;
+        const levels = Object.keys(state.slotsLeft).map(Number).sort((a,b) => a - b);
+        const lowestAvailable = levels.find(l => l >= 1 && state.slotsLeft[l] > 0);
+        if (!lowestAvailable) return;
+
+        const ref = self.pm.features.find(f => f.id === 'shield');
+        const params = (ref && ref.params) || this.deriveParams(self.pm);
+        const acBonus = params.acBonus || 5;
+        const hitBy = (rollCtx.roll || 0) - (self.ac || 10);
+        const wouldStillHit = hitBy > acBonus;
+        if (wouldStillHit) return;
+
+        const mode = (self.pm.tactics && self.pm.tactics.mode) || 'sustained';
+        const policy = this.modePolicy[mode] || this.modePolicy.sustained;
+        let shouldFire = false;
+        if (policy.threshold === 'whileSlotsLeft') shouldFire = true;
+        else if (typeof policy.threshold === 'number') shouldFire = hitBy <= policy.threshold;
+        else if (policy.threshold === 'wouldDrop') {
+          shouldFire = (self.hp || 0) <= 10;
+        }
+        if (!shouldFire) return;
+
+        rollCtx.hits = false;
+        state.slotsLeft[lowestAvailable] -= 1;
+        self.reactionAvailableThisRound = false;
+        return 'consume';
+      },
+
+      onRoundEnd(self, round, ctx) {
+        self.reactionAvailableThisRound = true;
+      },
+    },
+  };
+
   const LIBRARY = {
     rage: RAGE,
     sneakAttack: SNEAK_ATTACK,
     actionSurge: ACTION_SURGE,
     divineSmite: DIVINE_SMITE,
     healingWord: HEALING_WORD,
+    shield: SHIELD,
   };
 
   const PCFeatures = {

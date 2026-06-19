@@ -597,6 +597,60 @@
       hw.hooks.onAllyDowned(self, ally, { round: 3, combatants: [] });
       assertEq(ally.hp, 0);
     });
+
+    group('Shield');
+
+    test('Shield: onAttackAttempt fires when missed-by ≤ 5 (Sustained); +5 effective AC', () => {
+      const sh = PCFeatures.LIBRARY.shield;
+      const self = {
+        id: 'pc:wiz',
+        pm: { features: [{id:'shield'}], tactics: {mode:'sustained'}, identity: { level: 5 } },
+        featureState: { shield: { slotsLeft: { 1: 4 } } },
+        reactionAvailableThisRound: true,
+        ac: 12,
+      };
+      const rollCtx = { roll: 15, hits: true, missedBy: 0 };
+      const result = sh.hooks.onAttackAttempt(self, {kind:'attack'}, self, rollCtx);
+      assertEq(rollCtx.hits, false);
+      assertEq(self.reactionAvailableThisRound, false);
+      assertEq(self.featureState.shield.slotsLeft[1], 3);
+      assertEq(result, 'consume');
+    });
+
+    test('Shield: does not fire when missed-by > 5', () => {
+      const sh = PCFeatures.LIBRARY.shield;
+      const self = {
+        pm: { features: [{id:'shield'}], tactics: {mode:'sustained'} },
+        featureState: { shield: { slotsLeft: { 1: 4 } } },
+        reactionAvailableThisRound: true,
+        ac: 12,
+      };
+      const rollCtx = { roll: 20, hits: true, missedBy: 0 };
+      sh.hooks.onAttackAttempt(self, {kind:'attack'}, self, rollCtx);
+      assertEq(rollCtx.hits, true);
+      assertEq(self.reactionAvailableThisRound, true);
+      assertEq(self.featureState.shield.slotsLeft[1], 4);
+    });
+
+    test('Shield: no-op when reaction already used this round', () => {
+      const sh = PCFeatures.LIBRARY.shield;
+      const self = {
+        pm: { features: [{id:'shield'}], tactics: {mode:'sustained'} },
+        featureState: { shield: { slotsLeft: { 1: 4 } } },
+        reactionAvailableThisRound: false,
+        ac: 12,
+      };
+      const rollCtx = { roll: 14, hits: true };
+      sh.hooks.onAttackAttempt(self, {kind:'attack'}, self, rollCtx);
+      assertEq(rollCtx.hits, true);
+    });
+
+    test('Shield: onRoundEnd resets reactionAvailableThisRound', () => {
+      const sh = PCFeatures.LIBRARY.shield;
+      const self = { reactionAvailableThisRound: false };
+      sh.hooks.onRoundEnd(self, 2, {});
+      assertEq(self.reactionAvailableThisRound, true);
+    });
   </script>
 </body>
 </html>
