@@ -324,11 +324,111 @@
     },
   };
 
+  const FULL_CASTER_SLOTS_BY_LEVEL = {
+    1:  {1:2},
+    2:  {1:3},
+    3:  {1:4, 2:2},
+    4:  {1:4, 2:3},
+    5:  {1:4, 2:3, 3:2},
+    6:  {1:4, 2:3, 3:3},
+    7:  {1:4, 2:3, 3:3, 4:1},
+    8:  {1:4, 2:3, 3:3, 4:2},
+    9:  {1:4, 2:3, 3:3, 4:3, 5:1},
+    10: {1:4, 2:3, 3:3, 4:3, 5:2},
+    11: {1:4, 2:3, 3:3, 4:3, 5:2, 6:1},
+    12: {1:4, 2:3, 3:3, 4:3, 5:2, 6:1},
+    13: {1:4, 2:3, 3:3, 4:3, 5:2, 6:1, 7:1},
+    14: {1:4, 2:3, 3:3, 4:3, 5:2, 6:1, 7:1},
+    15: {1:4, 2:3, 3:3, 4:3, 5:2, 6:1, 7:1, 8:1},
+    16: {1:4, 2:3, 3:3, 4:3, 5:2, 6:1, 7:1, 8:1},
+    17: {1:4, 2:3, 3:3, 4:3, 5:2, 6:1, 7:1, 8:1, 9:1},
+    18: {1:4, 2:3, 3:3, 4:3, 5:3, 6:1, 7:1, 8:1, 9:1},
+    19: {1:4, 2:3, 3:3, 4:3, 5:3, 6:2, 7:1, 8:1, 9:1},
+    20: {1:4, 2:3, 3:3, 4:3, 5:3, 6:2, 7:2, 8:1, 9:1},
+  };
+
+  function mod(score) { return Math.floor((Number(score) - 10) / 2); }
+
+  function rollDie(sides, rng) {
+    if (rng && typeof rng === 'function') return Math.floor(rng() * sides) + 1;
+    return Math.ceil((sides + 1) / 2);
+  }
+
+  function rollDice(formula, rng) {
+    const m = /^(\d+)d(\d+)$/.exec(formula || '');
+    if (!m) return 0;
+    const n = parseInt(m[1], 10), s = parseInt(m[2], 10);
+    let total = 0;
+    for (let i = 0; i < n; i++) total += rollDie(s, rng);
+    return total;
+  }
+
+  const HEALING_WORD = {
+    id: 'healingWord',
+    name: 'Healing Word',
+    source: 'builtin',
+    category: ['healing'],
+    classHint: 'cleric',
+    summary: 'Bonus-action heal: 1d4 + spellcasting mod (+1d4 per slot level above 1st).',
+
+    deriveParams(identityOrPm) {
+      const level = (identityOrPm && identityOrPm.level) || (identityOrPm && identityOrPm.identity && identityOrPm.identity.level) || 5;
+      let slots = {1:4, 2:3, 3:2};
+      for (let l = level; l >= 1; l--) {
+        if (FULL_CASTER_SLOTS_BY_LEVEL[l]) { slots = FULL_CASTER_SLOTS_BY_LEVEL[l]; break; }
+      }
+      return { slotsByLevel: { ...slots }, ability: 'wis' };
+    },
+
+    modePolicy: {
+      nova:      { triggerRound: 1, conditionFn: 'whenAllyHpBelowHalf' },
+      sustained: { triggerRound: 1, conditionFn: 'whenAllyDowned' },
+      defensive: { triggerRound: 1, conditionFn: 'whenAllyDowned' },
+    },
+
+    initialState() { return { slotsLeft: {} }; },
+
+    hooks: {
+      onCombatStart(self, ctx) {
+        const ref = self.pm.features.find(f => f.id === 'healingWord');
+        const params = (ref && ref.params) || this.deriveParams(self.pm);
+        self.featureState.healingWord.slotsLeft = { ...(params.slotsByLevel || {}) };
+      },
+
+      onAllyDowned(self, ally, ctx) {
+        if (!self.bonusActionAvailable) return;
+        const state = self.featureState.healingWord;
+        if (!state) return;
+        const levels = Object.keys(state.slotsLeft).map(Number).sort((a,b) => a - b);
+        const lowestAvailable = levels.find(l => state.slotsLeft[l] > 0);
+        if (!lowestAvailable) return;
+
+        const ref = self.pm.features.find(f => f.id === 'healingWord');
+        const params = (ref && ref.params) || this.deriveParams(self.pm);
+        const ability = params.ability || 'wis';
+        const abilityScore = (self.pm.abilities && self.pm.abilities[ability]) || 10;
+        const dice = lowestAvailable + 'd4';
+        const healing = rollDice(dice, ctx.rng) + mod(abilityScore);
+
+        ally.hp = Math.max(1, Math.min(ally.maxHp, healing));
+        ally.downed = false;
+        state.slotsLeft[lowestAvailable] -= 1;
+        self.bonusActionAvailable = false;
+
+        if (ctx.eventLog) ctx.eventLog.push({
+          round: ctx.round, type: 'feature', who: self.id,
+          what: 'Healing Word on ' + ally.id + ' (+' + healing + ' HP, slot ' + lowestAvailable + ')',
+        });
+      },
+    },
+  };
+
   const LIBRARY = {
     rage: RAGE,
     sneakAttack: SNEAK_ATTACK,
     actionSurge: ACTION_SURGE,
     divineSmite: DIVINE_SMITE,
+    healingWord: HEALING_WORD,
   };
 
   const PCFeatures = {

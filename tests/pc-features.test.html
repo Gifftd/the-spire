@@ -547,6 +547,56 @@
       sm.hooks.onAttackHit(self, action, {}, dmgCtx);
       assertEq(dmgCtx.bonusDice.length, 0);
     });
+
+    group('Healing Word');
+
+    test('Healing Word: deriveParams reports slots from level (cleric-like)', () => {
+      const hw = PCFeatures.LIBRARY.healingWord;
+      const p = hw.deriveParams({ identity: { level: 5 } });
+      assert(p.slotsByLevel && p.slotsByLevel[1] >= 3);
+    });
+
+    test('Healing Word: onAllyDowned spends a slot and heals the ally', () => {
+      const hw = PCFeatures.LIBRARY.healingWord;
+      const self = {
+        id: 'pc:cleric',
+        pm: { features: [{id:'healingWord'}], abilities: { wis: 16 }, tactics: {mode:'sustained'}, identity: { level: 5 } },
+        featureState: { healingWord: { slotsLeft: { 1: 3 } } },
+        bonusActionAvailable: true,
+      };
+      const ally = { id: 'pc:fighter', side: 'pc', hp: 0, maxHp: 30, downed: true };
+      const ctx = { round: 3, combatants: [self, ally], eventLog: [] };
+      hw.hooks.onAllyDowned(self, ally, ctx);
+      assert(ally.hp > 0, 'ally should be healed above 0');
+      assertEq(ally.downed, false);
+      assertEq(self.featureState.healingWord.slotsLeft[1], 2);
+      assertEq(self.bonusActionAvailable, false);
+    });
+
+    test('Healing Word: no-op when no bonus action available', () => {
+      const hw = PCFeatures.LIBRARY.healingWord;
+      const self = {
+        pm: { features: [{id:'healingWord'}], abilities: { wis: 16 }, tactics: {mode:'sustained'}, identity: { level: 5 } },
+        featureState: { healingWord: { slotsLeft: { 1: 3 } } },
+        bonusActionAvailable: false,
+      };
+      const ally = { side: 'pc', hp: 0, maxHp: 30, downed: true };
+      hw.hooks.onAllyDowned(self, ally, { round: 3, combatants: [] });
+      assertEq(ally.hp, 0);
+      assertEq(self.featureState.healingWord.slotsLeft[1], 3);
+    });
+
+    test('Healing Word: no-op when out of slots', () => {
+      const hw = PCFeatures.LIBRARY.healingWord;
+      const self = {
+        pm: { features: [{id:'healingWord'}], abilities: { wis: 16 }, tactics: {mode:'sustained'}, identity: { level: 5 } },
+        featureState: { healingWord: { slotsLeft: { 1: 0 } } },
+        bonusActionAvailable: true,
+      };
+      const ally = { side: 'pc', hp: 0, maxHp: 30, downed: true };
+      hw.hooks.onAllyDowned(self, ally, { round: 3, combatants: [] });
+      assertEq(ally.hp, 0);
+    });
   </script>
 </body>
 </html>
