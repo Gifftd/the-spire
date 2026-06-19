@@ -6,6 +6,7 @@
 //   - LIBRARY: built-in features (Rage, Sneak Attack, etc.) by id
 //   - resolve(featureRef): given {id, source, params}, return the full feature def
 //   - dispatchHook(combatant, hookName, ...args): runs all subscribed features
+//   - dispatchBroadcastHook(combatants, triggering, hookName, ...args): cross-PC hook dispatch
 //
 // Companion: tests/pc-features.test.html exercises every function above.
 // Engine integration: crucible-engine.js calls dispatchHook at 9 sites.
@@ -605,6 +606,12 @@
 
     initialState() { return { diceHeldBy: {}, dieSize: 'd6' }; },
 
+    // Note: onSaveAttempt and onAttackAttempt use the broadcast-style signature
+    // (self, triggering, ...). They are designed to be invoked via
+    // dispatchBroadcastHook on every PC when ANY PC makes a roll, so the bard's
+    // feature can react to allies' rolls. Calling via dispatchHook directly
+    // would silently no-op because the second arg would be action/save object
+    // rather than the triggering combatant.
     hooks: {
       onCombatStart(self, ctx) {
         const ref = self.pm.features.find(f => f.id === 'bardicInspiration');
