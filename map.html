@@ -1129,8 +1129,10 @@ function renderLocationSubMap(loc) {
 
   // The onload handler retroactively resets the frame aspect to the
   // image's natural ratio so the frame never letterboxes and pin %s
-  // always land on the image content.
-  const onload = `(function(im){var f=im.closest('.submap-frame');if(!f||!im.naturalWidth||!im.naturalHeight)return;f.style.paddingBottom='0';f.style.aspectRatio=im.naturalWidth+' / '+im.naturalHeight;})(this)`;
+  // always land on the image content. Important: the base CSS sets
+  // .submap-frame{height:0;padding-bottom:60%}, so we must also clear
+  // height before aspect-ratio can take effect.
+  const onload = `(function(im){var f=im.closest('.submap-frame');if(!f||!im.naturalWidth||!im.naturalHeight)return;f.style.height='auto';f.style.paddingBottom='0';f.style.aspectRatio=im.naturalWidth+' / '+im.naturalHeight;})(this)`;
 
   return `
     <div class="submap-stage">
