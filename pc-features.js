@@ -492,6 +492,67 @@
     },
   };
 
+  const HEX_MARK = {
+    id: 'hexMark',
+    name: "Hex / Hunter's Mark",
+    source: 'builtin',
+    category: ['damage'],
+    classHint: 'warlock',
+    summary: '+1d6 damage on hits against a marked target. Concentration; recasts on kill in Nova mode.',
+
+    deriveParams(identityOrPm) {
+      return { damageDice: '1d6', recastSlots: 4 };
+    },
+
+    modePolicy: {
+      nova:      { recastOnKill: true },
+      sustained: { recastOnKill: false },
+      defensive: { recastOnKill: false },
+    },
+
+    initialState() { return { targetId: null, slotsLeft: 0 }; },
+
+    hooks: {
+      onCombatStart(self, ctx) {
+        const ref = self.pm.features.find(f => f.id === 'hexMark');
+        const params = (ref && ref.params) || this.deriveParams(self.pm);
+        self.featureState.hexMark.slotsLeft = params.recastSlots || 4;
+        const target = (ctx.combatants || []).find(c => c.side === 'monster' && !c.dead);
+        if (target) {
+          self.featureState.hexMark.targetId = target.id;
+          if (ctx.eventLog) ctx.eventLog.push({ round: ctx.round, type: 'feature', who: self.id, what: 'Hex on ' + target.id });
+        }
+      },
+
+      onAttackHit(self, action, target, dmgCtx) {
+        const state = self.featureState.hexMark;
+        if (!state || !state.targetId || !target) return;
+        if (target.id !== state.targetId) return;
+        const ref = self.pm.features.find(f => f.id === 'hexMark');
+        const params = (ref && ref.params) || this.deriveParams(self.pm);
+        if (!Array.isArray(dmgCtx.bonusDice)) dmgCtx.bonusDice = [];
+        dmgCtx.bonusDice.push({ dice: params.damageDice || '1d6', type: 'necrotic', source: 'hexMark' });
+      },
+
+      onMonsterDowned(self, monster, ctx) {
+        const state = self.featureState.hexMark;
+        if (!state || state.targetId !== monster.id) return;
+        const mode = (self.pm.tactics && self.pm.tactics.mode) || 'sustained';
+        const policy = this.modePolicy[mode] || this.modePolicy.sustained;
+        if (!policy.recastOnKill) { state.targetId = null; return; }
+        if (state.slotsLeft <= 0) { state.targetId = null; return; }
+        const newTarget = (ctx.combatants || []).find(c => c.side === 'monster' && !c.dead && c.id !== monster.id);
+        if (newTarget) {
+          state.targetId = newTarget.id;
+          state.slotsLeft -= 1;
+          if (ctx.eventLog) ctx.eventLog.push({ round: ctx.round, type: 'feature', who: self.id, what: 'Hex re-cast on ' + newTarget.id });
+        } else {
+          state.targetId = null;
+        }
+      },
+    },
+  };
+
   const LIBRARY = {
     rage: RAGE,
     sneakAttack: SNEAK_ATTACK,
@@ -499,6 +560,7 @@
     divineSmite: DIVINE_SMITE,
     healingWord: HEALING_WORD,
     shield: SHIELD,
+    hexMark: HEX_MARK,
   };
 
   const PCFeatures = {

@@ -651,6 +651,67 @@
       sh.hooks.onRoundEnd(self, 2, {});
       assertEq(self.reactionAvailableThisRound, true);
     });
+
+    group('Hex / Hunter\'s Mark');
+
+    test('Hex: onCombatStart picks a target (the first living monster)', () => {
+      const hex = PCFeatures.LIBRARY.hexMark;
+      const self = {
+        pm: { features: [{id:'hexMark'}], tactics: {mode:'sustained'} },
+        featureState: { hexMark: hex.initialState() },
+      };
+      const monster = { id: 'm:1', side: 'monster', dead: false };
+      const ctx = { round: 1, combatants: [self, monster], eventLog: [] };
+      hex.hooks.onCombatStart(self, ctx);
+      assertEq(self.featureState.hexMark.targetId, 'm:1');
+    });
+
+    test('Hex: onAttackHit adds 1d6 damage when target matches', () => {
+      const hex = PCFeatures.LIBRARY.hexMark;
+      const self = { featureState: { hexMark: { targetId: 'm:1' } } };
+      const action = { kind: 'attack' };
+      const target = { id: 'm:1' };
+      const dmgCtx = { amount: 8, type: 'piercing', bonusDice: [] };
+      hex.hooks.onAttackHit(self, action, target, dmgCtx);
+      assertEq(dmgCtx.bonusDice.length, 1);
+      assertEq(dmgCtx.bonusDice[0].dice, '1d6');
+      assertEq(dmgCtx.bonusDice[0].type, 'necrotic');
+    });
+
+    test('Hex: does NOT add damage when target does not match', () => {
+      const hex = PCFeatures.LIBRARY.hexMark;
+      const self = { featureState: { hexMark: { targetId: 'm:1' } } };
+      const action = { kind: 'attack' };
+      const target = { id: 'm:2' };
+      const dmgCtx = { amount: 8, type: 'piercing', bonusDice: [] };
+      hex.hooks.onAttackHit(self, action, target, dmgCtx);
+      assertEq(dmgCtx.bonusDice.length, 0);
+    });
+
+    test('Hex: onMonsterDowned recasts on a new target (Nova mode)', () => {
+      const hex = PCFeatures.LIBRARY.hexMark;
+      const self = {
+        pm: { features: [{id:'hexMark'}], tactics: {mode:'nova'} },
+        featureState: { hexMark: { targetId: 'm:1', slotsLeft: 4 } },
+      };
+      const dead = { id: 'm:1' };
+      const alive = { id: 'm:2', side: 'monster', dead: false };
+      const ctx = { round: 3, combatants: [self, dead, alive], eventLog: [] };
+      hex.hooks.onMonsterDowned(self, dead, ctx);
+      assertEq(self.featureState.hexMark.targetId, 'm:2');
+    });
+
+    test('Hex: does NOT recast under Sustained when first target dies', () => {
+      const hex = PCFeatures.LIBRARY.hexMark;
+      const self = {
+        pm: { features: [{id:'hexMark'}], tactics: {mode:'sustained'} },
+        featureState: { hexMark: { targetId: 'm:1', slotsLeft: 4 } },
+      };
+      const dead = { id: 'm:1' };
+      const alive = { id: 'm:2', side: 'monster', dead: false };
+      hex.hooks.onMonsterDowned(self, dead, { round: 3, combatants: [self, dead, alive] });
+      assertEq(self.featureState.hexMark.targetId, null);
+    });
   </script>
 </body>
 </html>
