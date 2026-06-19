@@ -26,8 +26,30 @@
     'onRoundEnd',
   ];
 
+  const MODE_PREDICATES = {
+    always:                  (self, ctx) => true,
+    whenAnyEnemyAlive:       (self, ctx) =>
+      Array.isArray(ctx && ctx.combatants) &&
+      ctx.combatants.some(c => c.side === 'monster' && !c.dead),
+    whenHpBelowHalf:         (self, ctx) =>
+      self && self.maxHp > 0 && (self.hp / self.maxHp) < 0.5,
+    whenHpBelowQuarter:      (self, ctx) =>
+      self && self.maxHp > 0 && (self.hp / self.maxHp) < 0.25,
+    whenAllyDowned:          (self, ctx) =>
+      Array.isArray(ctx && ctx.combatants) &&
+      ctx.combatants.some(c => c.side === 'pc' && c.downed),
+    whenAllyHpBelowHalf:     (self, ctx) =>
+      Array.isArray(ctx && ctx.combatants) &&
+      ctx.combatants.some(c =>
+        c.side === 'pc' && c.id !== (self && self.id) && c.maxHp > 0 && (c.hp / c.maxHp) < 0.5
+      ),
+    usesLeftGreaterThanZero: (self, ctx, featureId) =>
+      !!(self && self.featureState && self.featureState[featureId] && self.featureState[featureId].usesLeft > 0),
+  };
+
   const PCFeatures = {
     HOOK_NAMES,
+    MODE_PREDICATES,
   };
 
   if (typeof module !== 'undefined' && module.exports) {
