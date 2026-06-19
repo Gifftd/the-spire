@@ -708,8 +708,9 @@
     heal: {
       apply(self, hookCtx, params) {
         const amt = Number(params.amount) || 0;
+        const newHp = (self.hp || 0) + amt;
         if (params.target === 'self' || !params.target) {
-          self.hp = Math.min(self.maxHp || (self.hp || 0) + amt, (self.hp || 0) + amt);
+          self.hp = (typeof self.maxHp === 'number' && self.maxHp > 0) ? Math.min(self.maxHp, newHp) : newHp;
         }
         else if (hookCtx && hookCtx.target && hookCtx.target.maxHp) {
           hookCtx.target.hp = Math.min(hookCtx.target.maxHp, (hookCtx.target.hp || 0) + amt);
