@@ -259,6 +259,26 @@
         PCFeatures.LIBRARY = origLibrary;
       }
     });
+
+    test('initFeatureState is idempotent — preserves live state on second call', () => {
+      const origLibrary = PCFeatures.LIBRARY;
+      PCFeatures.LIBRARY = {
+        a: { id: 'a', initialState: () => ({ usesLeft: 3, active: false }) },
+      };
+      try {
+        const combatant = { pm: { features: [{id:'a'}] }, featureState: {} };
+        PCFeatures.initFeatureState(combatant);
+        // Mutate state as if the feature ran during combat.
+        combatant.featureState.a.usesLeft = 1;
+        combatant.featureState.a.active = true;
+        // Second call — should NOT clobber the mutation.
+        PCFeatures.initFeatureState(combatant);
+        assertEq(combatant.featureState.a.usesLeft, 1);
+        assertEq(combatant.featureState.a.active, true);
+      } finally {
+        PCFeatures.LIBRARY = origLibrary;
+      }
+    });
   </script>
 </body>
 </html>

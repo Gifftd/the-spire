@@ -63,7 +63,12 @@
       if (!def || !def.hooks || typeof def.hooks[hookName] !== 'function') continue;
       try {
         const result = def.hooks[hookName].call(def, combatant, ...args);
-        if (result === 'consume') return;
+        if (result === 'consume') {
+          // Reaction-style consume: short-circuits remaining features on THIS
+          // combatant only. The engine still calls dispatchHook on other
+          // combatants independently for the same event.
+          return;
+        }
       } catch (e) {
         console.warn('PCFeatures: feature "' + ref.id + '" hook ' + hookName + ' threw:', e);
         if (!combatant.featureState[ref.id]) combatant.featureState[ref.id] = {};
@@ -79,7 +84,9 @@
       if (!ref || !ref.id) continue;
       const def = PCFeatures.resolve(ref);
       if (!def) continue;
-      combatant.featureState[ref.id] = def.initialState ? def.initialState(def, ref) : {};
+      if (!combatant.featureState[ref.id]) {
+        combatant.featureState[ref.id] = def.initialState ? def.initialState(def, ref) : {};
+      }
     }
   }
 
