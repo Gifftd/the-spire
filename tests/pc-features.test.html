@@ -787,6 +787,83 @@
       PCFeatures.PRIMITIVES.heal.apply(self, {}, { amount: 8, target: 'self' });
       assertEq(self.hp, 18);
     });
+
+    group('compileDSL');
+
+    test('compileDSL produces a feature object with hooks from effects list', () => {
+      const spec = {
+        id: 'feyStep', name: 'Fey Step', source: 'homebrew',
+        category: ['action-economy'],
+        params: { usesPerEncounter: { type: 'int', value: 1 } },
+        modePolicy: { sustained: { triggerRound: 1, conditionFn: 'whenHpBelowHalf' } },
+        effects: [
+          { hook: 'onTurnStart', primitive: 'consumeBonusAction', when: 'usesLeftGreaterThanZero' },
+          { hook: 'onTurnStart', primitive: 'decrementUses', params: { featureId: 'feyStep' } },
+        ],
+      };
+      const compiled = PCFeatures.compileDSL(spec);
+      assert(compiled, 'compileDSL returns an object');
+      assertEq(compiled.id, 'feyStep');
+      assertEq(compiled.source, 'homebrew');
+      assert(typeof compiled.hooks.onTurnStart === 'function', 'onTurnStart hook attached');
+    });
+
+    test('compileDSL hook runs effects in order, respecting "when" predicates', () => {
+      const spec = {
+        id: 't', name: 'T', source: 'homebrew',
+        modePolicy: { sustained: { triggerRound: 1, conditionFn: 'always' } },
+        effects: [
+          { hook: 'onTurnStart', primitive: 'consumeBonusAction' },
+        ],
+      };
+      const compiled = PCFeatures.compileDSL(spec);
+      const self = {
+        pm: { features: [{id:'t'}], tactics: {mode:'sustained'} },
+        featureState: { t: {} },
+        bonusActionAvailable: true,
+      };
+      compiled.hooks.onTurnStart.call(compiled, self, { round: 1, combatants: [] });
+      assertEq(self.bonusActionAvailable, false);
+    });
+
+    test('compileDSL ignores unknown primitives gracefully (does not throw)', () => {
+      const spec = {
+        id: 'bad', name: 'Bad', source: 'homebrew',
+        modePolicy: { sustained: { triggerRound: 1, conditionFn: 'always' } },
+        effects: [
+          { hook: 'onTurnStart', primitive: 'doesNotExist' },
+          { hook: 'onTurnStart', primitive: 'consumeBonusAction' },
+        ],
+      };
+      const compiled = PCFeatures.compileDSL(spec);
+      const self = { pm: { features: [{id:'bad'}], tactics: {mode:'sustained'} }, featureState: { bad: {} }, bonusActionAvailable: true };
+      // Silence the expected warning.
+      const origWarn = console.warn;
+      console.warn = () => {};
+      try {
+        compiled.hooks.onTurnStart.call(compiled, self, { round: 1, combatants: [] });
+      } finally {
+        console.warn = origWarn;
+      }
+      assertEq(self.bonusActionAvailable, false);
+    });
+
+    test('compileDSL respects modePolicy.conditionFn predicate', () => {
+      const spec = {
+        id: 't', name: 'T', source: 'homebrew',
+        modePolicy: { sustained: { triggerRound: 1, conditionFn: 'whenHpBelowHalf' } },
+        effects: [ { hook: 'onTurnStart', primitive: 'consumeBonusAction' } ],
+      };
+      const compiled = PCFeatures.compileDSL(spec);
+      const self = {
+        pm: { features: [{id:'t'}], tactics: {mode:'sustained'} },
+        featureState: { t: {} },
+        bonusActionAvailable: true,
+        hp: 30, maxHp: 30,
+      };
+      compiled.hooks.onTurnStart.call(compiled, self, { round: 1, combatants: [] });
+      assertEq(self.bonusActionAvailable, true);
+    });
   </script>
 </body>
 </html>

@@ -7,6 +7,7 @@
 //   - resolve(featureRef): given {id, source, params}, return the full feature def
 //   - dispatchHook(combatant, hookName, ...args): runs all subscribed features
 //   - dispatchBroadcastHook(combatants, triggering, hookName, ...args): cross-PC hook dispatch
+//   - compileDSL(spec): turns a JSON spec into a feature object
 //
 // Companion: tests/pc-features.test.html exercises every function above.
 // Engine integration: crucible-engine.js calls dispatchHook at 9 sites.
@@ -740,6 +741,66 @@
     },
   };
 
+  function compileDSL(spec) {
+    if (!spec || typeof spec !== 'object' || !spec.id) return null;
+    const effectsByHook = {};
+    for (const eff of (spec.effects || [])) {
+      if (!eff || !eff.hook) continue;
+      if (!effectsByHook[eff.hook]) effectsByHook[eff.hook] = [];
+      effectsByHook[eff.hook].push(eff);
+    }
+    const hooks = {};
+    for (const hookName of Object.keys(effectsByHook)) {
+      const effects = effectsByHook[hookName];
+      hooks[hookName] = function (self, ...rest) {
+        // Pack the variadic positional args into a hookCtx the primitives can read.
+        const hookCtx = {
+          ctx: rest.find(a => a && Array.isArray(a.combatants)),
+          action:   rest[0] && rest[0].kind === 'attack' ? rest[0] : null,
+          target:   (rest[1] && rest[1].side) ? rest[1] : null,
+          dmgCtx:   rest.find(a => a && typeof a.amount === 'number'),
+          rollCtx:  rest.find(a => a && (typeof a.roll === 'number' || typeof a.bonus === 'number')),
+        };
+        const mode = (self.pm && self.pm.tactics && self.pm.tactics.mode) || 'sustained';
+        const policy = (spec.modePolicy && spec.modePolicy[mode]) || (spec.modePolicy && spec.modePolicy.sustained) || {};
+        if (policy.triggerRound && ((hookCtx.ctx && hookCtx.ctx.round) || 0) < policy.triggerRound) return;
+        if (policy.conditionFn) {
+          const pred = MODE_PREDICATES[policy.conditionFn];
+          if (pred && !pred(self, hookCtx.ctx || {}, spec.id)) return;
+        }
+        for (const eff of effects) {
+          if (eff.when) {
+            const whenPred = MODE_PREDICATES[eff.when];
+            if (whenPred && !whenPred(self, hookCtx.ctx || {}, spec.id)) continue;
+          }
+          const prim = PRIMITIVES[eff.primitive];
+          if (!prim || typeof prim.apply !== 'function') {
+            console.warn('PCFeatures.compileDSL: unknown primitive "' + eff.primitive + '" in feature ' + spec.id);
+            continue;
+          }
+          try { prim.apply(self, hookCtx, eff.params || {}); }
+          catch (e) { console.warn('PCFeatures.compileDSL: primitive ' + eff.primitive + ' threw:', e); }
+        }
+      };
+    }
+    return {
+      id: spec.id,
+      name: spec.name,
+      source: 'homebrew',
+      category: spec.category || [],
+      summary: spec.summary || '',
+      params: spec.params || {},
+      modePolicy: spec.modePolicy || {},
+      hooks,
+      initialState() {
+        const state = {};
+        const usesParam = spec.params && spec.params.usesPerEncounter;
+        if (usesParam) state.usesLeft = usesParam.value || usesParam.default || 0;
+        return state;
+      },
+    };
+  }
+
   const PCFeatures = {
     HOOK_NAMES,
     MODE_PREDICATES,
@@ -749,6 +810,7 @@
     dispatchHook,
     dispatchBroadcastHook,
     initFeatureState,
+    compileDSL,
   };
 
   if (typeof module !== 'undefined' && module.exports) {
