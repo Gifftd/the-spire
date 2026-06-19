@@ -2885,10 +2885,11 @@ async function handleStageParam() {
   }
   const enc = EncounterSchema.migrateInMemory(raw);
 
-  // Confirm if any combatants are already on the board.
-  if (isCombatActive()) {
-    const count = state.combatants.length;
-    if (!confirm('Combat in progress (' + count + ' combatant' + (count === 1 ? '' : 's') + '). Stage "' + (enc.name || 'this encounter') + '" and discard the current roster?')) {
+  // Confirm only if there are enemies on the board — staging clears
+  // enemies but preserves PCs, so a lobby with only PCs needs no confirm.
+  const enemyCount = state.combatants.filter(c => c.type === 'enemy').length;
+  if (enemyCount > 0) {
+    if (!confirm(enemyCount + ' enem' + (enemyCount === 1 ? 'y' : 'ies') + ' on the board. Stage "' + (enc.name || 'this encounter') + '" and replace them? (PCs stay.)')) {
       return;
     }
   }
@@ -2907,15 +2908,17 @@ async function handleStageParam() {
 }
 
 function stageEncounter(enc) {
-  // Clear the current roster. PCs survive into the next encounter via
-  // the carryover modal in normal flow, but when staging from a URL
-  // the DM has already confirmed the discard, so we remove everything.
-  state.combatants = [];
+  // Clear ONLY enemies. PCs persist across encounters in the tracker — they
+  // hold their HP, conditions, init, and any expansion UI state. The stage
+  // confirm gates the destruction of the in-progress combat (monsters); PCs
+  // stay. Mirrors the existing clearEnemies() behavior.
+  state.combatants = state.combatants.filter(c => c.type === 'pc');
   state.round = 1;
   state.activeIndex = 0;
   mode = 'lobby';
-  expandedIds.clear();
-  statblockOpenIds.clear();
+  // Don't touch expandedIds / statblockOpenIds — entries pointing at removed
+  // monsters become orphan but harmless; clearing them would collapse PC rows
+  // the DM had open.
 
   // Bridge to the existing bestiary add-picks code path.
   _BP.picks = (enc.picks || []).map(p => ({
