@@ -90,10 +90,86 @@
     }
   }
 
+  // ── Built-in library ──
+
+  const RAGE = {
+    id: 'rage',
+    name: 'Rage',
+    source: 'builtin',
+    category: ['damage', 'defense'],
+    classHint: 'barbarian',
+    summary: '+bonusDamage on melee hits; half physical damage taken; while raging.',
+
+    deriveParams(identityOrPm) {
+      const level = (identityOrPm && identityOrPm.level) || (identityOrPm && identityOrPm.identity && identityOrPm.identity.level) || 1;
+      let bonusDamage = 2;
+      if (level >= 9)  bonusDamage = 3;
+      if (level >= 16) bonusDamage = 4;
+      return { bonusDamage, duration: 10 };
+    },
+
+    modePolicy: {
+      nova:      { triggerRound: 1, conditionFn: 'always' },
+      sustained: { triggerRound: 1, conditionFn: 'whenAnyEnemyAlive' },
+      defensive: { triggerRound: 1, conditionFn: 'whenHpBelowHalf' },
+    },
+
+    initialState() { return { active: false, roundsLeft: 0 }; },
+
+    hooks: {
+      onCombatStart(self, ctx) {
+        const ref = self.pm.features.find(f => f.id === 'rage');
+        const mode = (self.pm.tactics && self.pm.tactics.mode) || 'sustained';
+        const policy = this.modePolicy[mode] || this.modePolicy.sustained;
+        if (ctx.round >= (policy.triggerRound || 1)) {
+          const pred = MODE_PREDICATES[policy.conditionFn] || MODE_PREDICATES.always;
+          if (pred(self, ctx, 'rage')) {
+            const params = (ref && ref.params) || this.deriveParams(self.pm);
+            self.featureState.rage.active = true;
+            self.featureState.rage.roundsLeft = params.duration || 10;
+            if (ctx.eventLog) ctx.eventLog.push({ round: ctx.round, type: 'feature', who: self.id, what: 'Rage activated' });
+          }
+        }
+      },
+
+      onAttackHit(self, action, target, dmgCtx) {
+        const state = self.featureState.rage;
+        if (!state || !state.active) return;
+        if (!action || action.actionRange === 'ranged') return;
+        const ref = self.pm.features.find(f => f.id === 'rage');
+        const params = (ref && ref.params) || this.deriveParams(self.pm);
+        dmgCtx.amount += (params.bonusDamage || 2);
+      },
+
+      onTakeDamage(self, dmgCtx) {
+        const state = self.featureState.rage;
+        if (!state || !state.active) return;
+        const PHYS = ['bludgeoning', 'piercing', 'slashing'];
+        if (PHYS.includes(dmgCtx.type)) {
+          dmgCtx.amount = Math.floor(dmgCtx.amount / 2);
+        }
+      },
+
+      onRoundEnd(self, round, ctx) {
+        const state = self.featureState.rage;
+        if (!state || !state.active) return;
+        state.roundsLeft = Math.max(0, state.roundsLeft - 1);
+        if (state.roundsLeft <= 0) {
+          state.active = false;
+          if (ctx && ctx.eventLog) ctx.eventLog.push({ round, type: 'feature', who: self.id, what: 'Rage ended' });
+        }
+      },
+    },
+  };
+
+  const LIBRARY = {
+    rage: RAGE,
+  };
+
   const PCFeatures = {
     HOOK_NAMES,
     MODE_PREDICATES,
-    LIBRARY: {},
+    LIBRARY,
     resolve,
     dispatchHook,
     initFeatureState,

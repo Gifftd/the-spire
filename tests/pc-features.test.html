@@ -279,6 +279,77 @@
         PCFeatures.LIBRARY = origLibrary;
       }
     });
+
+    group('Rage');
+
+    test('Rage: bonusDamage scales with level (+2 at L5, +3 at L9, +4 at L16)', () => {
+      const rage = PCFeatures.LIBRARY.rage;
+      assert(rage, 'rage exists in LIBRARY');
+      const r5  = rage.deriveParams({ identity: { level: 5  } });
+      const r9  = rage.deriveParams({ identity: { level: 9  } });
+      const r16 = rage.deriveParams({ identity: { level: 16 } });
+      assertEq(r5.bonusDamage, 2);
+      assertEq(r9.bonusDamage, 3);
+      assertEq(r16.bonusDamage, 4);
+    });
+
+    test('Rage: onCombatStart activates under Nova mode at round 1', () => {
+      const rage = PCFeatures.LIBRARY.rage;
+      const self = {
+        pm: { features: [{id:'rage', params:{bonusDamage:2, duration:10}}], tactics: {mode:'nova'} },
+        featureState: { rage: rage.initialState(rage) },
+        hp: 30, maxHp: 30,
+      };
+      const ctx = { round: 1, combatants: [self, {side:'monster', dead:false}] };
+      rage.hooks.onCombatStart(self, ctx);
+      assertEq(self.featureState.rage.active, true);
+      assertEq(self.featureState.rage.roundsLeft, 10);
+    });
+
+    test('Rage: onAttackHit adds bonusDamage on melee hits when active', () => {
+      const rage = PCFeatures.LIBRARY.rage;
+      const self = {
+        pm: { features: [{id:'rage', params:{bonusDamage:2}}], tactics: {mode:'nova'} },
+        featureState: { rage: { active: true, roundsLeft: 10 } },
+      };
+      const action = { kind: 'attack', actionRange: 'melee' };
+      const dmgCtx = { amount: 8, type: 'slashing', bonusDice: [] };
+      rage.hooks.onAttackHit(self, action, {}, dmgCtx);
+      assertEq(dmgCtx.amount, 10);
+    });
+
+    test('Rage: onAttackHit does NOT add damage on ranged attacks', () => {
+      const rage = PCFeatures.LIBRARY.rage;
+      const self = { featureState: { rage: { active: true, roundsLeft: 10 } } };
+      const action = { kind: 'attack', actionRange: 'ranged' };
+      const dmgCtx = { amount: 8, type: 'piercing' };
+      rage.hooks.onAttackHit(self, action, {}, dmgCtx);
+      assertEq(dmgCtx.amount, 8);
+    });
+
+    test('Rage: onTakeDamage halves physical damage when active', () => {
+      const rage = PCFeatures.LIBRARY.rage;
+      const self = { featureState: { rage: { active: true, roundsLeft: 10 } } };
+      const dmgCtx = { amount: 10, type: 'slashing' };
+      rage.hooks.onTakeDamage(self, dmgCtx);
+      assertEq(dmgCtx.amount, 5);
+    });
+
+    test('Rage: onTakeDamage does NOT halve non-physical damage', () => {
+      const rage = PCFeatures.LIBRARY.rage;
+      const self = { featureState: { rage: { active: true, roundsLeft: 10 } } };
+      const dmgCtx = { amount: 10, type: 'fire' };
+      rage.hooks.onTakeDamage(self, dmgCtx);
+      assertEq(dmgCtx.amount, 10);
+    });
+
+    test('Rage: onRoundEnd decrements duration; deactivates at 0', () => {
+      const rage = PCFeatures.LIBRARY.rage;
+      const self = { featureState: { rage: { active: true, roundsLeft: 1 } } };
+      rage.hooks.onRoundEnd(self, 5, {});
+      assertEq(self.featureState.rage.roundsLeft, 0);
+      assertEq(self.featureState.rage.active, false);
+    });
   </script>
 </body>
 </html>
