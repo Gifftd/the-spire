@@ -77,6 +77,33 @@
     }
   }
 
+  // Broadcast hook: invoke the named hook on every PC's features, with the
+  // triggering combatant as the second positional arg.
+  //
+  // Used for cross-PC features like Bardic Inspiration where the bard's
+  // feature needs to fire on another PC's save attempt.
+  function dispatchBroadcastHook(allCombatants, triggeringCombatant, hookName, ...args) {
+    if (!Array.isArray(allCombatants)) return;
+    for (const c of allCombatants) {
+      if (!c || c.side !== 'pc' || !c.pm || !Array.isArray(c.pm.features)) continue;
+      if (!c.featureState) c.featureState = {};
+      for (const ref of c.pm.features) {
+        if (!ref || !ref.id) continue;
+        const state = c.featureState[ref.id];
+        if (state && state._disabled) continue;
+        const def = PCFeatures.resolve(ref);
+        if (!def || !def.hooks || typeof def.hooks[hookName] !== 'function') continue;
+        try {
+          def.hooks[hookName].call(def, c, triggeringCombatant, ...args);
+        } catch (e) {
+          console.warn('PCFeatures: feature "' + ref.id + '" broadcast hook ' + hookName + ' threw:', e);
+          if (!c.featureState[ref.id]) c.featureState[ref.id] = {};
+          c.featureState[ref.id]._disabled = true;
+        }
+      }
+    }
+  }
+
   function initFeatureState(combatant) {
     if (!combatant || !combatant.pm || !Array.isArray(combatant.pm.features)) return;
     if (!combatant.featureState) combatant.featureState = {};
@@ -553,6 +580,76 @@
     },
   };
 
+  const BARDIC_INSPIRATION = {
+    id: 'bardicInspiration',
+    name: 'Bardic Inspiration',
+    source: 'builtin',
+    category: ['support'],
+    classHint: 'bard',
+    summary: 'Hand out inspiration dice at combat start; allies spend them to boost attacks and saves.',
+
+    deriveParams(identityOrPm) {
+      const level = (identityOrPm && identityOrPm.level) || (identityOrPm && identityOrPm.identity && identityOrPm.identity.level) || 1;
+      let die = 'd6';
+      if (level >= 5)  die = 'd8';
+      if (level >= 10) die = 'd10';
+      if (level >= 15) die = 'd12';
+      return { die };
+    },
+
+    modePolicy: {
+      nova:      { distribute: 'best-attackers' },
+      sustained: { distribute: 'mixed' },
+      defensive: { distribute: 'reserve-one-for-saves' },
+    },
+
+    initialState() { return { diceHeldBy: {}, dieSize: 'd6' }; },
+
+    hooks: {
+      onCombatStart(self, ctx) {
+        const ref = self.pm.features.find(f => f.id === 'bardicInspiration');
+        const params = (ref && ref.params) || this.deriveParams(self.pm);
+        const cha = (self.pm.abilities && self.pm.abilities.cha) || 10;
+        const count = Math.max(1, mod(cha));
+        const allies = (ctx.combatants || []).filter(c => c.side === 'pc' && c.id !== self.id);
+        const targets = allies.slice(0, count);
+        const dice = {};
+        for (const ally of targets) dice[ally.id] = params.die;
+        self.featureState.bardicInspiration.diceHeldBy = dice;
+        self.featureState.bardicInspiration.dieSize = params.die;
+        if (ctx.eventLog) ctx.eventLog.push({
+          round: ctx.round, type: 'feature', who: self.id,
+          what: 'Bardic Inspiration handed to ' + targets.map(a => a.id).join(', '),
+        });
+      },
+
+      onSaveAttempt(self, triggering, ability, dc, rollCtx) {
+        const state = self.featureState.bardicInspiration;
+        if (!state || !state.diceHeldBy) return;
+        if (!triggering || !state.diceHeldBy[triggering.id]) return;
+        const die = state.diceHeldBy[triggering.id];
+        const sides = parseInt(die.replace('d', ''), 10);
+        const expectedValue = (sides + 1) / 2;
+        rollCtx.bonus = (rollCtx.bonus || 0) + expectedValue;
+        delete state.diceHeldBy[triggering.id];
+      },
+
+      onAttackAttempt(self, triggering, target, rollCtx) {
+        const state = self.featureState.bardicInspiration;
+        if (!state || !state.diceHeldBy) return;
+        if (!triggering || !state.diceHeldBy[triggering.id]) return;
+        const hitBy = (rollCtx.roll || 0) - (target.ac || 10);
+        if (hitBy > 0 || hitBy < -5) return;
+        const die = state.diceHeldBy[triggering.id];
+        const sides = parseInt(die.replace('d', ''), 10);
+        const expectedValue = (sides + 1) / 2;
+        rollCtx.bonus = (rollCtx.bonus || 0) + expectedValue;
+        rollCtx.hits = ((rollCtx.roll || 0) + expectedValue) >= (target.ac || 10);
+        delete state.diceHeldBy[triggering.id];
+      },
+    },
+  };
+
   const LIBRARY = {
     rage: RAGE,
     sneakAttack: SNEAK_ATTACK,
@@ -561,6 +658,7 @@
     healingWord: HEALING_WORD,
     shield: SHIELD,
     hexMark: HEX_MARK,
+    bardicInspiration: BARDIC_INSPIRATION,
   };
 
   const PCFeatures = {
@@ -569,6 +667,7 @@
     LIBRARY,
     resolve,
     dispatchHook,
+    dispatchBroadcastHook,
     initFeatureState,
   };
 

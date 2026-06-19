@@ -712,6 +712,48 @@
       hex.hooks.onMonsterDowned(self, dead, { round: 3, combatants: [self, dead, alive] });
       assertEq(self.featureState.hexMark.targetId, null);
     });
+
+    group('Bardic Inspiration');
+
+    test('Bardic Inspiration: die size scales with level (d6→d8 at L5, d10 at L10, d12 at L15)', () => {
+      const bi = PCFeatures.LIBRARY.bardicInspiration;
+      assertEq(bi.deriveParams({ identity: { level: 1  } }).die, 'd6');
+      assertEq(bi.deriveParams({ identity: { level: 5  } }).die, 'd8');
+      assertEq(bi.deriveParams({ identity: { level: 10 } }).die, 'd10');
+      assertEq(bi.deriveParams({ identity: { level: 15 } }).die, 'd12');
+    });
+
+    test('Bardic Inspiration: onCombatStart hands out dice to allies (count = CHA mod)', () => {
+      const bi = PCFeatures.LIBRARY.bardicInspiration;
+      const self = {
+        id: 'pc:bard',
+        pm: { features: [{id:'bardicInspiration'}], abilities: { cha: 18 }, identity: { level: 5 }, tactics: {mode:'sustained'} },
+        featureState: { bardicInspiration: bi.initialState() },
+      };
+      const ally1 = { id: 'pc:fighter', side: 'pc' };
+      const ally2 = { id: 'pc:rogue',   side: 'pc' };
+      const ally3 = { id: 'pc:cleric',  side: 'pc' };
+      const ally4 = { id: 'pc:wizard',  side: 'pc' };
+      const ctx = { round: 1, combatants: [self, ally1, ally2, ally3, ally4], eventLog: [] };
+      bi.hooks.onCombatStart(self, ctx);
+      const diceCount = Object.keys(self.featureState.bardicInspiration.diceHeldBy || {}).length;
+      assertEq(diceCount, 4);
+    });
+
+    test('Bardic Inspiration: onSaveAttempt of an ally consumes a die and adds avg die value to bonus', () => {
+      const bi = PCFeatures.LIBRARY.bardicInspiration;
+      const bardId = 'pc:bard';
+      const bard = {
+        id: bardId,
+        pm: { features: [{id:'bardicInspiration'}], abilities: { cha: 16 }, identity: { level: 5 }, tactics: {mode:'sustained'} },
+        featureState: { bardicInspiration: { diceHeldBy: { 'pc:fighter': 'd8' }, dieSize: 'd8' } },
+      };
+      const ally = { id: 'pc:fighter', pm: { features: [], tactics: {mode:'sustained'} }, featureState: {} };
+      const rollCtx = { bonus: 0, eventLog: [] };
+      bi.hooks.onSaveAttempt(bard, ally, 'wis', 15, rollCtx);
+      assertEq(bard.featureState.bardicInspiration.diceHeldBy['pc:fighter'], undefined);
+      assert(rollCtx.bonus >= 4, 'rollCtx.bonus should be increased by d8 (median 4-5)');
+    });
   </script>
 </body>
 </html>
