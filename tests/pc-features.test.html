@@ -418,6 +418,75 @@
       sa.hooks.onAttackHit(self, action, {}, dmgCtx);
       assertEq(dmgCtx.bonusDice.length, 1);
     });
+
+    group('Action Surge');
+
+    test('Action Surge: 1 use at L2-16, 2 uses at L17+', () => {
+      const as = PCFeatures.LIBRARY.actionSurge;
+      assertEq(as.deriveParams({ identity: { level: 5  } }).maxUses, 1);
+      assertEq(as.deriveParams({ identity: { level: 17 } }).maxUses, 2);
+    });
+
+    test('Action Surge: onCombatStart seeds usesLeft', () => {
+      const as = PCFeatures.LIBRARY.actionSurge;
+      const self = {
+        pm: { features: [{id:'actionSurge', params:{maxUses:1}}], tactics: {mode:'sustained'} },
+        featureState: { actionSurge: as.initialState() },
+      };
+      as.hooks.onCombatStart(self, { round: 1, combatants: [] });
+      assertEq(self.featureState.actionSurge.usesLeft, 1);
+    });
+
+    test('Action Surge under Nova: fires at round 1, grants +1 actionsAvailable', () => {
+      const as = PCFeatures.LIBRARY.actionSurge;
+      const self = {
+        pm: { features: [{id:'actionSurge'}], tactics: {mode:'nova'} },
+        featureState: { actionSurge: { usesLeft: 1 } },
+        actionsAvailable: 1,
+      };
+      as.hooks.onTurnStart(self, { round: 1, combatants: [{side:'monster', dead:false}] });
+      assertEq(self.actionsAvailable, 2);
+      assertEq(self.featureState.actionSurge.usesLeft, 0);
+    });
+
+    test('Action Surge under Sustained: does not fire round 1', () => {
+      const as = PCFeatures.LIBRARY.actionSurge;
+      const self = {
+        pm: { features: [{id:'actionSurge'}], tactics: {mode:'sustained'} },
+        featureState: { actionSurge: { usesLeft: 1 } },
+        actionsAvailable: 1,
+      };
+      as.hooks.onTurnStart(self, { round: 1, combatants: [{side:'monster', dead:false}] });
+      assertEq(self.actionsAvailable, 1);
+      assertEq(self.featureState.actionSurge.usesLeft, 1);
+    });
+
+    test('Action Surge under Defensive: fires when ally is downed', () => {
+      const as = PCFeatures.LIBRARY.actionSurge;
+      const self = {
+        id: 'pc:fighter',
+        pm: { features: [{id:'actionSurge'}], tactics: {mode:'defensive'} },
+        featureState: { actionSurge: { usesLeft: 1 } },
+        actionsAvailable: 1,
+      };
+      const ctx = { round: 3, combatants: [
+        self,
+        { id:'pc:cleric', side:'pc', downed:true },
+      ]};
+      as.hooks.onTurnStart(self, ctx);
+      assertEq(self.actionsAvailable, 2);
+    });
+
+    test('Action Surge: does not fire when usesLeft is 0', () => {
+      const as = PCFeatures.LIBRARY.actionSurge;
+      const self = {
+        pm: { features: [{id:'actionSurge'}], tactics: {mode:'nova'} },
+        featureState: { actionSurge: { usesLeft: 0 } },
+        actionsAvailable: 1,
+      };
+      as.hooks.onTurnStart(self, { round: 1, combatants: [{side:'monster', dead:false}] });
+      assertEq(self.actionsAvailable, 1);
+    });
   </script>
 </body>
 </html>

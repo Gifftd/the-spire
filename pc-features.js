@@ -204,9 +204,54 @@
     },
   };
 
+  const ACTION_SURGE = {
+    id: 'actionSurge',
+    name: 'Action Surge',
+    source: 'builtin',
+    category: ['action-economy'],
+    classHint: 'fighter',
+    summary: 'Take an extra action on the turn it fires.',
+
+    deriveParams(identityOrPm) {
+      const level = (identityOrPm && identityOrPm.level) || (identityOrPm && identityOrPm.identity && identityOrPm.identity.level) || 2;
+      return { maxUses: level >= 17 ? 2 : 1 };
+    },
+
+    modePolicy: {
+      nova:      { triggerRound: 1, conditionFn: 'always' },
+      sustained: { triggerRound: 2, conditionFn: 'whenAnyEnemyAlive' },
+      defensive: { triggerRound: 1, conditionFn: 'whenAllyDowned' },
+    },
+
+    initialState() { return { usesLeft: 0 }; },
+
+    hooks: {
+      onCombatStart(self, ctx) {
+        const ref = self.pm.features.find(f => f.id === 'actionSurge');
+        const params = (ref && ref.params) || this.deriveParams(self.pm);
+        self.featureState.actionSurge.usesLeft = params.maxUses || 1;
+      },
+
+      onTurnStart(self, ctx) {
+        const state = self.featureState.actionSurge;
+        if (!state || state.usesLeft <= 0) return;
+        const mode = (self.pm.tactics && self.pm.tactics.mode) || 'sustained';
+        const policy = this.modePolicy[mode] || this.modePolicy.sustained;
+        if (ctx.round < (policy.triggerRound || 1)) return;
+        const pred = MODE_PREDICATES[policy.conditionFn] || MODE_PREDICATES.always;
+        if (!pred(self, ctx, 'actionSurge')) return;
+        if (typeof self.actionsAvailable !== 'number') self.actionsAvailable = 1;
+        self.actionsAvailable += 1;
+        state.usesLeft -= 1;
+        if (ctx.eventLog) ctx.eventLog.push({ round: ctx.round, type: 'feature', who: self.id, what: 'Action Surge activated' });
+      },
+    },
+  };
+
   const LIBRARY = {
     rage: RAGE,
     sneakAttack: SNEAK_ATTACK,
+    actionSurge: ACTION_SURGE,
   };
 
   const PCFeatures = {
