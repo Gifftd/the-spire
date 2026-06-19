@@ -248,10 +248,87 @@
     },
   };
 
+  const PALADIN_SLOTS_BY_LEVEL = {
+    2:  {1:2},
+    3:  {1:3}, 4: {1:3},
+    5:  {1:4, 2:3},
+    6:  {1:4, 2:3},
+    7:  {1:4, 2:3}, 8: {1:4, 2:3},
+    9:  {1:4, 2:3, 3:2},
+    10: {1:4, 2:3, 3:2},
+    11: {1:4, 2:3, 3:3}, 12: {1:4, 2:3, 3:3},
+    13: {1:4, 2:3, 3:3, 4:1}, 14: {1:4, 2:3, 3:3, 4:1},
+    15: {1:4, 2:3, 3:3, 4:2}, 16: {1:4, 2:3, 3:3, 4:2},
+    17: {1:4, 2:3, 3:3, 4:3, 5:1}, 18: {1:4, 2:3, 3:3, 4:3, 5:1},
+    19: {1:4, 2:3, 3:3, 4:3, 5:2}, 20: {1:4, 2:3, 3:3, 4:3, 5:2},
+  };
+
+  const DIVINE_SMITE = {
+    id: 'divineSmite',
+    name: 'Divine Smite',
+    source: 'builtin',
+    category: ['damage'],
+    classHint: 'paladin',
+    summary: 'Spend a spell slot on a hit for bonus radiant dice (2d8 + 1 per slot level above 1st).',
+
+    deriveParams(identityOrPm) {
+      const level = (identityOrPm && identityOrPm.level) || (identityOrPm && identityOrPm.identity && identityOrPm.identity.level) || 5;
+      let slots = {1:4, 2:3};
+      for (let l = level; l >= 2; l--) {
+        if (PALADIN_SLOTS_BY_LEVEL[l]) { slots = PALADIN_SLOTS_BY_LEVEL[l]; break; }
+      }
+      return { slotsByLevel: { ...slots } };
+    },
+
+    modePolicy: {
+      nova:      { triggerRound: 1, conditionFn: 'always', spendOn: 'everyHit' },
+      sustained: { triggerRound: 1, conditionFn: 'always', spendOn: 'paced' },
+      defensive: { triggerRound: 1, conditionFn: 'always', spendOn: 'critOnly' },
+    },
+
+    initialState() { return { slotsLeft: {}, hitsThisFight: 0, smitesThisFight: 0 }; },
+
+    hooks: {
+      onCombatStart(self, ctx) {
+        const ref = self.pm.features.find(f => f.id === 'divineSmite');
+        const params = (ref && ref.params) || this.deriveParams(self.pm);
+        self.featureState.divineSmite.slotsLeft = { ...(params.slotsByLevel || {}) };
+        self.featureState.divineSmite.hitsThisFight = 0;
+        self.featureState.divineSmite.smitesThisFight = 0;
+      },
+
+      onAttackHit(self, action, target, dmgCtx) {
+        const state = self.featureState.divineSmite;
+        if (!state) return;
+        if (!action || action.kind !== 'attack') return;
+        if (action.actionRange === 'ranged') return;
+        state.hitsThisFight += 1;
+        const levels = Object.keys(state.slotsLeft).map(Number).sort((a,b) => b - a);
+        const highestAvailable = levels.find(l => state.slotsLeft[l] > 0);
+        if (!highestAvailable) return;
+
+        const mode = (self.pm.tactics && self.pm.tactics.mode) || 'sustained';
+        const policy = this.modePolicy[mode] || this.modePolicy.sustained;
+        let shouldSpend = false;
+        if (policy.spendOn === 'everyHit')    shouldSpend = true;
+        else if (policy.spendOn === 'critOnly') shouldSpend = !!dmgCtx.crit;
+        else if (policy.spendOn === 'paced')    shouldSpend = (state.smitesThisFight < Math.ceil(state.hitsThisFight / 2));
+        if (!shouldSpend) return;
+
+        state.slotsLeft[highestAvailable] -= 1;
+        state.smitesThisFight += 1;
+        const dice = (1 + highestAvailable) + 'd8';
+        if (!Array.isArray(dmgCtx.bonusDice)) dmgCtx.bonusDice = [];
+        dmgCtx.bonusDice.push({ dice, type: 'radiant', source: 'divineSmite' });
+      },
+    },
+  };
+
   const LIBRARY = {
     rage: RAGE,
     sneakAttack: SNEAK_ATTACK,
     actionSurge: ACTION_SURGE,
+    divineSmite: DIVINE_SMITE,
   };
 
   const PCFeatures = {

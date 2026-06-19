@@ -487,6 +487,66 @@
       as.hooks.onTurnStart(self, { round: 1, combatants: [{side:'monster', dead:false}] });
       assertEq(self.actionsAvailable, 1);
     });
+
+    group('Divine Smite');
+
+    test('Divine Smite: deriveParams reports default slots {1:4, 2:3} at L5', () => {
+      const sm = PCFeatures.LIBRARY.divineSmite;
+      const p = sm.deriveParams({ identity: { level: 5 } });
+      assertEq(p.slotsByLevel, { 1: 4, 2: 3 });
+    });
+
+    test('Divine Smite: onCombatStart seeds slotsLeft from params', () => {
+      const sm = PCFeatures.LIBRARY.divineSmite;
+      const self = {
+        pm: { features: [{id:'divineSmite', params:{slotsByLevel:{1:4,2:3}}}], tactics: {mode:'nova'} },
+        featureState: { divineSmite: sm.initialState() },
+      };
+      sm.hooks.onCombatStart(self, { round: 1, combatants: [] });
+      assertEq(self.featureState.divineSmite.slotsLeft, { 1: 4, 2: 3 });
+    });
+
+    test('Divine Smite Nova: spends highest available slot on every hit, +radiant dice', () => {
+      const sm = PCFeatures.LIBRARY.divineSmite;
+      const self = {
+        pm: { features: [{id:'divineSmite'}], tactics: {mode:'nova'} },
+        featureState: { divineSmite: { slotsLeft: { 1: 2, 2: 1 }, hitsThisFight: 0, smitesThisFight: 0 } },
+      };
+      const action = { kind: 'attack', actionRange: 'melee' };
+      const dmgCtx = { amount: 8, type: 'slashing', bonusDice: [], crit: false };
+      sm.hooks.onAttackHit(self, action, {}, dmgCtx);
+      assertEq(self.featureState.divineSmite.slotsLeft, { 1: 2, 2: 0 });
+      assertEq(dmgCtx.bonusDice.length, 1);
+      assertEq(dmgCtx.bonusDice[0].dice, '3d8');
+      assertEq(dmgCtx.bonusDice[0].type, 'radiant');
+    });
+
+    test('Divine Smite Defensive: only spends on a crit', () => {
+      const sm = PCFeatures.LIBRARY.divineSmite;
+      const self = {
+        pm: { features: [{id:'divineSmite'}], tactics: {mode:'defensive'} },
+        featureState: { divineSmite: { slotsLeft: { 1: 2 }, hitsThisFight: 0, smitesThisFight: 0 } },
+      };
+      const action = { kind: 'attack', actionRange: 'melee' };
+      const dmgCtxNoCrit = { amount: 8, type: 'slashing', bonusDice: [], crit: false };
+      sm.hooks.onAttackHit(self, action, {}, dmgCtxNoCrit);
+      assertEq(dmgCtxNoCrit.bonusDice.length, 0);
+      const dmgCtxCrit = { amount: 8, type: 'slashing', bonusDice: [], crit: true };
+      sm.hooks.onAttackHit(self, action, {}, dmgCtxCrit);
+      assertEq(dmgCtxCrit.bonusDice.length, 1);
+    });
+
+    test('Divine Smite: no-op when out of slots', () => {
+      const sm = PCFeatures.LIBRARY.divineSmite;
+      const self = {
+        pm: { features: [{id:'divineSmite'}], tactics: {mode:'nova'} },
+        featureState: { divineSmite: { slotsLeft: { 1: 0, 2: 0 }, hitsThisFight: 0, smitesThisFight: 0 } },
+      };
+      const action = { kind: 'attack', actionRange: 'melee' };
+      const dmgCtx = { amount: 8, type: 'slashing', bonusDice: [], crit: false };
+      sm.hooks.onAttackHit(self, action, {}, dmgCtx);
+      assertEq(dmgCtx.bonusDice.length, 0);
+    });
   </script>
 </body>
 </html>
