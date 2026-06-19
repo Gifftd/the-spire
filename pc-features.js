@@ -6,7 +6,6 @@
 //   - LIBRARY: built-in features (Rage, Sneak Attack, etc.) by id
 //   - resolve(featureRef): given {id, source, params}, return the full feature def
 //   - dispatchHook(combatant, hookName, ...args): runs all subscribed features
-//   - compileDSL(spec): turns a JSON spec into a feature object
 //
 // Companion: tests/pc-features.test.html exercises every function above.
 // Engine integration: crucible-engine.js calls dispatchHook at 9 sites.
@@ -60,7 +59,7 @@
       if (!ref || !ref.id) continue;
       const state = combatant.featureState[ref.id];
       if (state && state._disabled) continue;
-      const def = resolve(ref);
+      const def = PCFeatures.resolve(ref);
       if (!def || !def.hooks || typeof def.hooks[hookName] !== 'function') continue;
       try {
         const result = def.hooks[hookName].call(def, combatant, ...args);
@@ -78,7 +77,7 @@
     if (!combatant.featureState) combatant.featureState = {};
     for (const ref of combatant.pm.features) {
       if (!ref || !ref.id) continue;
-      const def = resolve(ref);
+      const def = PCFeatures.resolve(ref);
       if (!def) continue;
       combatant.featureState[ref.id] = def.initialState ? def.initialState(def, ref) : {};
     }
