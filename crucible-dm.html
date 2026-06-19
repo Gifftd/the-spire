@@ -1210,9 +1210,16 @@ async function saveOverride(pickId) {
     const list = Array.isArray(current) ? current
                : (Array.isArray(current && current.monsters) ? current.monsters : []);
     const idx = list.findIndex(x => x.name === m.name && (x._source || x.source || '') === (m._source || m.source || ''));
+    // _ownerActions is a runtime-only back-pointer the engine sets on
+    // multiattack actions (so EV can resolve sub-attacks). It creates a
+    // circular reference that breaks JSON.stringify on save. Strip it
+    // before persisting.
+    const cleanParsedActions = Array.isArray(m.parsedActions)
+      ? m.parsedActions.map(a => { const { _ownerActions, ...rest } = a; return rest; })
+      : m.parsedActions;
     const overrideRecord = {
       name: m.name, _source: m._source || m.source || '',
-      parsedActions: m.parsedActions,
+      parsedActions: cleanParsedActions,
       regeneration: m.regeneration || null,
       roleOverride: m.roleOverride || null,
       overriddenAt: new Date().toISOString(),
