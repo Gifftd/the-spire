@@ -73,12 +73,24 @@
     }
   }
 
+  function initFeatureState(combatant) {
+    if (!combatant || !combatant.pm || !Array.isArray(combatant.pm.features)) return;
+    if (!combatant.featureState) combatant.featureState = {};
+    for (const ref of combatant.pm.features) {
+      if (!ref || !ref.id) continue;
+      const def = resolve(ref);
+      if (!def) continue;
+      combatant.featureState[ref.id] = def.initialState ? def.initialState(def, ref) : {};
+    }
+  }
+
   const PCFeatures = {
     HOOK_NAMES,
     MODE_PREDICATES,
     LIBRARY: {},
     resolve,
     dispatchHook,
+    initFeatureState,
   };
 
   if (typeof module !== 'undefined' && module.exports) {
