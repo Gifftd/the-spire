@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>PC Features — tests</title>
+  <style>
+    body { font: 14px/1.4 system-ui, sans-serif; padding: 1rem; background: #1a1f24; color: #e8e6df; }
+    h1 { font-family: Cinzel, serif; }
+    button { font: inherit; padding: 6px 14px; background: #2a3038; color: inherit; border: 1px solid #888; border-radius: 3px; cursor: pointer; }
+    #results { margin-top: 1rem; }
+    .pass { color: #6c8; }
+    .fail { color: #d66; }
+    .case { padding: 2px 0; font-family: ui-monospace, monospace; }
+    .group { margin-top: 1rem; font-weight: 600; color: #b88a5a; }
+  </style>
+</head>
+<body>
+  <h1>PC Features — tests</h1>
+  <button onclick="runAll()">Run tests</button>
+  <div id="results"></div>
+
+  <script src="../pc-features.js"></script>
+  <script>
+    const tests = [];
+    function test(name, fn) { tests.push({ name, fn }); }
+    function group(name) { tests.push({ group: name }); }
+    function assert(cond, msg) { if (!cond) throw new Error(msg || 'assertion failed'); }
+    function assertEq(a, b, msg) {
+      const sa = JSON.stringify(a), sb = JSON.stringify(b);
+      if (sa !== sb) throw new Error((msg || 'mismatch') + ': ' + sa + ' vs ' + sb);
+    }
+    function assertClose(a, b, eps, msg) {
+      if (Math.abs(a - b) > (eps || 0.01)) throw new Error((msg || 'not close') + ': ' + a + ' vs ' + b);
+    }
+
+    function runAll() {
+      const root = document.getElementById('results');
+      root.innerHTML = '';
+      let pass = 0, fail = 0;
+      for (const t of tests) {
+        if (t.group) {
+          const g = document.createElement('div');
+          g.className = 'group';
+          g.textContent = t.group;
+          root.appendChild(g);
+          continue;
+        }
+        const row = document.createElement('div');
+        row.className = 'case';
+        try { t.fn(); row.classList.add('pass'); row.textContent = '✓ ' + t.name; pass++; }
+        catch (e) { row.classList.add('fail'); row.textContent = '✗ ' + t.name + '  —  ' + e.message; fail++; }
+        root.appendChild(row);
+      }
+      const summary = document.createElement('div');
+      summary.style.marginTop = '1rem';
+      summary.style.fontWeight = '600';
+      summary.textContent = `${pass} passed, ${fail} failed (${tests.length - tests.filter(t => t.group).length} total)`;
+      root.appendChild(summary);
+    }
+
+    // ── Tests ──
+    group('Hook surface');
+
+    test('HOOK_NAMES exports all 9 expected names', () => {
+      const expected = ['onCombatStart','onTurnStart','onAttackAttempt','onAttackHit','onTakeDamage','onSaveAttempt','onAllyDowned','onMonsterDowned','onRoundEnd'];
+      assertEq(PCFeatures.HOOK_NAMES, expected);
+    });
+
+    group('Mode predicates');
+
+    test('always returns true regardless of input', () => {
+      assertEq(PCFeatures.MODE_PREDICATES.always({}, {}), true);
+    });
+
+    test('whenAnyEnemyAlive: true if any non-dead monster combatant', () => {
+      const ctx = { combatants: [
+        { side: 'monster', dead: false },
+        { side: 'pc', dead: false },
+      ]};
+      assertEq(PCFeatures.MODE_PREDICATES.whenAnyEnemyAlive({}, ctx), true);
+    });
+
+    test('whenAnyEnemyAlive: false if all monsters dead', () => {
+      const ctx = { combatants: [
+        { side: 'monster', dead: true },
+        { side: 'pc', dead: false },
+      ]};
+      assertEq(PCFeatures.MODE_PREDICATES.whenAnyEnemyAlive({}, ctx), false);
+    });
+
+    test('whenHpBelowHalf', () => {
+      assertEq(PCFeatures.MODE_PREDICATES.whenHpBelowHalf({hp:10, maxHp:30}, {}), true);
+      assertEq(PCFeatures.MODE_PREDICATES.whenHpBelowHalf({hp:20, maxHp:30}, {}), false);
+    });
+
+    test('whenHpBelowQuarter', () => {
+      assertEq(PCFeatures.MODE_PREDICATES.whenHpBelowQuarter({hp:5, maxHp:30}, {}), true);
+      assertEq(PCFeatures.MODE_PREDICATES.whenHpBelowQuarter({hp:10, maxHp:30}, {}), false);
+    });
+
+    test('whenAllyDowned: true if any pc combatant downed', () => {
+      const ctx = { combatants: [
+        { side: 'pc', downed: true },
+        { side: 'pc', downed: false },
+      ]};
+      assertEq(PCFeatures.MODE_PREDICATES.whenAllyDowned({}, ctx), true);
+    });
+
+    test('whenAllyHpBelowHalf: excludes self', () => {
+      const self = { id: 'pc:a', hp: 5, maxHp: 30 };
+      const ctx = { combatants: [
+        { id: 'pc:a', side: 'pc', hp: 5,  maxHp: 30 },
+        { id: 'pc:b', side: 'pc', hp: 25, maxHp: 30 },
+      ]};
+      assertEq(PCFeatures.MODE_PREDICATES.whenAllyHpBelowHalf(self, ctx), false);
+    });
+
+    test('whenAllyHpBelowHalf: true if any non-self ally below half', () => {
+      const self = { id: 'pc:a', hp: 30, maxHp: 30 };
+      const ctx = { combatants: [
+        { id: 'pc:a', side: 'pc', hp: 30, maxHp: 30 },
+        { id: 'pc:b', side: 'pc', hp: 10, maxHp: 30 },
+      ]};
+      assertEq(PCFeatures.MODE_PREDICATES.whenAllyHpBelowHalf(self, ctx), true);
+    });
+
+    test('usesLeftGreaterThanZero reads featureState by id', () => {
+      const self = { featureState: { rage: { usesLeft: 2 } } };
+      assertEq(PCFeatures.MODE_PREDICATES.usesLeftGreaterThanZero(self, {}, 'rage'), true);
+      const empty = { featureState: { rage: { usesLeft: 0 } } };
+      assertEq(PCFeatures.MODE_PREDICATES.usesLeftGreaterThanZero(empty, {}, 'rage'), false);
+    });
+
+    group('dispatchHook');
+
+    test('dispatchHook with no features is a no-op (does not throw)', () => {
+      const combatant = { pm: { features: [] }, featureState: {} };
+      PCFeatures.dispatchHook(combatant, 'onTurnStart', {round: 1});
+    });
+
+    test('dispatchHook fires features in declaration order', () => {
+      const calls = [];
+      const featureA = { id: 'a', hooks: { onTurnStart(self) { calls.push('a'); } } };
+      const featureB = { id: 'b', hooks: { onTurnStart(self) { calls.push('b'); } } };
+      const origResolve = PCFeatures.resolve;
+      PCFeatures.resolve = (f) => f.id === 'a' ? featureA : featureB;
+      try {
+        const combatant = {
+          pm: { features: [{id:'a'}, {id:'b'}] },
+          featureState: {a:{}, b:{}},
+        };
+        PCFeatures.dispatchHook(combatant, 'onTurnStart', {});
+        assertEq(calls, ['a','b']);
+      } finally {
+        PCFeatures.resolve = origResolve;
+      }
+    });
+
+    test('dispatchHook skips features without the named hook', () => {
+      const featureA = { id: 'a', hooks: { onTurnStart: () => 'fired' } };
+      const featureB = { id: 'b', hooks: { onAttackHit: () => 'should not fire' } };
+      const origResolve = PCFeatures.resolve;
+      PCFeatures.resolve = (f) => f.id === 'a' ? featureA : featureB;
+      try {
+        const combatant = {
+          pm: { features: [{id:'a'}, {id:'b'}] },
+          featureState: {a:{}, b:{}},
+        };
+        PCFeatures.dispatchHook(combatant, 'onTurnStart', {});
+      } finally {
+        PCFeatures.resolve = origResolve;
+      }
+    });
+
+    test('dispatchHook isolates throwing features and disables them', () => {
+      let bRan = false;
+      const featureA = { id: 'a', hooks: { onTurnStart() { throw new Error('boom'); } } };
+      const featureB = { id: 'b', hooks: { onTurnStart() { bRan = true; } } };
+      const origResolve = PCFeatures.resolve;
+      const origWarn = console.warn;
+      console.warn = () => {};
+      PCFeatures.resolve = (f) => f.id === 'a' ? featureA : featureB;
+      try {
+        const combatant = {
+          pm: { features: [{id:'a'}, {id:'b'}] },
+          featureState: {a:{}, b:{}},
+        };
+        PCFeatures.dispatchHook(combatant, 'onTurnStart', {});
+        assert(bRan, 'feature b should still run after a throws');
+        assert(combatant.featureState.a._disabled, 'a should be marked disabled');
+        let aCallsAfter = 0;
+        featureA.hooks.onTurnStart = () => { aCallsAfter++; };
+        PCFeatures.dispatchHook(combatant, 'onTurnStart', {});
+        assertEq(aCallsAfter, 0, 'disabled feature should not fire again');
+      } finally {
+        PCFeatures.resolve = origResolve;
+        console.warn = origWarn;
+      }
+    });
+
+    test('dispatchHook short-circuits on "consume" return (reaction semantics)', () => {
+      let bRan = false;
+      const featureA = { id: 'a', hooks: { onAttackAttempt() { return 'consume'; } } };
+      const featureB = { id: 'b', hooks: { onAttackAttempt() { bRan = true; } } };
+      const origResolve = PCFeatures.resolve;
+      PCFeatures.resolve = (f) => f.id === 'a' ? featureA : featureB;
+      try {
+        const combatant = {
+          pm: { features: [{id:'a'}, {id:'b'}] },
+          featureState: {a:{}, b:{}},
+        };
+        PCFeatures.dispatchHook(combatant, 'onAttackAttempt', {});
+        assertEq(bRan, false, 'b must not fire after a consumes');
+      } finally {
+        PCFeatures.resolve = origResolve;
+      }
+    });
+
+    group('initFeatureState');
+
+    test('initFeatureState seeds every feature with its initialState()', () => {
+      const origLibrary = PCFeatures.LIBRARY;
+      PCFeatures.LIBRARY = {
+        a: { id: 'a', initialState: () => ({ usesLeft: 3 }) },
+        b: { id: 'b', initialState: () => ({ active: false }) },
+      };
+      try {
+        const combatant = { pm: { features: [{id:'a'},{id:'b'}] }, featureState: {} };
+        PCFeatures.initFeatureState(combatant);
+        assertEq(combatant.featureState.a, { usesLeft: 3 });
+        assertEq(combatant.featureState.b, { active: false });
+      } finally {
+        PCFeatures.LIBRARY = origLibrary;
+      }
+    });
+
+    test('initFeatureState handles features without initialState', () => {
+      const origLibrary = PCFeatures.LIBRARY;
+      PCFeatures.LIBRARY = {
+        a: { id: 'a' },
+      };
+      try {
+        const combatant = { pm: { features: [{id:'a'}] }, featureState: {} };
+        PCFeatures.initFeatureState(combatant);
+        assertEq(combatant.featureState.a, {});
+      } finally {
+        PCFeatures.LIBRARY = origLibrary;
+      }
+    });
+
+    test('initFeatureState skips unresolvable features quietly', () => {
+      const origLibrary = PCFeatures.LIBRARY;
+      PCFeatures.LIBRARY = {};
+      try {
+        const combatant = { pm: { features: [{id:'unknown'}] }, featureState: {} };
+        PCFeatures.initFeatureState(combatant);
+        assertEq(combatant.featureState.unknown, undefined);
+      } finally {
+        PCFeatures.LIBRARY = origLibrary;
+      }
+    });
+  </script>
+</body>
+</html>
