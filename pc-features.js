@@ -47,9 +47,38 @@
       !!(self && self.featureState && self.featureState[featureId] && self.featureState[featureId].usesLeft > 0),
   };
 
+  function resolve(ref) {
+    if (!ref) return null;
+    if (ref.source === 'homebrew') return ref;
+    return (PCFeatures.LIBRARY && PCFeatures.LIBRARY[ref.id]) || null;
+  }
+
+  function dispatchHook(combatant, hookName, ...args) {
+    if (!combatant || !combatant.pm || !Array.isArray(combatant.pm.features)) return;
+    if (!combatant.featureState) combatant.featureState = {};
+    for (const ref of combatant.pm.features) {
+      if (!ref || !ref.id) continue;
+      const state = combatant.featureState[ref.id];
+      if (state && state._disabled) continue;
+      const def = resolve(ref);
+      if (!def || !def.hooks || typeof def.hooks[hookName] !== 'function') continue;
+      try {
+        const result = def.hooks[hookName].call(def, combatant, ...args);
+        if (result === 'consume') return;
+      } catch (e) {
+        console.warn('PCFeatures: feature "' + ref.id + '" hook ' + hookName + ' threw:', e);
+        if (!combatant.featureState[ref.id]) combatant.featureState[ref.id] = {};
+        combatant.featureState[ref.id]._disabled = true;
+      }
+    }
+  }
+
   const PCFeatures = {
     HOOK_NAMES,
     MODE_PREDICATES,
+    LIBRARY: {},
+    resolve,
+    dispatchHook,
   };
 
   if (typeof module !== 'undefined' && module.exports) {
