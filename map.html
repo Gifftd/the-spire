@@ -125,7 +125,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Crimson Text',Georgia,se
 /* Interactive sub-map (location detail page) */
 .submap-stage{position:relative;width:100%;overflow:hidden;border-radius:var(--radius);border:1px solid var(--border-light);background:var(--bg);margin-bottom:1rem;box-shadow:inset 0 0 24px rgba(0,0,0,0.45)}
 .submap-frame{position:relative;width:100%;height:0;padding-bottom:60%}  /* aspect ratio set inline */
-.submap-img{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block;pointer-events:none;user-select:none}
+.submap-img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;pointer-events:none;user-select:none}
 .submap-pin{position:absolute;transform:translate(-50%,-100%);cursor:pointer;z-index:5;transition:transform 0.15s;width:0;height:0}
 .submap-pin:hover{transform:translate(-50%,-100%) scale(1.18);z-index:6}
 .submap-pin .pin-icon{width:22px;height:28px;display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.6))}
@@ -738,12 +738,20 @@ function buildRegionMap() {
   const W = data.world.mapWidth  || 1200;
   const H = data.world.mapHeight || 800;
 
-  // Map background
+  // Map background. We deliberately do NOT set img.width/height — the
+  // image renders at its natural dimensions, the canvas sizes to match,
+  // and pins (% of the canvas) land on the image content regardless of
+  // whether the stored W/H matches the natural aspect.
   if (data.world.mapImage) {
     const img = document.createElement('img');
     img.className = 'map-img';
     img.src = data.world.mapImage;
-    img.width = W; img.height = H;
+    img.addEventListener('load', () => {
+      // Re-fit pan/zoom once the natural dims are known.
+      if (img.naturalWidth && img.naturalHeight) {
+        mapReset();
+      }
+    }, { once: true });
     canvas.appendChild(img);
   } else {
     const ph = document.createElement('div');
@@ -753,10 +761,14 @@ function buildRegionMap() {
     canvas.appendChild(ph);
   }
 
-  // Zones
+  // Zones — SVG uses a viewBox in the stored W/H coordinate system but
+  // stretches to fill the canvas at whatever size it ends up. Polygon
+  // points expressed in `p.x/100*W` SVG units therefore land at the same
+  // VISUAL position regardless of the image's natural size.
   const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
-  svg.style.cssText=`position:absolute;top:0;left:0;width:${W}px;height:${H}px;pointer-events:none;overflow:visible`;
-  svg.setAttribute('width',W); svg.setAttribute('height',H);
+  svg.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible';
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('preserveAspectRatio','none');
 
   (data.zones || []).filter(z => z.visible !== false).forEach(zone => {
     if (zone.shape === 'polygon') {
@@ -1094,9 +1106,13 @@ function renderLocationSubMap(loc) {
     return `<div class="sub-map-wrap"><div class="sub-map-placeholder">No local map available</div></div>`;
   }
   const img = sub.world?.mapImage || sub.image;
+  // Configured W/H is only a hint — the frame's actual aspect is set from
+  // the image's natural dimensions once it loads, so pins (positioned by
+  // % of the frame) land on the image regardless of how the DM configured
+  // the W/H values.
   const W   = sub.world?.mapWidth  || sub.width  || 1200;
   const H   = sub.world?.mapHeight || sub.height || 800;
-  const pad = (H / W * 100).toFixed(2) + '%';
+  const initialPad = (H / W * 100).toFixed(2) + '%';
 
   const zonesHtml = (sub.zones || []).filter(z => z.visible !== false).map(z => {
     if (z.shape === 'polygon') return ''; // polygons are world-only for now
@@ -1111,10 +1127,15 @@ function renderLocationSubMap(loc) {
     </div>`;
   }).join('');
 
+  // The onload handler retroactively resets the frame aspect to the
+  // image's natural ratio so the frame never letterboxes and pin %s
+  // always land on the image content.
+  const onload = `(function(im){var f=im.closest('.submap-frame');if(!f||!im.naturalWidth||!im.naturalHeight)return;f.style.paddingBottom='0';f.style.aspectRatio=im.naturalWidth+' / '+im.naturalHeight;})(this)`;
+
   return `
     <div class="submap-stage">
-      <div class="submap-frame" style="padding-bottom:${pad}">
-        <img class="submap-img" src="${esc(img)}" alt="${esc(loc.name)} sub-map">
+      <div class="submap-frame" style="padding-bottom:${initialPad}">
+        <img class="submap-img" src="${esc(img)}" alt="${esc(loc.name)} sub-map" onload="${onload}">
         ${zonesHtml}
         ${pinsHtml}
       </div>
