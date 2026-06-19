@@ -1550,10 +1550,28 @@ function buildMap() {
   const W = data.world.mapWidth  || 1200;
   const H = data.world.mapHeight || 800;
 
-  // Background
+  // Background. We deliberately do NOT set img.width/height here — the
+  // image loads at its natural dimensions. The map-canvas wraps the image
+  // and sizes itself to match, so pins (positioned by % of the canvas)
+  // land on the actual image content. On load we also auto-correct any
+  // stale data.world.mapWidth/mapHeight to match the natural dims, so the
+  // pan/zoom math and the player's frame aspect both align.
   if (data.world.mapImage) {
     const img = document.createElement('img');
-    img.className='map-img'; img.src=data.world.mapImage; img.width=W; img.height=H;
+    img.className='map-img'; img.src=data.world.mapImage;
+    img.addEventListener('load', () => {
+      const nw = img.naturalWidth, nh = img.naturalHeight;
+      if (!nw || !nh) return;
+      if (data.world.mapWidth !== nw || data.world.mapHeight !== nh) {
+        data.world.mapWidth  = nw;
+        data.world.mapHeight = nh;
+        if (typeof scheduleSave === 'function') scheduleSave();
+        buildMap();   // re-render so SVG overlay + pan math use the new dims
+      } else {
+        // Dims already correct — just fit the view to the freshly sized canvas
+        if (typeof resetMapView === 'function') resetMapView();
+      }
+    }, { once: true });
     canvas.appendChild(img);
   } else {
     const ph = document.createElement('div');
@@ -1563,10 +1581,15 @@ function buildMap() {
   }
 
   // ── SVG overlay for polygons ──────────────────────────────
+  // viewBox uses the stored W/H so polygon points (in those units) keep
+  // their stored positions; the SVG stretches to fill the canvas so the
+  // overlay tracks the natural-aspect image rather than being locked to
+  // a separate WxH box.
   const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
-  svg.setAttribute('width', W); svg.setAttribute('height', H);
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('preserveAspectRatio','none');
   svg.classList.add('map-svg-overlay');
-  svg.style.cssText = `position:absolute;top:0;left:0;width:${W}px;height:${H}px`;
+  svg.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;overflow:visible';
 
   (data.zones||[]).filter(z => z.shape === 'polygon').forEach(zone => {
     if (!zone.points || zone.points.length < 3) return;
