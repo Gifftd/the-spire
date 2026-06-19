@@ -668,10 +668,83 @@
     bardicInspiration: BARDIC_INSPIRATION,
   };
 
+  // ── DSL primitives ──
+  // Each primitive is a function that mutates state. Signature:
+  //   apply(self, hookCtx, params)
+  //     self     — the combatant the feature is on
+  //     hookCtx  — context from the hook (dmgCtx, rollCtx, ctx, etc., grouped)
+  //     params   — the params declared on the effect in the DSL spec
+  const PRIMITIVES = {
+    addDamage: {
+      apply(self, hookCtx, params) {
+        if (hookCtx && hookCtx.dmgCtx) hookCtx.dmgCtx.amount += Number(params.value) || 0;
+      },
+    },
+    addDamageDice: {
+      apply(self, hookCtx, params) {
+        if (!hookCtx || !hookCtx.dmgCtx) return;
+        if (!Array.isArray(hookCtx.dmgCtx.bonusDice)) hookCtx.dmgCtx.bonusDice = [];
+        hookCtx.dmgCtx.bonusDice.push({ dice: params.dice, type: params.type || 'force', source: 'dsl' });
+      },
+    },
+    addAcBonus: {
+      apply(self, hookCtx, params) {
+        if (typeof self.ac === 'number') self.ac += Number(params.value) || 0;
+      },
+    },
+    addResistance: {
+      apply(self, hookCtx, params) {
+        if (!hookCtx || !hookCtx.dmgCtx) return;
+        const types = Array.isArray(params.types) ? params.types : [];
+        if (types.includes(hookCtx.dmgCtx.type)) {
+          hookCtx.dmgCtx.amount = Math.floor(hookCtx.dmgCtx.amount / 2);
+        }
+      },
+    },
+    consumeAction:       { apply(self) { self.actionsAvailable = Math.max(0, (self.actionsAvailable || 0) - 1); } },
+    consumeBonusAction:  { apply(self) { self.bonusActionAvailable = false; } },
+    consumeReaction:     { apply(self) { self.reactionAvailableThisRound = false; } },
+    heal: {
+      apply(self, hookCtx, params) {
+        const amt = Number(params.amount) || 0;
+        if (params.target === 'self' || !params.target) {
+          self.hp = Math.min(self.maxHp || (self.hp || 0) + amt, (self.hp || 0) + amt);
+        }
+        else if (hookCtx && hookCtx.target && hookCtx.target.maxHp) {
+          hookCtx.target.hp = Math.min(hookCtx.target.maxHp, (hookCtx.target.hp || 0) + amt);
+        }
+      },
+    },
+    applyCondition: {
+      apply(self, hookCtx, params) {
+        const target = (params.target === 'self' || !params.target) ? self : (hookCtx && hookCtx.target);
+        if (!target) return;
+        if (!target.conditions) target.conditions = new Map();
+        target.conditions.set(params.condition, Number(params.duration) || 1);
+      },
+    },
+    decrementUses: {
+      apply(self, hookCtx, params) {
+        const id = params.featureId;
+        if (!id || !self.featureState || !self.featureState[id]) return;
+        const state = self.featureState[id];
+        if (typeof state.usesLeft === 'number') state.usesLeft = Math.max(0, state.usesLeft - 1);
+      },
+    },
+    flag: {
+      apply(self, hookCtx, params) {
+        if (!self.flags) self.flags = {};
+        const round = (hookCtx && hookCtx.ctx && typeof hookCtx.ctx.round === 'number') ? hookCtx.ctx.round : 0;
+        self.flags[params.name] = { until: round + (Number(params.duration) || 1) };
+      },
+    },
+  };
+
   const PCFeatures = {
     HOOK_NAMES,
     MODE_PREDICATES,
     LIBRARY,
+    PRIMITIVES,
     resolve,
     dispatchHook,
     dispatchBroadcastHook,
