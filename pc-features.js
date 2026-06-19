@@ -162,8 +162,51 @@
     },
   };
 
+  const SNEAK_ATTACK = {
+    id: 'sneakAttack',
+    name: 'Sneak Attack',
+    source: 'builtin',
+    category: ['damage'],
+    classHint: 'rogue',
+    summary: 'Bonus dice on the first finesse/ranged hit per turn.',
+
+    deriveParams(identityOrPm) {
+      const level = (identityOrPm && identityOrPm.level) || (identityOrPm && identityOrPm.identity && identityOrPm.identity.level) || 1;
+      const dice = Math.ceil(level / 2);
+      return { dice: dice + 'd6' };
+    },
+
+    modePolicy: {
+      nova:      { triggerRound: 1, conditionFn: 'always' },
+      sustained: { triggerRound: 1, conditionFn: 'always' },
+      defensive: { triggerRound: 1, conditionFn: 'always' },
+    },
+
+    initialState() { return { usedThisTurn: false }; },
+
+    hooks: {
+      onTurnStart(self, ctx) {
+        if (self.featureState.sneakAttack) self.featureState.sneakAttack.usedThisTurn = false;
+      },
+
+      onAttackHit(self, action, target, dmgCtx) {
+        const state = self.featureState.sneakAttack;
+        if (!state || state.usedThisTurn) return;
+        if (!action || action.kind !== 'attack') return;
+        const eligible = action.actionRange === 'ranged' || (action.actionRange === 'melee' && action.finesse);
+        if (!eligible) return;
+        const ref = self.pm.features.find(f => f.id === 'sneakAttack');
+        const params = (ref && ref.params) || this.deriveParams(self.pm);
+        if (!Array.isArray(dmgCtx.bonusDice)) dmgCtx.bonusDice = [];
+        dmgCtx.bonusDice.push({ dice: params.dice || '1d6', type: dmgCtx.type || 'piercing', source: 'sneakAttack' });
+        state.usedThisTurn = true;
+      },
+    },
+  };
+
   const LIBRARY = {
     rage: RAGE,
+    sneakAttack: SNEAK_ATTACK,
   };
 
   const PCFeatures = {

@@ -350,6 +350,74 @@
       assertEq(self.featureState.rage.roundsLeft, 0);
       assertEq(self.featureState.rage.active, false);
     });
+
+    group('Sneak Attack');
+
+    test('Sneak Attack: dice scale with level (1d6 at L1, 3d6 at L5, 5d6 at L9)', () => {
+      const sa = PCFeatures.LIBRARY.sneakAttack;
+      assert(sa, 'sneakAttack exists');
+      assertEq(sa.deriveParams({ identity: { level: 1 } }).dice, '1d6');
+      assertEq(sa.deriveParams({ identity: { level: 5 } }).dice, '3d6');
+      assertEq(sa.deriveParams({ identity: { level: 9 } }).dice, '5d6');
+      assertEq(sa.deriveParams({ identity: { level: 19 } }).dice, '10d6');
+    });
+
+    test('Sneak Attack: onTurnStart resets usedThisTurn flag', () => {
+      const sa = PCFeatures.LIBRARY.sneakAttack;
+      const self = { featureState: { sneakAttack: { usedThisTurn: true } } };
+      sa.hooks.onTurnStart(self, {round:1});
+      assertEq(self.featureState.sneakAttack.usedThisTurn, false);
+    });
+
+    test('Sneak Attack: onAttackHit adds dice on first hit per turn (finesse/ranged)', () => {
+      const sa = PCFeatures.LIBRARY.sneakAttack;
+      const self = {
+        pm: { features: [{id:'sneakAttack', params:{dice:'3d6'}}] },
+        featureState: { sneakAttack: { usedThisTurn: false } },
+      };
+      const action = { kind: 'attack', actionRange: 'melee', finesse: true };
+      const dmgCtx = { amount: 8, type: 'piercing', bonusDice: [] };
+      sa.hooks.onAttackHit(self, action, {}, dmgCtx);
+      assertEq(dmgCtx.bonusDice.length, 1);
+      assertEq(dmgCtx.bonusDice[0].dice, '3d6');
+      assertEq(self.featureState.sneakAttack.usedThisTurn, true);
+    });
+
+    test('Sneak Attack: does NOT fire twice on the same turn', () => {
+      const sa = PCFeatures.LIBRARY.sneakAttack;
+      const self = {
+        pm: { features: [{id:'sneakAttack', params:{dice:'3d6'}}] },
+        featureState: { sneakAttack: { usedThisTurn: true } },
+      };
+      const action = { kind: 'attack', actionRange: 'melee', finesse: true };
+      const dmgCtx = { amount: 8, type: 'piercing', bonusDice: [] };
+      sa.hooks.onAttackHit(self, action, {}, dmgCtx);
+      assertEq(dmgCtx.bonusDice.length, 0);
+    });
+
+    test('Sneak Attack: does NOT fire on non-finesse melee attacks (e.g., greatsword)', () => {
+      const sa = PCFeatures.LIBRARY.sneakAttack;
+      const self = {
+        pm: { features: [{id:'sneakAttack', params:{dice:'3d6'}}] },
+        featureState: { sneakAttack: { usedThisTurn: false } },
+      };
+      const action = { kind: 'attack', actionRange: 'melee', finesse: false };
+      const dmgCtx = { amount: 8, type: 'slashing', bonusDice: [] };
+      sa.hooks.onAttackHit(self, action, {}, dmgCtx);
+      assertEq(dmgCtx.bonusDice.length, 0);
+    });
+
+    test('Sneak Attack: fires on ranged attacks', () => {
+      const sa = PCFeatures.LIBRARY.sneakAttack;
+      const self = {
+        pm: { features: [{id:'sneakAttack', params:{dice:'3d6'}}] },
+        featureState: { sneakAttack: { usedThisTurn: false } },
+      };
+      const action = { kind: 'attack', actionRange: 'ranged' };
+      const dmgCtx = { amount: 6, type: 'piercing', bonusDice: [] };
+      sa.hooks.onAttackHit(self, action, {}, dmgCtx);
+      assertEq(dmgCtx.bonusDice.length, 1);
+    });
   </script>
 </body>
 </html>
