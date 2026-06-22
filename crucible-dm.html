@@ -643,12 +643,23 @@ function dslRemoveEffect(i) {
   dslRenderEffects();
 }
 
+const DSL_WHEN_OPTIONS = [
+  { value: '',                        label: 'when: — always —' },
+  { value: 'whenTargetHasntAttacked', label: "when: target hasn't attacked yet" },
+  { value: 'whenTargetIsBloodied',    label: 'when: target is bloodied' },
+  { value: 'whenTargetIsHostile',     label: 'when: target is hostile' },
+  { value: 'whenHpBelowHalf',         label: 'when: self HP below half' },
+  { value: 'whenHpBelowQuarter',      label: 'when: self HP below quarter' },
+  { value: 'whenAnyEnemyAlive',       label: 'when: any enemy alive' },
+];
+
 function dslRenderEffects() {
   const root = document.getElementById('dsl-effects-list');
   root.innerHTML = dslEffects.map((eff, i) => {
     const prim = PCFeatures.PRIMITIVES[eff.primitive];
     const schema = (prim && Array.isArray(prim.paramSchema)) ? prim.paramSchema : [];
     const paramsHtml = schema.map(field => dslRenderParamInput(eff, i, field)).join('');
+    const currentWhen = eff.when || '';
     return `
       <div class="dsl-effect-row">
         <select onchange="dslEffects[${i}].hook = this.value">
@@ -658,6 +669,9 @@ function dslRenderEffects() {
           ${Object.keys(PCFeatures.PRIMITIVES).map(p => `<option value="${p}" ${eff.primitive === p ? 'selected' : ''}>${p}</option>`).join('')}
         </select>
         ${paramsHtml}
+        <select title="Optional per-effect condition. Target conditions only fire on onAttackHit / onAttackAttempt." onchange="dslEffects[${i}].when = this.value || null">
+          ${DSL_WHEN_OPTIONS.map(o => `<option value="${o.value}" ${currentWhen === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
+        </select>
         <button onclick="dslRemoveEffect(${i})">×</button>
       </div>
     `;

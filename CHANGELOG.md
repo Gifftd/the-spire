@@ -41,6 +41,14 @@ closed:
   `[edit]` button that re-opens the modal pre-filled from the stored
   `_dslSpec`. Saved-feature iteration no longer requires deleting and
   re-authoring.
+- **Per-effect `when:` dropdown** — DSL effect rows now expose the
+  per-effect condition predicate. The seven target-aware and self-aware
+  predicates (`whenTargetHasntAttacked`, `whenTargetIsBloodied`,
+  `whenTargetIsHostile`, `whenHpBelowHalf`, `whenHpBelowQuarter`,
+  `whenAnyEnemyAlive`, plus the implicit "always") are selectable inline.
+  Target-conditional effects ("damage vs enemies who haven't attacked yet")
+  can finally be authored from the UI; the engine already supported `when`,
+  the editor was the missing piece.
 
 **Migration:** None. All changes are purely additive.
 
