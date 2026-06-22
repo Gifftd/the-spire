@@ -921,6 +921,127 @@
       assertEq(dmgCtx.amount, 7);
     });
 
+    group('Target-aware mode predicates');
+
+    test('whenTargetHasntAttacked: true if target.hasAttacked is falsy', () => {
+      const target = { id: 'm:1', hasAttacked: false };
+      const hookCtx = { target };
+      assertEq(PCFeatures.MODE_PREDICATES.whenTargetHasntAttacked({}, {}, 'f', hookCtx), true);
+    });
+
+    test('whenTargetHasntAttacked: false if target.hasAttacked is true', () => {
+      const target = { id: 'm:1', hasAttacked: true };
+      const hookCtx = { target };
+      assertEq(PCFeatures.MODE_PREDICATES.whenTargetHasntAttacked({}, {}, 'f', hookCtx), false);
+    });
+
+    test('whenTargetHasntAttacked: false if hookCtx or target is missing', () => {
+      assertEq(PCFeatures.MODE_PREDICATES.whenTargetHasntAttacked({}, {}, 'f', null), false);
+      assertEq(PCFeatures.MODE_PREDICATES.whenTargetHasntAttacked({}, {}, 'f', {}), false);
+    });
+
+    test('whenTargetIsBloodied: true if target HP below half', () => {
+      const target = { hp: 10, maxHp: 30 };
+      assertEq(PCFeatures.MODE_PREDICATES.whenTargetIsBloodied({}, {}, 'f', { target }), true);
+    });
+
+    test('whenTargetIsBloodied: false if target HP at full', () => {
+      const target = { hp: 30, maxHp: 30 };
+      assertEq(PCFeatures.MODE_PREDICATES.whenTargetIsBloodied({}, {}, 'f', { target }), false);
+    });
+
+    test('whenTargetIsHostile: true if target.side === monster', () => {
+      const target = { side: 'monster' };
+      assertEq(PCFeatures.MODE_PREDICATES.whenTargetIsHostile({}, {}, 'f', { target }), true);
+    });
+
+    test('whenTargetIsHostile: false if target is a PC', () => {
+      const target = { side: 'pc' };
+      assertEq(PCFeatures.MODE_PREDICATES.whenTargetIsHostile({}, {}, 'f', { target }), false);
+    });
+
+    group('monster.hasAttacked tracking');
+
+    test('hasAttacked is initially undefined on a fresh combatant', () => {
+      const monster = { id: 'm:1', side: 'monster', hp: 20, maxHp: 20 };
+      assertEq(monster.hasAttacked, undefined);
+    });
+
+    group('addAction / addBonusAction primitives');
+
+    test('addAction primitive grants N extra actions', () => {
+      const self = { actionsAvailable: 1 };
+      PCFeatures.PRIMITIVES.addAction.apply(self, {}, { amount: 2 });
+      assertEq(self.actionsAvailable, 3);
+    });
+
+    test('addAction defaults to +1 when amount omitted', () => {
+      const self = { actionsAvailable: 1 };
+      PCFeatures.PRIMITIVES.addAction.apply(self, {}, {});
+      assertEq(self.actionsAvailable, 2);
+    });
+
+    test('addAction handles missing actionsAvailable (initializes to 0+amount)', () => {
+      const self = {};
+      PCFeatures.PRIMITIVES.addAction.apply(self, {}, { amount: 2 });
+      assertEq(self.actionsAvailable, 2);
+    });
+
+    test('addBonusAction primitive sets bonusActionAvailable to true', () => {
+      const self = { bonusActionAvailable: false };
+      PCFeatures.PRIMITIVES.addBonusAction.apply(self, {}, {});
+      assertEq(self.bonusActionAvailable, true);
+    });
+
+    test('compileDSL: when predicate receives hookCtx so target-aware predicates work', () => {
+      const spec = {
+        id: 'ambush',
+        name: 'Ambush',
+        source: 'homebrew',
+        modePolicy: { sustained: { triggerRound: 1, conditionFn: 'always' } },
+        effects: [
+          { hook: 'onAttackHit', primitive: 'addDamage',
+            params: { value: 5 },
+            when: 'whenTargetHasntAttacked' },
+        ],
+      };
+      const compiled = PCFeatures.compileDSL(spec);
+
+      const selfA = { pm: { features: [{id:'ambush'}], tactics: {mode:'sustained'} }, featureState: { ambush: {} } };
+      const dmgCtxA = { amount: 10, type: 'piercing', bonusDice: [] };
+      compiled.hooks.onAttackHit.call(compiled, selfA, {kind:'attack'}, {id:'m:1', side:'monster', hasAttacked: false}, dmgCtxA, { round: 1, combatants: [] });
+      assertEq(dmgCtxA.amount, 15);
+
+      const selfB = { pm: { features: [{id:'ambush'}], tactics: {mode:'sustained'} }, featureState: { ambush: {} } };
+      const dmgCtxB = { amount: 10, type: 'piercing', bonusDice: [] };
+      compiled.hooks.onAttackHit.call(compiled, selfB, {kind:'attack'}, {id:'m:1', side:'monster', hasAttacked: true}, dmgCtxB, { round: 1, combatants: [] });
+      assertEq(dmgCtxB.amount, 10);
+    });
+
+    group('paramSchema sanity');
+
+    test('every primitive has a paramSchema array (possibly empty)', () => {
+      for (const [name, prim] of Object.entries(PCFeatures.PRIMITIVES)) {
+        assert(Array.isArray(prim.paramSchema), name + ' missing paramSchema array');
+      }
+    });
+
+    test('every paramSchema entry has name + type', () => {
+      const validTypes = ['int', 'string', 'enum', 'multi-enum', 'boolean'];
+      for (const [name, prim] of Object.entries(PCFeatures.PRIMITIVES)) {
+        for (const field of (prim.paramSchema || [])) {
+          assert(typeof field.name === 'string' && field.name, name + ': field missing name');
+          assert(validTypes.includes(field.type), name + ': field "' + field.name + '" has invalid type "' + field.type + '"');
+        }
+      }
+    });
+
+    test('every built-in feature has a paramSchema array (possibly empty)', () => {
+      for (const [id, feature] of Object.entries(PCFeatures.LIBRARY)) {
+        assert(Array.isArray(feature.paramSchema), id + ' missing paramSchema array');
+      }
+    });
+
     test('DSL feature integrates with dispatchHook (custom +3 fire damage rider)', () => {
       const spec = {
         id: 'flamingWeapon',
@@ -944,6 +1065,88 @@
         const ctx = { round: 1, combatants: [] };
         PCFeatures.dispatchHook(self, 'onAttackHit', {kind:'attack'}, {id:'m:1'}, dmgCtx, ctx);
         assertEq(dmgCtx.amount, 11);
+      } finally {
+        PCFeatures.resolve = origResolve;
+      }
+    });
+
+    group('v1.1 integration scenarios');
+
+    test('Custom Flurry of Blows feature grants +1 action', () => {
+      const spec = {
+        id: 'flurry',
+        name: 'Flurry of Blows',
+        source: 'homebrew',
+        modePolicy: { sustained: { triggerRound: 1, conditionFn: 'always' } },
+        effects: [
+          { hook: 'onTurnStart', primitive: 'consumeBonusAction' },
+          { hook: 'onTurnStart', primitive: 'addAction', params: { amount: 1 } },
+          { hook: 'onTurnStart', primitive: 'decrementUses' },
+        ],
+      };
+      const compiled = PCFeatures.compileDSL(spec);
+      const origResolve = PCFeatures.resolve;
+      PCFeatures.resolve = (ref) => ref.id === 'flurry' ? compiled : origResolve(ref);
+      try {
+        const self = {
+          id: 'pc:monk',
+          pm: { features: [{id:'flurry'}], tactics: {mode:'sustained'} },
+          featureState: { flurry: { usesLeft: 4 } },
+          actionsAvailable: 1,
+          bonusActionAvailable: true,
+        };
+        const ctx = { round: 1, combatants: [] };
+        PCFeatures.dispatchHook(self, 'onTurnStart', ctx);
+        assertEq(self.actionsAvailable, 2);
+        assertEq(self.bonusActionAvailable, false);
+      } finally {
+        PCFeatures.resolve = origResolve;
+      }
+    });
+
+    test('Hunter\'s Mark with d8 damage via built-in param override', () => {
+      const hex = PCFeatures.LIBRARY.hexMark;
+      const self = {
+        id: 'pc:ranger',
+        pm: {
+          features: [{id:'hexMark', source:'builtin', params: {damageDice: '1d8', recastSlots: 4}}],
+          tactics: {mode:'sustained'},
+        },
+        featureState: { hexMark: { targetId: 'm:1', slotsLeft: 4 } },
+      };
+      const action = { kind: 'attack' };
+      const target = { id: 'm:1' };
+      const dmgCtx = { amount: 8, type: 'piercing', bonusDice: [] };
+      hex.hooks.onAttackHit.call(hex, self, action, target, dmgCtx);
+      assertEq(dmgCtx.bonusDice.length, 1);
+      assertEq(dmgCtx.bonusDice[0].dice, '1d8');
+    });
+
+    test('Ambush damage: addDamage with whenTargetHasntAttacked predicate', () => {
+      const spec = {
+        id: 'ambush',
+        name: 'Ambush Strike',
+        source: 'homebrew',
+        modePolicy: { sustained: { triggerRound: 1, conditionFn: 'always' } },
+        effects: [
+          { hook: 'onAttackHit', primitive: 'addDamage',
+            params: { value: 5 },
+            when: 'whenTargetHasntAttacked' },
+        ],
+      };
+      const compiled = PCFeatures.compileDSL(spec);
+      const origResolve = PCFeatures.resolve;
+      PCFeatures.resolve = (ref) => ref.id === 'ambush' ? compiled : origResolve(ref);
+      try {
+        const self = { id: 'pc:test', pm: { features: [{id:'ambush'}], tactics: {mode:'sustained'} }, featureState: { ambush: {} } };
+        // Unattacked target → +5 damage
+        const dmgA = { amount: 10, type: 'piercing', bonusDice: [] };
+        PCFeatures.dispatchHook(self, 'onAttackHit', {kind:'attack'}, {id:'m:1', side:'monster', hasAttacked: false}, dmgA, { round: 1, combatants: [] });
+        assertEq(dmgA.amount, 15);
+        // Already-attacked target → no bonus
+        const dmgB = { amount: 10, type: 'piercing', bonusDice: [] };
+        PCFeatures.dispatchHook(self, 'onAttackHit', {kind:'attack'}, {id:'m:1', side:'monster', hasAttacked: true}, dmgB, { round: 1, combatants: [] });
+        assertEq(dmgB.amount, 10);
       } finally {
         PCFeatures.resolve = origResolve;
       }

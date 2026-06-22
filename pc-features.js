@@ -46,6 +46,13 @@
       ),
     usesLeftGreaterThanZero: (self, ctx, featureId) =>
       !!(self && self.featureState && self.featureState[featureId] && self.featureState[featureId].usesLeft > 0),
+    whenTargetHasntAttacked: (self, ctx, featureId, hookCtx) =>
+      !!(hookCtx && hookCtx.target && !hookCtx.target.hasAttacked),
+    whenTargetIsBloodied:    (self, ctx, featureId, hookCtx) =>
+      !!(hookCtx && hookCtx.target && hookCtx.target.maxHp > 0 &&
+        (hookCtx.target.hp / hookCtx.target.maxHp) < 0.5),
+    whenTargetIsHostile:     (self, ctx, featureId, hookCtx) =>
+      !!(hookCtx && hookCtx.target && hookCtx.target.side === 'monster'),
   };
 
   function resolve(ref) {
@@ -138,6 +145,11 @@
       return { bonusDamage, duration: 10 };
     },
 
+    paramSchema: [
+      { name: 'bonusDamage', type: 'int', label: 'Bonus damage', default: 2, min: 0, max: 9 },
+      { name: 'duration', type: 'int', label: 'Duration (rounds)', default: 10, min: 1, max: 100 },
+    ],
+
     modePolicy: {
       nova:      { triggerRound: 1, conditionFn: 'always' },
       sustained: { triggerRound: 1, conditionFn: 'whenAnyEnemyAlive' },
@@ -206,6 +218,10 @@
       return { dice: dice + 'd6' };
     },
 
+    paramSchema: [
+      { name: 'dice', type: 'string', label: 'Dice', default: '1d6', placeholder: '3d6' },
+    ],
+
     modePolicy: {
       nova:      { triggerRound: 1, conditionFn: 'always' },
       sustained: { triggerRound: 1, conditionFn: 'always' },
@@ -246,6 +262,10 @@
       const level = (identityOrPm && identityOrPm.level) || (identityOrPm && identityOrPm.identity && identityOrPm.identity.level) || 2;
       return { maxUses: level >= 17 ? 2 : 1 };
     },
+
+    paramSchema: [
+      { name: 'maxUses', type: 'int', label: 'Max uses per encounter', default: 1, min: 1, max: 5 },
+    ],
 
     modePolicy: {
       nova:      { triggerRound: 1, conditionFn: 'always' },
@@ -309,6 +329,8 @@
       }
       return { slotsByLevel: { ...slots } };
     },
+
+    paramSchema: [],
 
     modePolicy: {
       nova:      { triggerRound: 1, conditionFn: 'always', spendOn: 'everyHit' },
@@ -410,6 +432,10 @@
       return { slotsByLevel: { ...slots }, ability: 'wis' };
     },
 
+    paramSchema: [
+      { name: 'ability', type: 'enum', label: 'Spellcasting ability', default: 'wis', options: ['cha','wis','int'] },
+    ],
+
     modePolicy: {
       nova:      { triggerRound: 1, conditionFn: 'whenAllyHpBelowHalf' },
       sustained: { triggerRound: 1, conditionFn: 'whenAllyDowned' },
@@ -469,6 +495,10 @@
       }
       return { slotsByLevel: { ...slots }, acBonus: 5 };
     },
+
+    paramSchema: [
+      { name: 'acBonus', type: 'int', label: 'AC bonus', default: 5, min: 1, max: 10 },
+    ],
 
     modePolicy: {
       nova:      { triggerRound: 1, threshold: 'whileSlotsLeft' },
@@ -533,6 +563,11 @@
     deriveParams(identityOrPm) {
       return { damageDice: '1d6', recastSlots: 4 };
     },
+
+    paramSchema: [
+      { name: 'damageDice', type: 'string', label: 'Damage dice', default: '1d6', placeholder: '1d8' },
+      { name: 'recastSlots', type: 'int', label: 'Recasts available', default: 4, min: 0, max: 9 },
+    ],
 
     modePolicy: {
       nova:      { recastOnKill: true },
@@ -599,6 +634,10 @@
       if (level >= 15) die = 'd12';
       return { die };
     },
+
+    paramSchema: [
+      { name: 'die', type: 'enum', label: 'Die size', default: 'd8', options: ['d6','d8','d10','d12'] },
+    ],
 
     modePolicy: {
       nova:      { distribute: 'best-attackers' },
@@ -676,11 +715,18 @@
   //     self     — the combatant the feature is on
   //     hookCtx  — context from the hook (dmgCtx, rollCtx, ctx, etc., grouped)
   //     params   — the params declared on the effect in the DSL spec
+
+  const DAMAGE_TYPES = ['bludgeoning','piercing','slashing','fire','cold','lightning',
+                        'thunder','acid','poison','psychic','radiant','necrotic','force'];
+
   const PRIMITIVES = {
     addDamage: {
       apply(self, hookCtx, params) {
         if (hookCtx && hookCtx.dmgCtx) hookCtx.dmgCtx.amount += Number(params.value) || 0;
       },
+      paramSchema: [
+        { name: 'value', type: 'int', label: 'Amount', default: 1, min: 0, max: 99 },
+      ],
     },
     addDamageDice: {
       apply(self, hookCtx, params) {
@@ -688,11 +734,18 @@
         if (!Array.isArray(hookCtx.dmgCtx.bonusDice)) hookCtx.dmgCtx.bonusDice = [];
         hookCtx.dmgCtx.bonusDice.push({ dice: params.dice, type: params.type || 'force', source: 'dsl' });
       },
+      paramSchema: [
+        { name: 'dice', type: 'string', label: 'Dice', default: '1d6', placeholder: '1d6' },
+        { name: 'type', type: 'enum', label: 'Damage type', default: 'force', options: DAMAGE_TYPES },
+      ],
     },
     addAcBonus: {
       apply(self, hookCtx, params) {
         if (typeof self.ac === 'number') self.ac += Number(params.value) || 0;
       },
+      paramSchema: [
+        { name: 'value', type: 'int', label: 'AC bonus', default: 2, min: 0, max: 10 },
+      ],
     },
     addResistance: {
       apply(self, hookCtx, params) {
@@ -702,10 +755,22 @@
           hookCtx.dmgCtx.amount = Math.floor(hookCtx.dmgCtx.amount / 2);
         }
       },
+      paramSchema: [
+        { name: 'types', type: 'multi-enum', label: 'Damage types', default: [], options: DAMAGE_TYPES },
+      ],
     },
-    consumeAction:       { apply(self) { self.actionsAvailable = Math.max(0, (self.actionsAvailable || 0) - 1); } },
-    consumeBonusAction:  { apply(self) { self.bonusActionAvailable = false; } },
-    consumeReaction:     { apply(self) { self.reactionAvailableThisRound = false; } },
+    consumeAction: {
+      apply(self) { self.actionsAvailable = Math.max(0, (self.actionsAvailable || 0) - 1); },
+      paramSchema: [],
+    },
+    consumeBonusAction: {
+      apply(self) { self.bonusActionAvailable = false; },
+      paramSchema: [],
+    },
+    consumeReaction: {
+      apply(self) { self.reactionAvailableThisRound = false; },
+      paramSchema: [],
+    },
     heal: {
       apply(self, hookCtx, params) {
         const amt = Number(params.amount) || 0;
@@ -717,6 +782,10 @@
           hookCtx.target.hp = Math.min(hookCtx.target.maxHp, (hookCtx.target.hp || 0) + amt);
         }
       },
+      paramSchema: [
+        { name: 'amount', type: 'int', label: 'HP restored', default: 5, min: 0, max: 99 },
+        { name: 'target', type: 'enum', label: 'Target', default: 'self', options: ['self', 'ally'] },
+      ],
     },
     applyCondition: {
       apply(self, hookCtx, params) {
@@ -725,6 +794,11 @@
         if (!target.conditions) target.conditions = new Map();
         target.conditions.set(params.condition, Number(params.duration) || 1);
       },
+      paramSchema: [
+        { name: 'condition', type: 'string', label: 'Condition name', default: '', placeholder: 'prone' },
+        { name: 'duration', type: 'int', label: 'Duration (rounds)', default: 1, min: 1, max: 50 },
+        { name: 'target', type: 'enum', label: 'Target', default: 'target', options: ['self', 'target'] },
+      ],
     },
     decrementUses: {
       apply(self, hookCtx, params) {
@@ -733,6 +807,7 @@
         const state = self.featureState[id];
         if (typeof state.usesLeft === 'number') state.usesLeft = Math.max(0, state.usesLeft - 1);
       },
+      paramSchema: [],
     },
     flag: {
       apply(self, hookCtx, params) {
@@ -740,6 +815,22 @@
         const round = (hookCtx && hookCtx.ctx && typeof hookCtx.ctx.round === 'number') ? hookCtx.ctx.round : 0;
         self.flags[params.name] = { until: round + (Number(params.duration) || 1) };
       },
+      paramSchema: [
+        { name: 'name', type: 'string', label: 'Flag name', default: 'marked', placeholder: 'marked' },
+        { name: 'duration', type: 'int', label: 'Duration (rounds)', default: 1, min: 1, max: 50 },
+      ],
+    },
+    addAction: {
+      apply(self, hookCtx, params) {
+        self.actionsAvailable = (self.actionsAvailable || 0) + (Number(params.amount) || 1);
+      },
+      paramSchema: [
+        { name: 'amount', type: 'int', label: 'Extra actions', default: 1, min: 1, max: 5 },
+      ],
+    },
+    addBonusAction: {
+      apply(self) { self.bonusActionAvailable = true; },
+      paramSchema: [],
     },
   };
 
@@ -773,7 +864,7 @@
         for (const eff of effects) {
           if (eff.when) {
             const whenPred = MODE_PREDICATES[eff.when];
-            if (whenPred && !whenPred(self, hookCtx.ctx || {}, spec.id)) continue;
+            if (whenPred && !whenPred(self, hookCtx.ctx || {}, spec.id, hookCtx)) continue;
           }
           const prim = PRIMITIVES[eff.primitive];
           if (!prim || typeof prim.apply !== 'function') {

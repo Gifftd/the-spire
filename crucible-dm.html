@@ -40,6 +40,9 @@
     .feature-row-name { font-family: 'Cinzel', serif; font-size: 0.85rem; flex: 0 0 auto; }
     .feature-row-summary { font-size: 0.78rem; color: var(--c-ink-faint); flex: 1; }
     .feature-row-remove { background: none; border: none; color: var(--c-error); font-size: 1.2rem; cursor: pointer; padding: 0 6px; }
+    .feature-row-edit { background: none; border: 1px solid var(--c-border); color: var(--c-ink-faint); font-size: 0.7rem; padding: 1px 6px; border-radius: 3px; cursor: pointer; margin-right: 4px; }
+    .feature-row-edit:hover { color: var(--c-brass); border-color: var(--c-brass); }
+    .feature-param-editor { padding: 6px 10px; background: var(--c-bg); border-left: 2px solid var(--c-brass); margin-top: 4px; display: flex; flex-wrap: wrap; gap: 8px; }
     .feature-tag { font-size: 0.6rem; padding: 1px 6px; border: 1px solid currentColor; border-radius: 4px; margin-left: 4px; }
     .feature-tag.builtin { color: var(--c-brass); }
     .feature-tag.homebrew { color: var(--c-teal-bright); }
@@ -51,9 +54,14 @@
     .dsl-form input, .dsl-form select { width: 100%; background: var(--c-surface); color: var(--c-ink); border: 1px solid var(--c-border); border-radius: 2px; padding: 6px 8px; }
     .dsl-form fieldset { border: 1px solid var(--c-border); padding: 8px 12px; margin: 12px 0; }
     .dsl-form legend { color: var(--c-brass); font-family: Cinzel, serif; font-size: 0.75rem; padding: 0 6px; }
-    .dsl-effect-row { display: flex; gap: 6px; margin: 4px 0; align-items: center; }
+    .dsl-effect-row { display: flex; gap: 6px; margin: 4px 0; align-items: center; flex-wrap: wrap; }
     .dsl-effect-row select, .dsl-effect-row input { flex: 1; }
     .dsl-effect-row button { flex: 0; }
+    .dsl-param-field { display: inline-flex; flex-direction: column; gap: 2px; font-size: 0.75rem; color: var(--c-ink-faint); margin-right: 6px; }
+    .dsl-param-field input, .dsl-param-field select { font-size: 0.85rem; padding: 4px 6px; }
+    .dsl-param-field input[type="number"] { width: 60px; }
+    .dsl-param-field input[type="text"] { width: 100px; }
+    .dsl-param-field select { min-width: 80px; }
     .dsl-modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1rem; }
     .impact-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     .impact-table th, .impact-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--c-border); }
@@ -274,12 +282,19 @@ function renderPCEditor(pm) {
                 const sourceTag = f.source === 'homebrew'
                   ? '<span class="feature-tag homebrew">homebrew</span>'
                   : '<span class="feature-tag builtin">built-in</span>';
+                const editBtn = f.source === 'homebrew'
+                  ? `<button class="feature-row-edit" onclick="openDSLEditorForEdit('${pm.id}', '${f.id}')">edit</button>`
+                  : (Array.isArray(def.paramSchema) && def.paramSchema.length > 0
+                      ? `<button class="feature-row-edit" onclick="toggleFeatureParamEditor('${pm.id}', '${f.id}')">edit params</button>`
+                      : '');
                 return `
                   <div class="feature-row" data-feature-id="${f.id}">
                     <div class="feature-row-name">${escapeHtml(def.name)} ${sourceTag}</div>
                     <div class="feature-row-summary">${escapeHtml(def.summary || '')}</div>
+                    ${editBtn}
                     <button class="feature-row-remove" onclick="removeFeatureFromPC('${pm.id}','${f.id}')">×</button>
                   </div>
+                  <div class="feature-param-editor" id="feature-param-editor-${pm.id}-${f.id}" style="display:none"></div>
                 `;
               }).join('')}
             </div>
@@ -474,11 +489,71 @@ function removeFeatureFromPC(pmId, featureId) {
   saveParty();
   renderParty();
 }
+
+function toggleFeatureParamEditor(pmId, featureId) {
+  const editorId = 'feature-param-editor-' + pmId + '-' + featureId;
+  const editor = document.getElementById(editorId);
+  if (!editor) return;
+  if (editor.style.display === 'none') {
+    renderFeatureParamEditor(pmId, featureId);
+    editor.style.display = '';
+  } else {
+    editor.style.display = 'none';
+  }
+}
+
+function renderFeatureParamEditor(pmId, featureId) {
+  const pm = party.find(p => p.id === pmId);
+  if (!pm) return;
+  const f = pm.features.find(x => x.id === featureId);
+  if (!f) return;
+  const def = PCFeatures.LIBRARY[featureId];
+  if (!def || !Array.isArray(def.paramSchema)) return;
+
+  // Ensure params is populated with current values (auto-derived if missing).
+  if (!f.params) f.params = def.deriveParams ? def.deriveParams(pm) : {};
+
+  const editorId = 'feature-param-editor-' + pmId + '-' + featureId;
+  const editor = document.getElementById(editorId);
+  editor.innerHTML = def.paramSchema.map(field => renderBuiltinParamInput(pmId, featureId, f, field)).join('');
+}
+
+function renderBuiltinParamInput(pmId, featureId, f, field) {
+  const current = f.params[field.name] !== undefined ? f.params[field.name] : (field.default !== undefined ? field.default : '');
+  const labelText = field.label || field.name;
+  const onChangeBase = `updateBuiltinParam('${pmId}', '${featureId}', ${JSON.stringify(field.name)}, `;
+  if (field.type === 'int') {
+    return `<label class="dsl-param-field">${escapeHtml(labelText)}<input type="number" value="${current}" ${field.min!=null?'min="'+field.min+'"':''} ${field.max!=null?'max="'+field.max+'"':''} oninput="${onChangeBase}parseInt(this.value, 10) || 0)"></label>`;
+  }
+  if (field.type === 'string') {
+    return `<label class="dsl-param-field">${escapeHtml(labelText)}<input type="text" value="${escapeHtml(String(current))}" placeholder="${escapeHtml(field.placeholder || '')}" oninput="${onChangeBase}this.value)"></label>`;
+  }
+  if (field.type === 'enum') {
+    return `<label class="dsl-param-field">${escapeHtml(labelText)}<select onchange="${onChangeBase}this.value)">${(field.options || []).map(o => `<option value="${o}" ${current === o ? 'selected' : ''}>${o}</option>`).join('')}</select></label>`;
+  }
+  if (field.type === 'boolean') {
+    return `<label class="dsl-param-field">${escapeHtml(labelText)}<input type="checkbox" ${current ? 'checked' : ''} onchange="${onChangeBase}this.checked)"></label>`;
+  }
+  return '';
+}
+
+function updateBuiltinParam(pmId, featureId, paramName, value) {
+  const pm = party.find(p => p.id === pmId);
+  if (!pm) return;
+  const f = pm.features.find(x => x.id === featureId);
+  if (!f) return;
+  if (!f.params) f.params = {};
+  f.params[paramName] = value;
+  saveParty();
+}
+
 let dslEditingPmId = null;
+let dslEditingFeatureId = null;  // null = creating new; set = editing existing
 let dslEffects = [];
 
 function openDSLEditor(pmId) {
   dslEditingPmId = pmId;
+  dslEditingFeatureId = null;
   dslEffects = [];
   document.getElementById('dsl-name').value = '';
   document.getElementById('dsl-summary').value = '';
@@ -489,14 +564,77 @@ function openDSLEditor(pmId) {
   document.getElementById('dsl-modal').style.display = 'flex';
 }
 
+function openDSLEditorForEdit(pmId, featureId) {
+  const pm = party.find(p => p.id === pmId);
+  if (!pm) return;
+  const f = pm.features.find(x => x.id === featureId);
+  if (!f || f.source !== 'homebrew' || !f._dslSpec) {
+    alert('Cannot edit: feature is not a custom DSL feature.');
+    return;
+  }
+  const spec = f._dslSpec;
+  dslEditingPmId = pmId;
+  dslEditingFeatureId = featureId;
+
+  // Pre-fill form from spec.
+  document.getElementById('dsl-name').value = spec.name || '';
+  document.getElementById('dsl-summary').value = spec.summary || '';
+  document.getElementById('dsl-uses').value = (spec.params && spec.params.usesPerEncounter && spec.params.usesPerEncounter.value) || 1;
+  const sustainedPolicy = spec.modePolicy && spec.modePolicy.sustained || {};
+  document.getElementById('dsl-trigger-round').value = sustainedPolicy.triggerRound || 1;
+  document.getElementById('dsl-condition').value = sustainedPolicy.conditionFn || 'always';
+
+  // Pre-fill category checkboxes.
+  const categoryEl = document.getElementById('dsl-category');
+  Array.from(categoryEl.options).forEach(o => {
+    o.selected = Array.isArray(spec.category) && spec.category.includes(o.value);
+  });
+
+  // Pre-fill effects.
+  dslEffects = (spec.effects || []).map(e => ({
+    hook: e.hook,
+    primitive: e.primitive,
+    params: { ...(e.params || {}) },
+    when: e.when || null,
+  }));
+  dslRenderEffects();
+
+  document.getElementById('dsl-modal').style.display = 'flex';
+}
+
 function dslClose() {
   document.getElementById('dsl-modal').style.display = 'none';
   dslEditingPmId = null;
+  dslEditingFeatureId = null;
   dslEffects = [];
 }
 
 function dslAddEffect() {
-  dslEffects.push({ hook: 'onTurnStart', primitive: 'consumeBonusAction', params: {} });
+  // Initialize params from the primitive's paramSchema defaults.
+  const defaultPrim = 'consumeBonusAction';
+  const eff = { hook: 'onTurnStart', primitive: defaultPrim, params: {} };
+  dslApplySchemaDefaults(eff);
+  dslEffects.push(eff);
+  dslRenderEffects();
+}
+
+function dslApplySchemaDefaults(eff) {
+  const prim = PCFeatures.PRIMITIVES[eff.primitive];
+  if (!prim || !Array.isArray(prim.paramSchema)) { eff.params = {}; return; }
+  const newParams = {};
+  for (const field of prim.paramSchema) {
+    newParams[field.name] = field.default !== undefined ? field.default : null;
+  }
+  // Preserve any existing param values that still match a schema field name.
+  for (const k of Object.keys(eff.params || {})) {
+    if (k in newParams && eff.params[k] !== undefined) newParams[k] = eff.params[k];
+  }
+  eff.params = newParams;
+}
+
+function dslOnPrimitiveChange(i, newPrim) {
+  dslEffects[i].primitive = newPrim;
+  dslApplySchemaDefaults(dslEffects[i]);
   dslRenderEffects();
 }
 
@@ -507,17 +645,46 @@ function dslRemoveEffect(i) {
 
 function dslRenderEffects() {
   const root = document.getElementById('dsl-effects-list');
-  root.innerHTML = dslEffects.map((eff, i) => `
-    <div class="dsl-effect-row">
-      <select onchange="dslEffects[${i}].hook = this.value">
-        ${PCFeatures.HOOK_NAMES.map(h => `<option value="${h}" ${eff.hook === h ? 'selected' : ''}>${h}</option>`).join('')}
-      </select>
-      <select onchange="dslEffects[${i}].primitive = this.value">
-        ${Object.keys(PCFeatures.PRIMITIVES).map(p => `<option value="${p}" ${eff.primitive === p ? 'selected' : ''}>${p}</option>`).join('')}
-      </select>
-      <button onclick="dslRemoveEffect(${i})">×</button>
-    </div>
-  `).join('');
+  root.innerHTML = dslEffects.map((eff, i) => {
+    const prim = PCFeatures.PRIMITIVES[eff.primitive];
+    const schema = (prim && Array.isArray(prim.paramSchema)) ? prim.paramSchema : [];
+    const paramsHtml = schema.map(field => dslRenderParamInput(eff, i, field)).join('');
+    return `
+      <div class="dsl-effect-row">
+        <select onchange="dslEffects[${i}].hook = this.value">
+          ${PCFeatures.HOOK_NAMES.map(h => `<option value="${h}" ${eff.hook === h ? 'selected' : ''}>${h}</option>`).join('')}
+        </select>
+        <select onchange="dslOnPrimitiveChange(${i}, this.value)">
+          ${Object.keys(PCFeatures.PRIMITIVES).map(p => `<option value="${p}" ${eff.primitive === p ? 'selected' : ''}>${p}</option>`).join('')}
+        </select>
+        ${paramsHtml}
+        <button onclick="dslRemoveEffect(${i})">×</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function dslRenderParamInput(eff, i, field) {
+  const current = eff.params[field.name] !== undefined ? eff.params[field.name] : (field.default !== undefined ? field.default : '');
+  const labelText = field.label || field.name;
+  const onchange = `dslEffects[${i}].params[${JSON.stringify(field.name)}] = `;
+  if (field.type === 'int') {
+    return `<label class="dsl-param-field">${escapeHtml(labelText)}<input type="number" value="${current}" ${field.min!=null?'min="'+field.min+'"':''} ${field.max!=null?'max="'+field.max+'"':''} oninput="${onchange}parseInt(this.value, 10) || 0"></label>`;
+  }
+  if (field.type === 'string') {
+    return `<label class="dsl-param-field">${escapeHtml(labelText)}<input type="text" value="${escapeHtml(String(current))}" placeholder="${escapeHtml(field.placeholder || '')}" oninput="${onchange}this.value"></label>`;
+  }
+  if (field.type === 'boolean') {
+    return `<label class="dsl-param-field">${escapeHtml(labelText)}<input type="checkbox" ${current ? 'checked' : ''} onchange="${onchange}this.checked"></label>`;
+  }
+  if (field.type === 'enum') {
+    return `<label class="dsl-param-field">${escapeHtml(labelText)}<select onchange="${onchange}this.value">${(field.options || []).map(o => `<option value="${o}" ${current === o ? 'selected' : ''}>${o}</option>`).join('')}</select></label>`;
+  }
+  if (field.type === 'multi-enum') {
+    const currentArr = Array.isArray(current) ? current : [];
+    return `<label class="dsl-param-field">${escapeHtml(labelText)}<select multiple size="3" onchange="dslEffects[${i}].params[${JSON.stringify(field.name)}] = Array.from(this.selectedOptions).map(o => o.value)">${(field.options || []).map(o => `<option value="${o}" ${currentArr.includes(o) ? 'selected' : ''}>${o}</option>`).join('')}</select></label>`;
+  }
+  return '';
 }
 
 function dslBuildSpec() {
@@ -552,7 +719,20 @@ function dslSave() {
   const compiled = PCFeatures.compileDSL(spec);
   if (!compiled) { alert('DSL compilation failed.'); return; }
   if (!Array.isArray(pm.features)) pm.features = [];
-  pm.features.push({ id: spec.id, source: 'homebrew', params: spec.params, _dslSpec: spec });
+
+  if (dslEditingFeatureId) {
+    // Edit existing — preserve the original feature id so feature state stays addressed.
+    spec.id = dslEditingFeatureId;
+    const idx = pm.features.findIndex(f => f.id === dslEditingFeatureId);
+    if (idx >= 0) {
+      pm.features[idx] = { id: spec.id, source: 'homebrew', params: spec.params, _dslSpec: spec };
+    } else {
+      pm.features.push({ id: spec.id, source: 'homebrew', params: spec.params, _dslSpec: spec });
+    }
+  } else {
+    // Create new — generate a fresh id from the name (existing v1 behavior).
+    pm.features.push({ id: spec.id, source: 'homebrew', params: spec.params, _dslSpec: spec });
+  }
   saveParty();
   renderParty();
   dslClose();
