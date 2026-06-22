@@ -1025,6 +1025,19 @@
     rollInitiative(combatants, rng);
     const slots = initOrder(combatants);
 
+    // Fire onCombatStart for every PC's features.
+    if (typeof PCFeatures !== 'undefined') {
+      const startCtx = {
+        round: 1, combatants, rng,
+        livingEnemies: combatants.filter(c => c.side === 'monster' && !c.dead),
+        livingAllies: combatants.filter(c => c.side === 'pc' && !c.dead),
+        eventLog: events,
+      };
+      for (const c of combatants) {
+        if (c.side === 'pc') PCFeatures.dispatchHook(c, 'onCombatStart', startCtx);
+      }
+    }
+
     const perAction = new Map();
     function tally(actor, action, kind, dHit, dDmg, dHealed, dKills, dRevives) {
       const key = actor + '|' + action;
