@@ -228,7 +228,16 @@
         if (!action || action.actionRange === 'ranged') return;
         const ref = self.pm.features.find(f => f.id === 'rage');
         const params = (ref && ref.params) || this.deriveParams(self.pm);
-        dmgCtx.amount += (params.bonusDamage || 2);
+        const bonus = params.bonusDamage || 2;
+        if (!Array.isArray(dmgCtx.bonusDice)) dmgCtx.bonusDice = [];
+        // Pre-rolled bonus die so the engine's bonus-die loop applies the
+        // damage to target HP. Previously this just bumped dmgCtx.amount,
+        // which was cosmetic — the engine ignored amount modifications
+        // when applying damage.
+        dmgCtx.bonusDice.push({
+          dice: String(bonus), type: dmgCtx.type || 'bludgeoning',
+          source: 'rage', featureName: 'Rage', _rolled: bonus,
+        });
       },
 
       onTakeDamage(self, dmgCtx) {
@@ -787,10 +796,25 @@
   const PRIMITIVES = {
     addDamage: {
       apply(self, hookCtx, params) {
-        if (hookCtx && hookCtx.dmgCtx) hookCtx.dmgCtx.amount += Number(params.value) || 0;
+        const v = Number(params.value) || 0;
+        if (!v || !hookCtx || !hookCtx.dmgCtx) return;
+        if (!Array.isArray(hookCtx.dmgCtx.bonusDice)) hookCtx.dmgCtx.bonusDice = [];
+        // Push a pre-rolled bonus die — the engine's bonus-die loop skips
+        // rerolling when _rolled is already set, then applies through
+        // applyDamage so the damage actually lands on the target HP.
+        // (Previously this only bumped dmgCtx.amount, which was cosmetic.)
+        hookCtx.dmgCtx.bonusDice.push({
+          dice: String(v), type: params.type || hookCtx.dmgCtx.type || 'untyped',
+          source: (hookCtx && hookCtx.featureId) || 'dsl',
+          featureName: (hookCtx && hookCtx.featureName) || 'Custom feature',
+          _rolled: v,
+        });
       },
       paramSchema: [
         { name: 'value', type: 'int', label: 'Amount', default: 1, min: 0, max: 99 },
+        { name: 'type', type: 'enum', label: 'Damage type (optional)', default: '',
+          options: ['', 'untyped', 'bludgeoning', 'piercing', 'slashing', 'fire', 'cold', 'lightning',
+                    'thunder', 'acid', 'poison', 'psychic', 'radiant', 'necrotic', 'force'] },
       ],
     },
     addDamageDice: {
@@ -987,6 +1011,25 @@
             return;
           }
         }
+        // Auto-gate on usesLeft when the spec declares usesPerEncounter.
+        // The user expectation is: "Uses per encounter: 2 means the
+        // feature fires at most twice per fight." Previously this was
+        // only honored if the user manually picked the
+        // usesLeftGreaterThanZero condition AND added a decrementUses
+        // effect (which couldn't even be configured via the UI).
+        const usesParam = spec.params && spec.params.usesPerEncounter;
+        const usesCap = usesParam ? (usesParam.value || usesParam.default || 0) : 0;
+        if (usesCap > 0) {
+          const featState = self && self.featureState && self.featureState[spec.id];
+          if (featState && typeof featState.usesLeft === 'number' && featState.usesLeft <= 0) {
+            if (eventLog) eventLog.push({
+              round, type: 'feature', who: self && self.id,
+              what: featureName + ': gated — out of uses (' + usesCap + '/' + usesCap + ' spent)',
+              featureName, source: spec.id, isGate: true,
+            });
+            return;
+          }
+        }
         for (const eff of effects) {
           if (eff.when) {
             const whenPred = MODE_PREDICATES[eff.when];
@@ -999,6 +1042,20 @@
           }
           try { prim.apply(self, hookCtx, eff.params || {}); }
           catch (e) { console.warn('PCFeatures.compileDSL: primitive ' + eff.primitive + ' threw:', e); }
+        }
+        // Auto-decrement usesLeft when this feature actually fired through
+        // the gate. Pairs with the auto-gate above so usesPerEncounter is
+        // self-enforcing without the user wiring a decrementUses effect.
+        if (usesCap > 0) {
+          const featState = self && self.featureState && self.featureState[spec.id];
+          if (featState && typeof featState.usesLeft === 'number') {
+            featState.usesLeft = Math.max(0, featState.usesLeft - 1);
+            if (eventLog) eventLog.push({
+              round, type: 'feature', who: self && self.id,
+              what: featureName + ': use spent (' + featState.usesLeft + '/' + usesCap + ' remaining)',
+              featureName, source: spec.id,
+            });
+          }
         }
       };
     }

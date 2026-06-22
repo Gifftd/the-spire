@@ -306,7 +306,7 @@
       assertEq(self.featureState.rage.roundsLeft, 10);
     });
 
-    test('Rage: onAttackHit adds bonusDamage on melee hits when active', () => {
+    test('Rage: onAttackHit pushes a pre-rolled bonus die on melee hits when active', () => {
       const rage = PCFeatures.LIBRARY.rage;
       const self = {
         pm: { features: [{id:'rage', params:{bonusDamage:2}}], tactics: {mode:'nova'} },
@@ -315,7 +315,13 @@
       const action = { kind: 'attack', actionRange: 'melee' };
       const dmgCtx = { amount: 8, type: 'slashing', bonusDice: [] };
       rage.hooks.onAttackHit(self, action, {}, dmgCtx);
-      assertEq(dmgCtx.amount, 10);
+      // The engine's bonus-die loop applies bd._rolled to dmgCtx.amount AND
+      // calls applyDamage so the +2 actually lands on the target HP.
+      // Pre-fix Rage mutated dmgCtx.amount directly, which was cosmetic.
+      assertEq(dmgCtx.bonusDice.length, 1);
+      assertEq(dmgCtx.bonusDice[0]._rolled, 2);
+      assertEq(dmgCtx.bonusDice[0].source, 'rage');
+      assertEq(dmgCtx.bonusDice[0].type, 'slashing');
     });
 
     test('Rage: onAttackHit does NOT add damage on ranged attacks', () => {
@@ -757,10 +763,16 @@
 
     group('DSL primitives');
 
-    test('addDamage primitive adds flat damage to dmgCtx.amount', () => {
-      const ctx = { dmgCtx: { amount: 8, bonusDice: [] } };
-      PCFeatures.PRIMITIVES.addDamage.apply({}, ctx, { value: 3 });
-      assertEq(ctx.dmgCtx.amount, 11);
+    test('addDamage primitive pushes a pre-rolled bonus die so the damage actually lands', () => {
+      // Pre-fix this mutated dmgCtx.amount, but the engine never applied that
+      // delta to target HP. Now it pushes a pre-rolled bonus die which the
+      // engine's bonus-die loop adds to amount AND applies via applyDamage.
+      const ctx = { dmgCtx: { amount: 8, type: 'piercing', bonusDice: [] }, featureId: 'fX', featureName: 'F' };
+      PCFeatures.PRIMITIVES.addDamage.apply({}, ctx, { value: 3, type: 'fire' });
+      assertEq(ctx.dmgCtx.bonusDice.length, 1);
+      assertEq(ctx.dmgCtx.bonusDice[0]._rolled, 3);
+      assertEq(ctx.dmgCtx.bonusDice[0].type, 'fire');
+      assertEq(ctx.dmgCtx.bonusDice[0].source, 'fX');
     });
 
     test('addDamageDice primitive pushes a die spec onto bonusDice', () => {
@@ -885,9 +897,13 @@
       const target = { id: 'm:1' };
       const dmgCtx = { amount: 10, type: 'slashing', bonusDice: [] };
       PCFeatures.dispatchHook(self, 'onAttackHit', action, target, dmgCtx);
-      assertEq(dmgCtx.amount, 12);
-      assertEq(dmgCtx.bonusDice.length, 1);
-      assertEq(dmgCtx.bonusDice[0].dice, '1d6');
+      // Rage now pushes a pre-rolled +2 die; Hex pushes a 1d6 die. Both ride
+      // through the engine's bonus-die loop which applies them to target HP.
+      assertEq(dmgCtx.bonusDice.length, 2);
+      const rage = dmgCtx.bonusDice.find(b => b.source === 'rage');
+      const hex  = dmgCtx.bonusDice.find(b => b.source === 'hexMark');
+      assertEq(rage && rage._rolled, 2);
+      assertEq(hex && hex.dice, '1d6');
     });
 
     test('Sneak Attack + Hex stack on the same hit', () => {
@@ -1007,15 +1023,17 @@
       };
       const compiled = PCFeatures.compileDSL(spec);
 
+      // addDamage now pushes a pre-rolled bonus die instead of bumping amount.
       const selfA = { pm: { features: [{id:'ambush'}], tactics: {mode:'sustained'} }, featureState: { ambush: {} } };
       const dmgCtxA = { amount: 10, type: 'piercing', bonusDice: [] };
       compiled.hooks.onAttackHit.call(compiled, selfA, {kind:'attack'}, {id:'m:1', side:'monster', hasAttacked: false}, dmgCtxA, { round: 1, combatants: [] });
-      assertEq(dmgCtxA.amount, 15);
+      assertEq(dmgCtxA.bonusDice.length, 1);
+      assertEq(dmgCtxA.bonusDice[0]._rolled, 5);
 
       const selfB = { pm: { features: [{id:'ambush'}], tactics: {mode:'sustained'} }, featureState: { ambush: {} } };
       const dmgCtxB = { amount: 10, type: 'piercing', bonusDice: [] };
       compiled.hooks.onAttackHit.call(compiled, selfB, {kind:'attack'}, {id:'m:1', side:'monster', hasAttacked: true}, dmgCtxB, { round: 1, combatants: [] });
-      assertEq(dmgCtxB.amount, 10);
+      assertEq(dmgCtxB.bonusDice.length, 0);
     });
 
     group('paramSchema sanity');
@@ -1064,7 +1082,9 @@
         const dmgCtx = { amount: 8, type: 'slashing', bonusDice: [] };
         const ctx = { round: 1, combatants: [] };
         PCFeatures.dispatchHook(self, 'onAttackHit', {kind:'attack'}, {id:'m:1'}, dmgCtx, ctx);
-        assertEq(dmgCtx.amount, 11);
+        // addDamage now pushes a pre-rolled bonus die so the +3 actually lands on the target.
+        assertEq(dmgCtx.bonusDice.length, 1);
+        assertEq(dmgCtx.bonusDice[0]._rolled, 3);
       } finally {
         PCFeatures.resolve = origResolve;
       }
@@ -1139,14 +1159,15 @@
       PCFeatures.resolve = (ref) => ref.id === 'ambush' ? compiled : origResolve(ref);
       try {
         const self = { id: 'pc:test', pm: { features: [{id:'ambush'}], tactics: {mode:'sustained'} }, featureState: { ambush: {} } };
-        // Unattacked target → +5 damage
+        // Unattacked target → addDamage pushes a pre-rolled bonus die (+5)
         const dmgA = { amount: 10, type: 'piercing', bonusDice: [] };
         PCFeatures.dispatchHook(self, 'onAttackHit', {kind:'attack'}, {id:'m:1', side:'monster', hasAttacked: false}, dmgA, { round: 1, combatants: [] });
-        assertEq(dmgA.amount, 15);
-        // Already-attacked target → no bonus
+        assertEq(dmgA.bonusDice.length, 1);
+        assertEq(dmgA.bonusDice[0]._rolled, 5);
+        // Already-attacked target → predicate blocks, no bonus die
         const dmgB = { amount: 10, type: 'piercing', bonusDice: [] };
         PCFeatures.dispatchHook(self, 'onAttackHit', {kind:'attack'}, {id:'m:1', side:'monster', hasAttacked: true}, dmgB, { round: 1, combatants: [] });
-        assertEq(dmgB.amount, 10);
+        assertEq(dmgB.bonusDice.length, 0);
       } finally {
         PCFeatures.resolve = origResolve;
       }

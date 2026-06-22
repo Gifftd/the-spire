@@ -70,6 +70,32 @@ closed:
   or made a save with PCFeatures loaded. Latent in tests because the
   engine test suite doesn't load `pc-features.js`. `combatants` is now an
   optional final parameter, threaded through from `runTrial`.
+- **Uses per encounter now actually limits firings** — `compileDSL`'s
+  gate ignored `state.usesLeft`. Specs declared `usesPerEncounter` and
+  the state was initialized correctly, but nothing read or decremented
+  it. A "Uses per encounter: 2" feature fired every round of combat.
+  The gate now auto-checks `state.usesLeft > 0` when the spec sets
+  `usesPerEncounter`, and auto-decrements after the feature fires. Both
+  events emit a trace ("use spent (1/2 remaining)", "gated — out of
+  uses (2/2 spent)") so it's visible in the trial log.
+- **`addDamage` primitive now actually deals damage and accepts a type** —
+  pre-fix, `addDamage` mutated `dmgCtx.amount += value`. The engine then
+  applied `r.damageByType` and `bonusDice` separately, never reading
+  `amount` modifications. So flat additions (and Rage's +2) were
+  cosmetic-only: visible in the Feature Impact totals but never applied
+  to target HP. Plus `addDamage` had no damage-type input, so users
+  asking for "+5 fire" couldn't get a fire-typed contribution.
+  `addDamage` now pushes a pre-rolled bonus die tagged with the picked
+  type; the engine's bonus-die loop already calls `applyDamage` so the
+  damage actually lands. Rage's `onAttackHit` got the same treatment so
+  the +2 lands instead of being a phantom buff.
+- **`onTakeDamage` reductions now actually reduce damage** — Rage
+  resistance and `addResistance` halved `dmgCtx.amount`, but the engine
+  then applied untouched `r.damageByType` so the reduction was lost.
+  Engine now scales every base-damage and bonus-die contribution by
+  `(post-takeDamage amount / pre-takeDamage amount)` before applying
+  through `applyDamage`. Half-damage resistance now actually halves
+  incoming damage to PC HP.
 - **DSL features silently no-op-ing — the *real* bug** — `compileDSL`'s
   gate read the round only from `hookCtx.ctx`, which is `undefined` for
   any hook whose args don't contain a `combatants`-bearing object
