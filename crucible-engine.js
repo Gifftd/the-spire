@@ -1299,6 +1299,8 @@
     const trialResults = [];
     const errors = [];
     const chunkSize = 50;
+    // featureStats[label] = { activations, damageDealt, damagePrevented, hpRestored }
+    const featureStats = {};
 
     for (let start = 0; start < trials; start += chunkSize) {
       const end = Math.min(start + chunkSize, trials);
@@ -1318,6 +1320,22 @@
       if (typeof onProgress === 'function') {
         const winsSoFar = trialResults.filter(t => t.winner === 'pc').length;
         onProgress({ completed: trialResults.length, winRate: winsSoFar / trialResults.length });
+      }
+    }
+
+    // Aggregate feature events across all trials.
+    for (const trial of trialResults) {
+      for (const ev of trial.events) {
+        if (!ev || ev.type !== 'feature') continue;
+        const m = /^([A-Z][a-zA-Z' /]+?)(?:\s+activated|\s+on\s|\s+ended|\s+re-cast|\s+handed)/.exec(ev.what || '');
+        const featureLabel = m ? m[1].trim() : (ev.what || '').split(/[:(]/)[0].trim();
+        if (!featureLabel) continue;
+        if (!featureStats[featureLabel]) {
+          featureStats[featureLabel] = { activations: 0, damageDealt: 0, damagePrevented: 0, hpRestored: 0 };
+        }
+        featureStats[featureLabel].activations += 1;
+        const healMatch = /\+(\d+)\s*HP/.exec(ev.what || '');
+        if (healMatch) featureStats[featureLabel].hpRestored += parseInt(healMatch[1], 10);
       }
     }
 
@@ -1413,6 +1431,7 @@
       perPc,
       distribution: { downedHist, roundsHist },
       perAction: perActionAgg,
+      featureStats,
       representative: { low: lo, median: mid, high: hi },
       warnings,
       errors,
