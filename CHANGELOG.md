@@ -49,6 +49,27 @@ closed:
   Target-conditional effects ("damage vs enemies who haven't attacked yet")
   can finally be authored from the UI; the engine already supported `when`,
   the editor was the missing piece.
+- **Feature Impact attribution** — features that modify damage (Rage,
+  Sneak Attack, Hex/Hunter's Mark, Divine Smite, DSL `addDamage`,
+  `addDamageDice`, `addResistance`) now show actual damage dealt /
+  prevented in the results panel. Previously the columns existed in the
+  schema but the aggregator never incremented them — every feature read
+  "—" regardless of how much damage it pushed. Fix is two-pronged:
+  `dispatchHook` snapshots `dmgCtx.amount` per feature and emits an
+  attribution event for flat changes (Rage +2, Rage resistance);
+  the engine's bonus-die roll loop emits one event per rolled die using
+  the feature's source tag (Sneak, Smite, Hex, DSL dice). DSL features
+  pick up their custom name via `hookCtx.featureName` injected by
+  `compileDSL`. The aggregator now reads structured `amount`/`isDamage`/
+  `isPrevented`/`hpRestored` fields directly (with a regex fallback for
+  events that pre-date the structured fields).
+- **v1 regression fix**: `resolveAttackPc` and `resolveSave` referenced a
+  bare `combatants` that wasn't in their scope (declared inside `runTrial`,
+  but these functions live at module level). Under `'use strict'` that
+  threw `ReferenceError: combatants is not defined` whenever a PC attacked
+  or made a save with PCFeatures loaded. Latent in tests because the
+  engine test suite doesn't load `pc-features.js`. `combatants` is now an
+  optional final parameter, threaded through from `runTrial`.
 
 **Migration:** None. All changes are purely additive.
 
