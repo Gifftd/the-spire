@@ -548,10 +548,12 @@ function updateBuiltinParam(pmId, featureId, paramName, value) {
 }
 
 let dslEditingPmId = null;
+let dslEditingFeatureId = null;  // null = creating new; set = editing existing
 let dslEffects = [];
 
 function openDSLEditor(pmId) {
   dslEditingPmId = pmId;
+  dslEditingFeatureId = null;
   dslEffects = [];
   document.getElementById('dsl-name').value = '';
   document.getElementById('dsl-summary').value = '';
@@ -562,9 +564,48 @@ function openDSLEditor(pmId) {
   document.getElementById('dsl-modal').style.display = 'flex';
 }
 
+function openDSLEditorForEdit(pmId, featureId) {
+  const pm = party.find(p => p.id === pmId);
+  if (!pm) return;
+  const f = pm.features.find(x => x.id === featureId);
+  if (!f || f.source !== 'homebrew' || !f._dslSpec) {
+    alert('Cannot edit: feature is not a custom DSL feature.');
+    return;
+  }
+  const spec = f._dslSpec;
+  dslEditingPmId = pmId;
+  dslEditingFeatureId = featureId;
+
+  // Pre-fill form from spec.
+  document.getElementById('dsl-name').value = spec.name || '';
+  document.getElementById('dsl-summary').value = spec.summary || '';
+  document.getElementById('dsl-uses').value = (spec.params && spec.params.usesPerEncounter && spec.params.usesPerEncounter.value) || 1;
+  const sustainedPolicy = spec.modePolicy && spec.modePolicy.sustained || {};
+  document.getElementById('dsl-trigger-round').value = sustainedPolicy.triggerRound || 1;
+  document.getElementById('dsl-condition').value = sustainedPolicy.conditionFn || 'always';
+
+  // Pre-fill category checkboxes.
+  const categoryEl = document.getElementById('dsl-category');
+  Array.from(categoryEl.options).forEach(o => {
+    o.selected = Array.isArray(spec.category) && spec.category.includes(o.value);
+  });
+
+  // Pre-fill effects.
+  dslEffects = (spec.effects || []).map(e => ({
+    hook: e.hook,
+    primitive: e.primitive,
+    params: { ...(e.params || {}) },
+    when: e.when || null,
+  }));
+  dslRenderEffects();
+
+  document.getElementById('dsl-modal').style.display = 'flex';
+}
+
 function dslClose() {
   document.getElementById('dsl-modal').style.display = 'none';
   dslEditingPmId = null;
+  dslEditingFeatureId = null;
   dslEffects = [];
 }
 
@@ -678,7 +719,20 @@ function dslSave() {
   const compiled = PCFeatures.compileDSL(spec);
   if (!compiled) { alert('DSL compilation failed.'); return; }
   if (!Array.isArray(pm.features)) pm.features = [];
-  pm.features.push({ id: spec.id, source: 'homebrew', params: spec.params, _dslSpec: spec });
+
+  if (dslEditingFeatureId) {
+    // Edit existing — preserve the original feature id so feature state stays addressed.
+    spec.id = dslEditingFeatureId;
+    const idx = pm.features.findIndex(f => f.id === dslEditingFeatureId);
+    if (idx >= 0) {
+      pm.features[idx] = { id: spec.id, source: 'homebrew', params: spec.params, _dslSpec: spec };
+    } else {
+      pm.features.push({ id: spec.id, source: 'homebrew', params: spec.params, _dslSpec: spec });
+    }
+  } else {
+    // Create new — generate a fresh id from the name (existing v1 behavior).
+    pm.features.push({ id: spec.id, source: 'homebrew', params: spec.params, _dslSpec: spec });
+  }
   saveParty();
   renderParty();
   dslClose();
