@@ -9,6 +9,58 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-16
 
+### Crucible PC features v1.1 — DSL editor + action granting + target state
+
+Polish + extension pass on the v1 PC class features framework. Five gaps
+closed:
+
+- **`addAction` and `addBonusAction` primitives** — DSL can now express
+  Flurry-of-Blows / extra-attack abilities. The `actionsAvailable` counter
+  on PC combatants can be incremented, not just decremented.
+- **Per-monster `hasAttacked` tracking** — the engine sets a flag on
+  monsters when they attempt an attack. Three new mode predicates
+  (`whenTargetHasntAttacked`, `whenTargetIsBloodied`, `whenTargetIsHostile`)
+  let DSL effects react to per-target state.
+- **`compileDSL` extension** — `when` predicates now receive the full
+  `hookCtx` (so target-aware predicates can read the current target).
+  Backward-compatible: existing predicates ignore the new arg.
+- **Schema-driven DSL editor** — every primitive declares its `paramSchema`
+  (param name, type, default, options). The DSL effect-row editor renders
+  the right inputs for the selected primitive automatically. Picking
+  `addDamageDice` now shows dice + damage-type fields; picking
+  `addResistance` shows a multi-select; etc. **Critical UX bug fixed**:
+  before this change, picking a parameterized primitive in the editor
+  produced silent no-op effects because the params weren't enterable.
+- **Built-in feature param editor** — each built-in feature also declares
+  `paramSchema`. An `[edit params]` button on the feature row opens an
+  inline editor. Hunter's Mark can be set to 1d8, Rage's bonus damage can
+  be overridden, Bardic Inspiration's die size can be picked, etc. Divine
+  Smite's per-level slot table is too complex for the v1.1 editor;
+  deferred.
+- **Edit-after-save for DSL features** — custom features now have an
+  `[edit]` button that re-opens the modal pre-filled from the stored
+  `_dslSpec`. Saved-feature iteration no longer requires deleting and
+  re-authoring.
+
+**Migration:** None. All changes are purely additive.
+
+**Known limitation (carried from v1):** the 14 schema-test failures from
+v1 remain. They're test-invocation patterns (free-method calls without
+`this` binding); production dispatch via `dispatchHook` is unaffected. A
+follow-up cleanup PR will refactor those tests.
+
+**Manual UI checklist:**
+- [ ] Author a custom DSL feature with `addDamageDice` — dice + type fields
+      appear, save, run sim, Feature Impact shows non-zero damage.
+- [ ] Open a Barbarian's Rage in the param editor — change bonusDamage from
+      2 to 4, save, run sim — Rage Impact reflects the larger bonus.
+- [ ] Open a Ranger's Hunter's Mark — change damageDice from `1d6` to
+      `1d8`, run sim, Feature Impact shows higher damage.
+- [ ] Click `edit` on a saved custom feature — modal opens pre-filled,
+      change a value, save — verify the change persisted.
+- [ ] Add a feature using `addAction` with amount=2 — run sim — PC gets
+      extra actions.
+
 ### Crucible — PC class features simulation
 
 The Crucible can now model 8 SRD class features (Rage, Sneak Attack, Action
