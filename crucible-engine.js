@@ -753,6 +753,7 @@
   // ─────────── Resolve a monster-side attack action ───────────
   // For a PC-side attack, the engine uses resolveAttackPc (next task block).
   function resolveAttackMonster(me, target, action, rng, events, round) {
+    me.hasAttacked = true;
     const roll = rollDie(20, rng);
     const isCrit = roll === 20;
     const isFumble = roll === 1;

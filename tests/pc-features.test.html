@@ -921,6 +921,13 @@
       assertEq(dmgCtx.amount, 7);
     });
 
+    group('monster.hasAttacked tracking');
+
+    test('hasAttacked is initially undefined on a fresh combatant', () => {
+      const monster = { id: 'm:1', side: 'monster', hp: 20, maxHp: 20 };
+      assertEq(monster.hasAttacked, undefined);
+    });
+
     group('addAction / addBonusAction primitives');
 
     test('addAction primitive grants N extra actions', () => {
