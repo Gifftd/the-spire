@@ -1199,9 +1199,9 @@
               }
 
               // Resolve bonus dice that features pushed onto dmgCtx.bonusDice.
-              // Store each rolled value back on the bd entry so we can apply it typed.
+              // Pre-rolled dice (addDamage / Rage +N) carry _rolled already; skip the reroll.
               for (const bd of dmgCtx.bonusDice) {
-                bd._rolled = rollDice(bd.dice, rng);
+                if (typeof bd._rolled !== 'number') bd._rolled = rollDice(bd.dice, rng);
                 dmgCtx.amount += bd._rolled;
                 if (bd._rolled > 0) {
                   // Emit a feature event so the Feature Impact aggregator can
@@ -1216,24 +1216,42 @@
                 }
               }
 
+              // Snapshot the post-bonus-dice amount so we can detect any
+              // reduction applied by onTakeDamage features (Rage resistance,
+              // addResistance). Pre-fix the engine ignored amount edits and
+              // just applied raw damageByType / bonusDice as if no reduction
+              // happened.
+              const preTakeDamageAmount = dmgCtx.amount;
+
               // Fire onTakeDamage on the target for damage reduction (Rage resistance).
               if (tgt.side === 'pc') {
                 PCFeatures.dispatchHook(tgt, 'onTakeDamage', dmgCtx);
               }
+              const reductionRatio = preTakeDamageAmount > 0
+                ? Math.max(0, dmgCtx.amount) / preTakeDamageAmount
+                : 1;
 
-              // Apply base damage types through applyDamage (unmodified base amounts).
+              // Apply base damage types through applyDamage, scaled by any
+              // onTakeDamage reduction so resistances actually reduce HP loss.
               for (const [type, dmg] of Object.entries(r.damageByType || {})) {
-                applyDamage(tgt, dmg, type, c, events, round, c.name,
-                            action.sourceActionName || action.name);
-                totalDmgThisAttack += dmg;
+                const scaled = Math.floor(dmg * reductionRatio);
+                if (scaled > 0) {
+                  applyDamage(tgt, scaled, type, c, events, round, c.name,
+                              action.sourceActionName || action.name);
+                  totalDmgThisAttack += scaled;
+                }
               }
-              // Apply each bonus-dice roll as its declared type (or primaryType if none).
+              // Apply each bonus-dice roll as its declared type (or primaryType if none),
+              // also scaled by the reduction ratio.
               for (const bd of dmgCtx.bonusDice) {
                 if (bd._rolled > 0) {
                   const bdType = bd.type || primaryType;
-                  applyDamage(tgt, bd._rolled, bdType, c, events, round, c.name,
-                              action.sourceActionName || action.name);
-                  totalDmgThisAttack += bd._rolled;
+                  const scaled = Math.floor(bd._rolled * reductionRatio);
+                  if (scaled > 0) {
+                    applyDamage(tgt, scaled, bdType, c, events, round, c.name,
+                                action.sourceActionName || action.name);
+                    totalDmgThisAttack += scaled;
+                  }
                 }
               }
             } else {
