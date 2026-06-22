@@ -70,6 +70,25 @@ closed:
   or made a save with PCFeatures loaded. Latent in tests because the
   engine test suite doesn't load `pc-features.js`. `combatants` is now an
   optional final parameter, threaded through from `runTrial`.
+- **Built-in feature param editor was silently broken too** — the
+  `[edit params]` inline editor for Rage / Hex / Action Surge / etc.
+  has the same JSON.stringify-inside-double-quotes bug as the DSL
+  effect-row editor. `updateBuiltinParam('pmId', 'fId', "type", ...)`
+  rendered as `onchange="updateBuiltinParam('pmId', 'fId', "type", ...)"`
+  — the inner double quote terminated the attribute. Every override of
+  Rage's bonusDamage, Hex's damageDice, Bardic die size, etc. was
+  silently dropped after the user changed the value. Switched to
+  single-quoted field name (param names are valid identifiers).
+- **Extra actions actually grant extra actions now** — `addAction`,
+  Action Surge, and any Flurry-of-Blows-style feature bumped
+  `c.actionsAvailable`, but the engine's per-turn flow only ever picked
+  ONE action per turn regardless. The action budget was decorative.
+  Engine now wraps the heal-triage + action-pick block in a
+  `while (c.actionsAvailable > 0 ...)` loop with a safety belt of 10
+  iterations; each iteration decrements the budget. Heal triage still
+  runs only on the first action of the turn (PCs don't double-heal).
+  Monster pickTarget / pickAction returning null breaks the loop
+  cleanly (was `continue`, which would have burnt the safety belt).
 - **DSL param inputs were silently broken since v1.1 Phase 4** —
   `dslRenderParamInput` built inline handlers with
   `dslEffects[i].params[${JSON.stringify(field.name)}] = ...`, which

@@ -1131,7 +1131,20 @@
 
         // Heal triage first.
         const all = combatants;
-        const heal = healTriage(c, all, round);
+        // Action execution loop. Each iteration spends one of
+        // c.actionsAvailable. Features (Action Surge, custom addAction
+        // for Flurry of Blows, etc.) bump c.actionsAvailable during
+        // onTurnStart so the loop runs more than once. Without this
+        // loop, addAction was silent — the engine took exactly one
+        // action per turn regardless of action budget.
+        let _firstActionOfTurn = true;
+        const _MAX_ACTIONS_PER_TURN = 10;
+        let _actionSafety = _MAX_ACTIONS_PER_TURN;
+        while (c.actionsAvailable > 0 && !winner && _actionSafety-- > 0) {
+        c.actionsAvailable -= 1;
+        // Heal triage runs once at most per turn (first action only).
+        const heal = _firstActionOfTurn ? healTriage(c, all, round) : null;
+        _firstActionOfTurn = false;
         if (heal) {
           consumeUse(c, heal.action);
           c.lastHealRound = round;
@@ -1150,14 +1163,18 @@
               all,
             };
             const tgt = policy.pickTarget(c, all, policyCtx);
-            if (!tgt) continue;
+            // No target / no action → exit the action loop for this turn
+            // (break instead of continue: re-picking next iteration would
+            // produce the same null result and burn through the safety
+            // belt, wasting compute).
+            if (!tgt) break;
             targets = Array.isArray(tgt) ? tgt : [tgt];
             action = policy.pickAction(c, targets[0], policyCtx);
-            if (!action) continue;
+            if (!action) break;
           } else {
-            // PC branch — unchanged from v1.
+            // PC branch.
             action = pickAction(c);
-            if (!action) continue;
+            if (!action) break;
           }
           if (action.kind === 'multiattack') {
             consumeUse(c, action);
@@ -1310,8 +1327,8 @@
             }
           }
         }
-
-        // End check after each turn.
+        }
+        // End-of-turn end check.
         const pcsAlive = combatants.some(x => x.side === 'pc' && !x.downed && !x.dead);
         const monAlive = combatants.some(x => x.side === 'monster' && !x.dead);
         if (!pcsAlive) { winner = 'monster'; break; }
