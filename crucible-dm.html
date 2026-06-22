@@ -51,9 +51,14 @@
     .dsl-form input, .dsl-form select { width: 100%; background: var(--c-surface); color: var(--c-ink); border: 1px solid var(--c-border); border-radius: 2px; padding: 6px 8px; }
     .dsl-form fieldset { border: 1px solid var(--c-border); padding: 8px 12px; margin: 12px 0; }
     .dsl-form legend { color: var(--c-brass); font-family: Cinzel, serif; font-size: 0.75rem; padding: 0 6px; }
-    .dsl-effect-row { display: flex; gap: 6px; margin: 4px 0; align-items: center; }
+    .dsl-effect-row { display: flex; gap: 6px; margin: 4px 0; align-items: center; flex-wrap: wrap; }
     .dsl-effect-row select, .dsl-effect-row input { flex: 1; }
     .dsl-effect-row button { flex: 0; }
+    .dsl-param-field { display: inline-flex; flex-direction: column; gap: 2px; font-size: 0.75rem; color: var(--c-ink-faint); margin-right: 6px; }
+    .dsl-param-field input, .dsl-param-field select { font-size: 0.85rem; padding: 4px 6px; }
+    .dsl-param-field input[type="number"] { width: 60px; }
+    .dsl-param-field input[type="text"] { width: 100px; }
+    .dsl-param-field select { min-width: 80px; }
     .dsl-modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1rem; }
     .impact-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     .impact-table th, .impact-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--c-border); }
@@ -496,7 +501,31 @@ function dslClose() {
 }
 
 function dslAddEffect() {
-  dslEffects.push({ hook: 'onTurnStart', primitive: 'consumeBonusAction', params: {} });
+  // Initialize params from the primitive's paramSchema defaults.
+  const defaultPrim = 'consumeBonusAction';
+  const eff = { hook: 'onTurnStart', primitive: defaultPrim, params: {} };
+  dslApplySchemaDefaults(eff);
+  dslEffects.push(eff);
+  dslRenderEffects();
+}
+
+function dslApplySchemaDefaults(eff) {
+  const prim = PCFeatures.PRIMITIVES[eff.primitive];
+  if (!prim || !Array.isArray(prim.paramSchema)) { eff.params = {}; return; }
+  const newParams = {};
+  for (const field of prim.paramSchema) {
+    newParams[field.name] = field.default !== undefined ? field.default : null;
+  }
+  // Preserve any existing param values that still match a schema field name.
+  for (const k of Object.keys(eff.params || {})) {
+    if (k in newParams && eff.params[k] !== undefined) newParams[k] = eff.params[k];
+  }
+  eff.params = newParams;
+}
+
+function dslOnPrimitiveChange(i, newPrim) {
+  dslEffects[i].primitive = newPrim;
+  dslApplySchemaDefaults(dslEffects[i]);
   dslRenderEffects();
 }
 
@@ -507,17 +536,46 @@ function dslRemoveEffect(i) {
 
 function dslRenderEffects() {
   const root = document.getElementById('dsl-effects-list');
-  root.innerHTML = dslEffects.map((eff, i) => `
-    <div class="dsl-effect-row">
-      <select onchange="dslEffects[${i}].hook = this.value">
-        ${PCFeatures.HOOK_NAMES.map(h => `<option value="${h}" ${eff.hook === h ? 'selected' : ''}>${h}</option>`).join('')}
-      </select>
-      <select onchange="dslEffects[${i}].primitive = this.value">
-        ${Object.keys(PCFeatures.PRIMITIVES).map(p => `<option value="${p}" ${eff.primitive === p ? 'selected' : ''}>${p}</option>`).join('')}
-      </select>
-      <button onclick="dslRemoveEffect(${i})">×</button>
-    </div>
-  `).join('');
+  root.innerHTML = dslEffects.map((eff, i) => {
+    const prim = PCFeatures.PRIMITIVES[eff.primitive];
+    const schema = (prim && Array.isArray(prim.paramSchema)) ? prim.paramSchema : [];
+    const paramsHtml = schema.map(field => dslRenderParamInput(eff, i, field)).join('');
+    return `
+      <div class="dsl-effect-row">
+        <select onchange="dslEffects[${i}].hook = this.value">
+          ${PCFeatures.HOOK_NAMES.map(h => `<option value="${h}" ${eff.hook === h ? 'selected' : ''}>${h}</option>`).join('')}
+        </select>
+        <select onchange="dslOnPrimitiveChange(${i}, this.value)">
+          ${Object.keys(PCFeatures.PRIMITIVES).map(p => `<option value="${p}" ${eff.primitive === p ? 'selected' : ''}>${p}</option>`).join('')}
+        </select>
+        ${paramsHtml}
+        <button onclick="dslRemoveEffect(${i})">×</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function dslRenderParamInput(eff, i, field) {
+  const current = eff.params[field.name] !== undefined ? eff.params[field.name] : (field.default !== undefined ? field.default : '');
+  const labelText = field.label || field.name;
+  const onchange = `dslEffects[${i}].params[${JSON.stringify(field.name)}] = `;
+  if (field.type === 'int') {
+    return `<label class="dsl-param-field">${escapeHtml(labelText)}<input type="number" value="${current}" ${field.min!=null?'min="'+field.min+'"':''} ${field.max!=null?'max="'+field.max+'"':''} oninput="${onchange}parseInt(this.value, 10) || 0"></label>`;
+  }
+  if (field.type === 'string') {
+    return `<label class="dsl-param-field">${escapeHtml(labelText)}<input type="text" value="${escapeHtml(String(current))}" placeholder="${escapeHtml(field.placeholder || '')}" oninput="${onchange}this.value"></label>`;
+  }
+  if (field.type === 'boolean') {
+    return `<label class="dsl-param-field">${escapeHtml(labelText)}<input type="checkbox" ${current ? 'checked' : ''} onchange="${onchange}this.checked"></label>`;
+  }
+  if (field.type === 'enum') {
+    return `<label class="dsl-param-field">${escapeHtml(labelText)}<select onchange="${onchange}this.value">${(field.options || []).map(o => `<option value="${o}" ${current === o ? 'selected' : ''}>${o}</option>`).join('')}</select></label>`;
+  }
+  if (field.type === 'multi-enum') {
+    const currentArr = Array.isArray(current) ? current : [];
+    return `<label class="dsl-param-field">${escapeHtml(labelText)}<select multiple size="3" onchange="dslEffects[${i}].params[${JSON.stringify(field.name)}] = Array.from(this.selectedOptions).map(o => o.value)">${(field.options || []).map(o => `<option value="${o}" ${currentArr.includes(o) ? 'selected' : ''}>${o}</option>`).join('')}</select></label>`;
+  }
+  return '';
 }
 
 function dslBuildSpec() {
