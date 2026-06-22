@@ -530,7 +530,15 @@
         damageTypesReceivedLastTurn: new Set(),
         damageTypesReceivedThisTurn: new Set(),
         lastHealRound: -99,
+        actionsAvailable: 1,
+        bonusActionAvailable: true,
+        reactionAvailableThisRound: true,
       });
+      // Initialize feature state for any PC class features on this PC.
+      // (No-op when PC has no features array — backward compatible.)
+      if (typeof PCFeatures !== 'undefined') {
+        PCFeatures.initFeatureState(out[out.length - 1]);
+      }
     }
     for (const pick of (monsterPicks || [])) {
       const m = pick.monster;
@@ -748,7 +756,15 @@
     const roll = rollDie(20, rng);
     const isCrit = roll === 20;
     const isFumble = roll === 1;
-    const hit = !isFumble && (isCrit || roll + (action.toHit || 0) >= (target.ac || 10));
+    let hit = !isFumble && (isCrit || roll + (action.toHit || 0) >= (target.ac || 10));
+
+    // Allow target's reaction features (Shield) to modify the hit.
+    if (target.side === 'pc' && typeof PCFeatures !== 'undefined') {
+      const rollCtx = { roll, hits: hit, action, eventLog: events };
+      PCFeatures.dispatchHook(target, 'onAttackAttempt', action, target, rollCtx);
+      hit = rollCtx.hits;
+    }
+
     let damageDealt = 0;
     const damageByType = {};
     if (hit) {
@@ -775,7 +791,16 @@
     const roll = rollDie(20, rng);
     const isCrit = roll === 20;
     const isFumble = roll === 1;
-    const hit = !isFumble && (isCrit || roll + th >= (target.ac || 10));
+    let hit = !isFumble && (isCrit || roll + th >= (target.ac || 10));
+    // Broadcast onAttackAttempt: allow any PC's features (e.g., Bardic Inspiration
+    // held by an ally) to boost this PC's attack roll.
+    // me is the attacking PC; broadcast so the bard (or any other PC) can spend a die.
+    if (typeof PCFeatures !== 'undefined' && me && combatants) {
+      const rollCtx = { roll, hits: hit, action, eventLog: events };
+      PCFeatures.dispatchBroadcastHook(combatants, me, 'onAttackAttempt',
+        me, target, rollCtx);
+      hit = rollCtx.hits;
+    }
     let damageDealt = 0;
     const damageByType = {};
     if (hit && action.damage) {
@@ -818,7 +843,16 @@
         sb = ab ? (ab.save != null ? ab.save : ab.mod) : 0;
       }
       const roll = rollDie(20, rng);
-      const passed = roll + sb >= action.saveDc;
+      // Broadcast onSaveAttempt: allow any PC's features (e.g., Bardic Inspiration
+      // held by an ally) to add a bonus to this save.
+      let broadcastSaveBonus = 0;
+      if (typeof PCFeatures !== 'undefined' && t && combatants) {
+        const saveRollCtx = { roll, bonus: 0, eventLog: events };
+        PCFeatures.dispatchBroadcastHook(combatants, t, 'onSaveAttempt',
+          action.saveAbility, action.saveDc, saveRollCtx);
+        broadcastSaveBonus = saveRollCtx.bonus || 0;
+      }
+      const passed = (roll + broadcastSaveBonus) + sb >= action.saveDc;
       let dmgList;
       if (passed && action.halfOnSave) dmgList = action.damageOnFail; // half later
       else if (passed)                 dmgList = action.damageOnSave || [];
@@ -1017,6 +1051,19 @@
     rollInitiative(combatants, rng);
     const slots = initOrder(combatants);
 
+    // Fire onCombatStart for every PC's features.
+    if (typeof PCFeatures !== 'undefined') {
+      const startCtx = {
+        round: 1, combatants, rng,
+        livingEnemies: combatants.filter(c => c.side === 'monster' && !c.dead),
+        livingAllies: combatants.filter(c => c.side === 'pc' && !c.dead),
+        eventLog: events,
+      };
+      for (const c of combatants) {
+        if (c.side === 'pc') PCFeatures.dispatchHook(c, 'onCombatStart', startCtx);
+      }
+    }
+
     const perAction = new Map();
     function tally(actor, action, kind, dHit, dDmg, dHealed, dKills, dRevives) {
       const key = actor + '|' + action;
@@ -1044,6 +1091,24 @@
         if (c.dead || c.downed) continue;
         const skip = turnStart(c, round, rng, events);
         if (skip) continue;
+
+        // Reset per-turn action budgets.
+        c.actionsAvailable = 1;
+        c.bonusActionAvailable = true;
+        // reactionAvailableThisRound resets at onRoundEnd, not per turn.
+
+        // Fire onTurnStart for PC features.
+        if (c.side === 'pc' && typeof PCFeatures !== 'undefined') {
+          const turnCtx = {
+            round,
+            combatants, rng,
+            livingEnemies: combatants.filter(x => x.side === 'monster' && !x.dead),
+            livingAllies: combatants.filter(x => x.side === 'pc' && !x.dead),
+            eventLog: events,
+          };
+          PCFeatures.dispatchHook(c, 'onTurnStart', turnCtx);
+        }
+
         const myActions = c.side === 'pc' ? (c.pm.actions || [])
                                           : ((c.monster.parsedActions) || []);
         rollRecharge(c, myActions.map(a => ({
@@ -1095,12 +1160,82 @@
               : resolveAttackMonster(c, tgt, action, rng, events, round);
             const wasAlive = !tgt.dead && !tgt.downed;
             let totalDmgThisAttack = 0;
-            for (const [type, dmg] of Object.entries(r.damageByType || {})) {
-              applyDamage(tgt, dmg, type, c, events, round, c.name,
-                          action.sourceActionName || action.name);
-              totalDmgThisAttack += dmg;
+
+            // Build a dmgCtx so features can inspect and modify damage.
+            if (r.hit && typeof PCFeatures !== 'undefined') {
+              // Compute total base damage across all types.
+              let baseAmount = 0;
+              for (const dmg of Object.values(r.damageByType || {})) baseAmount += dmg;
+              const primaryType = Object.keys(r.damageByType || {})[0] || 'untyped';
+              const dmgCtx = {
+                amount: baseAmount,
+                type: primaryType,
+                source: action.name || action.sourceActionName || 'attack',
+                bonusDice: [],
+                crit: !!r.crit,
+              };
+
+              // Fire onAttackHit on the attacker for damage modifiers (Rage, Sneak, Hex, Smite).
+              if (c.side === 'pc') {
+                PCFeatures.dispatchHook(c, 'onAttackHit', action, tgt, dmgCtx);
+              }
+
+              // Resolve bonus dice that features pushed onto dmgCtx.bonusDice.
+              // Store each rolled value back on the bd entry so we can apply it typed.
+              for (const bd of dmgCtx.bonusDice) {
+                bd._rolled = rollDice(bd.dice, rng);
+                dmgCtx.amount += bd._rolled;
+              }
+
+              // Fire onTakeDamage on the target for damage reduction (Rage resistance).
+              if (tgt.side === 'pc') {
+                PCFeatures.dispatchHook(tgt, 'onTakeDamage', dmgCtx);
+              }
+
+              // Apply base damage types through applyDamage (unmodified base amounts).
+              for (const [type, dmg] of Object.entries(r.damageByType || {})) {
+                applyDamage(tgt, dmg, type, c, events, round, c.name,
+                            action.sourceActionName || action.name);
+                totalDmgThisAttack += dmg;
+              }
+              // Apply each bonus-dice roll as its declared type (or primaryType if none).
+              for (const bd of dmgCtx.bonusDice) {
+                if (bd._rolled > 0) {
+                  const bdType = bd.type || primaryType;
+                  applyDamage(tgt, bd._rolled, bdType, c, events, round, c.name,
+                              action.sourceActionName || action.name);
+                  totalDmgThisAttack += bd._rolled;
+                }
+              }
+            } else {
+              for (const [type, dmg] of Object.entries(r.damageByType || {})) {
+                applyDamage(tgt, dmg, type, c, events, round, c.name,
+                            action.sourceActionName || action.name);
+                totalDmgThisAttack += dmg;
+              }
             }
             const killed = wasAlive && (tgt.dead || tgt.downed);
+
+            // Fire onAllyDowned / onMonsterDowned when a combatant just dropped.
+            if (killed && typeof PCFeatures !== 'undefined') {
+              const downedCtx = { round, combatants, rng, eventLog: events };
+              if (tgt.side === 'pc') {
+                // Broadcast onAllyDowned to surviving PCs (not the downed one).
+                for (const ally of combatants) {
+                  if (ally.side === 'pc' && ally.id !== tgt.id && !ally.downed) {
+                    PCFeatures.dispatchHook(ally, 'onAllyDowned', tgt, downedCtx);
+                  }
+                }
+              } else if (tgt.side === 'monster') {
+                // Broadcast onMonsterDowned to surviving PCs.
+                for (const ally of combatants) {
+                  if (ally.side === 'pc' && !ally.downed) {
+                    PCFeatures.dispatchHook(ally, 'onMonsterDowned', tgt, downedCtx);
+                  }
+                }
+              }
+            }
+
             // Tally once per attack, summing damage across all damage types.
             tally(c.side, action.sourceActionName || action.name, 'attack',
                   r.hit, totalDmgThisAttack, 0, killed ? 1 : 0, 0);
@@ -1134,6 +1269,13 @@
         const monAlive = combatants.some(x => x.side === 'monster' && !x.dead);
         if (!pcsAlive) { winner = 'monster'; break; }
         if (!monAlive) { winner = 'pc';      break; }
+      }
+      // End-of-round hook for PC features (Rage duration tick, reaction reset).
+      if (!winner && typeof PCFeatures !== 'undefined') {
+        const endCtx = { round, combatants, rng, eventLog: events };
+        for (const c of combatants) {
+          if (c.side === 'pc') PCFeatures.dispatchHook(c, 'onRoundEnd', round, endCtx);
+        }
       }
       if (!winner) round++;
     }
@@ -1175,6 +1317,8 @@
     const trialResults = [];
     const errors = [];
     const chunkSize = 50;
+    // featureStats[label] = { activations, damageDealt, damagePrevented, hpRestored }
+    const featureStats = {};
 
     for (let start = 0; start < trials; start += chunkSize) {
       const end = Math.min(start + chunkSize, trials);
@@ -1194,6 +1338,22 @@
       if (typeof onProgress === 'function') {
         const winsSoFar = trialResults.filter(t => t.winner === 'pc').length;
         onProgress({ completed: trialResults.length, winRate: winsSoFar / trialResults.length });
+      }
+    }
+
+    // Aggregate feature events across all trials.
+    for (const trial of trialResults) {
+      for (const ev of trial.events) {
+        if (!ev || ev.type !== 'feature') continue;
+        const m = /^([A-Z][a-zA-Z' /]+?)(?:\s+activated|\s+on\s|\s+ended|\s+re-cast|\s+handed)/.exec(ev.what || '');
+        const featureLabel = m ? m[1].trim() : (ev.what || '').split(/[:(]/)[0].trim();
+        if (!featureLabel) continue;
+        if (!featureStats[featureLabel]) {
+          featureStats[featureLabel] = { activations: 0, damageDealt: 0, damagePrevented: 0, hpRestored: 0 };
+        }
+        featureStats[featureLabel].activations += 1;
+        const healMatch = /\+(\d+)\s*HP/.exec(ev.what || '');
+        if (healMatch) featureStats[featureLabel].hpRestored += parseInt(healMatch[1], 10);
       }
     }
 
@@ -1289,6 +1449,7 @@
       perPc,
       distribution: { downedHist, roundsHist },
       perAction: perActionAgg,
+      featureStats,
       representative: { low: lo, median: mid, high: hi },
       warnings,
       errors,
