@@ -1018,6 +1018,24 @@
       assertEq(dmgCtxB.amount, 10);
     });
 
+    group('paramSchema sanity');
+
+    test('every primitive has a paramSchema array (possibly empty)', () => {
+      for (const [name, prim] of Object.entries(PCFeatures.PRIMITIVES)) {
+        assert(Array.isArray(prim.paramSchema), name + ' missing paramSchema array');
+      }
+    });
+
+    test('every paramSchema entry has name + type', () => {
+      const validTypes = ['int', 'string', 'enum', 'multi-enum', 'boolean'];
+      for (const [name, prim] of Object.entries(PCFeatures.PRIMITIVES)) {
+        for (const field of (prim.paramSchema || [])) {
+          assert(typeof field.name === 'string' && field.name, name + ': field missing name');
+          assert(validTypes.includes(field.type), name + ': field "' + field.name + '" has invalid type "' + field.type + '"');
+        }
+      }
+    });
+
     test('DSL feature integrates with dispatchHook (custom +3 fire damage rider)', () => {
       const spec = {
         id: 'flamingWeapon',
