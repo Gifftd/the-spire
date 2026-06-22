@@ -70,6 +70,21 @@ closed:
   or made a save with PCFeatures loaded. Latent in tests because the
   engine test suite doesn't load `pc-features.js`. `combatants` is now an
   optional final parameter, threaded through from `runTrial`.
+- **DSL param inputs were silently broken since v1.1 Phase 4** —
+  `dslRenderParamInput` built inline handlers with
+  `dslEffects[i].params[${JSON.stringify(field.name)}] = ...`, which
+  emits double quotes (`params["type"]`) inside attributes already
+  wrapped in double quotes. The browser parsed the rendered
+  `oninput="dslEffects[0].params["` as a truncated attribute and
+  treated the rest as garbage HTML — so the onchange / oninput never
+  fired and every user edit to a param input (value, dice, type, name,
+  duration, …) was silently dropped. Initial values still rendered
+  correctly via `<option ... selected>`, which is why the UI looked
+  like it persisted: the first dropdown selection appeared to "stick"
+  because it was the pre-render default. Switching to dot notation
+  (`dslEffects[i].params.${field.name}`) fixes every input at once;
+  paramSchema field names are validated as identifiers with a hard
+  guard before rendering.
 - **Uses per encounter now actually limits firings** — `compileDSL`'s
   gate ignored `state.usesLeft`. Specs declared `usesPerEncounter` and
   the state was initialized correctly, but nothing read or decremented

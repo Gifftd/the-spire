@@ -681,7 +681,18 @@ function dslRenderEffects() {
 function dslRenderParamInput(eff, i, field) {
   const current = eff.params[field.name] !== undefined ? eff.params[field.name] : (field.default !== undefined ? field.default : '');
   const labelText = field.label || field.name;
-  const onchange = `dslEffects[${i}].params[${JSON.stringify(field.name)}] = `;
+  // Use dot notation (not `params["${name}"]`) so the inline handler doesn't
+  // embed double quotes inside an attribute wrapped in double quotes — that
+  // broke every param input since v1.1: the browser parsed the rendered
+  // `oninput="dslEffects[0].params["type"]=..."` as a truncated attribute,
+  // so the onchange never fired and user edits to value / type / dice etc.
+  // were silently dropped. paramSchema field names are valid JS identifiers,
+  // so dot access is safe; we still validate with a hard guard.
+  if (!/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(field.name)) {
+    console.warn('dslRenderParamInput: refusing to render field with non-identifier name "' + field.name + '"');
+    return '';
+  }
+  const onchange = `dslEffects[${i}].params.${field.name} = `;
   if (field.type === 'int') {
     return `<label class="dsl-param-field">${escapeHtml(labelText)}<input type="number" value="${current}" ${field.min!=null?'min="'+field.min+'"':''} ${field.max!=null?'max="'+field.max+'"':''} oninput="${onchange}parseInt(this.value, 10) || 0"></label>`;
   }
@@ -696,7 +707,7 @@ function dslRenderParamInput(eff, i, field) {
   }
   if (field.type === 'multi-enum') {
     const currentArr = Array.isArray(current) ? current : [];
-    return `<label class="dsl-param-field">${escapeHtml(labelText)}<select multiple size="3" onchange="dslEffects[${i}].params[${JSON.stringify(field.name)}] = Array.from(this.selectedOptions).map(o => o.value)">${(field.options || []).map(o => `<option value="${o}" ${currentArr.includes(o) ? 'selected' : ''}>${o}</option>`).join('')}</select></label>`;
+    return `<label class="dsl-param-field">${escapeHtml(labelText)}<select multiple size="3" onchange="dslEffects[${i}].params.${field.name} = Array.from(this.selectedOptions).map(o => o.value)">${(field.options || []).map(o => `<option value="${o}" ${currentArr.includes(o) ? 'selected' : ''}>${o}</option>`).join('')}</select></label>`;
   }
   return '';
 }
