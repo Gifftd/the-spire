@@ -1003,7 +1003,7 @@
 
   // ─────────── Pick action (nova resources strategy) ───────────
   // Prefer multiattack > limited-use > at-will. If no usable action, returns null.
-  function pickAction(c) {
+  function pickAction(c, preferredName) {
     const list = c.side === 'pc'
       ? ((c.pm && c.pm.actions) || []).map(a => {
           const base = { ...a, sourceActionName: a.name, kind: a.type };
@@ -1030,6 +1030,17 @@
           return base;
         })
       : ((c.monster && c.monster.parsedActions) || []);
+    // Preferred action name (from forcedActions queue — e.g. Flurry of Blows
+    // tagging "Unarmed Strike"). Falls through to normal priority if the
+    // named action doesn't exist or isn't currently available.
+    if (preferredName) {
+      const lc = String(preferredName).toLowerCase().trim();
+      const match = list.find(a => {
+        const nm = (a.sourceActionName || a.name || '').toLowerCase();
+        return nm === lc && isAvailable(c, a);
+      });
+      if (match) return match;
+    }
     // Multiattack first.
     const ma = list.find(a => a.kind === 'multiattack' && isAvailable(c, a));
     if (ma) return ma;
@@ -1110,6 +1121,10 @@
         // Reset per-turn action budgets.
         c.actionsAvailable = 1;
         c.bonusActionAvailable = true;
+        c.forcedActions = [];   // Queue of action names that features (e.g.
+                                // Flurry of Blows) want the engine to use
+                                // instead of pickAction's priority order.
+                                // Refilled by features inside onTurnStart.
         // reactionAvailableThisRound resets at onRoundEnd, not per turn.
 
         // Fire onTurnStart for PC features.
@@ -1172,9 +1187,26 @@
             action = policy.pickAction(c, targets[0], policyCtx);
             if (!action) break;
           } else {
-            // PC branch.
-            action = pickAction(c);
+            // PC branch. Consume the next forced-action name (if any) so
+            // pickAction prefers it; emit a trace when the requested name
+            // didn't actually map to an available action so the user can
+            // catch typos.
+            let preferredName = null;
+            if (Array.isArray(c.forcedActions) && c.forcedActions.length > 0) {
+              preferredName = c.forcedActions.shift();
+            }
+            action = pickAction(c, preferredName);
             if (!action) break;
+            if (preferredName) {
+              const matched = (action.sourceActionName || action.name || '').toLowerCase() === preferredName.toLowerCase().trim();
+              events.push({
+                round, type: 'feature', who: c.id,
+                what: matched
+                  ? 'Forced action: "' + preferredName + '"'
+                  : 'Forced action "' + preferredName + '" not found — fell back to "' + (action.sourceActionName || action.name) + '"',
+                featureName: 'Forced action', source: 'forcedAction',
+              });
+            }
           }
           if (action.kind === 'multiattack') {
             consumeUse(c, action);

@@ -70,6 +70,17 @@ closed:
   or made a save with PCFeatures loaded. Latent in tests because the
   engine test suite doesn't load `pc-features.js`. `combatants` is now an
   optional final parameter, threaded through from `runTrial`.
+- **Tag a feature's extra action to a specific PC action** — `addAction`
+  now accepts an optional `actionName` string. When set, the engine
+  pushes that name onto a per-turn `forcedActions` queue; the action
+  loop shifts a name off the queue before calling pickAction and
+  passes it as a preferred match. `pickAction(c, preferredName)` looks
+  for an available action whose name matches case-insensitively. Lets
+  custom features model Flurry of Blows (forces "Unarmed Strike"),
+  Nick (forces the off-hand weapon name), etc. If the name doesn't
+  match any of the PC's actions the engine falls back to normal pick
+  priority and logs an explanatory event so typos surface in the
+  trial log.
 - **Color-coded trial log** — every event type now gets a subtle color
   so a long fight is scannable at a glance. White for actions, red for
   damage taken / failed saves, green for heals, blue for prevented

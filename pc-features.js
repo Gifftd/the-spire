@@ -933,11 +933,24 @@
       apply(self, hookCtx, params) {
         const n = Number(params.amount) || 1;
         self.actionsAvailable = (self.actionsAvailable || 0) + n;
+        // If the feature tags a specific action (e.g. Flurry of Blows →
+        // "Unarmed Strike"), push it onto the forcedActions queue so the
+        // engine's action loop uses that action instead of pickAction's
+        // generic priority. Without a name, the granted action falls
+        // through to normal action selection.
+        const actionName = (params.actionName || '').trim();
+        if (actionName) {
+          if (!Array.isArray(self.forcedActions)) self.forcedActions = [];
+          for (let i = 0; i < n; i++) self.forcedActions.push(actionName);
+        }
+        const suffix = actionName ? ' → forces "' + actionName + '"' : '';
         emitTrace(self, hookCtx, hookCtx && hookCtx.featureName, hookCtx && hookCtx.featureId,
-                  '+' + n + ' action' + (n === 1 ? '' : 's') + ' (now ' + self.actionsAvailable + ')');
+                  '+' + n + ' action' + (n === 1 ? '' : 's') + ' (now ' + self.actionsAvailable + ')' + suffix);
       },
       paramSchema: [
         { name: 'amount', type: 'int', label: 'Extra actions', default: 1, min: 1, max: 5 },
+        { name: 'actionName', type: 'string', label: 'Force action (by name, optional)',
+          default: '', placeholder: 'Unarmed Strike' },
       ],
     },
     addBonusAction: {
