@@ -790,7 +790,7 @@
         for (const eff of effects) {
           if (eff.when) {
             const whenPred = MODE_PREDICATES[eff.when];
-            if (whenPred && !whenPred(self, hookCtx.ctx || {}, spec.id)) continue;
+            if (whenPred && !whenPred(self, hookCtx.ctx || {}, spec.id, hookCtx)) continue;
           }
           const prim = PRIMITIVES[eff.primitive];
           if (!prim || typeof prim.apply !== 'function') {

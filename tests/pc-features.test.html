@@ -993,6 +993,31 @@
       assertEq(self.bonusActionAvailable, true);
     });
 
+    test('compileDSL: when predicate receives hookCtx so target-aware predicates work', () => {
+      const spec = {
+        id: 'ambush',
+        name: 'Ambush',
+        source: 'homebrew',
+        modePolicy: { sustained: { triggerRound: 1, conditionFn: 'always' } },
+        effects: [
+          { hook: 'onAttackHit', primitive: 'addDamage',
+            params: { value: 5 },
+            when: 'whenTargetHasntAttacked' },
+        ],
+      };
+      const compiled = PCFeatures.compileDSL(spec);
+
+      const selfA = { pm: { features: [{id:'ambush'}], tactics: {mode:'sustained'} }, featureState: { ambush: {} } };
+      const dmgCtxA = { amount: 10, type: 'piercing', bonusDice: [] };
+      compiled.hooks.onAttackHit.call(compiled, selfA, {kind:'attack'}, {id:'m:1', side:'monster', hasAttacked: false}, dmgCtxA, { round: 1, combatants: [] });
+      assertEq(dmgCtxA.amount, 15);
+
+      const selfB = { pm: { features: [{id:'ambush'}], tactics: {mode:'sustained'} }, featureState: { ambush: {} } };
+      const dmgCtxB = { amount: 10, type: 'piercing', bonusDice: [] };
+      compiled.hooks.onAttackHit.call(compiled, selfB, {kind:'attack'}, {id:'m:1', side:'monster', hasAttacked: true}, dmgCtxB, { round: 1, combatants: [] });
+      assertEq(dmgCtxB.amount, 10);
+    });
+
     test('DSL feature integrates with dispatchHook (custom +3 fire damage rider)', () => {
       const spec = {
         id: 'flamingWeapon',
