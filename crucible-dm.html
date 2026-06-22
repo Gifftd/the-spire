@@ -40,6 +40,9 @@
     .feature-row-name { font-family: 'Cinzel', serif; font-size: 0.85rem; flex: 0 0 auto; }
     .feature-row-summary { font-size: 0.78rem; color: var(--c-ink-faint); flex: 1; }
     .feature-row-remove { background: none; border: none; color: var(--c-error); font-size: 1.2rem; cursor: pointer; padding: 0 6px; }
+    .feature-row-edit { background: none; border: 1px solid var(--c-border); color: var(--c-ink-faint); font-size: 0.7rem; padding: 1px 6px; border-radius: 3px; cursor: pointer; margin-right: 4px; }
+    .feature-row-edit:hover { color: var(--c-brass); border-color: var(--c-brass); }
+    .feature-param-editor { padding: 6px 10px; background: var(--c-bg); border-left: 2px solid var(--c-brass); margin-top: 4px; display: flex; flex-wrap: wrap; gap: 8px; }
     .feature-tag { font-size: 0.6rem; padding: 1px 6px; border: 1px solid currentColor; border-radius: 4px; margin-left: 4px; }
     .feature-tag.builtin { color: var(--c-brass); }
     .feature-tag.homebrew { color: var(--c-teal-bright); }
@@ -279,12 +282,19 @@ function renderPCEditor(pm) {
                 const sourceTag = f.source === 'homebrew'
                   ? '<span class="feature-tag homebrew">homebrew</span>'
                   : '<span class="feature-tag builtin">built-in</span>';
+                const editBtn = f.source === 'homebrew'
+                  ? `<button class="feature-row-edit" onclick="openDSLEditorForEdit('${pm.id}', '${f.id}')">edit</button>`
+                  : (Array.isArray(def.paramSchema) && def.paramSchema.length > 0
+                      ? `<button class="feature-row-edit" onclick="toggleFeatureParamEditor('${pm.id}', '${f.id}')">edit params</button>`
+                      : '');
                 return `
                   <div class="feature-row" data-feature-id="${f.id}">
                     <div class="feature-row-name">${escapeHtml(def.name)} ${sourceTag}</div>
                     <div class="feature-row-summary">${escapeHtml(def.summary || '')}</div>
+                    ${editBtn}
                     <button class="feature-row-remove" onclick="removeFeatureFromPC('${pm.id}','${f.id}')">×</button>
                   </div>
+                  <div class="feature-param-editor" id="feature-param-editor-${pm.id}-${f.id}" style="display:none"></div>
                 `;
               }).join('')}
             </div>
@@ -479,6 +489,64 @@ function removeFeatureFromPC(pmId, featureId) {
   saveParty();
   renderParty();
 }
+
+function toggleFeatureParamEditor(pmId, featureId) {
+  const editorId = 'feature-param-editor-' + pmId + '-' + featureId;
+  const editor = document.getElementById(editorId);
+  if (!editor) return;
+  if (editor.style.display === 'none') {
+    renderFeatureParamEditor(pmId, featureId);
+    editor.style.display = '';
+  } else {
+    editor.style.display = 'none';
+  }
+}
+
+function renderFeatureParamEditor(pmId, featureId) {
+  const pm = party.find(p => p.id === pmId);
+  if (!pm) return;
+  const f = pm.features.find(x => x.id === featureId);
+  if (!f) return;
+  const def = PCFeatures.LIBRARY[featureId];
+  if (!def || !Array.isArray(def.paramSchema)) return;
+
+  // Ensure params is populated with current values (auto-derived if missing).
+  if (!f.params) f.params = def.deriveParams ? def.deriveParams(pm) : {};
+
+  const editorId = 'feature-param-editor-' + pmId + '-' + featureId;
+  const editor = document.getElementById(editorId);
+  editor.innerHTML = def.paramSchema.map(field => renderBuiltinParamInput(pmId, featureId, f, field)).join('');
+}
+
+function renderBuiltinParamInput(pmId, featureId, f, field) {
+  const current = f.params[field.name] !== undefined ? f.params[field.name] : (field.default !== undefined ? field.default : '');
+  const labelText = field.label || field.name;
+  const onChangeBase = `updateBuiltinParam('${pmId}', '${featureId}', ${JSON.stringify(field.name)}, `;
+  if (field.type === 'int') {
+    return `<label class="dsl-param-field">${escapeHtml(labelText)}<input type="number" value="${current}" ${field.min!=null?'min="'+field.min+'"':''} ${field.max!=null?'max="'+field.max+'"':''} oninput="${onChangeBase}parseInt(this.value, 10) || 0)"></label>`;
+  }
+  if (field.type === 'string') {
+    return `<label class="dsl-param-field">${escapeHtml(labelText)}<input type="text" value="${escapeHtml(String(current))}" placeholder="${escapeHtml(field.placeholder || '')}" oninput="${onChangeBase}this.value)"></label>`;
+  }
+  if (field.type === 'enum') {
+    return `<label class="dsl-param-field">${escapeHtml(labelText)}<select onchange="${onChangeBase}this.value)">${(field.options || []).map(o => `<option value="${o}" ${current === o ? 'selected' : ''}>${o}</option>`).join('')}</select></label>`;
+  }
+  if (field.type === 'boolean') {
+    return `<label class="dsl-param-field">${escapeHtml(labelText)}<input type="checkbox" ${current ? 'checked' : ''} onchange="${onChangeBase}this.checked)"></label>`;
+  }
+  return '';
+}
+
+function updateBuiltinParam(pmId, featureId, paramName, value) {
+  const pm = party.find(p => p.id === pmId);
+  if (!pm) return;
+  const f = pm.features.find(x => x.id === featureId);
+  if (!f) return;
+  if (!f.params) f.params = {};
+  f.params[paramName] = value;
+  saveParty();
+}
+
 let dslEditingPmId = null;
 let dslEffects = [];
 
