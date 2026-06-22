@@ -761,7 +761,7 @@
 
     // Allow target's reaction features (Shield) to modify the hit.
     if (target.side === 'pc' && typeof PCFeatures !== 'undefined') {
-      const rollCtx = { roll, hits: hit, action, eventLog: events };
+      const rollCtx = { roll, hits: hit, action, eventLog: events, round };
       PCFeatures.dispatchHook(target, 'onAttackAttempt', action, target, rollCtx);
       hit = rollCtx.hits;
     }
@@ -799,7 +799,7 @@
     // held by an ally) to boost this PC's attack roll.
     // me is the attacking PC; broadcast so the bard (or any other PC) can spend a die.
     if (typeof PCFeatures !== 'undefined' && me && combatants) {
-      const rollCtx = { roll, hits: hit, action, eventLog: events };
+      const rollCtx = { roll, hits: hit, action, eventLog: events, round };
       PCFeatures.dispatchBroadcastHook(combatants, me, 'onAttackAttempt',
         me, target, rollCtx);
       hit = rollCtx.hits;
@@ -850,7 +850,7 @@
       // held by an ally) to add a bonus to this save.
       let broadcastSaveBonus = 0;
       if (typeof PCFeatures !== 'undefined' && t && combatants) {
-        const saveRollCtx = { roll, bonus: 0, eventLog: events };
+        const saveRollCtx = { roll, bonus: 0, eventLog: events, round };
         PCFeatures.dispatchBroadcastHook(combatants, t, 'onSaveAttempt',
           action.saveAbility, action.saveDc, saveRollCtx);
         broadcastSaveBonus = saveRollCtx.bonus || 0;
