@@ -65,14 +65,38 @@
   function dispatchHook(combatant, hookName, ...args) {
     if (!combatant || !combatant.pm || !Array.isArray(combatant.pm.features)) return;
     if (!combatant.featureState) combatant.featureState = {};
+    // For damage-shaping hooks, find a dmgCtx so we can attribute flat amount
+    // changes (Rage +2, Rage resistance, DSL addDamage, DSL addResistance) to
+    // the running feature. Bonus dice attribution is handled by the engine
+    // after roll, since the dispatcher doesn't know the rolled value.
+    const dmgCtx = args.find(a => a && typeof a.amount === 'number' && Array.isArray(a.bonusDice));
     for (const ref of combatant.pm.features) {
       if (!ref || !ref.id) continue;
       const state = combatant.featureState[ref.id];
       if (state && state._disabled) continue;
       const def = PCFeatures.resolve(ref);
       if (!def || !def.hooks || typeof def.hooks[hookName] !== 'function') continue;
+      const beforeAmount = dmgCtx ? dmgCtx.amount : null;
       try {
         const result = def.hooks[hookName].call(def, combatant, ...args);
+        if (dmgCtx && dmgCtx.eventLog && beforeAmount !== null) {
+          const delta = dmgCtx.amount - beforeAmount;
+          if (delta > 0 && hookName === 'onAttackHit') {
+            dmgCtx.eventLog.push({
+              round: dmgCtx.round || 0, type: 'feature', who: combatant.id,
+              what: (def.name || ref.id) + ' +' + delta + ' damage',
+              featureName: def.name || ref.id, source: ref.id,
+              amount: delta, isDamage: true,
+            });
+          } else if (delta < 0 && hookName === 'onTakeDamage') {
+            dmgCtx.eventLog.push({
+              round: dmgCtx.round || 0, type: 'feature', who: combatant.id,
+              what: (def.name || ref.id) + ' prevented ' + (-delta) + ' damage',
+              featureName: def.name || ref.id, source: ref.id,
+              amount: -delta, isPrevented: true,
+            });
+          }
+        }
         if (result === 'consume') {
           // Reaction-style consume: short-circuits remaining features on THIS
           // combatant only. The engine still calls dispatchHook on other
@@ -169,7 +193,7 @@
             const params = (ref && ref.params) || this.deriveParams(self.pm);
             self.featureState.rage.active = true;
             self.featureState.rage.roundsLeft = params.duration || 10;
-            if (ctx.eventLog) ctx.eventLog.push({ round: ctx.round, type: 'feature', who: self.id, what: 'Rage activated' });
+            if (ctx.eventLog) ctx.eventLog.push({ round: ctx.round, type: 'feature', who: self.id, what: 'Rage activated', featureName: 'Rage', source: 'rage' });
           }
         }
       },
@@ -198,7 +222,7 @@
         state.roundsLeft = Math.max(0, state.roundsLeft - 1);
         if (state.roundsLeft <= 0) {
           state.active = false;
-          if (ctx && ctx.eventLog) ctx.eventLog.push({ round, type: 'feature', who: self.id, what: 'Rage ended' });
+          if (ctx && ctx.eventLog) ctx.eventLog.push({ round, type: 'feature', who: self.id, what: 'Rage ended', featureName: 'Rage', source: 'rage' });
         }
       },
     },
@@ -293,7 +317,7 @@
         if (typeof self.actionsAvailable !== 'number') self.actionsAvailable = 1;
         self.actionsAvailable += 1;
         state.usesLeft -= 1;
-        if (ctx.eventLog) ctx.eventLog.push({ round: ctx.round, type: 'feature', who: self.id, what: 'Action Surge activated' });
+        if (ctx.eventLog) ctx.eventLog.push({ round: ctx.round, type: 'feature', who: self.id, what: 'Action Surge activated', featureName: 'Action Surge', source: 'actionSurge' });
       },
     },
   };
@@ -474,6 +498,7 @@
         if (ctx.eventLog) ctx.eventLog.push({
           round: ctx.round, type: 'feature', who: self.id,
           what: 'Healing Word on ' + ally.id + ' (+' + healing + ' HP, slot ' + lowestAvailable + ')',
+          featureName: 'Healing Word', source: 'healingWord', hpRestored: healing,
         });
       },
     },
@@ -585,7 +610,7 @@
         const target = (ctx.combatants || []).find(c => c.side === 'monster' && !c.dead);
         if (target) {
           self.featureState.hexMark.targetId = target.id;
-          if (ctx.eventLog) ctx.eventLog.push({ round: ctx.round, type: 'feature', who: self.id, what: 'Hex on ' + target.id });
+          if (ctx.eventLog) ctx.eventLog.push({ round: ctx.round, type: 'feature', who: self.id, what: 'Hex on ' + target.id, featureName: 'Hex / Hunter\'s Mark', source: 'hexMark' });
         }
       },
 
@@ -610,7 +635,7 @@
         if (newTarget) {
           state.targetId = newTarget.id;
           state.slotsLeft -= 1;
-          if (ctx.eventLog) ctx.eventLog.push({ round: ctx.round, type: 'feature', who: self.id, what: 'Hex re-cast on ' + newTarget.id });
+          if (ctx.eventLog) ctx.eventLog.push({ round: ctx.round, type: 'feature', who: self.id, what: 'Hex re-cast on ' + newTarget.id, featureName: 'Hex / Hunter\'s Mark', source: 'hexMark' });
         } else {
           state.targetId = null;
         }
@@ -668,6 +693,7 @@
         if (ctx.eventLog) ctx.eventLog.push({
           round: ctx.round, type: 'feature', who: self.id,
           what: 'Bardic Inspiration handed to ' + targets.map(a => a.id).join(', '),
+          featureName: 'Bardic Inspiration', source: 'bardicInspiration',
         });
       },
 
@@ -732,7 +758,11 @@
       apply(self, hookCtx, params) {
         if (!hookCtx || !hookCtx.dmgCtx) return;
         if (!Array.isArray(hookCtx.dmgCtx.bonusDice)) hookCtx.dmgCtx.bonusDice = [];
-        hookCtx.dmgCtx.bonusDice.push({ dice: params.dice, type: params.type || 'force', source: 'dsl' });
+        hookCtx.dmgCtx.bonusDice.push({
+          dice: params.dice, type: params.type || 'force',
+          source: hookCtx.featureId || 'dsl',
+          featureName: hookCtx.featureName || 'Custom feature',
+        });
       },
       paramSchema: [
         { name: 'dice', type: 'string', label: 'Dice', default: '1d6', placeholder: '1d6' },
@@ -853,6 +883,8 @@
           target:   (rest[1] && rest[1].side) ? rest[1] : null,
           dmgCtx:   rest.find(a => a && typeof a.amount === 'number'),
           rollCtx:  rest.find(a => a && (typeof a.roll === 'number' || typeof a.bonus === 'number')),
+          featureId: spec.id,
+          featureName: spec.name || spec.id,
         };
         const mode = (self.pm && self.pm.tactics && self.pm.tactics.mode) || 'sustained';
         const policy = (spec.modePolicy && spec.modePolicy[mode]) || (spec.modePolicy && spec.modePolicy.sustained) || {};

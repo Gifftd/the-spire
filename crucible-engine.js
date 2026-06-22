@@ -1050,6 +1050,18 @@
   function runTrial(party, monsterPicks, tactics, rng) {
     const events = [];
     const warnings = [];
+    // Lookup: feature id (the source tag on bonus dice) → display name.
+    // Used when the engine emits per-die feature events post-roll so the
+    // aggregator can group damage under the right feature label.
+    const FEATURE_NAMES = {};
+    if (typeof PCFeatures !== 'undefined') {
+      for (const pm of (party || [])) {
+        for (const ref of (pm.features || [])) {
+          const def = PCFeatures.resolve(ref);
+          if (def && def.name) FEATURE_NAMES[ref.id] = def.name;
+        }
+      }
+    }
     const combatants = buildCombatants(party, monsterPicks, rng, false);
     rollInitiative(combatants, rng);
     const slots = initOrder(combatants);
@@ -1176,6 +1188,8 @@
                 source: action.name || action.sourceActionName || 'attack',
                 bonusDice: [],
                 crit: !!r.crit,
+                eventLog: events,
+                round,
               };
 
               // Fire onAttackHit on the attacker for damage modifiers (Rage, Sneak, Hex, Smite).
@@ -1188,6 +1202,17 @@
               for (const bd of dmgCtx.bonusDice) {
                 bd._rolled = rollDice(bd.dice, rng);
                 dmgCtx.amount += bd._rolled;
+                if (bd._rolled > 0) {
+                  // Emit a feature event so the Feature Impact aggregator can
+                  // attribute this damage to the feature that pushed the die.
+                  const featureName = bd.featureName || FEATURE_NAMES[bd.source] || bd.source || 'Feature';
+                  events.push({
+                    round, type: 'feature', who: c.id,
+                    what: featureName + ' +' + bd._rolled + ' ' + (bd.type || 'damage'),
+                    featureName, source: bd.source,
+                    amount: bd._rolled, isDamage: true,
+                  });
+                }
               }
 
               // Fire onTakeDamage on the target for damage reduction (Rage resistance).
@@ -1344,19 +1369,35 @@
       }
     }
 
-    // Aggregate feature events across all trials.
+    // Aggregate feature events across all trials. Events carry structured
+    // attribution fields (featureName, amount, isDamage, isPrevented,
+    // hpRestored) from both pc-features.js and the engine's bonus-die roll
+    // loop. Fall back to the legacy regex parse for any event that pre-dates
+    // the structured fields.
     for (const trial of trialResults) {
       for (const ev of trial.events) {
         if (!ev || ev.type !== 'feature') continue;
-        const m = /^([A-Z][a-zA-Z' /]+?)(?:\s+activated|\s+on\s|\s+ended|\s+re-cast|\s+handed)/.exec(ev.what || '');
-        const featureLabel = m ? m[1].trim() : (ev.what || '').split(/[:(]/)[0].trim();
+        let featureLabel = ev.featureName;
+        if (!featureLabel) {
+          const m = /^([A-Z][a-zA-Z' /]+?)(?:\s+activated|\s+on\s|\s+ended|\s+re-cast|\s+handed|\s+\+|\s+prevented)/.exec(ev.what || '');
+          featureLabel = m ? m[1].trim() : (ev.what || '').split(/[:(]/)[0].trim();
+        }
         if (!featureLabel) continue;
         if (!featureStats[featureLabel]) {
           featureStats[featureLabel] = { activations: 0, damageDealt: 0, damagePrevented: 0, hpRestored: 0 };
         }
         featureStats[featureLabel].activations += 1;
-        const healMatch = /\+(\d+)\s*HP/.exec(ev.what || '');
-        if (healMatch) featureStats[featureLabel].hpRestored += parseInt(healMatch[1], 10);
+        if (ev.isDamage && typeof ev.amount === 'number') {
+          featureStats[featureLabel].damageDealt += ev.amount;
+        } else if (ev.isPrevented && typeof ev.amount === 'number') {
+          featureStats[featureLabel].damagePrevented += ev.amount;
+        }
+        if (typeof ev.hpRestored === 'number') {
+          featureStats[featureLabel].hpRestored += ev.hpRestored;
+        } else {
+          const healMatch = /\+(\d+)\s*HP/.exec(ev.what || '');
+          if (healMatch) featureStats[featureLabel].hpRestored += parseInt(healMatch[1], 10);
+        }
       }
     }
 
