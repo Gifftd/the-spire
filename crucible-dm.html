@@ -55,6 +55,10 @@
     .dsl-effect-row select, .dsl-effect-row input { flex: 1; }
     .dsl-effect-row button { flex: 0; }
     .dsl-modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1rem; }
+    .impact-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .impact-table th, .impact-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--c-border); }
+    .impact-table th { font-family: Cinzel, serif; color: var(--c-brass); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    .log-feature { color: var(--c-brass-bright); font-weight: 500; }
   </style>
 </head>
 <body>
@@ -793,6 +797,7 @@ function renderResults(r) {
       <div id="result-perpc"></div>
       <div id="result-dist"></div>
       <div id="result-peraction"></div>
+      <div id="result-feature"></div>
       <div id="result-replays"></div>
 
       ${r.warnings.length ? `
@@ -808,6 +813,7 @@ function renderResults(r) {
   renderPerPc(r);
   renderDistribution(r);
   renderPerAction(r);
+  renderFeatureImpact(r);
   renderReplays(r);
 }
 
@@ -953,6 +959,33 @@ function renderPerAction(r) {
       </table>
     </details>`;
 }
+function renderFeatureImpact(r) {
+  const root = document.getElementById('result-feature');
+  if (!r.featureStats || Object.keys(r.featureStats).length === 0) { root.innerHTML = ''; return; }
+  root.innerHTML = `
+    <details open style="margin-top:0.5rem;">
+      <summary style="font-family:'Cinzel',serif; color:var(--c-accent); cursor:pointer;">Feature Impact</summary>
+      <table class="impact-table" style="margin-top:0.5rem;">
+        <thead>
+          <tr><th>Feature</th><th>Activations / fight</th><th>Avg impact</th></tr>
+        </thead>
+        <tbody>
+          ${Object.entries(r.featureStats).map(([name, stat]) => {
+            const perFight = (stat.activations / r.trials).toFixed(1);
+            const impact = stat.damageDealt > 0
+              ? '+' + (stat.damageDealt / r.trials).toFixed(1) + ' dmg dealt'
+              : stat.damagePrevented > 0
+                ? (stat.damagePrevented / r.trials).toFixed(1) + ' dmg prevented'
+                : stat.hpRestored > 0
+                  ? '+' + (stat.hpRestored / r.trials).toFixed(1) + ' HP restored'
+                  : '—';
+            return '<tr><td>' + escapeHtml(name) + '</td><td>' + perFight + '</td><td>' + impact + '</td></tr>';
+          }).join('')}
+        </tbody>
+      </table>
+    </details>`;
+}
+
 let activeReplay = 'median';
 function renderReplays(r) {
   const root = document.getElementById('result-replays');
