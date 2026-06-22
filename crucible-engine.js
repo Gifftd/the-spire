@@ -1134,10 +1134,59 @@
               : resolveAttackMonster(c, tgt, action, rng, events, round);
             const wasAlive = !tgt.dead && !tgt.downed;
             let totalDmgThisAttack = 0;
-            for (const [type, dmg] of Object.entries(r.damageByType || {})) {
-              applyDamage(tgt, dmg, type, c, events, round, c.name,
-                          action.sourceActionName || action.name);
-              totalDmgThisAttack += dmg;
+
+            // Build a dmgCtx so features can inspect and modify damage.
+            if (r.hit && typeof PCFeatures !== 'undefined') {
+              // Compute total base damage across all types.
+              let baseAmount = 0;
+              for (const dmg of Object.values(r.damageByType || {})) baseAmount += dmg;
+              const primaryType = Object.keys(r.damageByType || {})[0] || 'untyped';
+              const dmgCtx = {
+                amount: baseAmount,
+                type: primaryType,
+                source: action.name || action.sourceActionName || 'attack',
+                bonusDice: [],
+                crit: !!r.crit,
+              };
+
+              // Fire onAttackHit on the attacker for damage modifiers (Rage, Sneak, Hex, Smite).
+              if (c.side === 'pc') {
+                PCFeatures.dispatchHook(c, 'onAttackHit', action, tgt, dmgCtx);
+              }
+
+              // Resolve bonus dice that features pushed onto dmgCtx.bonusDice.
+              // Store each rolled value back on the bd entry so we can apply it typed.
+              for (const bd of dmgCtx.bonusDice) {
+                bd._rolled = rollDice(bd.dice, rng);
+                dmgCtx.amount += bd._rolled;
+              }
+
+              // Fire onTakeDamage on the target for damage reduction (Rage resistance).
+              if (tgt.side === 'pc') {
+                PCFeatures.dispatchHook(tgt, 'onTakeDamage', dmgCtx);
+              }
+
+              // Apply base damage types through applyDamage (unmodified base amounts).
+              for (const [type, dmg] of Object.entries(r.damageByType || {})) {
+                applyDamage(tgt, dmg, type, c, events, round, c.name,
+                            action.sourceActionName || action.name);
+                totalDmgThisAttack += dmg;
+              }
+              // Apply each bonus-dice roll as its declared type (or primaryType if none).
+              for (const bd of dmgCtx.bonusDice) {
+                if (bd._rolled > 0) {
+                  const bdType = bd.type || primaryType;
+                  applyDamage(tgt, bd._rolled, bdType, c, events, round, c.name,
+                              action.sourceActionName || action.name);
+                  totalDmgThisAttack += bd._rolled;
+                }
+              }
+            } else {
+              for (const [type, dmg] of Object.entries(r.damageByType || {})) {
+                applyDamage(tgt, dmg, type, c, events, round, c.name,
+                            action.sourceActionName || action.name);
+                totalDmgThisAttack += dmg;
+              }
             }
             const killed = wasAlive && (tgt.dead || tgt.downed);
             // Tally once per attack, summing damage across all damage types.
