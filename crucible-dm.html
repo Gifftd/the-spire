@@ -91,9 +91,23 @@ let party = loadParty();
 function loadParty() {
   try {
     const raw = localStorage.getItem('crucible-party');
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      return (Array.isArray(arr) ? arr : []).map(migratePCRecord);
+    }
   } catch (e) { console.warn('crucible-party load failed', e); }
   return [];
+}
+function migratePCRecord(pm) {
+  if (!pm) return pm;
+  if (!pm.tactics) pm.tactics = { aiHint: 'focus' };
+  if (!pm.tactics.mode) {
+    if (pm.tactics.resources === 'nova') pm.tactics.mode = 'nova';
+    else if (pm.tactics.resources === 'sustained') pm.tactics.mode = 'sustained';
+    else pm.tactics.mode = 'sustained';
+  }
+  if (!Array.isArray(pm.features)) pm.features = [];
+  return pm;
 }
 function saveParty() {
   localStorage.setItem('crucible-party', JSON.stringify(party));
@@ -114,7 +128,8 @@ function defaultPC() {
                           riderDice:null, riderType:null },
                  save:null, heal:null, aoeTargets:0,
                  usesPerDay:null, recharge:null, attacksPerAction:1 }],
-    tactics:  { aiHint:'focus', resources:'nova' },
+    tactics:  { aiHint:'focus', mode:'sustained' },
+    features: [],
     _expanded: true,
   };
 }
