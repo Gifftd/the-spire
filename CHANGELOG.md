@@ -70,6 +70,13 @@ closed:
   or made a save with PCFeatures loaded. Latent in tests because the
   engine test suite doesn't load `pc-features.js`. `combatants` is now an
   optional final parameter, threaded through from `runTrial`.
+- **Color-coded trial log** — every event type now gets a subtle color
+  so a long fight is scannable at a glance. White for actions, red for
+  damage taken / failed saves, green for heals, blue for prevented
+  damage (resistance), brass for feature state changes, orange (bold)
+  for crits, dimmed italic for gate-trace events ("Rage: gated — round
+  1 < triggerRound 2"), dimmed for misses. Palette stays inside the
+  existing slate+teal theme; no inline styles in the renderer.
 - **Built-in feature param editor was silently broken too** — the
   `[edit params]` inline editor for Rage / Hex / Action Surge / etc.
   has the same JSON.stringify-inside-double-quotes bug as the DSL

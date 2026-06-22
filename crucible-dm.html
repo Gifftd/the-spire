@@ -66,7 +66,22 @@
     .impact-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     .impact-table th, .impact-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--c-border); }
     .impact-table th { font-family: Cinzel, serif; color: var(--c-brass); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; }
-    .log-feature { color: var(--c-brass-bright); font-weight: 500; }
+    /* Trial log color coding by event type — subtle palette so the log
+       stays scannable without fighting the slate+teal theme. */
+    .log-line { padding: 1px 0; }
+    .log-attack       { color: var(--c-ink, #dde7e9); }
+    .log-attack.crit  { color: #ffb35c; font-weight: 600; }
+    .log-attack.miss  { color: var(--c-ink-faint, #8b9da3); }
+    .log-damage       { color: #d97a7a; }
+    .log-heal         { color: #6dd58c; }
+    .log-regen        { color: #6dd58c; }
+    .log-save         { color: #7ec5e6; }
+    .log-save.failed  { color: #d97a7a; }
+    .log-feature              { color: var(--c-brass-bright, #d4a85a); font-weight: 500; }
+    .log-feature.is-damage    { color: #e0a060; }
+    .log-feature.is-prevented { color: #6da3d9; }
+    .log-feature.is-gate      { color: var(--c-ink-faint, #8b9da3); font-style: italic; font-weight: normal; }
+    .log-killed { font-weight: 600; }
   </style>
 </head>
 <body>
@@ -1229,11 +1244,21 @@ function switchReplay(which) {
     document.getElementById('show-feature-events').checked;
   // Render per-event divs so the feature filter toggle can show/hide them.
   const lines = trial.events.map(ev => {
-    const isFeatureEv = ev.type === 'feature';
-    const lineClass = isFeatureEv ? 'log-line log-feature' : 'log-line';
+    const classes = ['log-line', 'log-' + (ev.type || 'misc')];
+    if (ev.type === 'attack') {
+      if (ev.crit) classes.push('crit');
+      else if (!ev.hit) classes.push('miss');
+    } else if (ev.type === 'save') {
+      if (ev.passed === false) classes.push('failed');
+    } else if (ev.type === 'feature') {
+      if (ev.isDamage)    classes.push('is-damage');
+      if (ev.isPrevented) classes.push('is-prevented');
+      if (ev.isGate)      classes.push('is-gate');
+    }
     const text = formatEvent(ev);
+    const isFeatureEv = ev.type === 'feature';
     const display = (isFeatureEv && !showFeature) ? ' style="display:none"' : '';
-    return '<div class="' + lineClass + '"' + display + '>' + escapeHtml(text) + '</div>';
+    return '<div class="' + classes.join(' ') + '"' + display + '>' + escapeHtml(text) + '</div>';
   });
   const footer = '\n===\nWinner: ' + trial.winner +
     '\nRounds: ' + trial.rounds +
