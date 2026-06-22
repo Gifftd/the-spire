@@ -530,7 +530,15 @@
         damageTypesReceivedLastTurn: new Set(),
         damageTypesReceivedThisTurn: new Set(),
         lastHealRound: -99,
+        actionsAvailable: 1,
+        bonusActionAvailable: true,
+        reactionAvailableThisRound: true,
       });
+      // Initialize feature state for any PC class features on this PC.
+      // (No-op when PC has no features array — backward compatible.)
+      if (typeof PCFeatures !== 'undefined') {
+        PCFeatures.initFeatureState(out[out.length - 1]);
+      }
     }
     for (const pick of (monsterPicks || [])) {
       const m = pick.monster;
