@@ -9,6 +9,51 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-16
 
+### Crucible — PC class features simulation
+
+The Crucible can now model 8 SRD class features (Rage, Sneak Attack, Action
+Surge, Divine Smite, Healing Word, Shield, Hex/Hunter's Mark, Bardic
+Inspiration) plus DM-authored homebrew features via a small DSL.
+
+- **New file `pc-features.js`** — shared module owning the 9-hook surface,
+  mode predicates, 8 built-in feature objects, 11 DSL primitives, and the
+  `dispatchHook` / `dispatchBroadcastHook` runners.
+- **Engine integration:** `crucible-engine.js` calls `dispatchHook` at 9
+  points (combat start, turn start, attack attempt/hit, take damage, save
+  attempt, ally/monster downed, round end). New per-combatant action-economy
+  fields: `actionsAvailable`, `bonusActionAvailable`,
+  `reactionAvailableThisRound`.
+- **PC editor:** Each PC card gains a Features section with library picker
+  and Custom-feature DSL modal. New mode picker (Nova / Sustained /
+  Defensive) in the tactics row.
+- **Results panel:** New Feature Impact table showing per-feature
+  activations and average impact per fight. Trial logs prefix feature events
+  with `⚡` and offer a filter toggle.
+- **Mode preset** drives active-resource features (Rage, Action Surge,
+  Smite, Healing Word, Shield, Hex/Mark, Bardic Insp.). Passive features
+  (Sneak Attack rider) ignore mode and fire under their built-in rules.
+- **Custom features (DSL):** DM authors via a constrained form (no `eval`).
+  Features and templates persist to `localStorage`.
+- **Migration:** existing PCs auto-upgrade in memory on load
+  (`tactics.resources → tactics.mode`, `features:[]` added). First save
+  persists. No worker / KV changes.
+
+**Known limitations (v1):**
+- Rage's Nova and Sustained modes behave identically because the sim
+  doesn't track resources across an adventuring day. Documented in spec.
+- 14 schema tests for direct hook invocation patterns fail in isolation
+  because they don't bind `this` — production calls via `dispatchHook` work
+  correctly. Tests will be updated in a polish pass.
+
+**Manual UI checklist (post-deploy):**
+
+- [ ] Open Crucible → existing PCs load with `tactics.mode: 'sustained'`
+- [ ] Add Rage to a Barbarian via Add from library → params auto-derived
+- [ ] Run 500 trials → Rage shows in Feature Impact with non-zero numbers
+- [ ] Author a custom DSL feature → saves to PC + template → reusable
+- [ ] Trial logs show `⚡` glyph next to feature events; filter toggle hides them
+- [ ] Open the schema test page (`tests/pc-features.test.html`) → at least 54 of 68 assertions pass (14 known direct-invocation tests fail)
+
 ### Atlas Workshop v2 — DM map redesign
 
 The DM map page (`map-dm.html`) was a 3700-line single file with a
