@@ -864,6 +864,90 @@
       compiled.hooks.onTurnStart.call(compiled, self, { round: 1, combatants: [] });
       assertEq(self.bonusActionAvailable, true);
     });
+
+    group('Integration: features + engine interactions');
+
+    test('Two features stack on the same attack (Rage + Hex)', () => {
+      const self = {
+        id: 'pc:barb',
+        pm: {
+          features: [{id:'rage'}, {id:'hexMark'}],
+          tactics: { mode: 'nova' },
+          identity: { level: 5 },
+          abilities: { str: 16 },
+        },
+        featureState: {
+          rage: { active: true, roundsLeft: 10 },
+          hexMark: { targetId: 'm:1' },
+        },
+      };
+      const action = { kind: 'attack', actionRange: 'melee' };
+      const target = { id: 'm:1' };
+      const dmgCtx = { amount: 10, type: 'slashing', bonusDice: [] };
+      PCFeatures.dispatchHook(self, 'onAttackHit', action, target, dmgCtx);
+      assertEq(dmgCtx.amount, 12);
+      assertEq(dmgCtx.bonusDice.length, 1);
+      assertEq(dmgCtx.bonusDice[0].dice, '1d6');
+    });
+
+    test('Sneak Attack + Hex stack on the same hit', () => {
+      const self = {
+        id: 'pc:rogue',
+        pm: {
+          features: [{id:'sneakAttack'}, {id:'hexMark'}],
+          tactics: { mode: 'sustained' },
+          identity: { level: 5 },
+        },
+        featureState: {
+          sneakAttack: { usedThisTurn: false },
+          hexMark: { targetId: 'm:1' },
+        },
+      };
+      const action = { kind: 'attack', actionRange: 'melee', finesse: true };
+      const target = { id: 'm:1' };
+      const dmgCtx = { amount: 6, type: 'piercing', bonusDice: [] };
+      PCFeatures.dispatchHook(self, 'onAttackHit', action, target, dmgCtx);
+      assertEq(dmgCtx.bonusDice.length, 2);
+    });
+
+    test('Rage halves a slashing hit on a raging Barbarian', () => {
+      const self = {
+        id: 'pc:barb',
+        pm: { features: [{id:'rage'}], tactics: { mode: 'nova' } },
+        featureState: { rage: { active: true, roundsLeft: 10 } },
+      };
+      const dmgCtx = { amount: 14, type: 'slashing' };
+      PCFeatures.dispatchHook(self, 'onTakeDamage', dmgCtx);
+      assertEq(dmgCtx.amount, 7);
+    });
+
+    test('DSL feature integrates with dispatchHook (custom +3 fire damage rider)', () => {
+      const spec = {
+        id: 'flamingWeapon',
+        name: 'Flaming Weapon',
+        source: 'homebrew',
+        modePolicy: { sustained: { triggerRound: 1, conditionFn: 'always' } },
+        effects: [
+          { hook: 'onAttackHit', primitive: 'addDamage', params: { value: 3 } },
+        ],
+      };
+      const compiled = PCFeatures.compileDSL(spec);
+      const origResolve = PCFeatures.resolve;
+      PCFeatures.resolve = (ref) => ref.id === 'flamingWeapon' ? compiled : origResolve(ref);
+      try {
+        const self = {
+          id: 'pc:test',
+          pm: { features: [{id:'flamingWeapon'}], tactics: {mode:'sustained'} },
+          featureState: { flamingWeapon: {} },
+        };
+        const dmgCtx = { amount: 8, type: 'slashing', bonusDice: [] };
+        const ctx = { round: 1, combatants: [] };
+        PCFeatures.dispatchHook(self, 'onAttackHit', {kind:'attack'}, {id:'m:1'}, dmgCtx, ctx);
+        assertEq(dmgCtx.amount, 11);
+      } finally {
+        PCFeatures.resolve = origResolve;
+      }
+    });
   </script>
 </body>
 </html>
