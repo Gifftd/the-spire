@@ -921,6 +921,45 @@
       assertEq(dmgCtx.amount, 7);
     });
 
+    group('Target-aware mode predicates');
+
+    test('whenTargetHasntAttacked: true if target.hasAttacked is falsy', () => {
+      const target = { id: 'm:1', hasAttacked: false };
+      const hookCtx = { target };
+      assertEq(PCFeatures.MODE_PREDICATES.whenTargetHasntAttacked({}, {}, 'f', hookCtx), true);
+    });
+
+    test('whenTargetHasntAttacked: false if target.hasAttacked is true', () => {
+      const target = { id: 'm:1', hasAttacked: true };
+      const hookCtx = { target };
+      assertEq(PCFeatures.MODE_PREDICATES.whenTargetHasntAttacked({}, {}, 'f', hookCtx), false);
+    });
+
+    test('whenTargetHasntAttacked: false if hookCtx or target is missing', () => {
+      assertEq(PCFeatures.MODE_PREDICATES.whenTargetHasntAttacked({}, {}, 'f', null), false);
+      assertEq(PCFeatures.MODE_PREDICATES.whenTargetHasntAttacked({}, {}, 'f', {}), false);
+    });
+
+    test('whenTargetIsBloodied: true if target HP below half', () => {
+      const target = { hp: 10, maxHp: 30 };
+      assertEq(PCFeatures.MODE_PREDICATES.whenTargetIsBloodied({}, {}, 'f', { target }), true);
+    });
+
+    test('whenTargetIsBloodied: false if target HP at full', () => {
+      const target = { hp: 30, maxHp: 30 };
+      assertEq(PCFeatures.MODE_PREDICATES.whenTargetIsBloodied({}, {}, 'f', { target }), false);
+    });
+
+    test('whenTargetIsHostile: true if target.side === monster', () => {
+      const target = { side: 'monster' };
+      assertEq(PCFeatures.MODE_PREDICATES.whenTargetIsHostile({}, {}, 'f', { target }), true);
+    });
+
+    test('whenTargetIsHostile: false if target is a PC', () => {
+      const target = { side: 'pc' };
+      assertEq(PCFeatures.MODE_PREDICATES.whenTargetIsHostile({}, {}, 'f', { target }), false);
+    });
+
     group('monster.hasAttacked tracking');
 
     test('hasAttacked is initially undefined on a fresh combatant', () => {

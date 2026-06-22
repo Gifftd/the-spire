@@ -46,6 +46,13 @@
       ),
     usesLeftGreaterThanZero: (self, ctx, featureId) =>
       !!(self && self.featureState && self.featureState[featureId] && self.featureState[featureId].usesLeft > 0),
+    whenTargetHasntAttacked: (self, ctx, featureId, hookCtx) =>
+      !!(hookCtx && hookCtx.target && !hookCtx.target.hasAttacked),
+    whenTargetIsBloodied:    (self, ctx, featureId, hookCtx) =>
+      !!(hookCtx && hookCtx.target && hookCtx.target.maxHp > 0 &&
+        (hookCtx.target.hp / hookCtx.target.maxHp) < 0.5),
+    whenTargetIsHostile:     (self, ctx, featureId, hookCtx) =>
+      !!(hookCtx && hookCtx.target && hookCtx.target.side === 'monster'),
   };
 
   function resolve(ref) {
