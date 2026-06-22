@@ -791,7 +791,16 @@
     const roll = rollDie(20, rng);
     const isCrit = roll === 20;
     const isFumble = roll === 1;
-    const hit = !isFumble && (isCrit || roll + th >= (target.ac || 10));
+    let hit = !isFumble && (isCrit || roll + th >= (target.ac || 10));
+    // Broadcast onAttackAttempt: allow any PC's features (e.g., Bardic Inspiration
+    // held by an ally) to boost this PC's attack roll.
+    // me is the attacking PC; broadcast so the bard (or any other PC) can spend a die.
+    if (typeof PCFeatures !== 'undefined' && me && combatants) {
+      const rollCtx = { roll, hits: hit, action, eventLog: events };
+      PCFeatures.dispatchBroadcastHook(combatants, me, 'onAttackAttempt',
+        me, target, rollCtx);
+      hit = rollCtx.hits;
+    }
     let damageDealt = 0;
     const damageByType = {};
     if (hit && action.damage) {
@@ -834,7 +843,16 @@
         sb = ab ? (ab.save != null ? ab.save : ab.mod) : 0;
       }
       const roll = rollDie(20, rng);
-      const passed = roll + sb >= action.saveDc;
+      // Broadcast onSaveAttempt: allow any PC's features (e.g., Bardic Inspiration
+      // held by an ally) to add a bonus to this save.
+      let broadcastSaveBonus = 0;
+      if (typeof PCFeatures !== 'undefined' && t && combatants) {
+        const saveRollCtx = { roll, bonus: 0, eventLog: events };
+        PCFeatures.dispatchBroadcastHook(combatants, t, 'onSaveAttempt',
+          action.saveAbility, action.saveDc, saveRollCtx);
+        broadcastSaveBonus = saveRollCtx.bonus || 0;
+      }
+      const passed = (roll + broadcastSaveBonus) + sb >= action.saveDc;
       let dmgList;
       if (passed && action.halfOnSave) dmgList = action.damageOnFail; // half later
       else if (passed)                 dmgList = action.damageOnSave || [];

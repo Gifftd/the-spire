@@ -52,7 +52,7 @@ Inspiration) plus DM-authored homebrew features via a small DSL.
 - [ ] Run 500 trials → Rage shows in Feature Impact with non-zero numbers
 - [ ] Author a custom DSL feature → saves to PC + template → reusable
 - [ ] Trial logs show `⚡` glyph next to feature events; filter toggle hides them
-- [ ] Open the schema test page (`tests/pc-features.test.html`) → at least 54 of 68 assertions pass (14 known direct-invocation tests fail)
+- [ ] Open the schema test page (`tests/pc-features.test.html`) → at least 58 of 72 assertions pass (14 known direct-invocation tests fail)
 
 ### Atlas Workshop v2 — DM map redesign
 
