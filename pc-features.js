@@ -50,6 +50,7 @@
 
   function resolve(ref) {
     if (!ref) return null;
+    if (ref.source === 'homebrew' && ref._dslSpec) return compileDSL(ref._dslSpec);
     if (ref.source === 'homebrew') return ref;
     return (PCFeatures.LIBRARY && PCFeatures.LIBRARY[ref.id]) || null;
   }

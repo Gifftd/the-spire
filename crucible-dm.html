@@ -461,9 +461,97 @@ function removeFeatureFromPC(pmId, featureId) {
   saveParty();
   renderParty();
 }
+let dslEditingPmId = null;
+let dslEffects = [];
+
 function openDSLEditor(pmId) {
-  // Implemented in Task 5.3.
-  alert('DSL editor — implemented in next task.');
+  dslEditingPmId = pmId;
+  dslEffects = [];
+  document.getElementById('dsl-name').value = '';
+  document.getElementById('dsl-summary').value = '';
+  document.getElementById('dsl-uses').value = 1;
+  document.getElementById('dsl-trigger-round').value = 1;
+  document.getElementById('dsl-condition').value = 'always';
+  dslRenderEffects();
+  document.getElementById('dsl-modal').style.display = 'flex';
+}
+
+function dslClose() {
+  document.getElementById('dsl-modal').style.display = 'none';
+  dslEditingPmId = null;
+  dslEffects = [];
+}
+
+function dslAddEffect() {
+  dslEffects.push({ hook: 'onTurnStart', primitive: 'consumeBonusAction', params: {} });
+  dslRenderEffects();
+}
+
+function dslRemoveEffect(i) {
+  dslEffects.splice(i, 1);
+  dslRenderEffects();
+}
+
+function dslRenderEffects() {
+  const root = document.getElementById('dsl-effects-list');
+  root.innerHTML = dslEffects.map((eff, i) => `
+    <div class="dsl-effect-row">
+      <select onchange="dslEffects[${i}].hook = this.value">
+        ${PCFeatures.HOOK_NAMES.map(h => `<option value="${h}" ${eff.hook === h ? 'selected' : ''}>${h}</option>`).join('')}
+      </select>
+      <select onchange="dslEffects[${i}].primitive = this.value">
+        ${Object.keys(PCFeatures.PRIMITIVES).map(p => `<option value="${p}" ${eff.primitive === p ? 'selected' : ''}>${p}</option>`).join('')}
+      </select>
+      <button onclick="dslRemoveEffect(${i})">×</button>
+    </div>
+  `).join('');
+}
+
+function dslBuildSpec() {
+  const name = document.getElementById('dsl-name').value.trim();
+  if (!name) { alert('Name is required.'); return null; }
+  const summary = document.getElementById('dsl-summary').value.trim();
+  const categoryEl = document.getElementById('dsl-category');
+  const category = Array.from(categoryEl.selectedOptions).map(o => o.value);
+  const uses = parseInt(document.getElementById('dsl-uses').value, 10) || 1;
+  const triggerRound = parseInt(document.getElementById('dsl-trigger-round').value, 10) || 1;
+  const condition = document.getElementById('dsl-condition').value;
+  const id = 'dsl_' + name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+  return {
+    id, name, source: 'homebrew',
+    category, summary,
+    params: { usesPerEncounter: { type: 'int', value: uses } },
+    modePolicy: {
+      nova:      { triggerRound, conditionFn: condition },
+      sustained: { triggerRound, conditionFn: condition },
+      defensive: { triggerRound, conditionFn: condition },
+    },
+    effects: dslEffects.slice(),
+  };
+}
+
+function dslSave() {
+  if (!dslEditingPmId) return;
+  const pm = party.find(p => p.id === dslEditingPmId);
+  if (!pm) return;
+  const spec = dslBuildSpec();
+  if (!spec) return;
+  const compiled = PCFeatures.compileDSL(spec);
+  if (!compiled) { alert('DSL compilation failed.'); return; }
+  if (!Array.isArray(pm.features)) pm.features = [];
+  pm.features.push({ id: spec.id, source: 'homebrew', params: spec.params, _dslSpec: spec });
+  saveParty();
+  renderParty();
+  dslClose();
+}
+
+function dslSaveAsTemplate() {
+  const spec = dslBuildSpec();
+  if (!spec) return;
+  const templates = JSON.parse(localStorage.getItem('crucible-feature-templates') || '[]');
+  templates.push(spec);
+  localStorage.setItem('crucible-feature-templates', JSON.stringify(templates));
+  alert('Template saved.');
 }
 function updateAction(pmId, aId, field, value) {
   const pm = party.find(p => p.id === pmId); if (!pm) return;
@@ -1495,5 +1583,50 @@ loadBestiary().catch(e => console.warn('Bestiary preload failed', e));
   }
 })();
 </script>
+
+<div id="dsl-modal" class="dsl-modal" style="display:none">
+  <div class="dsl-modal-card">
+    <h3>Custom Feature</h3>
+    <div class="dsl-form">
+      <label>Name <input type="text" id="dsl-name"></label>
+      <label>Summary <input type="text" id="dsl-summary"></label>
+      <label>Category
+        <select id="dsl-category" multiple size="5">
+          <option value="damage">damage</option>
+          <option value="defense">defense</option>
+          <option value="action-economy">action-economy</option>
+          <option value="healing">healing</option>
+          <option value="support">support</option>
+        </select>
+      </label>
+      <label>Uses per encounter <input type="number" id="dsl-uses" min="1" value="1"></label>
+      <fieldset>
+        <legend>Mode policy — Sustained</legend>
+        <label>Trigger round <input type="number" id="dsl-trigger-round" min="1" value="1"></label>
+        <label>Condition
+          <select id="dsl-condition">
+            <option value="always">always</option>
+            <option value="whenAnyEnemyAlive">when any enemy alive</option>
+            <option value="whenHpBelowHalf">when HP below half</option>
+            <option value="whenHpBelowQuarter">when HP below quarter</option>
+            <option value="whenAllyDowned">when ally downed</option>
+            <option value="whenAllyHpBelowHalf">when ally HP below half</option>
+            <option value="usesLeftGreaterThanZero">when uses left</option>
+          </select>
+        </label>
+      </fieldset>
+      <fieldset>
+        <legend>Effects (executed in order)</legend>
+        <div id="dsl-effects-list"></div>
+        <button onclick="dslAddEffect()">+ Add effect</button>
+      </fieldset>
+    </div>
+    <div class="dsl-modal-actions">
+      <button onclick="dslSave()">Save feature</button>
+      <button onclick="dslSaveAsTemplate()">Save as template</button>
+      <button onclick="dslClose()">Cancel</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
