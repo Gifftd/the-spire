@@ -921,6 +921,32 @@
       assertEq(dmgCtx.amount, 7);
     });
 
+    group('addAction / addBonusAction primitives');
+
+    test('addAction primitive grants N extra actions', () => {
+      const self = { actionsAvailable: 1 };
+      PCFeatures.PRIMITIVES.addAction.apply(self, {}, { amount: 2 });
+      assertEq(self.actionsAvailable, 3);
+    });
+
+    test('addAction defaults to +1 when amount omitted', () => {
+      const self = { actionsAvailable: 1 };
+      PCFeatures.PRIMITIVES.addAction.apply(self, {}, {});
+      assertEq(self.actionsAvailable, 2);
+    });
+
+    test('addAction handles missing actionsAvailable (initializes to 0+amount)', () => {
+      const self = {};
+      PCFeatures.PRIMITIVES.addAction.apply(self, {}, { amount: 2 });
+      assertEq(self.actionsAvailable, 2);
+    });
+
+    test('addBonusAction primitive sets bonusActionAvailable to true', () => {
+      const self = { bonusActionAvailable: false };
+      PCFeatures.PRIMITIVES.addBonusAction.apply(self, {}, {});
+      assertEq(self.bonusActionAvailable, true);
+    });
+
     test('DSL feature integrates with dispatchHook (custom +3 fire damage rider)', () => {
       const spec = {
         id: 'flamingWeapon',

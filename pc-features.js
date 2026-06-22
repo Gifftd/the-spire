@@ -703,6 +703,16 @@
         }
       },
     },
+    addAction: {
+      apply(self, hookCtx, params) {
+        self.actionsAvailable = (self.actionsAvailable || 0) + (Number(params.amount) || 1);
+      },
+    },
+    addBonusAction: {
+      apply(self, hookCtx, params) {
+        self.bonusActionAvailable = true;
+      },
+    },
     consumeAction:       { apply(self) { self.actionsAvailable = Math.max(0, (self.actionsAvailable || 0) - 1); } },
     consumeBonusAction:  { apply(self) { self.bonusActionAvailable = false; } },
     consumeReaction:     { apply(self) { self.reactionAvailableThisRound = false; } },
