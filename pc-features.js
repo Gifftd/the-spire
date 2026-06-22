@@ -145,6 +145,11 @@
       return { bonusDamage, duration: 10 };
     },
 
+    paramSchema: [
+      { name: 'bonusDamage', type: 'int', label: 'Bonus damage', default: 2, min: 0, max: 9 },
+      { name: 'duration', type: 'int', label: 'Duration (rounds)', default: 10, min: 1, max: 100 },
+    ],
+
     modePolicy: {
       nova:      { triggerRound: 1, conditionFn: 'always' },
       sustained: { triggerRound: 1, conditionFn: 'whenAnyEnemyAlive' },
@@ -213,6 +218,10 @@
       return { dice: dice + 'd6' };
     },
 
+    paramSchema: [
+      { name: 'dice', type: 'string', label: 'Dice', default: '1d6', placeholder: '3d6' },
+    ],
+
     modePolicy: {
       nova:      { triggerRound: 1, conditionFn: 'always' },
       sustained: { triggerRound: 1, conditionFn: 'always' },
@@ -253,6 +262,10 @@
       const level = (identityOrPm && identityOrPm.level) || (identityOrPm && identityOrPm.identity && identityOrPm.identity.level) || 2;
       return { maxUses: level >= 17 ? 2 : 1 };
     },
+
+    paramSchema: [
+      { name: 'maxUses', type: 'int', label: 'Max uses per encounter', default: 1, min: 1, max: 5 },
+    ],
 
     modePolicy: {
       nova:      { triggerRound: 1, conditionFn: 'always' },
@@ -316,6 +329,8 @@
       }
       return { slotsByLevel: { ...slots } };
     },
+
+    paramSchema: [],
 
     modePolicy: {
       nova:      { triggerRound: 1, conditionFn: 'always', spendOn: 'everyHit' },
@@ -417,6 +432,10 @@
       return { slotsByLevel: { ...slots }, ability: 'wis' };
     },
 
+    paramSchema: [
+      { name: 'ability', type: 'enum', label: 'Spellcasting ability', default: 'wis', options: ['cha','wis','int'] },
+    ],
+
     modePolicy: {
       nova:      { triggerRound: 1, conditionFn: 'whenAllyHpBelowHalf' },
       sustained: { triggerRound: 1, conditionFn: 'whenAllyDowned' },
@@ -476,6 +495,10 @@
       }
       return { slotsByLevel: { ...slots }, acBonus: 5 };
     },
+
+    paramSchema: [
+      { name: 'acBonus', type: 'int', label: 'AC bonus', default: 5, min: 1, max: 10 },
+    ],
 
     modePolicy: {
       nova:      { triggerRound: 1, threshold: 'whileSlotsLeft' },
@@ -540,6 +563,11 @@
     deriveParams(identityOrPm) {
       return { damageDice: '1d6', recastSlots: 4 };
     },
+
+    paramSchema: [
+      { name: 'damageDice', type: 'string', label: 'Damage dice', default: '1d6', placeholder: '1d8' },
+      { name: 'recastSlots', type: 'int', label: 'Recasts available', default: 4, min: 0, max: 9 },
+    ],
 
     modePolicy: {
       nova:      { recastOnKill: true },
@@ -606,6 +634,10 @@
       if (level >= 15) die = 'd12';
       return { die };
     },
+
+    paramSchema: [
+      { name: 'die', type: 'enum', label: 'Die size', default: 'd8', options: ['d6','d8','d10','d12'] },
+    ],
 
     modePolicy: {
       nova:      { distribute: 'best-attackers' },

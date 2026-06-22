@@ -1036,6 +1036,12 @@
       }
     });
 
+    test('every built-in feature has a paramSchema array (possibly empty)', () => {
+      for (const [id, feature] of Object.entries(PCFeatures.LIBRARY)) {
+        assert(Array.isArray(feature.paramSchema), id + ' missing paramSchema array');
+      }
+    });
+
     test('DSL feature integrates with dispatchHook (custom +3 fire damage rider)', () => {
       const spec = {
         id: 'flamingWeapon',
