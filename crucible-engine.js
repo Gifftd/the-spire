@@ -1065,6 +1065,24 @@
         if (c.dead || c.downed) continue;
         const skip = turnStart(c, round, rng, events);
         if (skip) continue;
+
+        // Reset per-turn action budgets.
+        c.actionsAvailable = 1;
+        c.bonusActionAvailable = true;
+        // reactionAvailableThisRound resets at onRoundEnd, not per turn.
+
+        // Fire onTurnStart for PC features.
+        if (c.side === 'pc' && typeof PCFeatures !== 'undefined') {
+          const turnCtx = {
+            round,
+            combatants, rng,
+            livingEnemies: combatants.filter(x => x.side === 'monster' && !x.dead),
+            livingAllies: combatants.filter(x => x.side === 'pc' && !x.dead),
+            eventLog: events,
+          };
+          PCFeatures.dispatchHook(c, 'onTurnStart', turnCtx);
+        }
+
         const myActions = c.side === 'pc' ? (c.pm.actions || [])
                                           : ((c.monster.parsedActions) || []);
         rollRecharge(c, myActions.map(a => ({
