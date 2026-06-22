@@ -295,6 +295,15 @@ function renderPCEditor(pm) {
         return featuresHtml;
       })()}
 
+      <div style="margin-top:0.5rem; display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+        <span class="tactics-label" style="font-family:'Cinzel',serif; font-size:0.75rem; color:var(--c-brass);">Mode</span>
+        <select onchange="updatePCMode('${pm.id}', this.value)">
+          <option value="nova"      ${pm.tactics.mode === 'nova' ? 'selected' : ''}>Nova</option>
+          <option value="sustained" ${pm.tactics.mode === 'sustained' ? 'selected' : ''}>Sustained</option>
+          <option value="defensive" ${pm.tactics.mode === 'defensive' ? 'selected' : ''}>Defensive</option>
+        </select>
+      </div>
+
       <div style="margin-top:0.5rem; display:flex; gap:0.5rem;">
         <button class="btn" style="font-size:0.8rem" onclick="removePC('${pm.id}')">✕ Remove PC</button>
       </div>
@@ -552,6 +561,13 @@ function dslSaveAsTemplate() {
   templates.push(spec);
   localStorage.setItem('crucible-feature-templates', JSON.stringify(templates));
   alert('Template saved.');
+}
+function updatePCMode(pmId, mode) {
+  const pm = party.find(p => p.id === pmId);
+  if (!pm) return;
+  if (!pm.tactics) pm.tactics = {};
+  pm.tactics.mode = mode;
+  saveParty();
 }
 function updateAction(pmId, aId, field, value) {
   const pm = party.find(p => p.id === pmId); if (!pm) return;
