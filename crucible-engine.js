@@ -786,7 +786,9 @@
   }
 
   // ─────────── Resolve a PC-side attack action ───────────
-  function resolveAttackPc(me, target, action, rng, events, round) {
+  // combatants is optional; required only for the broadcast onAttackAttempt
+  // hook (Bardic Inspiration etc.). Tests call without it.
+  function resolveAttackPc(me, target, action, rng, events, round, combatants) {
     // PC actions store inputs; derive to-hit + damage roll.
     const th = toHit(me.pm, action);
     const roll = rollDie(20, rng);
@@ -832,7 +834,7 @@
   }
 
   // ─────────── Resolve a save effect ───────────
-  function resolveSave(me, targets, action, rng, events, round) {
+  function resolveSave(me, targets, action, rng, events, round, combatants) {
     let totalDmg = 0;
     for (const t of targets) {
       if (t.dead || t.downed) continue;
@@ -984,7 +986,7 @@
         if (sub.kind === 'attack') {
           const r = me.side === 'monster'
             ? resolveAttackMonster(me, tgt, sub, rng, events, round)
-            : resolveAttackPc(me, tgt, sub, rng, events, round);
+            : resolveAttackPc(me, tgt, sub, rng, events, round, all);
           // Convert damageByType into applyDamage calls.
           for (const [t, dmg] of Object.entries(r.damageByType || {})) {
             applyDamage(tgt, dmg, t, me, events, round, me.name, sub.sourceActionName || sub.name);
@@ -992,7 +994,7 @@
         }
         // Save sub-actions inside a multiattack are rare; resolve if encountered.
         else if (sub.kind === 'save') {
-          resolveSave(me, [tgt], sub, rng, events, round);
+          resolveSave(me, [tgt], sub, rng, events, round, all);
         }
       }
     }
@@ -1157,7 +1159,7 @@
             if (!tgt) continue;
             consumeUse(c, action);
             const r = c.side === 'pc'
-              ? resolveAttackPc(c, tgt, action, rng, events, round)
+              ? resolveAttackPc(c, tgt, action, rng, events, round, combatants)
               : resolveAttackMonster(c, tgt, action, rng, events, round);
             const wasAlive = !tgt.dead && !tgt.downed;
             let totalDmgThisAttack = 0;
@@ -1251,7 +1253,7 @@
             }
             if (!saveTargets.length) continue;
             consumeUse(c, action);
-            const r = resolveSave(c, saveTargets, action, rng, events, round);
+            const r = resolveSave(c, saveTargets, action, rng, events, round, combatants);
             tally(c.side, action.sourceActionName || action.name, 'save',
                   false, r.totalDmg, 0, 0, 0);
           } else if (action.kind === 'heal') {
