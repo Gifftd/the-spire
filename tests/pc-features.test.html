@@ -1069,6 +1069,88 @@
         PCFeatures.resolve = origResolve;
       }
     });
+
+    group('v1.1 integration scenarios');
+
+    test('Custom Flurry of Blows feature grants +1 action', () => {
+      const spec = {
+        id: 'flurry',
+        name: 'Flurry of Blows',
+        source: 'homebrew',
+        modePolicy: { sustained: { triggerRound: 1, conditionFn: 'always' } },
+        effects: [
+          { hook: 'onTurnStart', primitive: 'consumeBonusAction' },
+          { hook: 'onTurnStart', primitive: 'addAction', params: { amount: 1 } },
+          { hook: 'onTurnStart', primitive: 'decrementUses' },
+        ],
+      };
+      const compiled = PCFeatures.compileDSL(spec);
+      const origResolve = PCFeatures.resolve;
+      PCFeatures.resolve = (ref) => ref.id === 'flurry' ? compiled : origResolve(ref);
+      try {
+        const self = {
+          id: 'pc:monk',
+          pm: { features: [{id:'flurry'}], tactics: {mode:'sustained'} },
+          featureState: { flurry: { usesLeft: 4 } },
+          actionsAvailable: 1,
+          bonusActionAvailable: true,
+        };
+        const ctx = { round: 1, combatants: [] };
+        PCFeatures.dispatchHook(self, 'onTurnStart', ctx);
+        assertEq(self.actionsAvailable, 2);
+        assertEq(self.bonusActionAvailable, false);
+      } finally {
+        PCFeatures.resolve = origResolve;
+      }
+    });
+
+    test('Hunter\'s Mark with d8 damage via built-in param override', () => {
+      const hex = PCFeatures.LIBRARY.hexMark;
+      const self = {
+        id: 'pc:ranger',
+        pm: {
+          features: [{id:'hexMark', source:'builtin', params: {damageDice: '1d8', recastSlots: 4}}],
+          tactics: {mode:'sustained'},
+        },
+        featureState: { hexMark: { targetId: 'm:1', slotsLeft: 4 } },
+      };
+      const action = { kind: 'attack' };
+      const target = { id: 'm:1' };
+      const dmgCtx = { amount: 8, type: 'piercing', bonusDice: [] };
+      hex.hooks.onAttackHit.call(hex, self, action, target, dmgCtx);
+      assertEq(dmgCtx.bonusDice.length, 1);
+      assertEq(dmgCtx.bonusDice[0].dice, '1d8');
+    });
+
+    test('Ambush damage: addDamage with whenTargetHasntAttacked predicate', () => {
+      const spec = {
+        id: 'ambush',
+        name: 'Ambush Strike',
+        source: 'homebrew',
+        modePolicy: { sustained: { triggerRound: 1, conditionFn: 'always' } },
+        effects: [
+          { hook: 'onAttackHit', primitive: 'addDamage',
+            params: { value: 5 },
+            when: 'whenTargetHasntAttacked' },
+        ],
+      };
+      const compiled = PCFeatures.compileDSL(spec);
+      const origResolve = PCFeatures.resolve;
+      PCFeatures.resolve = (ref) => ref.id === 'ambush' ? compiled : origResolve(ref);
+      try {
+        const self = { id: 'pc:test', pm: { features: [{id:'ambush'}], tactics: {mode:'sustained'} }, featureState: { ambush: {} } };
+        // Unattacked target → +5 damage
+        const dmgA = { amount: 10, type: 'piercing', bonusDice: [] };
+        PCFeatures.dispatchHook(self, 'onAttackHit', {kind:'attack'}, {id:'m:1', side:'monster', hasAttacked: false}, dmgA, { round: 1, combatants: [] });
+        assertEq(dmgA.amount, 15);
+        // Already-attacked target → no bonus
+        const dmgB = { amount: 10, type: 'piercing', bonusDice: [] };
+        PCFeatures.dispatchHook(self, 'onAttackHit', {kind:'attack'}, {id:'m:1', side:'monster', hasAttacked: true}, dmgB, { round: 1, combatants: [] });
+        assertEq(dmgB.amount, 10);
+      } finally {
+        PCFeatures.resolve = origResolve;
+      }
+    });
   </script>
 </body>
 </html>
