@@ -756,7 +756,15 @@
     const roll = rollDie(20, rng);
     const isCrit = roll === 20;
     const isFumble = roll === 1;
-    const hit = !isFumble && (isCrit || roll + (action.toHit || 0) >= (target.ac || 10));
+    let hit = !isFumble && (isCrit || roll + (action.toHit || 0) >= (target.ac || 10));
+
+    // Allow target's reaction features (Shield) to modify the hit.
+    if (target.side === 'pc' && typeof PCFeatures !== 'undefined') {
+      const rollCtx = { roll, hits: hit, action, eventLog: events };
+      PCFeatures.dispatchHook(target, 'onAttackAttempt', action, target, rollCtx);
+      hit = rollCtx.hits;
+    }
+
     let damageDealt = 0;
     const damageByType = {};
     if (hit) {
