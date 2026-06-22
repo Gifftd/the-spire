@@ -1197,6 +1197,27 @@
               }
             }
             const killed = wasAlive && (tgt.dead || tgt.downed);
+
+            // Fire onAllyDowned / onMonsterDowned when a combatant just dropped.
+            if (killed && typeof PCFeatures !== 'undefined') {
+              const downedCtx = { round, combatants, rng, eventLog: events };
+              if (tgt.side === 'pc') {
+                // Broadcast onAllyDowned to surviving PCs (not the downed one).
+                for (const ally of combatants) {
+                  if (ally.side === 'pc' && ally.id !== tgt.id && !ally.downed) {
+                    PCFeatures.dispatchHook(ally, 'onAllyDowned', tgt, downedCtx);
+                  }
+                }
+              } else if (tgt.side === 'monster') {
+                // Broadcast onMonsterDowned to surviving PCs.
+                for (const ally of combatants) {
+                  if (ally.side === 'pc' && !ally.downed) {
+                    PCFeatures.dispatchHook(ally, 'onMonsterDowned', tgt, downedCtx);
+                  }
+                }
+              }
+            }
+
             // Tally once per attack, summing damage across all damage types.
             tally(c.side, action.sourceActionName || action.name, 'attack',
                   r.hit, totalDmgThisAttack, 0, killed ? 1 : 0, 0);
@@ -1230,6 +1251,13 @@
         const monAlive = combatants.some(x => x.side === 'monster' && !x.dead);
         if (!pcsAlive) { winner = 'monster'; break; }
         if (!monAlive) { winner = 'pc';      break; }
+      }
+      // End-of-round hook for PC features (Rage duration tick, reaction reset).
+      if (!winner && typeof PCFeatures !== 'undefined') {
+        const endCtx = { round, combatants, rng, eventLog: events };
+        for (const c of combatants) {
+          if (c.side === 'pc') PCFeatures.dispatchHook(c, 'onRoundEnd', round, endCtx);
+        }
       }
       if (!winner) round++;
     }
