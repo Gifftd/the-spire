@@ -752,7 +752,7 @@
 
   // ─────────── Resolve a monster-side attack action ───────────
   // For a PC-side attack, the engine uses resolveAttackPc (next task block).
-  function resolveAttackMonster(me, target, action, rng, events, round) {
+  function resolveAttackMonster(me, target, action, rng, events, round, combatants) {
     me.hasAttacked = true;
     const roll = rollDie(20, rng);
     const isCrit = roll === 20;
@@ -761,7 +761,7 @@
 
     // Allow target's reaction features (Shield) to modify the hit.
     if (target.side === 'pc' && typeof PCFeatures !== 'undefined') {
-      const rollCtx = { roll, hits: hit, action, eventLog: events, round };
+      const rollCtx = { roll, hits: hit, action, eventLog: events, round, combatants };
       PCFeatures.dispatchHook(target, 'onAttackAttempt', action, target, rollCtx);
       hit = rollCtx.hits;
     }
@@ -799,7 +799,7 @@
     // held by an ally) to boost this PC's attack roll.
     // me is the attacking PC; broadcast so the bard (or any other PC) can spend a die.
     if (typeof PCFeatures !== 'undefined' && me && combatants) {
-      const rollCtx = { roll, hits: hit, action, eventLog: events, round };
+      const rollCtx = { roll, hits: hit, action, eventLog: events, round, combatants };
       PCFeatures.dispatchBroadcastHook(combatants, me, 'onAttackAttempt',
         me, target, rollCtx);
       hit = rollCtx.hits;
@@ -850,7 +850,7 @@
       // held by an ally) to add a bonus to this save.
       let broadcastSaveBonus = 0;
       if (typeof PCFeatures !== 'undefined' && t && combatants) {
-        const saveRollCtx = { roll, bonus: 0, eventLog: events, round };
+        const saveRollCtx = { roll, bonus: 0, eventLog: events, round, combatants };
         PCFeatures.dispatchBroadcastHook(combatants, t, 'onSaveAttempt',
           action.saveAbility, action.saveDc, saveRollCtx);
         broadcastSaveBonus = saveRollCtx.bonus || 0;
@@ -985,7 +985,7 @@
         if (!tgt) break;
         if (sub.kind === 'attack') {
           const r = me.side === 'monster'
-            ? resolveAttackMonster(me, tgt, sub, rng, events, round)
+            ? resolveAttackMonster(me, tgt, sub, rng, events, round, all)
             : resolveAttackPc(me, tgt, sub, rng, events, round, all);
           // Convert damageByType into applyDamage calls.
           for (const [t, dmg] of Object.entries(r.damageByType || {})) {
@@ -1172,7 +1172,7 @@
             consumeUse(c, action);
             const r = c.side === 'pc'
               ? resolveAttackPc(c, tgt, action, rng, events, round, combatants)
-              : resolveAttackMonster(c, tgt, action, rng, events, round);
+              : resolveAttackMonster(c, tgt, action, rng, events, round, combatants);
             const wasAlive = !tgt.dead && !tgt.downed;
             let totalDmgThisAttack = 0;
 
@@ -1190,6 +1190,7 @@
                 crit: !!r.crit,
                 eventLog: events,
                 round,
+                combatants,
               };
 
               // Fire onAttackHit on the attacker for damage modifiers (Rage, Sneak, Hex, Smite).

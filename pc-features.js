@@ -948,12 +948,44 @@
           featureId: spec.id,
           featureName: spec.name || spec.id,
         };
+        // Round + combatants might live on any of ctx/dmgCtx/rollCtx depending
+        // on the hook. Pulling from any source available so a feature on
+        // onAttackHit etc. doesn't get stuck on triggerRound=1 (which used to
+        // be the silent-no-op cause for nearly every custom feature).
+        const round =
+          (hookCtx.ctx     && hookCtx.ctx.round) ||
+          (hookCtx.dmgCtx  && hookCtx.dmgCtx.round) ||
+          (hookCtx.rollCtx && hookCtx.rollCtx.round) || 0;
+        const combatants =
+          (hookCtx.ctx     && hookCtx.ctx.combatants) ||
+          (hookCtx.dmgCtx  && hookCtx.dmgCtx.combatants) ||
+          (hookCtx.rollCtx && hookCtx.rollCtx.combatants) || [];
+        const predCtx = hookCtx.ctx || { round, combatants };
         const mode = (self.pm && self.pm.tactics && self.pm.tactics.mode) || 'sustained';
         const policy = (spec.modePolicy && spec.modePolicy[mode]) || (spec.modePolicy && spec.modePolicy.sustained) || {};
-        if (policy.triggerRound && ((hookCtx.ctx && hookCtx.ctx.round) || 0) < policy.triggerRound) return;
+        const eventLog =
+          (hookCtx.dmgCtx  && hookCtx.dmgCtx.eventLog) ||
+          (hookCtx.ctx     && hookCtx.ctx.eventLog) ||
+          (hookCtx.rollCtx && hookCtx.rollCtx.eventLog) || null;
+        const featureName = spec.name || spec.id;
+        if (policy.triggerRound && round < policy.triggerRound) {
+          if (eventLog) eventLog.push({
+            round, type: 'feature', who: self && self.id,
+            what: featureName + ': gated — round ' + round + ' < triggerRound ' + policy.triggerRound,
+            featureName, source: spec.id, isGate: true,
+          });
+          return;
+        }
         if (policy.conditionFn) {
           const pred = MODE_PREDICATES[policy.conditionFn];
-          if (pred && !pred(self, hookCtx.ctx || {}, spec.id)) return;
+          if (pred && !pred(self, predCtx, spec.id)) {
+            if (eventLog) eventLog.push({
+              round, type: 'feature', who: self && self.id,
+              what: featureName + ': gated — condition ' + policy.conditionFn + ' = false',
+              featureName, source: spec.id, isGate: true,
+            });
+            return;
+          }
         }
         for (const eff of effects) {
           if (eff.when) {

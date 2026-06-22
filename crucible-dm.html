@@ -1864,7 +1864,7 @@ loadBestiary().catch(e => console.warn('Bestiary preload failed', e));
       </label>
       <label>Uses per encounter <input type="number" id="dsl-uses" min="1" value="1"></label>
       <fieldset>
-        <legend>Mode policy — Sustained</legend>
+        <legend>Activation gate (applies to all PC modes)</legend>
         <label>Trigger round <input type="number" id="dsl-trigger-round" min="1" value="1"></label>
         <label>Condition
           <select id="dsl-condition">
@@ -1877,6 +1877,10 @@ loadBestiary().catch(e => console.warn('Bestiary preload failed', e));
             <option value="usesLeftGreaterThanZero">when uses left</option>
           </select>
         </label>
+        <small style="opacity:0.7; display:block; margin-top:0.25rem;">
+          The PC's mode (Nova / Sustained / Defensive) is set on the PC card.
+          Custom features use these same gate values for every mode.
+        </small>
       </fieldset>
       <fieldset>
         <legend>Effects (executed in order)</legend>

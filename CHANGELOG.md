@@ -70,6 +70,31 @@ closed:
   or made a save with PCFeatures loaded. Latent in tests because the
   engine test suite doesn't load `pc-features.js`. `combatants` is now an
   optional final parameter, threaded through from `runTrial`.
+- **DSL features silently no-op-ing — the *real* bug** — `compileDSL`'s
+  gate read the round only from `hookCtx.ctx`, which is `undefined` for
+  any hook whose args don't contain a `combatants`-bearing object
+  (onAttackHit, onTakeDamage, onAttackAttempt, onSaveAttempt — i.e. nearly
+  every interesting hook). Round defaulted to 0, default `triggerRound`
+  is 1, so the gate evaluated `0 < 1` → return. Every custom feature on
+  those hooks silently no-op'd regardless of mode or condition. Now round
+  is pulled from any of `ctx` / `dmgCtx` / `rollCtx`, and the same for
+  `combatants` (so predicates like `whenAnyEnemyAlive` actually work on
+  damage hooks). Engine attaches `combatants` to every dmgCtx /
+  rollCtx / saveRollCtx; `resolveAttackMonster` got the same combatants
+  parameter treatment as `resolveAttackPc`.
+- **Gate-trace events** — when the activation gate blocks a custom
+  feature (either `triggerRound` not yet reached or `conditionFn` returns
+  false), the trial log now gets an explanatory event:
+  "`<Feature>: gated — round 1 < triggerRound 3`" or "`<Feature>: gated —
+  condition whenAnyEnemyAlive = false`". Solves the "why isn't my
+  feature firing" debugging problem the previous patches couldn't.
+- **DSL modal legend clarification** — the fieldset above trigger-round
+  used to say "Mode policy — Sustained", which read as "this feature
+  is locked to sustained mode." Renamed to "Activation gate (applies to
+  all PC modes)" with a one-line explanation underneath: the PC's
+  Nova / Sustained / Defensive mode is on the PC card; custom features
+  use the same gate values for every mode (there's no per-mode override
+  in the v1 UI).
 - **Trial-log visibility for all primitives + silent built-in paths** —
   custom features authoring previously failed silently for primitives
   that don't touch damage. Now every state-mutating primitive emits a
