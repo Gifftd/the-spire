@@ -521,7 +521,14 @@ function renderFeatureParamEditor(pmId, featureId) {
 function renderBuiltinParamInput(pmId, featureId, f, field) {
   const current = f.params[field.name] !== undefined ? f.params[field.name] : (field.default !== undefined ? field.default : '');
   const labelText = field.label || field.name;
-  const onChangeBase = `updateBuiltinParam('${pmId}', '${featureId}', ${JSON.stringify(field.name)}, `;
+  // Single-quote the param name so embedded double quotes don't terminate
+  // the outer double-quoted attribute. Same class of bug we just fixed in
+  // dslRenderParamInput; paramSchema field names are valid identifiers.
+  if (!/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(field.name)) {
+    console.warn('renderBuiltinParamInput: refusing non-identifier name "' + field.name + '"');
+    return '';
+  }
+  const onChangeBase = `updateBuiltinParam('${pmId}', '${featureId}', '${field.name}', `;
   if (field.type === 'int') {
     return `<label class="dsl-param-field">${escapeHtml(labelText)}<input type="number" value="${current}" ${field.min!=null?'min="'+field.min+'"':''} ${field.max!=null?'max="'+field.max+'"':''} oninput="${onChangeBase}parseInt(this.value, 10) || 0)"></label>`;
   }
