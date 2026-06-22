@@ -70,6 +70,18 @@ closed:
   or made a save with PCFeatures loaded. Latent in tests because the
   engine test suite doesn't load `pc-features.js`. `combatants` is now an
   optional final parameter, threaded through from `runTrial`.
+- **Trial-log visibility for all primitives + silent built-in paths** —
+  custom features authoring previously failed silently for primitives
+  that don't touch damage. Now every state-mutating primitive emits a
+  descriptive feature event when it actually does something:
+  `addAcBonus`, `addAction`, `addBonusAction`, `flag`, `applyCondition`,
+  and `heal`. Built-in silent paths got the same treatment: Shield logs
+  "blocked the hit (consumed lvl-N slot)" on a successful block, and
+  Bardic Inspiration logs "+X (avg dY) to <ally>'s save/attack" when an
+  inspiration die is spent. Two new helpers (`eventLogFrom`,
+  `emitTrace`) hide the eventLog discovery so primitives don't have to
+  thread it themselves. `rollCtx` now also carries `round` so Shield /
+  Bardic events get the right round number.
 
 **Migration:** None. All changes are purely additive.
 

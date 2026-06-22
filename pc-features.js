@@ -15,6 +15,30 @@
 (function (global) {
   'use strict';
 
+  // Find an event log + round from whichever context arg has them. Used by
+  // primitives and built-in feature hooks to push trace events without
+  // threading the log through every signature.
+  function eventLogFrom(hookCtx) {
+    return (hookCtx && hookCtx.dmgCtx && hookCtx.dmgCtx.eventLog) ||
+           (hookCtx && hookCtx.ctx && hookCtx.ctx.eventLog) ||
+           (hookCtx && hookCtx.rollCtx && hookCtx.rollCtx.eventLog) || null;
+  }
+  function roundFrom(hookCtx) {
+    return (hookCtx && hookCtx.dmgCtx && typeof hookCtx.dmgCtx.round === 'number') ? hookCtx.dmgCtx.round :
+           (hookCtx && hookCtx.ctx    && typeof hookCtx.ctx.round    === 'number') ? hookCtx.ctx.round :
+           0;
+  }
+  function emitTrace(self, hookCtx, featureName, source, summary, extras) {
+    const log = eventLogFrom(hookCtx);
+    if (!log) return;
+    log.push({
+      round: roundFrom(hookCtx), type: 'feature', who: self && self.id,
+      what: (featureName || source || 'Feature') + ': ' + summary,
+      featureName: featureName || source || 'Feature', source: source || 'unknown',
+      ...(extras || {}),
+    });
+  }
+
   const HOOK_NAMES = [
     'onCombatStart',
     'onTurnStart',
@@ -568,6 +592,11 @@
         rollCtx.hits = false;
         state.slotsLeft[lowestAvailable] -= 1;
         self.reactionAvailableThisRound = false;
+        if (rollCtx.eventLog) rollCtx.eventLog.push({
+          round: rollCtx.round || 0, type: 'feature', who: self.id,
+          what: 'Shield: blocked the hit (consumed lvl-' + lowestAvailable + ' slot)',
+          featureName: 'Shield', source: 'shield',
+        });
         return 'consume';
       },
 
@@ -706,6 +735,11 @@
         const expectedValue = (sides + 1) / 2;
         rollCtx.bonus = (rollCtx.bonus || 0) + expectedValue;
         delete state.diceHeldBy[triggering.id];
+        if (rollCtx.eventLog) rollCtx.eventLog.push({
+          round: rollCtx.round || 0, type: 'feature', who: self.id,
+          what: 'Bardic Inspiration: +' + expectedValue + ' (avg ' + die + ') to ' + triggering.id + "'s save",
+          featureName: 'Bardic Inspiration', source: 'bardicInspiration',
+        });
       },
 
       onAttackAttempt(self, triggering, target, rollCtx) {
@@ -720,6 +754,11 @@
         rollCtx.bonus = (rollCtx.bonus || 0) + expectedValue;
         rollCtx.hits = ((rollCtx.roll || 0) + expectedValue) >= (target.ac || 10);
         delete state.diceHeldBy[triggering.id];
+        if (rollCtx.eventLog) rollCtx.eventLog.push({
+          round: rollCtx.round || 0, type: 'feature', who: self.id,
+          what: 'Bardic Inspiration: +' + expectedValue + ' (avg ' + die + ') to ' + triggering.id + "'s attack",
+          featureName: 'Bardic Inspiration', source: 'bardicInspiration',
+        });
       },
     },
   };
@@ -771,7 +810,9 @@
     },
     addAcBonus: {
       apply(self, hookCtx, params) {
-        if (typeof self.ac === 'number') self.ac += Number(params.value) || 0;
+        const v = Number(params.value) || 0;
+        if (typeof self.ac === 'number') self.ac += v;
+        if (v) emitTrace(self, hookCtx, hookCtx && hookCtx.featureName, hookCtx && hookCtx.featureId, '+' + v + ' AC (now ' + self.ac + ')');
       },
       paramSchema: [
         { name: 'value', type: 'int', label: 'AC bonus', default: 2, min: 0, max: 10 },
@@ -804,12 +845,21 @@
     heal: {
       apply(self, hookCtx, params) {
         const amt = Number(params.amount) || 0;
+        if (!amt) return;
         const newHp = (self.hp || 0) + amt;
         if (params.target === 'self' || !params.target) {
+          const before = self.hp;
           self.hp = (typeof self.maxHp === 'number' && self.maxHp > 0) ? Math.min(self.maxHp, newHp) : newHp;
+          const delta = self.hp - before;
+          emitTrace(self, hookCtx, hookCtx && hookCtx.featureName, hookCtx && hookCtx.featureId,
+                    '+' + delta + ' HP (self)', { hpRestored: delta });
         }
         else if (hookCtx && hookCtx.target && hookCtx.target.maxHp) {
-          hookCtx.target.hp = Math.min(hookCtx.target.maxHp, (hookCtx.target.hp || 0) + amt);
+          const before = hookCtx.target.hp || 0;
+          hookCtx.target.hp = Math.min(hookCtx.target.maxHp, before + amt);
+          const delta = hookCtx.target.hp - before;
+          emitTrace(self, hookCtx, hookCtx.featureName, hookCtx.featureId,
+                    '+' + delta + ' HP to ' + hookCtx.target.id, { hpRestored: delta });
         }
       },
       paramSchema: [
@@ -820,9 +870,11 @@
     applyCondition: {
       apply(self, hookCtx, params) {
         const target = (params.target === 'self' || !params.target) ? self : (hookCtx && hookCtx.target);
-        if (!target) return;
+        if (!target || !params.condition) return;
         if (!target.conditions) target.conditions = new Map();
         target.conditions.set(params.condition, Number(params.duration) || 1);
+        emitTrace(self, hookCtx, hookCtx && hookCtx.featureName, hookCtx && hookCtx.featureId,
+                  'applied ' + params.condition + ' to ' + (target === self ? 'self' : target.id) + ' for ' + (params.duration || 1) + ' rounds');
       },
       paramSchema: [
         { name: 'condition', type: 'string', label: 'Condition name', default: '', placeholder: 'prone' },
@@ -842,8 +894,11 @@
     flag: {
       apply(self, hookCtx, params) {
         if (!self.flags) self.flags = {};
+        if (!params.name) return;
         const round = (hookCtx && hookCtx.ctx && typeof hookCtx.ctx.round === 'number') ? hookCtx.ctx.round : 0;
         self.flags[params.name] = { until: round + (Number(params.duration) || 1) };
+        emitTrace(self, hookCtx, hookCtx && hookCtx.featureName, hookCtx && hookCtx.featureId,
+                  'flag "' + params.name + '" set for ' + (params.duration || 1) + ' rounds');
       },
       paramSchema: [
         { name: 'name', type: 'string', label: 'Flag name', default: 'marked', placeholder: 'marked' },
@@ -852,14 +907,21 @@
     },
     addAction: {
       apply(self, hookCtx, params) {
-        self.actionsAvailable = (self.actionsAvailable || 0) + (Number(params.amount) || 1);
+        const n = Number(params.amount) || 1;
+        self.actionsAvailable = (self.actionsAvailable || 0) + n;
+        emitTrace(self, hookCtx, hookCtx && hookCtx.featureName, hookCtx && hookCtx.featureId,
+                  '+' + n + ' action' + (n === 1 ? '' : 's') + ' (now ' + self.actionsAvailable + ')');
       },
       paramSchema: [
         { name: 'amount', type: 'int', label: 'Extra actions', default: 1, min: 1, max: 5 },
       ],
     },
     addBonusAction: {
-      apply(self) { self.bonusActionAvailable = true; },
+      apply(self, hookCtx) {
+        if (self.bonusActionAvailable) return;
+        self.bonusActionAvailable = true;
+        emitTrace(self, hookCtx, hookCtx && hookCtx.featureName, hookCtx && hookCtx.featureId, 'bonus action granted');
+      },
       paramSchema: [],
     },
   };
