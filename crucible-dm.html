@@ -35,6 +35,26 @@
     }
     .empty-state { color:var(--c-ink-faint, #8b9da3); font-style:italic;
                    padding:1rem; text-align:center; }
+    .pc-features-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+    .feature-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 3px; }
+    .feature-row-name { font-family: 'Cinzel', serif; font-size: 0.85rem; flex: 0 0 auto; }
+    .feature-row-summary { font-size: 0.78rem; color: var(--c-ink-faint); flex: 1; }
+    .feature-row-remove { background: none; border: none; color: var(--c-error); font-size: 1.2rem; cursor: pointer; padding: 0 6px; }
+    .feature-tag { font-size: 0.6rem; padding: 1px 6px; border: 1px solid currentColor; border-radius: 4px; margin-left: 4px; }
+    .feature-tag.builtin { color: var(--c-brass); }
+    .feature-tag.homebrew { color: var(--c-teal-bright); }
+    .pc-features-actions { display: flex; gap: 8px; margin-top: 8px; }
+    .dsl-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    .dsl-modal-card { background: var(--c-bg); border: 1px solid var(--c-brass); border-radius: 4px; padding: 1.5rem; min-width: 480px; max-width: 720px; max-height: 80vh; overflow-y: auto; }
+    .dsl-modal-card h3 { font-family: Cinzel, serif; margin: 0 0 1rem; color: var(--c-brass); }
+    .dsl-form label { display: block; margin-bottom: 8px; font-size: 0.85rem; }
+    .dsl-form input, .dsl-form select { width: 100%; background: var(--c-surface); color: var(--c-ink); border: 1px solid var(--c-border); border-radius: 2px; padding: 6px 8px; }
+    .dsl-form fieldset { border: 1px solid var(--c-border); padding: 8px 12px; margin: 12px 0; }
+    .dsl-form legend { color: var(--c-brass); font-family: Cinzel, serif; font-size: 0.75rem; padding: 0 6px; }
+    .dsl-effect-row { display: flex; gap: 6px; margin: 4px 0; align-items: center; }
+    .dsl-effect-row select, .dsl-effect-row input { flex: 1; }
+    .dsl-effect-row button { flex: 0; }
+    .dsl-modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1rem; }
   </style>
 </head>
 <body>
@@ -239,6 +259,42 @@ function renderPCEditor(pm) {
       <button class="btn" style="font-size:0.8rem; margin-top:0.25rem"
         onclick="addAction('${pm.id}')">+ Add action</button>
 
+      ${(() => {
+        const featuresHtml = `
+          <details class="pc-section" id="pc-features-${pm.id}">
+            <summary>Features (${(pm.features || []).length})</summary>
+            <div class="pc-features-list">
+              ${(pm.features || []).map(f => {
+                const def = PCFeatures.resolve(f);
+                if (!def) return '';
+                const sourceTag = f.source === 'homebrew'
+                  ? '<span class="feature-tag homebrew">homebrew</span>'
+                  : '<span class="feature-tag builtin">built-in</span>';
+                return `
+                  <div class="feature-row" data-feature-id="${f.id}">
+                    <div class="feature-row-name">${escapeHtml(def.name)} ${sourceTag}</div>
+                    <div class="feature-row-summary">${escapeHtml(def.summary || '')}</div>
+                    <button class="feature-row-remove" onclick="removeFeatureFromPC('${pm.id}','${f.id}')">×</button>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+            <div class="pc-features-actions">
+              <select onchange="addFeatureFromLibrary('${pm.id}', this.value); this.value=''">
+                <option value="">+ Add from library...</option>
+                ${Object.keys(PCFeatures.LIBRARY).map(id => {
+                  const def = PCFeatures.LIBRARY[id];
+                  const taken = (pm.features || []).some(f => f.id === id);
+                  return `<option value="${id}" ${taken ? 'disabled' : ''}>${escapeHtml(def.name)}${def.classHint ? ' (' + def.classHint + ')' : ''}</option>`;
+                }).join('')}
+              </select>
+              <button onclick="openDSLEditor('${pm.id}')">+ Custom feature...</button>
+            </div>
+          </details>
+        `;
+        return featuresHtml;
+      })()}
+
       <div style="margin-top:0.5rem; display:flex; gap:0.5rem;">
         <button class="btn" style="font-size:0.8rem" onclick="removePC('${pm.id}')">✕ Remove PC</button>
       </div>
@@ -385,6 +441,29 @@ function removePC(id) {
   expandedPC.delete(id);
   saveParty();
   renderParty();
+}
+function addFeatureFromLibrary(pmId, featureId) {
+  if (!featureId) return;
+  const pm = party.find(p => p.id === pmId);
+  const def = PCFeatures.LIBRARY[featureId];
+  if (!pm || !def) return;
+  if ((pm.features || []).some(f => f.id === featureId)) return;
+  if (!Array.isArray(pm.features)) pm.features = [];
+  const params = def.deriveParams ? def.deriveParams(pm) : {};
+  pm.features.push({ id: featureId, source: 'builtin', params });
+  saveParty();
+  renderParty();
+}
+function removeFeatureFromPC(pmId, featureId) {
+  const pm = party.find(p => p.id === pmId);
+  if (!pm) return;
+  pm.features = (pm.features || []).filter(f => f.id !== featureId);
+  saveParty();
+  renderParty();
+}
+function openDSLEditor(pmId) {
+  // Implemented in Task 5.3.
+  alert('DSL editor — implemented in next task.');
 }
 function updateAction(pmId, aId, field, value) {
   const pm = party.find(p => p.id === pmId); if (!pm) return;
