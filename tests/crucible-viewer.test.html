@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>crucible-viewer tests</title>
+<style>
+  body { font-family: monospace; background: #0e1418; color: #dde7e9; padding: 1rem; }
+  .pass { color: #6dd58c; } .fail { color: #d97a7a; }
+  button { padding: 0.5rem 1rem; background: #1d3a4a; color: #dde7e9; border: 1px solid #1c2429; cursor: pointer; }
+  pre { white-space: pre-wrap; margin-top: 0.5rem; }
+  #host { display: none; }
+</style>
+</head>
+<body>
+<h1>crucible-viewer tests</h1>
+<button onclick="runAll()">Run tests</button>
+<pre id="out"></pre>
+<div id="host"></div>
+<script src="../crucible-spatial.js"></script>
+<script src="../crucible-viewer.js"></script>
+<script>
+const TESTS = [];
+function test(name, fn) { TESTS.push({ name, fn }); }
+function assert(cond, msg) { if (!cond) throw new Error(msg || 'assertion failed'); }
+function assertEq(a, b, m) {
+  const x = JSON.stringify(a), y = JSON.stringify(b);
+  if (x !== y) throw new Error((m || 'mismatch') + ': ' + x + ' vs ' + y);
+}
+function runAll() {
+  const out = document.getElementById('out');
+  let passed = 0, failed = 0;
+  const lines = [];
+  for (const t of TESTS) {
+    try { t.fn(); lines.push('<span class="pass">✓ ' + t.name + '</span>'); passed++; }
+    catch (e) { lines.push('<span class="fail">✗ ' + t.name + ' — ' + e.message + '</span>'); failed++; }
+  }
+  lines.push('\n' + passed + ' passed, ' + failed + ' failed');
+  out.innerHTML = lines.join('\n');
+}
+function syntheticTrial() {
+  return {
+    events: [
+      { type: 'placement', round: 0, map: { width: 10, height: 10, blocked: null },
+        placements: [
+          { id: 'pc:1', name: 'PC', side: 'pc', pos: { x: 1, y: 1 }, hp: 30, maxHp: 30, ac: 14, speed: 6 },
+          { id: 'mon:0', name: 'Goblin', side: 'monster', pos: { x: 8, y: 8 }, hp: 7, maxHp: 7, ac: 13, speed: 6 },
+        ] },
+      { type: 'move', round: 1, who: 'pc:1', name: 'PC', from: { x: 1, y: 1 }, to: { x: 4, y: 4 },
+        path: [{x:2,y:2},{x:3,y:3},{x:4,y:4}], reason: 'engage' },
+      { type: 'attack', round: 1, actor: 'PC', target: 'Goblin', action: 'Sword', roll: 17, hit: true, damageDealt: 8,
+        pos: { x: 4, y: 4 }, targetPos: { x: 8, y: 8 } },
+      { type: 'damage', round: 1, actor: 'PC', target: 'Goblin', amount: 8, dmgType: 'slashing', action: 'Sword',
+        pos: { x: 4, y: 4 }, targetPos: { x: 8, y: 8 } },
+    ],
+    rounds: 1, winner: 'pc', partyView: [{ name: 'PC', hp: 30 }],
+  };
+}
+// === Tests below this line ===
+</script>
+</body>
+</html>
