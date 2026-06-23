@@ -139,6 +139,11 @@
                               border: 1px solid var(--c-border); cursor: pointer; }
     .viewer-scrub { flex: 1; }
     .viewer-speed { background: var(--c-surface); color: var(--c-ink); border: 1px solid var(--c-border); }
+    .viewer-legend { display: flex; gap: 0.4rem 0.85rem; flex-wrap: wrap;
+                     margin-top: 0.5rem; font-size: 0.78rem; color: var(--c-ink-faint); }
+    .viewer-legend-item { display: inline-flex; align-items: center; gap: 0.3rem; }
+    .viewer-legend-swatch { display: inline-block; width: 12px; height: 12px;
+                            border-radius: 50%; border: 1px solid var(--c-border); }
     @media (max-width: 1200px) { .viewer-flex { flex-direction: column; } }
   </style>
 </head>
@@ -1699,12 +1704,33 @@ function renderEncounter() {
           <button class="btn" onclick="removePick('${p.pickId}')">✕</button>
         </span>
       </div>
+      <div style="margin-top:0.25rem; font-size:0.78em; color:var(--c-ink-faint);">
+        <b style="color:var(--c-accent);">Spatial:</b>
+        speed ${Crucible.monsterSpeedCells(p.monster)} cells
+        (${p.monster.speedText || (p.monster.speed && p.monster.speed.walk ? p.monster.speed.walk + ' ft.' : '30 ft. default')})
+        · reach ${Crucible.monsterReachCells(p.monster)} cell${Crucible.monsterReachCells(p.monster) > 1 ? 's' : ''}
+      </div>
       <details>
         <summary style="cursor:pointer; color:var(--c-ink-faint); font-size:0.85em">Parsed actions (${p.monster.parsedActions.length})</summary>
         <ul style="font-size:0.8em; margin:0.25rem 0 0; padding-left:1rem;">
-          ${p.monster.parsedActions.map(pa => `
-            <li>${escapeHtml(pa.sourceActionName)} —
-              <span style="color:${pa.kind === 'unparsed' ? '#e77878' : 'var(--c-ink-faint)'}">${pa.kind}</span></li>`).join('')}
+          ${p.monster.parsedActions.map(pa => {
+            const tags = [];
+            if (pa.kind === 'attack') {
+              const r = Crucible.actionRange(pa);
+              const arLabel = pa.actionRange
+                ? pa.actionRange
+                : (Array.isArray(pa.range) ? 'ranged (inferred)' : (typeof pa.reach === 'number' ? 'melee (inferred)' : 'melee (default)'));
+              tags.push(`range ${r}c [${arLabel}]`);
+              if (typeof pa.reach === 'number') tags.push(`reach ${pa.reach}ft`);
+              if (Array.isArray(pa.range)) tags.push(`shot ${pa.range[0]}/${pa.range[1] ?? '—'}ft`);
+            } else if (pa.kind === 'multiattack') {
+              const need = Crucible.multiattackRange(pa, p.monster.parsedActions || []);
+              tags.push(`effective range ${need}c`);
+            }
+            const tagStr = tags.length ? ` <span style="color:var(--c-accent); font-size:0.9em">· ${tags.join(' · ')}</span>` : '';
+            return `<li>${escapeHtml(pa.sourceActionName)} —
+              <span style="color:${pa.kind === 'unparsed' ? '#e77878' : 'var(--c-ink-faint)'}">${pa.kind}</span>${tagStr}</li>`;
+          }).join('')}
         </ul>
         <button class="btn" style="font-size:0.75em; margin-top:0.25rem"
           onclick="openOverridePanel('${p.pickId}')">Review parsed actions</button>
@@ -1740,6 +1766,27 @@ function openOverridePanel(pickId) {
             </span>
           </div>`;
         })()}
+        <div style="margin-bottom:1rem; padding:0.5rem; border:1px solid var(--c-border); border-radius:4px;">
+          <b style="color:var(--c-accent);">Spatial:</b>
+          <label style="margin-left:0.5rem;">Speed (ft)
+            <input type="number" min="0" step="5"
+              value="${(m.speed && m.speed.walk) || ''}"
+              placeholder="30"
+              class="pc-input"
+              oninput="overrideMonsterSpeed('${pickId}', this.value)">
+          </label>
+          <label style="margin-left:0.5rem;">Reach (ft)
+            <input type="number" min="0" step="5"
+              value="${typeof m.reach === 'number' ? m.reach : ''}"
+              placeholder="5"
+              class="pc-input"
+              oninput="overrideMonsterReach('${pickId}', this.value)">
+          </label>
+          <span style="margin-left:0.5rem; color:var(--c-ink-faint); font-size:0.85em">
+            → engine: ${Crucible.monsterSpeedCells(m)} cell speed,
+            ${Crucible.monsterReachCells(m)} cell reach
+          </span>
+        </div>
         <div id="override-list"></div>
         ${m.regeneration ? `
           <div style="margin-top:1rem; padding:0.5rem; border:1px solid var(--c-border); border-radius:4px;">
@@ -1779,7 +1826,29 @@ function renderOverrideList(pick, root) {
 
 function renderOverrideFields(pa, pickId, idx) {
   if (pa.kind === 'attack') {
+    const arOpts = ['melee', 'ranged', 'both']
+      .map(v => `<option value="${v}" ${pa.actionRange === v ? 'selected' : ''}>${v}</option>`).join('');
+    const arEmptyOpt = pa.actionRange ? '' : '<option value="" selected>(unset → defaults to melee)</option>';
+    const rangeNear = Array.isArray(pa.range) ? pa.range[0] : '';
+    const rangeFar  = Array.isArray(pa.range) && pa.range[1] != null ? pa.range[1] : '';
+    const cells = Crucible.actionRange(pa);
     return `
+      <div style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:flex-end;">
+        <label>Attack type
+          <select onchange="overrideActionRange('${pickId}', ${idx}, this.value)">
+            ${arEmptyOpt}${arOpts}
+          </select></label>
+        <label>Reach (ft)
+          <input type="number" min="0" step="5" value="${pa.reach ?? ''}" class="pc-input"
+            oninput="overrideField('${pickId}', ${idx}, 'reach', this.value === '' ? null : parseInt(this.value))"></label>
+        <label>Range near (ft)
+          <input type="number" min="0" step="5" value="${rangeNear}" class="pc-input"
+            oninput="overrideRangeNear('${pickId}', ${idx}, this.value)"></label>
+        <label>Range far (ft)
+          <input type="number" min="0" step="5" value="${rangeFar}" class="pc-input"
+            oninput="overrideRangeFar('${pickId}', ${idx}, this.value)"></label>
+        <span style="color:var(--c-accent); font-size:0.85em">→ engine reads ${cells} cell${cells === 1 ? '' : 's'}</span>
+      </div>
       <label>To-hit <input type="number" value="${pa.toHit ?? 0}" class="pc-input"
         oninput="overrideField('${pickId}', ${idx}, 'toHit', parseInt(this.value)||0)"></label>
       <label>Damage entries (one per line: dice±mod type, e.g. "1d8+3 slashing")
@@ -1863,6 +1932,52 @@ function overrideDamageOnFailList(pickId, idx, raw) {
   pa.damageOnFail = parseDamageLines(raw);
   pa.parsedBy = 'manual';
 }
+function overrideActionRange(pickId, idx, value) {
+  const pick = picks.find(p => p.pickId === pickId); if (!pick) return;
+  const pa = pick.monster.parsedActions[idx]; if (!pa) return;
+  pa.actionRange = value || null;
+  pa.parsedBy = 'manual';
+  // Re-render the pick row so the spatial summary picks up the new value.
+  renderEncounter();
+}
+function overrideRangeNear(pickId, idx, raw) {
+  const pick = picks.find(p => p.pickId === pickId); if (!pick) return;
+  const pa = pick.monster.parsedActions[idx]; if (!pa) return;
+  const n = raw === '' ? null : parseInt(raw, 10);
+  if (n == null) { pa.range = null; }
+  else {
+    const far = Array.isArray(pa.range) ? pa.range[1] : null;
+    pa.range = [n, far];
+  }
+  pa.parsedBy = 'manual';
+  renderEncounter();
+}
+function overrideRangeFar(pickId, idx, raw) {
+  const pick = picks.find(p => p.pickId === pickId); if (!pick) return;
+  const pa = pick.monster.parsedActions[idx]; if (!pa) return;
+  const f = raw === '' ? null : parseInt(raw, 10);
+  const near = Array.isArray(pa.range) ? pa.range[0] : null;
+  if (near == null && f == null) pa.range = null;
+  else pa.range = [near, f];
+  pa.parsedBy = 'manual';
+  renderEncounter();
+}
+function overrideMonsterSpeed(pickId, ftValue) {
+  const pick = picks.find(p => p.pickId === pickId); if (!pick) return;
+  const ft = parseInt(ftValue, 10);
+  if (!Number.isFinite(ft) || ft <= 0) return;
+  pick.monster.speed = { ...(pick.monster.speed || {}), walk: ft };
+  pick.monster.speedText = ft + ' ft.';
+  renderEncounter();
+}
+function overrideMonsterReach(pickId, ftValue) {
+  const pick = picks.find(p => p.pickId === pickId); if (!pick) return;
+  const ft = parseInt(ftValue, 10);
+  if (!Number.isFinite(ft) || ft <= 0) { pick.monster.reach = null; }
+  else pick.monster.reach = ft;
+  renderEncounter();
+}
+
 function overrideMultiattackPlan(pickId, idx, raw) {
   const pick = picks.find(p => p.pickId === pickId); if (!pick) return;
   const pa = pick.monster.parsedActions[idx]; if (!pa) return;

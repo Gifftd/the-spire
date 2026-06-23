@@ -17,6 +17,28 @@
   const CELL = 24;  // pixels per cell
   CrucibleViewer.CELL = CELL;
 
+  // Distinct, theme-friendly fill colors for PC tokens. Selected so the
+  // dark-bg first-letter glyph stays legible on every swatch. Order is
+  // deliberate — first PCs get the most distinctive hues.
+  const PC_PALETTE = [
+    '#7ec5c5', // teal (the existing accent)
+    '#d4a85a', // amber/brass
+    '#c87cd4', // violet
+    '#e08a8a', // rose
+    '#7ad4e0', // cyan
+    '#a5d47a', // lime
+    '#e0b07a', // peach
+    '#9a8de0', // periwinkle
+  ];
+  CrucibleViewer.PC_PALETTE = PC_PALETTE;
+  function pcColor(id) {
+    let h = 0;
+    const s = String(id || '');
+    for (let i = 0; i < s.length; i++) h = ((h * 31) + s.charCodeAt(i)) >>> 0;
+    return PC_PALETTE[h % PC_PALETTE.length];
+  }
+  CrucibleViewer.pcColor = pcColor;
+
   function initialState(placementEvent) {
     if (!placementEvent || placementEvent.type !== 'placement') {
       return { map: { width: 20, height: 20, blocked: null }, combatants: [],
@@ -26,6 +48,7 @@
       id: p.id, name: p.name, side: p.side,
       x: p.pos.x, y: p.pos.y,
       hp: p.hp, maxHp: p.maxHp, ac: p.ac, speed: p.speed,
+      color: p.side === 'pc' ? pcColor(p.id) : null,
       dead: false, downed: false,
     }));
     return { map: placementEvent.map, combatants, lastMove: null, lastAoE: null };
@@ -99,8 +122,12 @@
       const dead = c.dead ? ' dead' : '';
       const downed = c.downed ? ' downed' : '';
       const hpFrac = c.maxHp ? Math.max(0, c.hp / c.maxHp) : 1;
+      // Per-PC fill so multiple PCs are visually distinct. Monsters keep
+      // their CSS-driven red. Downed PCs fall back to the grey downed style.
+      const fillStyle = (c.side === 'pc' && c.color && !c.downed)
+        ? ` style="fill:${c.color}"` : '';
       return `<g class="${cls}${dead}${downed}" data-id="${c.id}" transform="translate(${cx}, ${cy})">
-        <circle r="${r}" />
+        <circle r="${r}"${fillStyle} />
         <text dy="0.35em" text-anchor="middle">${(c.name || '?').charAt(0)}</text>
         <rect class="hp-bar" x="${-r}" y="${-r - 6}" width="${2*r*hpFrac}" height="3" />
       </g>`;
@@ -162,6 +189,16 @@
       timer: null,
     };
 
+    // Build a tiny legend so the per-PC colors are decodable at a glance.
+    const pcs = state.combatants.filter(c => c.side === 'pc');
+    const legendHtml = pcs.length
+      ? '<div class="viewer-legend">' + pcs.map(c =>
+          `<span class="viewer-legend-item">` +
+            `<span class="viewer-legend-swatch" style="background:${c.color || '#7ec5c5'};"></span>` +
+            `<span class="viewer-legend-name">${escapeText(c.name)}</span>` +
+          `</span>`
+        ).join('') + '</div>'
+      : '';
     host.innerHTML = `<div class="viewer-flex">
       <div class="viewer-left">
         <div class="viewer-board"></div>
@@ -177,6 +214,7 @@
             <option value="150">4×</option>
           </select>
         </div>
+        ${legendHtml}
       </div>
       <div class="viewer-log"></div>
     </div>`;

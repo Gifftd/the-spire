@@ -113,9 +113,57 @@
   // v2 spatial: resolve an action's range in cells. Honors explicit
   // action.range; falls back to deriving from actionRange string.
   function actionRange(action) {
+    // Explicit cell-range override (PC-side, or hand-tuned).
     if (typeof action.range === 'number') return action.range;
+    // Parsed-monster ranged weapon: range = [near, far] in feet.
+    if (Array.isArray(action.range) && typeof action.range[0] === 'number') {
+      return Math.max(1, Math.floor(action.range[0] / 5));
+    }
+    // PC-side 'ranged' marker (no explicit cell range).
     if (action.actionRange === 'ranged') return 6;
+    // Parsed-monster melee reach in feet (e.g., 5, 10).
+    if (typeof action.reach === 'number') {
+      return Math.max(1, Math.floor(action.reach / 5));
+    }
     return 1;
+  }
+
+  // Derive a monster's walking speed in cells from whatever shape the
+  // bestiary data uses. Bestiary records can be { walk: 30 }, a bare number,
+  // or just a "30 ft." string in speedText. Defaults to 6 cells (30 ft).
+  function monsterSpeedCells(m) {
+    if (!m) return 6;
+    if (m.speed && typeof m.speed.walk === 'number') return Math.max(1, Math.floor(m.speed.walk / 5));
+    if (typeof m.speed === 'number') return Math.max(1, Math.floor(m.speed / 5));
+    const text = typeof m.speedText === 'string' ? m.speedText
+                 : (typeof m.speed === 'string' ? m.speed : '');
+    if (text) {
+      const mm = /(\d+)\s*(?:ft|feet|')/i.exec(text) || /^(\d+)$/.exec(text.trim());
+      if (mm) return Math.max(1, Math.floor(parseInt(mm[1], 10) / 5));
+    }
+    return 6;
+  }
+
+  // Natural melee reach in cells. m.reach is feet on imported records;
+  // legacy custom records may already be in cells.
+  function monsterReachCells(m) {
+    if (!m) return 1;
+    if (typeof m.reach !== 'number') return 1;
+    return m.reach >= 5 ? Math.max(1, Math.floor(m.reach / 5)) : Math.max(1, m.reach);
+  }
+
+  // For multiattack actions, the effective range is the max of any sub-action's
+  // range. Monster moves to within that range, then resolveMultiattack picks
+  // which sub-attacks to fire per-target.
+  function multiattackRange(action, allActions) {
+    if (action.kind !== 'multiattack' || !Array.isArray(action.multiattackPlan)) return 1;
+    let maxR = 0;
+    for (const step of action.multiattackPlan) {
+      const sub = allActions.find(a =>
+        (a.sourceActionName || a.name) === step.actionName);
+      if (sub) maxR = Math.max(maxR, actionRange(sub));
+    }
+    return Math.max(1, maxR);
   }
 
   function targetSaveBonus(target, ability) {
@@ -579,8 +627,8 @@
           damageTypesReceivedThisTurn: new Set(),
           lastHealRound: -99,
           regeneration: m.regeneration || null,
-          speed: Math.max(1, Math.floor(((m.speed && m.speed.walk) || 30) / 5)),
-          naturalReach: typeof m.reach === 'number' ? Math.max(1, Math.floor(m.reach / 5)) : 1,
+          speed: monsterSpeedCells(m),
+          naturalReach: monsterReachCells(m),
           x: 0, y: 0,
           reactionAvailableThisRound: true,
         });
@@ -1311,14 +1359,18 @@
           }
           // v2 spatial: range check + cell-by-cell movement, firing OoA on
           // any enemy whose reach the mover leaves during the path.
-          if (action && action.kind !== 'multiattack'
-              && (!action.shape || action.shape === 'single')
+          if (action && (!action.shape || action.shape === 'single')
               && typeof CrucibleSpatial !== 'undefined') {
             const tgtCandidate = (c.side === 'monster' && targets && targets[0])
               ? targets[0]
               : pickEnemyTarget(c, all, tactics, rng, action);
             if (tgtCandidate) {
-              const need = actionRange(action);
+              const myActions = c.side === 'pc'
+                ? ((c.pm && c.pm.actions) || []).map(a => ({ ...a, sourceActionName: a.sourceActionName || a.name }))
+                : ((c.monster && c.monster.parsedActions) || []);
+              const need = action.kind === 'multiattack'
+                ? multiattackRange(action, myActions)
+                : actionRange(action);
               let dist = CrucibleSpatial.chebyshev(c, tgtCandidate);
               if (dist > need) {
                 const path = CrucibleSpatial.findPath(
@@ -1772,7 +1824,9 @@
     applyDamage, resolveMultiattack, pickAction,
     runTrial, runSim,
     // Role-policy helpers
-    clamp01, sumDice, actionIsMelee, actionIsRanged, actionRange, targetSaveBonus, actionEv,
+    clamp01, sumDice, actionIsMelee, actionIsRanged, actionRange, multiattackRange,
+    monsterSpeedCells, monsterReachCells,
+    targetSaveBonus, actionEv,
     tagActions, bestEvAction, lowestPick, targetsInBucket,
     rangedness, bucket, position, positionOf,
     crHpMedian, inferRole, resolveRole, normalizeRole,

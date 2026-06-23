@@ -101,9 +101,18 @@
     const th = body.match(TOHIT_RE);
     const reachM = body.match(REACH_RE);
     const rangeM = body.match(RANGE_RE);
+    // Distinguish melee vs ranged from the header so v2 spatial code can
+    // route correctly even when the body omits explicit "reach"/"range" text.
+    const headerMatch = body.match(ATTACK_HEADER_RE);
+    const header = headerMatch ? headerMatch[0] : '';
+    let actionRange = null;
+    if (/Melee\s+or\s+Ranged/i.test(header))      actionRange = 'both';
+    else if (/Ranged/i.test(header))              actionRange = 'ranged';
+    else if (/Melee/i.test(header))               actionRange = 'melee';
     return {
       sourceActionName: actionName,
       kind: 'attack',
+      actionRange,
       toHit: th ? parseInt(th[1], 10) : 0,
       reach: reachM ? parseInt(reachM[1], 10) : null,
       range: rangeM ? [parseInt(rangeM[1], 10), rangeM[2] ? parseInt(rangeM[2], 10) : null] : null,
