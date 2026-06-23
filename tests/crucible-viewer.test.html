@@ -66,6 +66,43 @@ test('initialState: extracts combatants + map from placement event', () => {
   assertEq(pc.y, 1);
   assertEq(pc.hp, 30);
 });
+
+test('applyEvent: move updates combatant position', () => {
+  const trial = syntheticTrial();
+  const state = CrucibleViewer.initialState(trial.events[0]);
+  CrucibleViewer.applyEvent(state, trial.events[1]);
+  const pc = state.combatants.find(c => c.id === 'pc:1');
+  assertEq(pc.x, 4);
+  assertEq(pc.y, 4);
+});
+
+test('applyEvent: damage event reduces target hp', () => {
+  const trial = syntheticTrial();
+  const state = CrucibleViewer.initialState(trial.events[0]);
+  CrucibleViewer.applyEvent(state, { type: 'damage', target: 'Goblin', amount: 5 });
+  const mon = state.combatants.find(c => c.name === 'Goblin');
+  assertEq(mon.hp, 2);
+});
+
+test('applyEvent: damage to 0 marks dead (monster) / downed (pc)', () => {
+  const trial = syntheticTrial();
+  const state = CrucibleViewer.initialState(trial.events[0]);
+  CrucibleViewer.applyEvent(state, { type: 'damage', target: 'Goblin', amount: 99 });
+  const mon = state.combatants.find(c => c.name === 'Goblin');
+  assertEq(mon.hp, 0);
+  assert(mon.dead);
+});
+
+test('applyEvent: aoe event records lastAoE', () => {
+  const trial = syntheticTrial();
+  const state = CrucibleViewer.initialState(trial.events[0]);
+  CrucibleViewer.applyEvent(state, {
+    type: 'aoe', shape: 'sphere', center: { x: 5, y: 5 }, size: 2,
+    cellsCovered: [{x:4,y:4},{x:5,y:5},{x:6,y:6}], targets: [],
+  });
+  assert(state.lastAoE);
+  assertEq(state.lastAoE.shape, 'sphere');
+});
 </script>
 </body>
 </html>
