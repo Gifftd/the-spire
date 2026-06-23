@@ -814,6 +814,17 @@
   // ─────────── Resolve a monster-side attack action ───────────
   // For a PC-side attack, the engine uses resolveAttackPc (next task block).
   function resolveAttackMonster(me, target, action, rng, events, round, combatants) {
+    // v2 spatial: refuse out-of-range. Prevents callers from triggering the
+    // target's onAttackAttempt hooks (Shield etc.) from a position that
+    // could never have hit. Returns a deterministic miss so callers that
+    // tally results still get a sensible object back.
+    if (typeof CrucibleSpatial !== 'undefined'
+        && typeof me.x === 'number' && typeof target.x === 'number') {
+      const need = actionRange(action);
+      if (CrucibleSpatial.chebyshev(me, target) > need) {
+        return { roll: 0, crit: false, hit: false, damageDealt: 0, damageByType: {} };
+      }
+    }
     me.hasAttacked = true;
     const roll = rollDie(20, rng);
     const isCrit = roll === 20;
@@ -850,6 +861,14 @@
   // combatants is optional; required only for the broadcast onAttackAttempt
   // hook (Bardic Inspiration etc.). Tests call without it.
   function resolveAttackPc(me, target, action, rng, events, round, combatants) {
+    // v2 spatial: refuse out-of-range, same as resolveAttackMonster.
+    if (typeof CrucibleSpatial !== 'undefined'
+        && typeof me.x === 'number' && typeof target.x === 'number') {
+      const need = actionRange(action);
+      if (CrucibleSpatial.chebyshev(me, target) > need) {
+        return { roll: 0, crit: false, hit: false, damageDealt: 0, damageByType: {} };
+      }
+    }
     // PC actions store inputs; derive to-hit + damage roll.
     const th = toHit(me.pm, action);
     const roll = rollDie(20, rng);
@@ -935,11 +954,20 @@
   function executeMove(c, target, maxSteps, reason, combatants, map, rng, events, round) {
     if (typeof CrucibleSpatial === 'undefined') return 0;
     if (maxSteps <= 0) return 0;
+    // Build occupied-cells set so the path can't pass through other
+    // combatants. Self is excluded (we're leaving), and the target's cell
+    // is implicitly avoided by stopWhenAdjacent.
+    const occupied = new Set();
+    for (const d of combatants) {
+      if (d === c || d.dead || d.downed) continue;
+      if (typeof d.x !== 'number' || typeof d.y !== 'number') continue;
+      occupied.add(d.x + ',' + d.y);
+    }
     const path = CrucibleSpatial.findPath(
       { x: c.x, y: c.y },
       { x: target.x, y: target.y },
       map,
-      { maxSteps, stopWhenAdjacent: target }
+      { maxSteps, stopWhenAdjacent: target, occupied }
     );
     if (path.length === 0) return 0;
     const from = { x: c.x, y: c.y };
@@ -1188,6 +1216,16 @@
       for (let i = 0; i < (step.count || 1); i++) {
         const tgt = pickSubTarget(sub);
         if (!tgt) break;
+        // v2 spatial: skip sub-attacks whose own range can't reach this
+        // target. Multiattack range is the max across sub-actions so the
+        // monster moves close enough for at least one sub-attack; the
+        // shorter-ranged sub-attacks are silently dropped per swing.
+        if (typeof CrucibleSpatial !== 'undefined'
+            && typeof me.x === 'number' && typeof tgt.x === 'number') {
+          const subNeed = actionRange(sub);
+          const subDist = CrucibleSpatial.chebyshev(me, tgt);
+          if (subDist > subNeed) continue;
+        }
         if (sub.kind === 'attack') {
           const r = me.side === 'monster'
             ? resolveAttackMonster(me, tgt, sub, rng, events, round, all)

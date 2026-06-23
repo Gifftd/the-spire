@@ -24,6 +24,11 @@
     options = options || {};
     const maxSteps = options.maxSteps != null ? options.maxSteps : Infinity;
     const stopAdj = options.stopWhenAdjacent || null;
+    // v2 spatial: occupied cells (other combatants) — treated as blocked so
+    // movers can't path through allies/enemies. The target's cell is
+    // implicitly allowed since stopWhenAdjacent stops one cell short.
+    // Pass a Set of "x,y" strings, or omit for no occupancy filtering.
+    const occupied = options.occupied || null;
 
     if (start.x === goal.x && start.y === goal.y) return [];
 
@@ -31,7 +36,11 @@
     const blocked = map.blocked;
 
     function inBounds(x, y) { return x >= 0 && x < w && y >= 0 && y < h; }
-    function isBlocked(x, y) { return blocked && blocked[y] && blocked[y][x] === true; }
+    function isBlocked(x, y) {
+      if (blocked && blocked[y] && blocked[y][x] === true) return true;
+      if (occupied && occupied.has(x + ',' + y)) return true;
+      return false;
+    }
     function key(x, y) { return y * w + x; }
     function heuristic(x, y) { return Math.max(Math.abs(goal.x - x), Math.abs(goal.y - y)); }
 
