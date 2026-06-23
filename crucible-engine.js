@@ -869,6 +869,13 @@
         return { roll: 0, crit: false, hit: false, damageDealt: 0, damageByType: {} };
       }
     }
+    // Pre-attack hook — fires only when the attack will actually proceed (i.e.
+    // the range guard above didn't bail). Used by Rage, Action Surge, etc.
+    // PC-only by design; resolveAttackMonster does not dispatch this hook.
+    if (me.side === 'pc' && typeof PCFeatures !== 'undefined') {
+      PCFeatures.dispatchHook(me, 'onBeforeOwnAttack', action, target,
+        { round, combatants: combatants || [], eventLog: events });
+    }
     // PC actions store inputs; derive to-hit + damage roll.
     const th = toHit(me.pm, action);
     const roll = rollDie(20, rng);

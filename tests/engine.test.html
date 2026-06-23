@@ -24,6 +24,7 @@
 
 <script src="../crucible-parser.js"></script>
 <script src="../crucible-spatial.js"></script>
+<script src="../pc-features.js"></script>
 <script src="../crucible-engine.js"></script>
 <script>
 const TESTS = [];
@@ -2061,6 +2062,89 @@ test('runTrial: combatants do not stack on the same cell during movement', () =>
   const cells = Array.from(finalPositions.values()).map(p => p.x + ',' + p.y);
   const distinct = new Set(cells);
   assertEq(distinct.size, cells.length, 'no two combatants share a cell after move resolution');
+});
+
+test('runTrial: Rage does NOT activate when PC dashes instead of attacking', () => {
+  // Barbarian with speed 0 so they can never reach the dummy. The PC will
+  // try to engage every turn but get no movement — they never swing.
+  // Rage must stay inactive (it used to fire at onCombatStart on round 1).
+  const pm = {
+    id: 'pm1', identity: { name: 'Barb', level: 5 },
+    abilities: { dex: 14, str: 18 },
+    combat: { hp: 60, maxHp: 60, ac: 14, initBonus: 0, speed: 0 },
+    actions: [{ type: 'attack', name: 'Greatsword', actionRange: 'melee',
+                atkAbility: 'str', damage: { dice: '2d6', mod: '+atkAbility', type: 'slashing' } }],
+    tactics: { aiHint: 'focus', mode: 'sustained' },
+    features: [{ id: 'rage', source: 'builtin', params: { duration: 10, bonusDamage: 2 } }],
+  };
+  const dummy = { pickId: 'dum', name: 'Dummy', cr: '0', count: 1,
+    monster: { name: 'Dummy', ac: 30, hp: 200, maxHp: 200, initiative: -20,
+               abilities: { str: { mod: 0 } }, speed: { walk: 0 },
+               parsedActions: [] } };
+  const party = [pm];
+  party._encounter = {
+    map: { width: 30, height: 10, blocked: null },
+    placement: [{ id: 'pc:pm1', x: 1, y: 5 }, { id: 'dum:1', x: 28, y: 5 }],
+  };
+  const rng = () => 0.5;
+  const trial = Crucible.runTrial(party, [dummy], { aiHint: 'focus' }, rng);
+  // PC can never reach Dummy. Rage should NOT have a matching activation event.
+  const rageEvent = trial.events.find(e =>
+    e.type === 'feature' && e.featureName === 'Rage' && e.what && e.what.includes('activated'));
+  assertEq(rageEvent, undefined, 'Rage should not activate before the barbarian actually attacks');
+});
+
+test('runTrial: Action Surge does NOT consume a use when PC dashes instead of attacking', () => {
+  // Speed 0 so the fighter never reaches the dummy and never swings.
+  const pm = {
+    id: 'pm1', identity: { name: 'Fighter', level: 5 },
+    abilities: { dex: 14, str: 18 },
+    combat: { hp: 60, maxHp: 60, ac: 14, initBonus: 0, speed: 0 },
+    actions: [{ type: 'attack', name: 'Greatsword', actionRange: 'melee',
+                atkAbility: 'str', damage: { dice: '2d6', mod: '+atkAbility', type: 'slashing' } }],
+    tactics: { aiHint: 'focus', mode: 'sustained' },
+    features: [{ id: 'actionSurge', source: 'builtin', params: { maxUses: 1 } }],
+  };
+  const dummy = { pickId: 'dum', name: 'Dummy', cr: '0', count: 1,
+    monster: { name: 'Dummy', ac: 30, hp: 200, maxHp: 200, initiative: -20,
+               abilities: { str: { mod: 0 } }, speed: { walk: 0 },
+               parsedActions: [] } };
+  const party = [pm];
+  party._encounter = {
+    map: { width: 30, height: 10, blocked: null },
+    placement: [{ id: 'pc:pm1', x: 1, y: 5 }, { id: 'dum:1', x: 28, y: 5 }],
+  };
+  const rng = () => 0.5;
+  const trial = Crucible.runTrial(party, [dummy], { aiHint: 'focus' }, rng);
+  const surgeEvent = trial.events.find(e =>
+    e.type === 'feature' && e.featureName === 'Action Surge');
+  assertEq(surgeEvent, undefined, 'Action Surge should not fire when no attack happens');
+});
+
+test('runTrial: Rage DOES activate on first actual melee attack', () => {
+  const pm = {
+    id: 'pm1', identity: { name: 'Barb', level: 5 },
+    abilities: { dex: 14, str: 18 },
+    combat: { hp: 60, maxHp: 60, ac: 14, initBonus: 0, speed: 6 },
+    actions: [{ type: 'attack', name: 'Greatsword', actionRange: 'melee',
+                atkAbility: 'str', damage: { dice: '2d6', mod: '+atkAbility', type: 'slashing' } }],
+    tactics: { aiHint: 'focus', mode: 'sustained' },
+    features: [{ id: 'rage', source: 'builtin', params: { duration: 10, bonusDamage: 2 } }],
+  };
+  const dummy = { pickId: 'dum', name: 'Dummy', cr: '0', count: 1,
+    monster: { name: 'Dummy', ac: 10, hp: 200, maxHp: 200, initiative: -20,
+               abilities: { str: { mod: 0 } }, speed: { walk: 0 },
+               parsedActions: [] } };
+  const party = [pm];
+  party._encounter = {
+    map: { width: 10, height: 10, blocked: null },
+    placement: [{ id: 'pc:pm1', x: 5, y: 5 }, { id: 'dum:1', x: 6, y: 5 }],
+  };
+  const rng = () => 0.5;
+  const trial = Crucible.runTrial(party, [dummy], { aiHint: 'focus' }, rng);
+  const rageEvent = trial.events.find(e =>
+    e.type === 'feature' && e.featureName === 'Rage' && e.what && e.what.includes('activated'));
+  assertTrue(rageEvent, 'Rage should activate when the barbarian swings');
 });
 </script>
 </body>

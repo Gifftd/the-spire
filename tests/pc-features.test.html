@@ -61,8 +61,8 @@
     // ── Tests ──
     group('Hook surface');
 
-    test('HOOK_NAMES exports all 9 expected names', () => {
-      const expected = ['onCombatStart','onTurnStart','onAttackAttempt','onAttackHit','onTakeDamage','onSaveAttempt','onAllyDowned','onMonsterDowned','onRoundEnd'];
+    test('HOOK_NAMES exports all 10 expected names', () => {
+      const expected = ['onCombatStart','onTurnStart','onAttackAttempt','onAttackHit','onTakeDamage','onSaveAttempt','onAllyDowned','onMonsterDowned','onRoundEnd','onBeforeOwnAttack'];
       assertEq(PCFeatures.HOOK_NAMES, expected);
     });
 
@@ -293,17 +293,31 @@
       assertEq(r16.bonusDamage, 4);
     });
 
-    test('Rage: onCombatStart activates under Nova mode at round 1', () => {
+    test('Rage: onBeforeOwnAttack activates under Nova mode on first melee swing', () => {
       const rage = PCFeatures.LIBRARY.rage;
       const self = {
         pm: { features: [{id:'rage', params:{bonusDamage:2, duration:10}}], tactics: {mode:'nova'} },
         featureState: { rage: rage.initialState(rage) },
-        hp: 30, maxHp: 30,
+        hp: 30, maxHp: 30, id: 'pc:test',
       };
-      const ctx = { round: 1, combatants: [self, {side:'monster', dead:false}] };
-      rage.hooks.onCombatStart(self, ctx);
+      const action = { kind: 'attack', actionRange: 'melee' };
+      const attackCtx = { round: 1, combatants: [self, {side:'monster', dead:false}], eventLog: [] };
+      rage.hooks.onBeforeOwnAttack.call(rage, self, action, {}, attackCtx);
       assertEq(self.featureState.rage.active, true);
       assertEq(self.featureState.rage.roundsLeft, 10);
+    });
+
+    test('Rage: onBeforeOwnAttack does NOT activate on a ranged attack', () => {
+      const rage = PCFeatures.LIBRARY.rage;
+      const self = {
+        pm: { features: [{id:'rage', params:{bonusDamage:2, duration:10}}], tactics: {mode:'nova'} },
+        featureState: { rage: rage.initialState(rage) },
+        hp: 30, maxHp: 30, id: 'pc:test',
+      };
+      const action = { kind: 'attack', actionRange: 'ranged' };
+      const attackCtx = { round: 1, combatants: [self, {side:'monster', dead:false}], eventLog: [] };
+      rage.hooks.onBeforeOwnAttack.call(rage, self, action, {}, attackCtx);
+      assertEq(self.featureState.rage.active, false);
     });
 
     test('Rage: onAttackHit pushes a pre-rolled bonus die on melee hits when active', () => {
@@ -443,27 +457,49 @@
       assertEq(self.featureState.actionSurge.usesLeft, 1);
     });
 
-    test('Action Surge under Nova: fires at round 1, grants +1 actionsAvailable', () => {
+    test('Action Surge under Nova: fires on first own attack, grants +1 actionsAvailable', () => {
       const as = PCFeatures.LIBRARY.actionSurge;
       const self = {
+        id: 'pc:fighter',
         pm: { features: [{id:'actionSurge'}], tactics: {mode:'nova'} },
         featureState: { actionSurge: { usesLeft: 1 } },
         actionsAvailable: 1,
       };
-      as.hooks.onTurnStart(self, { round: 1, combatants: [{side:'monster', dead:false}] });
+      const attackCtx = { round: 1, combatants: [{side:'monster', dead:false}], eventLog: [] };
+      as.hooks.onBeforeOwnAttack.call(as, self, { kind:'attack' }, {}, attackCtx);
       assertEq(self.actionsAvailable, 2);
       assertEq(self.featureState.actionSurge.usesLeft, 0);
+      assertEq(self.featureState.actionSurge._firedThisTurn, true);
     });
 
-    test('Action Surge under Sustained: does not fire round 1', () => {
+    test('Action Surge: _firedThisTurn prevents firing twice in one turn', () => {
       const as = PCFeatures.LIBRARY.actionSurge;
       const self = {
-        pm: { features: [{id:'actionSurge'}], tactics: {mode:'sustained'} },
-        featureState: { actionSurge: { usesLeft: 1 } },
+        id: 'pc:fighter',
+        pm: { features: [{id:'actionSurge'}], tactics: {mode:'nova'} },
+        featureState: { actionSurge: { usesLeft: 2 } },  // Two uses available
         actionsAvailable: 1,
       };
-      as.hooks.onTurnStart(self, { round: 1, combatants: [{side:'monster', dead:false}] });
-      assertEq(self.actionsAvailable, 1);
+      const attackCtx = { round: 1, combatants: [{side:'monster', dead:false}], eventLog: [] };
+      as.hooks.onBeforeOwnAttack.call(as, self, { kind:'attack' }, {}, attackCtx);
+      as.hooks.onBeforeOwnAttack.call(as, self, { kind:'attack' }, {}, attackCtx);  // second swing this turn
+      assertEq(self.actionsAvailable, 2);                  // only +1, not +2
+      assertEq(self.featureState.actionSurge.usesLeft, 1); // only one use spent
+    });
+
+    test('Action Surge: onTurnStart resets _firedThisTurn so next turn can surge', () => {
+      const as = PCFeatures.LIBRARY.actionSurge;
+      const self = {
+        id: 'pc:fighter',
+        pm: { features: [{id:'actionSurge'}], tactics: {mode:'nova'} },
+        featureState: { actionSurge: { usesLeft: 2, _firedThisTurn: true } },
+        actionsAvailable: 1,
+      };
+      as.hooks.onTurnStart(self, { round: 2, combatants: [] });
+      assertEq(self.featureState.actionSurge._firedThisTurn, false);
+      const attackCtx = { round: 2, combatants: [{side:'monster', dead:false}], eventLog: [] };
+      as.hooks.onBeforeOwnAttack.call(as, self, { kind:'attack' }, {}, attackCtx);
+      assertEq(self.actionsAvailable, 2);
       assertEq(self.featureState.actionSurge.usesLeft, 1);
     });
 
@@ -475,22 +511,41 @@
         featureState: { actionSurge: { usesLeft: 1 } },
         actionsAvailable: 1,
       };
-      const ctx = { round: 3, combatants: [
+      const attackCtx = { round: 3, combatants: [
         self,
         { id:'pc:cleric', side:'pc', downed:true },
-      ]};
-      as.hooks.onTurnStart(self, ctx);
+      ], eventLog: [] };
+      as.hooks.onBeforeOwnAttack.call(as, self, { kind:'attack' }, {}, attackCtx);
       assertEq(self.actionsAvailable, 2);
+    });
+
+    test('Action Surge under Defensive: does NOT fire when no ally is downed', () => {
+      const as = PCFeatures.LIBRARY.actionSurge;
+      const self = {
+        id: 'pc:fighter',
+        pm: { features: [{id:'actionSurge'}], tactics: {mode:'defensive'} },
+        featureState: { actionSurge: { usesLeft: 1 } },
+        actionsAvailable: 1,
+      };
+      const attackCtx = { round: 3, combatants: [
+        self,
+        { id:'pc:cleric', side:'pc', downed:false },
+      ], eventLog: [] };
+      as.hooks.onBeforeOwnAttack.call(as, self, { kind:'attack' }, {}, attackCtx);
+      assertEq(self.actionsAvailable, 1);
+      assertEq(self.featureState.actionSurge.usesLeft, 1);
     });
 
     test('Action Surge: does not fire when usesLeft is 0', () => {
       const as = PCFeatures.LIBRARY.actionSurge;
       const self = {
+        id: 'pc:fighter',
         pm: { features: [{id:'actionSurge'}], tactics: {mode:'nova'} },
         featureState: { actionSurge: { usesLeft: 0 } },
         actionsAvailable: 1,
       };
-      as.hooks.onTurnStart(self, { round: 1, combatants: [{side:'monster', dead:false}] });
+      const attackCtx = { round: 1, combatants: [{side:'monster', dead:false}], eventLog: [] };
+      as.hooks.onBeforeOwnAttack.call(as, self, { kind:'attack' }, {}, attackCtx);
       assertEq(self.actionsAvailable, 1);
     });
 
