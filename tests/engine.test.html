@@ -1954,6 +1954,114 @@ test('runTrial: PC unable to reach target after free movement uses action as Das
   // First dash should record some cells.
   assertTrue(dashes[0].cells > 0, 'dash event should report cells moved');
 });
+
+test('resolveAttackMonster: out-of-range target returns deterministic miss (no attack event)', () => {
+  // Monster at (0,0) attacking PC at (10,0) with melee Bite (reach 5 → 1 cell).
+  // The guard should refuse the attack so no roll, no event, no Shield trigger.
+  const me = { side: 'monster', name: 'Goblin', x: 0, y: 0, monster: {} };
+  const target = { side: 'pc', name: 'PC', x: 10, y: 0, hp: 30, maxHp: 30, ac: 14,
+                   damageTypesReceivedThisTurn: new Set() };
+  const action = { sourceActionName: 'Bite', kind: 'attack', actionRange: 'melee',
+                   reach: 5, toHit: 4, damage: [{ dice: '1d4', mod: 0, type: 'piercing' }] };
+  const events = [];
+  const rng = () => 0.99;
+  const r = Crucible.resolveAttackMonster(me, target, action, rng, events, 1, [me, target]);
+  assertEq(r.hit, false);
+  assertEq(r.damageDealt, 0);
+  // No attack event emitted from the refusal path.
+  const attackEvents = events.filter(e => e.type === 'attack');
+  assertEq(attackEvents.length, 0, 'no attack event emitted when out of range');
+});
+
+test('runTrial: multiattack scimitar+shortbow only fires shortbow from range', () => {
+  // Goblin with 1 Scimitar (melee 1c) + 1 Shortbow (16c) at distance 10 from PC.
+  // Multiattack range = 16 (max). Goblin is already in range → no movement.
+  // Only the Shortbow swing should reach the PC; Scimitar should be silently dropped.
+  const pm = {
+    id: 'pm1', identity: { name: 'PC', level: 5 },
+    abilities: { dex: 14, str: 14 },
+    combat: { hp: 30, maxHp: 30, ac: 18, initBonus: -10, speed: 1 },
+    actions: [{ type: 'attack', name: 'Sword', actionRange: 'melee',
+                atkAbility: 'str', damage: { dice: '1d8', mod: '+atkAbility', type: 'slashing' } }],
+  };
+  const goblin = {
+    pickId: 'gob', name: 'Goblin', cr: '1/4', count: 1,
+    monster: {
+      name: 'Goblin', ac: 13, hp: 30, maxHp: 30, initiative: 20,
+      abilities: { str: { mod: 0 }, dex: { mod: 2 } }, speed: { walk: 30 },
+      parsedActions: [
+        { kind: 'multiattack', sourceActionName: 'Multiattack', name: 'Multiattack',
+          multiattackPlan: [{ actionName: 'Scimitar', count: 1 },
+                            { actionName: 'Shortbow', count: 1 }] },
+        { kind: 'attack', sourceActionName: 'Scimitar', name: 'Scimitar',
+          actionRange: 'melee', reach: 5, toHit: 4,
+          damage: [{ dice: '1d6', mod: 2, type: 'slashing' }] },
+        { kind: 'attack', sourceActionName: 'Shortbow', name: 'Shortbow',
+          actionRange: 'ranged', range: [80, 320], toHit: 4,
+          damage: [{ dice: '1d6', mod: 2, type: 'piercing' }] },
+      ],
+    },
+  };
+  const party = [pm];
+  party._encounter = {
+    map: { width: 20, height: 20, blocked: null },
+    placement: [{ id: 'pc:pm1', x: 5, y: 5 }, { id: 'gob:1', x: 15, y: 5 }],
+  };
+  const rng = () => 0.5;
+  const trial = Crucible.runTrial(party, [goblin], { aiHint: 'focus' }, rng);
+  // First round: Goblin should attack with Shortbow but NOT Scimitar.
+  const round1Attacks = trial.events.filter(e =>
+    e.type === 'attack' && e.actor === 'Goblin' && e.round === 1);
+  const scimitarSwings = round1Attacks.filter(e => e.action === 'Scimitar');
+  const shortbowSwings = round1Attacks.filter(e => e.action === 'Shortbow');
+  assertEq(scimitarSwings.length, 0, 'Scimitar should be skipped from 10c away');
+  assertTrue(shortbowSwings.length > 0, 'Shortbow should fire from 10c away (within 16c range)');
+});
+
+test('runTrial: combatants do not stack on the same cell during movement', () => {
+  // Two PCs both want to attack the same monster. The first to act stops
+  // adjacent to the monster; the second must route around the first.
+  const pm1 = {
+    id: 'pmA', identity: { name: 'A', level: 5 },
+    abilities: { dex: 14, str: 14 },
+    combat: { hp: 30, maxHp: 30, ac: 14, initBonus: 10, speed: 6 },
+    actions: [{ type: 'attack', name: 'Sword', actionRange: 'melee',
+                atkAbility: 'str', damage: { dice: '1d8', mod: '+atkAbility', type: 'slashing' } }],
+  };
+  const pm2 = {
+    id: 'pmB', identity: { name: 'B', level: 5 },
+    abilities: { dex: 14, str: 14 },
+    combat: { hp: 30, maxHp: 30, ac: 14, initBonus: 5, speed: 6 },
+    actions: [{ type: 'attack', name: 'Sword', actionRange: 'melee',
+                atkAbility: 'str', damage: { dice: '1d8', mod: '+atkAbility', type: 'slashing' } }],
+  };
+  const dummy = { pickId: 'dum', name: 'Dummy', cr: '0', count: 1,
+    monster: { name: 'Dummy', ac: 10, hp: 200, maxHp: 200, initiative: -20,
+               abilities: { str: { mod: 0 } }, speed: { walk: 0 },
+               parsedActions: [] } };
+  const party = [pm1, pm2];
+  party._encounter = {
+    map: { width: 15, height: 10, blocked: null },
+    placement: [
+      { id: 'pc:pmA', x: 1, y: 5 },
+      { id: 'pc:pmB', x: 2, y: 5 },
+      { id: 'dum:1',  x: 10, y: 5 },
+    ],
+  };
+  const rng = () => 0.5;
+  const trial = Crucible.runTrial(party, [dummy], { aiHint: 'focus' }, rng);
+  // After round 1, all combatants should occupy distinct cells.
+  const finalPositions = new Map();
+  const placement = trial.events.find(e => e.type === 'placement');
+  for (const p of placement.placements) finalPositions.set(p.id, { x: p.pos.x, y: p.pos.y });
+  // Walk move events to update positions.
+  for (const ev of trial.events) {
+    if (ev.type === 'move' && ev.to) finalPositions.set(ev.who, { x: ev.to.x, y: ev.to.y });
+  }
+  const cells = Array.from(finalPositions.values()).map(p => p.x + ',' + p.y);
+  const distinct = new Set(cells);
+  assertEq(distinct.size, cells.length, 'no two combatants share a cell after move resolution');
+});
 </script>
 </body>
 </html>
