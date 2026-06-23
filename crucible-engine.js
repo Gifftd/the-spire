@@ -128,6 +128,30 @@
     return 1;
   }
 
+  // Derive a monster's walking speed in cells from whatever shape the
+  // bestiary data uses. Bestiary records can be { walk: 30 }, a bare number,
+  // or just a "30 ft." string in speedText. Defaults to 6 cells (30 ft).
+  function monsterSpeedCells(m) {
+    if (!m) return 6;
+    if (m.speed && typeof m.speed.walk === 'number') return Math.max(1, Math.floor(m.speed.walk / 5));
+    if (typeof m.speed === 'number') return Math.max(1, Math.floor(m.speed / 5));
+    const text = typeof m.speedText === 'string' ? m.speedText
+                 : (typeof m.speed === 'string' ? m.speed : '');
+    if (text) {
+      const mm = /(\d+)\s*(?:ft|feet|')/i.exec(text) || /^(\d+)$/.exec(text.trim());
+      if (mm) return Math.max(1, Math.floor(parseInt(mm[1], 10) / 5));
+    }
+    return 6;
+  }
+
+  // Natural melee reach in cells. m.reach is feet on imported records;
+  // legacy custom records may already be in cells.
+  function monsterReachCells(m) {
+    if (!m) return 1;
+    if (typeof m.reach !== 'number') return 1;
+    return m.reach >= 5 ? Math.max(1, Math.floor(m.reach / 5)) : Math.max(1, m.reach);
+  }
+
   // For multiattack actions, the effective range is the max of any sub-action's
   // range. Monster moves to within that range, then resolveMultiattack picks
   // which sub-attacks to fire per-target.
@@ -603,8 +627,8 @@
           damageTypesReceivedThisTurn: new Set(),
           lastHealRound: -99,
           regeneration: m.regeneration || null,
-          speed: Math.max(1, Math.floor(((m.speed && m.speed.walk) || 30) / 5)),
-          naturalReach: typeof m.reach === 'number' ? Math.max(1, Math.floor(m.reach / 5)) : 1,
+          speed: monsterSpeedCells(m),
+          naturalReach: monsterReachCells(m),
           x: 0, y: 0,
           reactionAvailableThisRound: true,
         });
@@ -1771,7 +1795,9 @@
     applyDamage, resolveMultiattack, pickAction,
     runTrial, runSim,
     // Role-policy helpers
-    clamp01, sumDice, actionIsMelee, actionIsRanged, actionRange, multiattackRange, targetSaveBonus, actionEv,
+    clamp01, sumDice, actionIsMelee, actionIsRanged, actionRange, multiattackRange,
+    monsterSpeedCells, monsterReachCells,
+    targetSaveBonus, actionEv,
     tagActions, bestEvAction, lowestPick, targetsInBucket,
     rangedness, bucket, position, positionOf,
     crHpMedian, inferRole, resolveRole, normalizeRole,
