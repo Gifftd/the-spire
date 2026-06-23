@@ -18,7 +18,8 @@
   CrucibleSpatial.chebyshev = chebyshev;
 
   // A* with Chebyshev heuristic. Returns the cell list from start (excluded)
-  // to the chosen endpoint (included). Empty array if unreachable.
+  // to the chosen endpoint (included). On maxSteps exhaustion, returns the
+  // best-effort partial path toward the goal. Empty array if no progress.
   function findPath(start, goal, map, options) {
     options = options || {};
     const maxSteps = options.maxSteps != null ? options.maxSteps : Infinity;
@@ -32,17 +33,29 @@
     function inBounds(x, y) { return x >= 0 && x < w && y >= 0 && y < h; }
     function isBlocked(x, y) { return blocked && blocked[y] && blocked[y][x] === true; }
     function key(x, y) { return y * w + x; }
+    function heuristic(x, y) { return Math.max(Math.abs(goal.x - x), Math.abs(goal.y - y)); }
 
-    // Goal test: are we at goal, or (if stopAdj is set) adjacent to it?
     function isGoal(x, y) {
       if (stopAdj) return Math.max(Math.abs(x - stopAdj.x), Math.abs(y - stopAdj.y)) <= 1
                          && !(x === stopAdj.x && y === stopAdj.y);
       return x === goal.x && y === goal.y;
     }
 
-    const open = [{ x: start.x, y: start.y, g: 0, f: 0, parent: null }];
+    const startNode = { x: start.x, y: start.y, g: 0, f: heuristic(start.x, start.y), parent: null };
+    const open = [startNode];
     const seen = new Map();
-    seen.set(key(start.x, start.y), open[0]);
+    seen.set(key(start.x, start.y), startNode);
+
+    // Track best-h node ever expanded (excluding start), for partial-path fallback.
+    let bestNode = null;
+    let bestH = Infinity;
+
+    function reconstruct(node) {
+      const path = [];
+      let n = node;
+      while (n.parent) { path.unshift({ x: n.x, y: n.y }); n = n.parent; }
+      return path;
+    }
 
     while (open.length > 0) {
       // Pick the node with lowest f. Linear scan — fine for our grid sizes.
@@ -50,13 +63,15 @@
       for (let i = 1; i < open.length; i++) if (open[i].f < open[bestIdx].f) bestIdx = i;
       const cur = open.splice(bestIdx, 1)[0];
 
-      if (isGoal(cur.x, cur.y)) {
-        // Reconstruct path from cur back to start (exclusive).
-        const path = [];
-        let node = cur;
-        while (node.parent) { path.unshift({ x: node.x, y: node.y }); node = node.parent; }
-        // Trim to maxSteps.
-        return path.slice(0, maxSteps);
+      if (isGoal(cur.x, cur.y)) return reconstruct(cur);
+
+      // Track best-h seen so far (only nodes we've actually moved to, g > 0).
+      if (cur.g > 0) {
+        const ch = heuristic(cur.x, cur.y);
+        if (ch < bestH || (ch === bestH && bestNode && cur.g < bestNode.g)) {
+          bestH = ch;
+          bestNode = cur;
+        }
       }
 
       // Expand 8 neighbors.
@@ -71,14 +86,15 @@
           const k = key(nx, ny);
           const prev = seen.get(k);
           if (prev && prev.g <= ng) continue;
-          const hCost = Math.max(Math.abs(goal.x - nx), Math.abs(goal.y - ny));
-          const node = { x: nx, y: ny, g: ng, f: ng + hCost, parent: cur };
+          const node = { x: nx, y: ny, g: ng, f: ng + heuristic(nx, ny), parent: cur };
           seen.set(k, node);
           open.push(node);
         }
       }
     }
 
+    // Goal not reached. If we made progress toward it, return the partial path.
+    if (bestNode && bestH < heuristic(start.x, start.y)) return reconstruct(bestNode);
     return [];
   }
 
