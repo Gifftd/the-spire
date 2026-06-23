@@ -49,6 +49,8 @@
     // Track best-h node ever expanded (excluding start), for partial-path fallback.
     let bestNode = null;
     let bestH = Infinity;
+    // Whether maxSteps was the limiting factor on at least one neighbor expansion.
+    let hitMaxSteps = false;
 
     function reconstruct(node) {
       const path = [];
@@ -82,7 +84,7 @@
           if (!inBounds(nx, ny)) continue;
           if (isBlocked(nx, ny)) continue;
           const ng = cur.g + 1;
-          if (ng > maxSteps) continue;
+          if (ng > maxSteps) { hitMaxSteps = true; continue; }
           const k = key(nx, ny);
           const prev = seen.get(k);
           if (prev && prev.g <= ng) continue;
@@ -93,8 +95,9 @@
       }
     }
 
-    // Goal not reached. If we made progress toward it, return the partial path.
-    if (bestNode && bestH < heuristic(start.x, start.y)) return reconstruct(bestNode);
+    // Goal not reached. Return partial path ONLY when maxSteps was the
+    // limiting factor; if the goal is genuinely unreachable, return [].
+    if (hitMaxSteps && bestNode && bestH < heuristic(start.x, start.y)) return reconstruct(bestNode);
     return [];
   }
 
