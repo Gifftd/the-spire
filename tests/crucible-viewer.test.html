@@ -103,6 +103,19 @@ test('applyEvent: aoe event records lastAoE', () => {
   assert(state.lastAoE);
   assertEq(state.lastAoE.shape, 'sphere');
 });
+
+test('renderSVG: produces an svg with W*CELL × H*CELL viewBox and one token per combatant', () => {
+  const trial = syntheticTrial();
+  const state = CrucibleViewer.initialState(trial.events[0]);
+  const host = document.getElementById('host');
+  host.innerHTML = '';
+  CrucibleViewer.renderSVG(host, state);
+  const svg = host.querySelector('svg');
+  assert(svg, 'svg present');
+  assert(svg.getAttribute('viewBox').includes('240 240'));  // 10×24 = 240
+  const tokens = svg.querySelectorAll('.token');
+  assertEq(tokens.length, 2);
+});
 </script>
 </body>
 </html>

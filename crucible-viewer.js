@@ -83,6 +83,41 @@
   }
   CrucibleViewer.renderTo = renderTo;
 
+  function renderSVG(host, state) {
+    const w = state.map.width * CELL;
+    const h = state.map.height * CELL;
+    const tokensHtml = state.combatants.map(c => {
+      const cx = c.x * CELL + CELL / 2;
+      const cy = c.y * CELL + CELL / 2;
+      const r  = CELL * 0.4;
+      const cls = c.side === 'pc' ? 'token pc' : 'token monster';
+      const dead = c.dead ? ' dead' : '';
+      const downed = c.downed ? ' downed' : '';
+      const hpFrac = c.maxHp ? Math.max(0, c.hp / c.maxHp) : 1;
+      return `<g class="${cls}${dead}${downed}" data-id="${c.id}" transform="translate(${cx}, ${cy})">
+        <circle r="${r}" />
+        <text dy="0.35em" text-anchor="middle">${(c.name || '?').charAt(0)}</text>
+        <rect class="hp-bar" x="${-r}" y="${-r - 6}" width="${2*r*hpFrac}" height="3" />
+      </g>`;
+    }).join('');
+    const gridLines = [];
+    for (let i = 0; i <= state.map.width; i++) {
+      gridLines.push(`<line x1="${i*CELL}" y1="0" x2="${i*CELL}" y2="${h}" class="grid-line" />`);
+    }
+    for (let i = 0; i <= state.map.height; i++) {
+      gridLines.push(`<line x1="0" y1="${i*CELL}" x2="${w}" y2="${i*CELL}" class="grid-line" />`);
+    }
+    const aoeHtml = state.lastAoE
+      ? state.lastAoE.cellsCovered.map(c => `<rect x="${c.x*CELL}" y="${c.y*CELL}" width="${CELL}" height="${CELL}" class="aoe-cell" />`).join('')
+      : '';
+    host.innerHTML = `<svg class="tactical-board" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
+      <g class="grid-lines">${gridLines.join('')}</g>
+      <g class="aoe-overlay">${aoeHtml}</g>
+      <g class="tokens">${tokensHtml}</g>
+    </svg>`;
+  }
+  CrucibleViewer.renderSVG = renderSVG;
+
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = CrucibleViewer;
   } else {
