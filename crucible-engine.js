@@ -110,6 +110,14 @@
     return false;
   }
 
+  // v2 spatial: resolve an action's range in cells. Honors explicit
+  // action.range; falls back to deriving from actionRange string.
+  function actionRange(action) {
+    if (typeof action.range === 'number') return action.range;
+    if (action.actionRange === 'ranged') return 6;
+    return 1;
+  }
+
   function targetSaveBonus(target, ability) {
     if (!target || !ability) return 0;
     if (target.side === 'pc' && target.pm) return saveBonus(target.pm, ability);
@@ -1572,7 +1580,7 @@
     applyDamage, resolveMultiattack, pickAction,
     runTrial, runSim,
     // Role-policy helpers
-    clamp01, sumDice, actionIsMelee, actionIsRanged, targetSaveBonus, actionEv,
+    clamp01, sumDice, actionIsMelee, actionIsRanged, actionRange, targetSaveBonus, actionEv,
     tagActions, bestEvAction, lowestPick, targetsInBucket,
     rangedness, bucket, position, positionOf,
     crHpMedian, inferRole, resolveRole, normalizeRole,

@@ -1512,6 +1512,19 @@ test('runTrial: emits a placement event at the top with map + placements', () =>
   assertTrue(placement.map.height > 0, 'map height set');
   assertEq(placement.placements.length, 2);
 });
+
+test('actionRange: explicit range honored', () => {
+  assertEq(Crucible.actionRange({ range: 12 }), 12);
+});
+test('actionRange: melee → 1', () => {
+  assertEq(Crucible.actionRange({ actionRange: 'melee' }), 1);
+});
+test('actionRange: ranged → 6', () => {
+  assertEq(Crucible.actionRange({ actionRange: 'ranged' }), 6);
+});
+test('actionRange: missing → 1 (safe default)', () => {
+  assertEq(Crucible.actionRange({}), 1);
+});
 </script>
 </body>
 </html>
