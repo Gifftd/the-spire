@@ -1207,6 +1207,43 @@
             action = pickAction(c);
             if (!action) break;
           }
+          // v2 spatial: range check + A* movement toward target for
+          // single-target actions. Skips AoE shapes (handled in Phase 7),
+          // multiattack (managed by its own inner loop), and no-target actions.
+          if (action && action.kind !== 'multiattack'
+              && (!action.shape || action.shape === 'single')
+              && typeof CrucibleSpatial !== 'undefined') {
+            const tgtCandidate = (c.side === 'monster' && targets && targets[0])
+              ? targets[0]
+              : pickEnemyTarget(c, all, tactics, rng);
+            if (tgtCandidate) {
+              const need = actionRange(action);
+              const dist = CrucibleSpatial.chebyshev(c, tgtCandidate);
+              if (dist > need) {
+                const path = CrucibleSpatial.findPath(
+                  { x: c.x, y: c.y },
+                  { x: tgtCandidate.x, y: tgtCandidate.y },
+                  map,
+                  { maxSteps: c.speed, stopWhenAdjacent: tgtCandidate }
+                );
+                if (path.length > 0) {
+                  const from = { x: c.x, y: c.y };
+                  c.x = path[path.length - 1].x;
+                  c.y = path[path.length - 1].y;
+                  events.push({
+                    type: 'move', round, who: c.id, name: c.name,
+                    from, to: { x: c.x, y: c.y }, path, reason: 'engage',
+                  });
+                }
+                const newDist = CrucibleSpatial.chebyshev(c, tgtCandidate);
+                if (newDist > need) {
+                  // Couldn't close. End this iteration; the action is wasted
+                  // (consumed via the outer c.actionsAvailable -= 1).
+                  continue;
+                }
+              }
+            }
+          }
           if (action.kind === 'multiattack') {
             consumeUse(c, action);
             const r = resolveMultiattack(c, all, action, tactics, rng, events, round);
