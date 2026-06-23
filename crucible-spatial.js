@@ -11,6 +11,12 @@
 
   const CrucibleSpatial = {};
 
+  function chebyshev(a, b) {
+    return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+  }
+
+  CrucibleSpatial.chebyshev = chebyshev;
+
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = CrucibleSpatial;
   } else {

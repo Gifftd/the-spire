@@ -45,6 +45,22 @@ function runAll() {
 }
 
 // === Tests below this line ===
+
+group('chebyshev');
+
+test('chebyshev: same cell → 0', () => {
+  assertEq(CrucibleSpatial.chebyshev({x:5,y:5}, {x:5,y:5}), 0);
+});
+test('chebyshev: orthogonal 1 step → 1', () => {
+  assertEq(CrucibleSpatial.chebyshev({x:5,y:5}, {x:6,y:5}), 1);
+  assertEq(CrucibleSpatial.chebyshev({x:5,y:5}, {x:5,y:6}), 1);
+});
+test('chebyshev: diagonal 1 step → 1 (5e RAW)', () => {
+  assertEq(CrucibleSpatial.chebyshev({x:5,y:5}, {x:6,y:6}), 1);
+});
+test('chebyshev: 3 right, 4 up → 4 (max axis)', () => {
+  assertEq(CrucibleSpatial.chebyshev({x:0,y:0}, {x:3,y:4}), 4);
+});
 </script>
 </body>
 </html>
