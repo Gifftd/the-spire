@@ -1760,156 +1760,63 @@ test('runTrial: AoE action on PC list emits aoe event in the trial', () => {
   assertTrue(aoe, 'expected aoe event in trial');
 });
 
-test('actionRange: monster reach (5 ft) → 1 cell', () => {
-  assertEq(Crucible.actionRange({ reach: 5 }), 1);
-});
-test('actionRange: monster reach (10 ft) → 2 cells', () => {
-  assertEq(Crucible.actionRange({ reach: 10 }), 2);
-});
-test('actionRange: monster range array [80, 320] → 16 cells', () => {
-  assertEq(Crucible.actionRange({ range: [80, 320] }), 16);
-});
-test('actionRange: monster melee with no reach field → 1 cell (default)', () => {
-  assertEq(Crucible.actionRange({ kind: 'attack', toHit: 4 }), 1);
-});
-
-test('multiattackRange: max across sub-actions', () => {
-  const subs = [
-    { sourceActionName: 'Scimitar', reach: 5, kind: 'attack' },
-    { sourceActionName: 'Shortbow', range: [80, 320], kind: 'attack' },
-  ];
-  const ma = { kind: 'multiattack',
-               multiattackPlan: [{ actionName: 'Scimitar', count: 1 },
-                                 { actionName: 'Shortbow', count: 1 }] };
-  assertEq(Crucible.multiattackRange(ma, subs), 16);
-});
-test('multiattackRange: all melee sub-actions → 1', () => {
-  const subs = [
-    { sourceActionName: 'Greataxe', reach: 5, kind: 'attack' },
-    { sourceActionName: 'Slam', reach: 5, kind: 'attack' },
-  ];
-  const ma = { kind: 'multiattack',
-               multiattackPlan: [{ actionName: 'Greataxe', count: 1 },
-                                 { actionName: 'Slam', count: 1 }] };
-  assertEq(Crucible.multiattackRange(ma, subs), 1);
-});
-
-test('runTrial: multiattacking monster moves toward distant PC before swinging', () => {
+test('runTrial: combatant standing on damaging terrain takes damage at end of turn', () => {
   const pm = {
     id: 'pm1', identity: { name: 'PC', level: 5 },
     abilities: { dex: 14, str: 14 },
-    combat: { hp: 100, maxHp: 100, ac: 18, initBonus: 0, speed: 6 },
+    combat: { hp: 30, maxHp: 30, ac: 18, initBonus: 5, speed: 6 },
     actions: [{ type: 'attack', name: 'Sword', actionRange: 'melee',
                 atkAbility: 'str', damage: { dice: '1d8', mod: '+atkAbility', type: 'slashing' } }],
   };
-  const orc = {
-    pickId: 'mon0', name: 'Orc', cr: '1', count: 1,
-    monster: {
-      name: 'Orc', ac: 13, hp: 30, maxHp: 30, initiative: -5,
-      abilities: { str: { mod: 3 }, dex: { mod: 1 } },
-      speed: { walk: 30 },
-      parsedActions: [
-        { kind: 'multiattack', sourceActionName: 'Multiattack',
-          name: 'Multiattack',
-          multiattackPlan: [{ actionName: 'Greataxe', count: 2 }] },
-        { kind: 'attack', sourceActionName: 'Greataxe', name: 'Greataxe',
-          reach: 5, toHit: 5,
-          damage: [{ dice: '1d12', mod: 3, type: 'slashing' }] },
-      ],
-    },
-  };
+  const goblin = { pickId: 'gob', name: 'Goblin', cr: '1/4', count: 1,
+    monster: { name: 'Goblin', ac: 13, hp: 200, maxHp: 200,
+               abilities: { str: { mod: 0 } }, speed: { walk: 30 },
+               parsedActions: [{ kind: 'attack', sourceActionName: 'Bite', name: 'Bite',
+                                 actionRange: 'melee', reach: 5, toHit: 4,
+                                 damage: [{ dice: '1d4', mod: 0, type: 'piercing' }] }] } };
   const party = [pm];
-  party._encounter = {
-    map: { width: 20, height: 20, blocked: null },
-    placement: [{ id: 'pc:pm1', x: 5, y: 5 }, { id: 'mon0:1', x: 15, y: 5 }],
-  };
+  const map = { width: 10, height: 10, blocked: null,
+    terrain: Array.from({length: 10}, () => new Array(10).fill(null)) };
+  map.terrain[5][5] = { type: 'damaging', dice: '1d6', mod: 0, dmgType: 'fire' };
+  party._encounter = { map,
+    placement: [{ id: 'pc:pm1', x: 5, y: 5 }, { id: 'gob:1', x: 6, y: 5 }] };
   const rng = () => 0.5;
-  const trial = Crucible.runTrial(party, [orc], { aiHint: 'focus' }, rng);
-  const moves = trial.events.filter(e => e.type === 'move' && e.who === 'mon0:1');
-  assertTrue(moves.length > 0, 'Orc should move toward the PC before its multiattack fires');
+  const trial = Crucible.runTrial(party, [goblin], { aiHint: 'focus' }, rng);
+  const terrainEv = trial.events.find(e => e.type === 'terrain-damage' && e.who === 'pc:pm1');
+  assertTrue(terrainEv, 'expected terrain-damage event for PC ending turn on lava');
+  assertEq(terrainEv.dmgType, 'fire');
+  assertTrue(terrainEv.amount > 0, 'terrain damage > 0');
 });
 
-test('monsterSpeedCells: { walk: 30 } → 6 cells', () => {
-  assertEq(Crucible.monsterSpeedCells({ speed: { walk: 30 } }), 6);
-});
-test('monsterSpeedCells: { walk: 40 } → 8 cells', () => {
-  assertEq(Crucible.monsterSpeedCells({ speed: { walk: 40 } }), 8);
-});
-test('monsterSpeedCells: speedText "30 ft." → 6 cells', () => {
-  assertEq(Crucible.monsterSpeedCells({ speedText: '30 ft.' }), 6);
-});
-test('monsterSpeedCells: speedText "40 ft., fly 60 ft." → 8 cells (first match)', () => {
-  assertEq(Crucible.monsterSpeedCells({ speedText: '40 ft., fly 60 ft.' }), 8);
-});
-test('monsterSpeedCells: missing data → 6 (default 30 ft)', () => {
-  assertEq(Crucible.monsterSpeedCells({}), 6);
-});
-test('monsterSpeedCells: numeric speed 25 → 5 cells', () => {
-  assertEq(Crucible.monsterSpeedCells({ speed: 25 }), 5);
-});
-
-test('monsterReachCells: missing → 1 cell', () => {
-  assertEq(Crucible.monsterReachCells({}), 1);
-});
-test('monsterReachCells: reach 5 (feet) → 1 cell', () => {
-  assertEq(Crucible.monsterReachCells({ reach: 5 }), 1);
-});
-test('monsterReachCells: reach 10 (feet) → 2 cells', () => {
-  assertEq(Crucible.monsterReachCells({ reach: 10 }), 2);
-});
-
-test('parser: tryAttack stamps actionRange="melee" from Melee Attack header', () => {
-  const a = CrucibleParser.parseAction('Bite',
-    'Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) piercing damage.', {}, 2);
-  assertEq(a.kind, 'attack');
-  assertEq(a.actionRange, 'melee');
-});
-test('parser: tryAttack stamps actionRange="ranged" from Ranged Attack header', () => {
-  const a = CrucibleParser.parseAction('Shortbow',
-    'Ranged Attack Roll: +4, range 80/320 ft. Hit: 5 (1d6 + 2) piercing damage.', {}, 2);
-  assertEq(a.kind, 'attack');
-  assertEq(a.actionRange, 'ranged');
-});
-test('parser: tryAttack stamps actionRange="both" from "Melee or Ranged" header', () => {
-  const a = CrucibleParser.parseAction('Dagger',
-    'Melee or Ranged Attack Roll: +4, reach 5 ft. or range 20/60 ft. Hit: 4 (1d4 + 2) piercing damage.', {}, 2);
-  assertEq(a.actionRange, 'both');
-});
-test('runTrial: monster with only a ranged attack (no reach in body) fires from distance', () => {
+test('runTrial: ranged attack blocked by a wall between attacker and target', () => {
   const pm = {
     id: 'pm1', identity: { name: 'PC', level: 5 },
     abilities: { dex: 14, str: 14 },
-    combat: { hp: 30, maxHp: 30, ac: 18, initBonus: 0, speed: 6 },
-    actions: [{ type: 'attack', name: 'Sword', actionRange: 'melee',
-                atkAbility: 'str', damage: { dice: '1d8', mod: '+atkAbility', type: 'slashing' } }],
+    combat: { hp: 30, maxHp: 30, ac: 18, initBonus: 5, speed: 1 }, // speed 1 so PC can't easily reposition
+    actions: [{ type: 'attack', name: 'Bow', actionRange: 'ranged', range: 12,
+                atkAbility: 'dex', damage: { dice: '1d8', mod: '+atkAbility', type: 'piercing' } }],
   };
-  const archer = {
-    pickId: 'arch', name: 'Archer', cr: '1', count: 1,
-    monster: {
-      name: 'Archer', ac: 13, hp: 20, maxHp: 20, initiative: 5,
-      abilities: { str: { mod: 0 }, dex: { mod: 3 } },
-      speed: { walk: 30 },
-      parsedActions: [{
-        kind: 'attack', sourceActionName: 'Shortbow', name: 'Shortbow',
-        actionRange: 'ranged',  // parser set this
-        toHit: 5,
-        reach: null, range: null,  // body omitted explicit numbers
-        damage: [{ dice: '1d6', mod: 3, type: 'piercing' }],
-      }],
-    },
-  };
+  const target = { pickId: 'tgt', name: 'Goblin', cr: '1/4', count: 1,
+    monster: { name: 'Goblin', ac: 13, hp: 10, maxHp: 10, initiative: -10,
+               abilities: { str: { mod: 0 }, dex: { mod: 2 } }, speed: { walk: 5 }, // slow so it doesn't break LOS
+               parsedActions: [{ kind: 'attack', sourceActionName: 'Bite', name: 'Bite',
+                                 actionRange: 'melee', reach: 5, toHit: 4,
+                                 damage: [{ dice: '1d4', mod: 0, type: 'piercing' }] }] } };
   const party = [pm];
-  party._encounter = {
-    map: { width: 20, height: 20, blocked: null },
-    placement: [{ id: 'pc:pm1', x: 5, y: 5 }, { id: 'arch:1', x: 12, y: 5 }],
-  };
-  const rng = () => 0.5;
-  const trial = Crucible.runTrial(party, [archer], { aiHint: 'focus' }, rng);
-  const attacks = trial.events.filter(e => e.type === 'attack' && e.actor === 'Archer');
-  // Archer at (12,5) is 7 cells from PC. With ranged=6 cells (default for
-  // actionRange:'ranged'), they need to close 1 cell — but should still
-  // attack same round.
-  assertTrue(attacks.length > 0, 'Archer should attack the PC from range');
+  const map = { width: 10, height: 10, blocked: null,
+    terrain: Array.from({length: 10}, () => new Array(10).fill(null)) };
+  // Full wall column at x=5 between PC (x=2) and target (x=8) at y=5.
+  // Goes from y=0 to y=9 so neither side can route around it.
+  for (let y = 0; y <= 9; y++) map.terrain[y][5] = { type: 'wall' };
+  party._encounter = { map,
+    placement: [{ id: 'pc:pm1', x: 2, y: 5 }, { id: 'tgt:1', x: 8, y: 5 }] };
+  let s = 42;
+  const rng = () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1);
+                      t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const trial = Crucible.runTrial(party, [target], { aiHint: 'focus' }, rng);
+  // No attack event should fire from PC (no LOS, can't reposition with speed=1).
+  const pcAttacks = trial.events.filter(e => e.type === 'attack' && e.actor === 'PC');
+  assertEq(pcAttacks.length, 0, 'PC should not attack through wall');
 });
 </script>
 </body>

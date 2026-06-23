@@ -9,6 +9,10 @@
   button { padding: 0.5rem 1rem; background: #1d3a4a; color: #dde7e9; border: 1px solid #1c2429; cursor: pointer; }
   pre { white-space: pre-wrap; margin-top: 0.5rem; }
   #host { display: none; }
+  .tactical-board .terrain-wall { fill: #4a4a52; }
+  .tactical-board .terrain-difficult { fill: #806c3a; opacity: 0.4; }
+  .tactical-board .terrain-damaging rect { fill: #c43838; opacity: 0.35; }
+  .tactical-board .terrain-damaging text { fill: #ffdd99; font-family: Cinzel, serif; font-size: 0.55rem; pointer-events: none; }
 </style>
 </head>
 <body>
@@ -158,6 +162,27 @@ test('renderSVG: draws a move-trail polyline when state.lastMove is set', () => 
   CrucibleViewer.renderSVG(host, state);
   const trail = host.querySelector('.move-trail');
   assert(trail, 'move trail polyline rendered');
+});
+
+test('renderSVG: draws wall + difficult + damaging cells from map.terrain', () => {
+  const trial = { events: [{
+    type: 'placement', round: 0,
+    map: { width: 5, height: 5, blocked: null, terrain: [
+      [null, null, null, null, null],
+      [null, {type:'wall'}, null, null, null],
+      [null, null, {type:'difficult'}, null, null],
+      [null, null, null, {type:'damaging', dice:'1d6', mod:0, dmgType:'fire'}, null],
+      [null, null, null, null, null],
+    ]},
+    placements: [{ id: 'pc:1', name: 'P', side: 'pc', pos:{x:0,y:0}, hp:30, maxHp:30, ac:14, speed:6 }],
+  }], rounds: 0, winner: 'pc', partyView: [] };
+  const host = document.getElementById('host');
+  host.innerHTML = '';
+  const state = CrucibleViewer.initialState(trial.events[0]);
+  CrucibleViewer.renderSVG(host, state);
+  assert(host.querySelector('.terrain-wall'), 'wall rendered');
+  assert(host.querySelector('.terrain-difficult'), 'difficult rendered');
+  assert(host.querySelector('.terrain-damaging'), 'damaging rendered');
 });
 </script>
 </body>
