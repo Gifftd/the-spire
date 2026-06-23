@@ -1239,9 +1239,8 @@
             action = pickAction(c);
             if (!action) break;
           }
-          // v2 spatial: range check + A* movement toward target for
-          // single-target actions. Skips AoE shapes (handled in Phase 7),
-          // multiattack (managed by its own inner loop), and no-target actions.
+          // v2 spatial: range check + cell-by-cell movement, firing OoA on
+          // any enemy whose reach the mover leaves during the path.
           if (action && action.kind !== 'multiattack'
               && (!action.shape || action.shape === 'single')
               && typeof CrucibleSpatial !== 'undefined') {
@@ -1250,7 +1249,7 @@
               : pickEnemyTarget(c, all, tactics, rng);
             if (tgtCandidate) {
               const need = actionRange(action);
-              const dist = CrucibleSpatial.chebyshev(c, tgtCandidate);
+              let dist = CrucibleSpatial.chebyshev(c, tgtCandidate);
               if (dist > need) {
                 const path = CrucibleSpatial.findPath(
                   { x: c.x, y: c.y },
@@ -1260,19 +1259,39 @@
                 );
                 if (path.length > 0) {
                   const from = { x: c.x, y: c.y };
-                  c.x = path[path.length - 1].x;
-                  c.y = path[path.length - 1].y;
-                  events.push({
-                    type: 'move', round, who: c.id, name: c.name,
-                    from, to: { x: c.x, y: c.y }, path, reason: 'engage',
-                  });
+                  const stepped = [];
+                  for (const cell of path) {
+                    const prev = { x: c.x, y: c.y };
+                    // OoA detection: any enemy adjacent before step, not after.
+                    for (const d of combatants) {
+                      if (d.side === c.side || d.dead || d.downed) continue;
+                      if (!d.reactionAvailableThisRound) continue;
+                      const reach = d.naturalReach || 1;
+                      const dPrev = CrucibleSpatial.chebyshev(d, prev);
+                      const dCur  = CrucibleSpatial.chebyshev(d, cell);
+                      // Was adjacent (within reach, not on the same cell)
+                      // before and now out of reach → provokes.
+                      if (dPrev > 0 && dPrev <= reach && dCur > reach) {
+                        resolveOpportunityAttack(d, c, rng, events, round, combatants);
+                        d.reactionAvailableThisRound = false;
+                        if (c.dead || c.downed) break;
+                      }
+                    }
+                    if (c.dead || c.downed) break;
+                    c.x = cell.x;
+                    c.y = cell.y;
+                    stepped.push(cell);
+                  }
+                  if (stepped.length > 0) {
+                    events.push({
+                      type: 'move', round, who: c.id, name: c.name,
+                      from, to: { x: c.x, y: c.y }, path: stepped, reason: 'engage',
+                    });
+                  }
                 }
-                const newDist = CrucibleSpatial.chebyshev(c, tgtCandidate);
-                if (newDist > need) {
-                  // Couldn't close. End this iteration; the action is wasted
-                  // (consumed via the outer c.actionsAvailable -= 1).
-                  continue;
-                }
+                if (c.dead || c.downed) continue;
+                dist = CrucibleSpatial.chebyshev(c, tgtCandidate);
+                if (dist > need) continue;
               }
             }
           }
