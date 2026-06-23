@@ -1282,29 +1282,6 @@ function switchReplay(which) {
   activeReplayInst = CrucibleViewer.mount(host, trial);
 }
 
-function toggleFeatureLogs(visible) {
-  const lines = document.querySelectorAll('.log-feature');
-  lines.forEach(l => l.style.display = visible ? '' : 'none');
-}
-
-function formatEvent(ev) {
-  switch (ev.type) {
-    case 'attack':
-      return `R${ev.round} · ${ev.actor} → ${ev.target} · ${ev.action} (roll ${ev.roll}${ev.crit?' CRIT':''}) → ${ev.hit?'hit':'miss'}${ev.damageDealt?' '+ev.damageDealt+' dmg':''}`;
-    case 'save':
-      return `R${ev.round} · ${ev.actor} → ${ev.target} · ${ev.action} save: ${ev.passed?'passed':'failed'}${ev.damageDealt?' '+ev.damageDealt+' dmg':''}`;
-    case 'heal':
-      return `R${ev.round} · ${ev.actor} heals ${ev.target} · ${ev.action} → +${ev.amount}${ev.revived?' REVIVED':''}`;
-    case 'damage':
-      return `R${ev.round} · ${ev.target} takes ${ev.amount} ${ev.dmgType} (from ${ev.action})`;
-    case 'regen':
-      return `R${ev.round} · ${ev.actor} regenerates +${ev.amount} → ${ev.hpAfter} HP`;
-    case 'feature':
-      return `R${ev.round} · ⚡ ${ev.what || ''}`;
-  }
-  return JSON.stringify(ev);
-}
-
 // ═══════════════════════════════════════════════════════════════════════
 //  Bestiary loader
 // ═══════════════════════════════════════════════════════════════════════
