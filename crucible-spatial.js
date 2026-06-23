@@ -160,6 +160,18 @@
   CrucibleSpatial.computeThreat = computeThreat;
   CrucibleSpatial.diceAverage = diceAverage;  // exposed for expectedDamage in Phase 2
 
+  function sphereCells(origin, radius) {
+    const r = Math.max(0, Math.floor(radius));
+    const out = [];
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        out.push({ x: origin.x + dx, y: origin.y + dy });
+      }
+    }
+    return out;
+  }
+  CrucibleSpatial.sphereCells = sphereCells;
+
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = CrucibleSpatial;
   } else {
