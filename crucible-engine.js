@@ -1358,6 +1358,15 @@
               }
             }
           }
+          // v2 spatial: AoE-shape actions (sphere/cube/cone/line) go through
+          // the spatial resolver, which picks the best cast point.
+          if (action && action.shape && action.shape !== 'single'
+              && typeof CrucibleSpatial !== 'undefined') {
+            consumeUse(c, action);
+            resolveAoE(c, action, combatants, map, rng, events, round);
+            tally(c.side, action.sourceActionName || action.name, 'aoe', false, 0, 0, 0, 0);
+            continue;
+          }
           if (action.kind === 'multiattack') {
             consumeUse(c, action);
             const r = resolveMultiattack(c, all, action, tactics, rng, events, round);

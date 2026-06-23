@@ -1719,6 +1719,45 @@ test('resolveAoE: sphere catches multiple enemies in a cluster', () => {
   assertEq(aoe.shape, 'sphere');
   assertTrue(aoe.targets.length >= 2, 'expected 2+ enemies caught: ' + aoe.targets.length);
 });
+
+test('runTrial: AoE action on PC list emits aoe event in the trial', () => {
+  const pm = {
+    id: 'pm1', identity: { name: 'Wizard', level: 5 },
+    abilities: { int: 16 },
+    combat: { hp: 25, maxHp: 25, ac: 12, initBonus: 1, speed: 6 },
+    actions: [{
+      type: 'save', name: 'Fireball', shape: 'sphere', size: 2, range: 12,
+      atkAbility: 'int',
+      save: { ability: 'dex', dcOverride: 14, halfOnSave: true },
+      damage: { dice: '8d6', type: 'fire' },
+      damageOnFail: [{ dice: '8d6', mod: 0, type: 'fire' }],
+      halfOnSave: true,
+      aoeTargets: 99,
+    }],
+  };
+  const monsterPicks = [];
+  for (let i = 0; i < 3; i++) {
+    monsterPicks.push({ pickId: 'gob' + i, name: 'Goblin' + i, cr: '1/4', count: 1,
+      monster: { name: 'Goblin', ac: 13, hp: 7, maxHp: 7,
+                 abilities: { str: { mod: 0 }, dex: { mod: 2 } },
+                 parsedActions: [{ kind: 'attack', name: 'Bite', sourceActionName: 'Bite',
+                                   toHit: 4, damage: [{ dice: '1d4', mod: 0, type: 'piercing' }] }] } });
+  }
+  const party = [pm];
+  party._encounter = {
+    map: { width: 20, height: 20, blocked: null },
+    placement: [
+      { id: 'pc:pm1', x: 5,  y: 5 },
+      { id: 'gob0:1', x: 11, y: 10 },
+      { id: 'gob1:1', x: 12, y: 10 },
+      { id: 'gob2:1', x: 11, y: 11 },
+    ],
+  };
+  const rng = () => 0.5;
+  const trial = Crucible.runTrial(party, monsterPicks, { aiHint: 'focus' }, rng);
+  const aoe = trial.events.find(e => e.type === 'aoe');
+  assertTrue(aoe, 'expected aoe event in trial');
+});
 </script>
 </body>
 </html>
