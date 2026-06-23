@@ -350,6 +350,28 @@ test('combatantsAt: returns combatants whose (x,y) is in cells', () => {
   assert(hits.find(h => h.id === 'a'));
   assert(hits.find(h => h.id === 'c'));
 });
+
+group('AoE: expectedDamage');
+
+test('expectedDamage: 1d6 → 3.5', () => {
+  assertClose(CrucibleSpatial.expectedDamage({ damage: { dice: '1d6' } }), 3.5);
+});
+
+test('expectedDamage: 2d6+3 → 10', () => {
+  assertClose(CrucibleSpatial.expectedDamage({ damage: { dice: '2d6', mod: 3 } }), 10);
+});
+
+test('expectedDamage: save action with halfOnSave → halve', () => {
+  const ev = CrucibleSpatial.expectedDamage({
+    kind: 'save', halfOnSave: true,
+    damageOnFail: [{ dice: '8d6', mod: 0 }],
+  });
+  assertClose(ev, 21);
+});
+
+test('expectedDamage: action with no damage → 0', () => {
+  assertEq(CrucibleSpatial.expectedDamage({ kind: 'utility' }), 0);
+});
 </script>
 </body>
 </html>

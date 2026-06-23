@@ -244,6 +244,24 @@
   }
   CrucibleSpatial.combatantsAt = combatantsAt;
 
+  function expectedDamage(action) {
+    if (!action) return 0;
+    if (action.kind === 'save' && Array.isArray(action.damageOnFail)) {
+      let fail = 0;
+      for (const d of action.damageOnFail) fail += diceAverage(d.dice) + (Number(d.mod) || 0);
+      return action.halfOnSave ? (fail + fail / 2) / 2 : fail / 2;
+    }
+    const dmg = action.damage;
+    if (dmg && dmg.dice) return diceAverage(dmg.dice) + (Number(dmg.mod) || 0);
+    if (Array.isArray(action.damage)) {
+      let total = 0;
+      for (const d of action.damage) total += diceAverage(d.dice) + (Number(d.mod) || 0);
+      return total;
+    }
+    return 0;
+  }
+  CrucibleSpatial.expectedDamage = expectedDamage;
+
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = CrucibleSpatial;
   } else {
