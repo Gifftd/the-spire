@@ -637,7 +637,6 @@ function openDSLEditor(pmId) {
   document.getElementById('dsl-name').value = '';
   document.getElementById('dsl-summary').value = '';
   document.getElementById('dsl-uses').value = 1;
-  document.getElementById('dsl-trigger-round').value = 1;
   document.getElementById('dsl-condition').value = 'always';
   dslRenderEffects();
   document.getElementById('dsl-modal').style.display = 'flex';
@@ -660,7 +659,6 @@ function openDSLEditorForEdit(pmId, featureId) {
   document.getElementById('dsl-summary').value = spec.summary || '';
   document.getElementById('dsl-uses').value = (spec.params && spec.params.usesPerEncounter && spec.params.usesPerEncounter.value) || 1;
   const sustainedPolicy = spec.modePolicy && spec.modePolicy.sustained || {};
-  document.getElementById('dsl-trigger-round').value = sustainedPolicy.triggerRound || 1;
   document.getElementById('dsl-condition').value = sustainedPolicy.conditionFn || 'always';
 
   // Pre-fill category checkboxes.
@@ -798,7 +796,6 @@ function dslBuildSpec() {
   const categoryEl = document.getElementById('dsl-category');
   const category = Array.from(categoryEl.selectedOptions).map(o => o.value);
   const uses = parseInt(document.getElementById('dsl-uses').value, 10) || 1;
-  const triggerRound = parseInt(document.getElementById('dsl-trigger-round').value, 10) || 1;
   const condition = document.getElementById('dsl-condition').value;
   const id = 'dsl_' + name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
   return {
@@ -806,9 +803,9 @@ function dslBuildSpec() {
     category, summary,
     params: { usesPerEncounter: { type: 'int', value: uses } },
     modePolicy: {
-      nova:      { triggerRound, conditionFn: condition },
-      sustained: { triggerRound, conditionFn: condition },
-      defensive: { triggerRound, conditionFn: condition },
+      nova:      { conditionFn: condition },
+      sustained: { conditionFn: condition },
+      defensive: { conditionFn: condition },
     },
     effects: dslEffects.slice(),
   };
@@ -2030,7 +2027,6 @@ loadBestiary().catch(e => console.warn('Bestiary preload failed', e));
       <label>Uses per encounter <input type="number" id="dsl-uses" min="1" value="1"></label>
       <fieldset>
         <legend>Activation gate (applies to all PC modes)</legend>
-        <label>Trigger round <input type="number" id="dsl-trigger-round" min="1" value="1"></label>
         <label>Condition
           <select id="dsl-condition">
             <option value="always">always</option>
