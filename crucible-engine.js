@@ -943,9 +943,16 @@
     if (typeof CrucibleSpatial === 'undefined') return null;
     const Spatial = CrucibleSpatial;
     const candidates = Spatial.enumerateCastPoints(c, action, map);
+    // v2 terrain: filter cast points to those with LOS from the caster.
+    // Cone/line cast points are anchored at the caster (origin = caster cell)
+    // so LOS to themselves is trivially true; this primarily prunes sphere/cube
+    // candidates that lie behind a wall.
+    const filteredCandidates = candidates.filter(p =>
+      Spatial.hasLineOfSight(map, { x: c.x, y: c.y }, { x: p.x, y: p.y })
+    );
     const ev = Spatial.expectedDamage(action);
     let best = null;
-    for (const point of candidates) {
+    for (const point of filteredCandidates) {
       let cells;
       switch (action.shape) {
         case 'sphere': cells = Spatial.sphereCells(point, action.size); break;
@@ -1356,6 +1363,14 @@
                 dist = CrucibleSpatial.chebyshev(c, tgtCandidate);
                 if (dist > need) continue;
               }
+              // v2 terrain: LOS check for ranged attacks. If no LOS, skip
+              // this action — caller continues to the next iteration of the
+              // action loop (actionsAvailable was already decremented).
+              if (action.actionRange === 'ranged' || (typeof action.range === 'number' && action.range > 1)) {
+                if (!CrucibleSpatial.hasLineOfSight(map, { x: c.x, y: c.y }, { x: tgtCandidate.x, y: tgtCandidate.y })) {
+                  continue;
+                }
+              }
             }
           }
           // v2 spatial: AoE-shape actions (sphere/cube/cone/line) go through
@@ -1518,6 +1533,20 @@
             }
           }
         }
+        }
+        // v2 terrain: damaging-cell trigger if combatant ends turn standing on it.
+        if (typeof CrucibleSpatial !== 'undefined' && map && !c.dead && !c.downed) {
+          const t = CrucibleSpatial.terrainAt(map, c.x, c.y);
+          if (t && t.type === 'damaging') {
+            const dmg = (t.dice ? rollDice(t.dice, rng) : 0) + (Number(t.mod) || 0);
+            if (dmg > 0) {
+              events.push({
+                type: 'terrain-damage', round, who: c.id, name: c.name,
+                cell: { x: c.x, y: c.y }, amount: dmg, dmgType: t.dmgType || 'untyped',
+              });
+              applyDamage(c, dmg, t.dmgType || 'untyped', null, events, round, 'Terrain', 'damaging cell');
+            }
+          }
         }
         // End-of-turn end check.
         const pcsAlive = combatants.some(x => x.side === 'pc' && !x.downed && !x.dead);
