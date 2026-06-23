@@ -1621,6 +1621,29 @@ test('runTrial: PC leaving a monster melee reach provokes an opportunity attack'
   assertTrue(oa, 'expected Goblin to take an opportunity attack on the leaving PC');
 });
 
+test('runTrial: trial runs to completion without infinite loop on adjacent OoA setup', () => {
+  // Sanity check that reactions reset across rounds (no asserting count;
+  // engine reaching trial.rounds > 0 is enough).
+  const pm = {
+    id: 'pm1', identity: { name: 'PC', level: 5 },
+    abilities: { dex: 14, str: 14 },
+    combat: { hp: 100, maxHp: 100, ac: 18, initBonus: 5, speed: 1 },
+    actions: [{ type: 'attack', name: 'Sword', actionRange: 'melee',
+                atkAbility: 'str', damage: { dice: '1d8', mod: '+atkAbility', type: 'slashing' } }],
+  };
+  const m = { pickId: 'mon0', name: 'Goblin', cr: '1/4', count: 1,
+    monster: { name: 'Goblin', ac: 13, hp: 200, maxHp: 200,
+               abilities: { str: { mod: 0 } },
+               parsedActions: [{ kind: 'attack', name: 'Bite', sourceActionName: 'Bite',
+                                 toHit: 4, damage: [{ dice: '1d4', mod: 0, type: 'piercing' }] }] } };
+  const party = [pm];
+  party._encounter = { map: { width: 10, height: 10, blocked: null },
+                       placement: [{ id: 'pc:pm1', x: 5, y: 5 }, { id: 'mon0:1', x: 6, y: 5 }] };
+  const rng = () => 0.5;
+  const trial = Crucible.runTrial(party, [m], { aiHint: 'focus' }, rng);
+  assertTrue(trial.rounds > 0, 'trial completed at least one round');
+});
+
 test('resolveOpportunityAttack: emits opportunity-attack event with hit/damage fields', () => {
   const defender = {
     id: 'mon:1', name: 'Goblin', side: 'monster', x: 3, y: 3,

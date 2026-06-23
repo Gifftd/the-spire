@@ -1453,6 +1453,8 @@
         if (!pcsAlive) { winner = 'monster'; break; }
         if (!monAlive) { winner = 'pc';      break; }
       }
+      // v2: reset reactions at end of round so OoAs can fire again.
+      for (const cc of combatants) cc.reactionAvailableThisRound = true;
       // End-of-round hook for PC features (Rage duration tick, reaction reset).
       if (!winner && typeof PCFeatures !== 'undefined') {
         const endCtx = { round, combatants, rng, eventLog: events };
