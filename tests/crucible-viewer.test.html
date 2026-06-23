@@ -56,6 +56,16 @@ function syntheticTrial() {
   };
 }
 // === Tests below this line ===
+test('initialState: extracts combatants + map from placement event', () => {
+  const trial = syntheticTrial();
+  const state = CrucibleViewer.initialState(trial.events[0]);
+  assertEq(state.map, { width: 10, height: 10, blocked: null });
+  assertEq(state.combatants.length, 2);
+  const pc = state.combatants.find(c => c.id === 'pc:1');
+  assertEq(pc.x, 1);
+  assertEq(pc.y, 1);
+  assertEq(pc.hp, 30);
+});
 </script>
 </body>
 </html>
