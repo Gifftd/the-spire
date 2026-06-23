@@ -61,6 +61,69 @@ test('chebyshev: diagonal 1 step → 1 (5e RAW)', () => {
 test('chebyshev: 3 right, 4 up → 4 (max axis)', () => {
   assertEq(CrucibleSpatial.chebyshev({x:0,y:0}, {x:3,y:4}), 4);
 });
+
+group('findPath (A*)');
+
+// Tiny helper to build a map quickly. blocked is a list of [x,y] pairs.
+function mkMap(width, height, blocked) {
+  const m = { width, height, blocked: null };
+  if (blocked && blocked.length) {
+    m.blocked = Array.from({length: height}, () => new Array(width).fill(false));
+    for (const [x, y] of blocked) m.blocked[y][x] = true;
+  }
+  return m;
+}
+
+test('findPath: open grid, straight line', () => {
+  const map = mkMap(10, 10, []);
+  const path = CrucibleSpatial.findPath({x:1,y:1}, {x:4,y:1}, map, {});
+  assertEq(path, [{x:2,y:1}, {x:3,y:1}, {x:4,y:1}]);
+});
+
+test('findPath: diagonal allowed (Chebyshev)', () => {
+  const map = mkMap(10, 10, []);
+  const path = CrucibleSpatial.findPath({x:0,y:0}, {x:3,y:3}, map, {});
+  assertEq(path.length, 3);  // 3 diagonal steps
+  assertEq(path[path.length - 1], {x:3,y:3});
+});
+
+test('findPath: routes around a single blocked cell', () => {
+  // Block (2,1). Path from (1,1) → (4,1) goes around.
+  const map = mkMap(10, 10, [[2,1]]);
+  const path = CrucibleSpatial.findPath({x:1,y:1}, {x:4,y:1}, map, {});
+  assert(path.length > 0, 'should find a path');
+  assertEq(path[path.length - 1], {x:4,y:1});
+  // None of the cells should be the blocked one.
+  assert(!path.some(c => c.x === 2 && c.y === 1), 'path crossed blocked cell');
+});
+
+test('findPath: unreachable → empty array', () => {
+  // Surround goal with blocks.
+  const blocked = [[3,1],[4,2],[3,3],[2,2]];
+  const map = mkMap(10, 10, blocked);
+  const path = CrucibleSpatial.findPath({x:0,y:0}, {x:3,y:2}, map, {});
+  assertEq(path, []);
+});
+
+test('findPath: maxSteps caps the path length', () => {
+  const map = mkMap(20, 20, []);
+  const path = CrucibleSpatial.findPath({x:0,y:0}, {x:10,y:10}, map, { maxSteps: 3 });
+  assertEq(path.length, 3);
+});
+
+test('findPath: stopWhenAdjacent stops one cell short', () => {
+  const map = mkMap(10, 10, []);
+  const goalCombatant = { x: 6, y: 1 };
+  const path = CrucibleSpatial.findPath({x:1,y:1}, {x:6,y:1}, map, { stopWhenAdjacent: goalCombatant });
+  // Path should land adjacent to (6,1), i.e. at (5,1).
+  assertEq(path[path.length - 1], {x:5,y:1});
+});
+
+test('findPath: empty path if start === goal', () => {
+  const map = mkMap(10, 10, []);
+  const path = CrucibleSpatial.findPath({x:3,y:3}, {x:3,y:3}, map, {});
+  assertEq(path, []);
+});
 </script>
 </body>
 </html>
