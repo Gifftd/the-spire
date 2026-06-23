@@ -196,6 +196,13 @@ function migratePCRecord(pm) {
   if (typeof pm.combat.speed !== 'number') pm.combat.speed = 6;
   else if (pm.combat.speed > 9) pm.combat.speed = Math.max(1, Math.floor(pm.combat.speed / 5));
   if (typeof pm.combat.reach !== 'number') pm.combat.reach = 1;
+  // v2 spatial: per-action attack-range default. Legacy actions saved before
+  // the actionRange field existed get 'melee' (the engine's safe default).
+  if (Array.isArray(pm.actions)) {
+    for (const a of pm.actions) {
+      if (a && a.type === 'attack' && !a.actionRange) a.actionRange = 'melee';
+    }
+  }
   return pm;
 }
 function saveParty() {
@@ -454,13 +461,21 @@ function renderActionEditor(pm, act) {
   }
   const rangeSel = ['melee','ranged','both'].map(t =>
     `<option value="${t}" ${act.actionRange===t?'selected':''}>${t}</option>`).join('');
+  const engineCells = (typeof Crucible !== 'undefined' && Crucible.actionRange)
+    ? Crucible.actionRange(act) : (act.actionRange === 'ranged' ? 6 : 1);
   return `
     <div style="padding:0.25rem 0.5rem; background:var(--c-surface);">
       <label>Name <input type="text" value="${escapeHtml(act.name)}"
         oninput="updateAction('${pm.id}','${act.id}','name', this.value)" class="pc-input"></label>
-      <label>Range
+      <label>Attack type
         <select onchange="updateAction('${pm.id}','${act.id}','actionRange', this.value)">${rangeSel}</select>
       </label>
+      <label>Range (cells, optional)
+        <input type="number" min="1" max="60" value="${typeof act.range === 'number' ? act.range : ''}"
+          placeholder="${act.actionRange === 'ranged' ? '6' : '1'}"
+          oninput="updateAction('${pm.id}','${act.id}','range', this.value === '' ? null : parseInt(this.value))"
+          class="pc-input" style="width:5rem"></label>
+      <span style="color:var(--c-accent); font-size:0.78rem">→ engine reads ${engineCells} cell${engineCells === 1 ? '' : 's'}</span>
       <label>Type <select onchange="changeActionType('${pm.id}','${act.id}', this.value)">${typeSel}</select></label>
       ${body}
       <label>Uses/day (blank=at-will) <input type="number" value="${act.usesPerDay ?? ''}"

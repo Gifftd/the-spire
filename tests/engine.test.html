@@ -1795,17 +1795,19 @@ test('multiattackRange: all melee sub-actions → 1', () => {
 });
 
 test('runTrial: multiattacking monster moves toward distant PC before swinging', () => {
+  // Orc goes first (high init) so the PC can't race to it first via Dash.
+  // PC speed 1 so even with Dash the PC only closes 2 cells/turn.
   const pm = {
     id: 'pm1', identity: { name: 'PC', level: 5 },
     abilities: { dex: 14, str: 14 },
-    combat: { hp: 100, maxHp: 100, ac: 18, initBonus: 0, speed: 6 },
+    combat: { hp: 100, maxHp: 100, ac: 18, initBonus: -10, speed: 1 },
     actions: [{ type: 'attack', name: 'Sword', actionRange: 'melee',
                 atkAbility: 'str', damage: { dice: '1d8', mod: '+atkAbility', type: 'slashing' } }],
   };
   const orc = {
     pickId: 'mon0', name: 'Orc', cr: '1', count: 1,
     monster: {
-      name: 'Orc', ac: 13, hp: 30, maxHp: 30, initiative: -5,
+      name: 'Orc', ac: 13, hp: 30, maxHp: 30, initiative: 20,
       abilities: { str: { mod: 3 }, dex: { mod: 1 } },
       speed: { walk: 30 },
       parsedActions: [
@@ -1825,8 +1827,11 @@ test('runTrial: multiattacking monster moves toward distant PC before swinging',
   };
   const rng = () => 0.5;
   const trial = Crucible.runTrial(party, [orc], { aiHint: 'focus' }, rng);
-  const moves = trial.events.filter(e => e.type === 'move' && e.who === 'mon0:1');
-  assertTrue(moves.length > 0, 'Orc should move toward the PC before its multiattack fires');
+  // Orc emits a free 'move' event (engage) and/or a 'dash' event since the PC
+  // is 10 cells away and the Orc's multiattack range is 1.
+  const orcMoved = trial.events.some(e =>
+    (e.type === 'move' || e.type === 'dash') && e.who === 'mon0:1');
+  assertTrue(orcMoved, 'Orc should move (or Dash) toward the PC before its multiattack fires');
 });
 
 test('monsterSpeedCells: { walk: 30 } → 6 cells', () => {
@@ -1910,6 +1915,44 @@ test('runTrial: monster with only a ranged attack (no reach in body) fires from 
   // actionRange:'ranged'), they need to close 1 cell — but should still
   // attack same round.
   assertTrue(attacks.length > 0, 'Archer should attack the PC from range');
+});
+
+test('runTrial: PC unable to reach target after free movement uses action as Dash', () => {
+  // Wizard with a melee weapon, far from the only monster. Speed 6, target
+  // is 15 cells away — needs free movement + Dash to make any progress.
+  const pm = {
+    id: 'pm1', identity: { name: 'PC', level: 5 },
+    abilities: { dex: 14, str: 14 },
+    combat: { hp: 30, maxHp: 30, ac: 14, initBonus: 5, speed: 6 },
+    actions: [{ type: 'attack', name: 'Sword', actionRange: 'melee',
+                atkAbility: 'str', damage: { dice: '1d8', mod: '+atkAbility', type: 'slashing' } }],
+  };
+  const goblin = { pickId: 'gob', name: 'Goblin', cr: '1/4', count: 1,
+    monster: { name: 'Goblin', ac: 13, hp: 200, maxHp: 200, initiative: -10,
+               abilities: { str: { mod: 0 } }, speed: { walk: 5 },  // slow so it can't close
+               parsedActions: [{ kind: 'attack', sourceActionName: 'Bite', name: 'Bite',
+                                 actionRange: 'melee', reach: 5, toHit: 4,
+                                 damage: [{ dice: '1d4', mod: 0, type: 'piercing' }] }] } };
+  const party = [pm];
+  party._encounter = {
+    map: { width: 30, height: 20, blocked: null },
+    placement: [{ id: 'pc:pm1', x: 1, y: 5 }, { id: 'gob:1', x: 16, y: 5 }],
+  };
+  let s = 12345;
+  const rng = () => {
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const trial = Crucible.runTrial(party, [goblin], { aiHint: 'focus' }, rng);
+  // Round 1 from PC: free move (6) + dash (6) = 12 cells closer. Should land
+  // around x=13, still 3 cells short — so a Dash event must fire.
+  const dashes = trial.events.filter(e => e.type === 'dash' && e.who === 'pc:pm1');
+  assertTrue(dashes.length > 0, 'PC should Dash when free movement alone leaves them out of melee range');
+  // First dash should record some cells.
+  assertTrue(dashes[0].cells > 0, 'dash event should report cells moved');
 });
 </script>
 </body>
