@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>crucible-spatial tests</title>
+<style>
+  body { font-family: monospace; background: #0e1418; color: #dde7e9; padding: 1rem; }
+  .pass { color: #6dd58c; }
+  .fail { color: #d97a7a; }
+  button { padding: 0.5rem 1rem; background: #1d3a4a; color: #dde7e9; border: 1px solid #1c2429; cursor: pointer; }
+  pre { white-space: pre-wrap; margin-top: 0.5rem; }
+</style>
+</head>
+<body>
+<h1>crucible-spatial tests</h1>
+<button onclick="runAll()">Run tests</button>
+<pre id="out"></pre>
+
+<script src="../crucible-spatial.js"></script>
+<script>
+const TESTS = [];
+function test(name, fn) { TESTS.push({ name, fn }); }
+function group(name) { TESTS.push({ group: name }); }
+function assert(cond, msg) {
+  if (!cond) throw new Error(msg || 'assertion failed');
+}
+function assertEq(actual, expected, msg) {
+  const a = JSON.stringify(actual), e = JSON.stringify(expected);
+  if (a !== e) throw new Error((msg || 'mismatch') + ': ' + a + ' vs ' + e);
+}
+function assertClose(a, b, eps) {
+  if (Math.abs(a - b) > (eps || 0.001)) throw new Error('close mismatch: ' + a + ' vs ' + b);
+}
+function runAll() {
+  const out = document.getElementById('out');
+  let passed = 0, failed = 0;
+  const lines = [];
+  for (const t of TESTS) {
+    if (t.group) { lines.push('\n— ' + t.group + ' —'); continue; }
+    try { t.fn(); lines.push('<span class="pass">✓ ' + t.name + '</span>'); passed++; }
+    catch (e) { lines.push('<span class="fail">✗ ' + t.name + ' — ' + e.message + '</span>'); failed++; }
+  }
+  lines.push('\n' + passed + ' passed, ' + failed + ' failed');
+  out.innerHTML = lines.join('\n');
+}
+
+// === Tests below this line ===
+</script>
+</body>
+</html>
