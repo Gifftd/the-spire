@@ -673,22 +673,20 @@
     return all.filter(c => c.side === me.side && !c.dead && (includeSelf || c !== me));
   }
 
-  function pickEnemyTarget(me, all, tactics, rng) {
-    const candidates = aliveEnemies(me, all);
-    if (!candidates.length) return null;
-    const mode = (tactics && tactics.aiHint) || 'focus';
-    if (mode === 'random') {
-      return candidates[Math.floor(rng() * candidates.length)];
+  function pickEnemyTarget(me, all, tactics, rng, action) {
+    const enemies = all.filter(t => t.side !== me.side && !t.dead && !t.downed);
+    if (enemies.length === 0) return null;
+    if (typeof CrucibleSpatial !== 'undefined' && action) {
+      const map = me._mapRef || { width: 20, height: 20, blocked: null };
+      let best = null, bestScore = -Infinity;
+      for (const e of enemies) {
+        const s = CrucibleSpatial.scoreTarget(e, me, action, all, map, tactics);
+        if (s > bestScore) { bestScore = s; best = e; }
+      }
+      return best;
     }
-    // focus (default): lowest HP, then lowest AC, then random.
-    let best = candidates[0];
-    for (const c of candidates) {
-      if (c.hp < best.hp) best = c;
-      else if (c.hp === best.hp && c.ac < best.ac) best = c;
-    }
-    // Final random tiebreak among true ties.
-    const ties = candidates.filter(c => c.hp === best.hp && c.ac === best.ac);
-    return ties[Math.floor(rng() * ties.length)];
+    // v1 fallback: lowest-HP heuristic.
+    return enemies.slice().sort((a, b) => a.hp - b.hp)[0];
   }
 
   // ─────────── Action availability ───────────
@@ -1017,7 +1015,7 @@
         return Array.isArray(t) ? t[0] : t;
       };
     } else {
-      pickSubTarget = () => pickEnemyTarget(me, all, tactics, rng);
+      pickSubTarget = (subAction) => pickEnemyTarget(me, all, tactics, rng, subAction);
     }
 
     for (const step of (multiAction.multiattackPlan || [])) {
@@ -1028,7 +1026,7 @@
         continue;
       }
       for (let i = 0; i < (step.count || 1); i++) {
-        const tgt = pickSubTarget();
+        const tgt = pickSubTarget(sub);
         if (!tgt) break;
         if (sub.kind === 'attack') {
           const r = me.side === 'monster'
@@ -1246,7 +1244,7 @@
               && typeof CrucibleSpatial !== 'undefined') {
             const tgtCandidate = (c.side === 'monster' && targets && targets[0])
               ? targets[0]
-              : pickEnemyTarget(c, all, tactics, rng);
+              : pickEnemyTarget(c, all, tactics, rng, action);
             if (tgtCandidate) {
               const need = actionRange(action);
               let dist = CrucibleSpatial.chebyshev(c, tgtCandidate);
@@ -1303,7 +1301,7 @@
           } else if (action.kind === 'attack') {
             const tgt = (c.side === 'monster' && targets && targets[0])
                           ? targets[0]
-                          : pickEnemyTarget(c, all, tactics, rng);
+                          : pickEnemyTarget(c, all, tactics, rng, action);
             if (!tgt) continue;
             consumeUse(c, action);
             const r = c.side === 'pc'

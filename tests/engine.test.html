@@ -290,6 +290,19 @@ test('pickEnemyTarget: skips downed/dead enemies', () => {
   const t = Crucible.pickEnemyTarget(me, [me, ...enemies], { aiHint:'focus' }, Crucible.makeRng(1));
   assertEq(t.name, 'B');
 });
+test('pickEnemyTarget: spatial scorer prefers near low-HP over far low-HP', () => {
+  const c = { id: 'pc:1', side: 'pc', x: 0, y: 0, threat: 1,
+              _mapRef: { width: 20, height: 20, blocked: null } };
+  const near = { id: 'mon:near', side: 'monster', x: 2, y: 0, hp: 30, threat: 1,
+                 dead: false, downed: false };
+  const far  = { id: 'mon:far',  side: 'monster', x: 9, y: 0, hp: 10, threat: 1,
+                 dead: false, downed: false };
+  const all = [c, near, far];
+  const action = { actionRange: 'melee', range: 1 };
+  const picked = Crucible.pickEnemyTarget(c, all, { aiHint: 'focus' }, () => 0.5, action);
+  // distance dominates: near scores -1+1/30+0.3 ≈ -0.67; far scores -4.5+0.1+0.3 ≈ -4.1
+  assertEq(picked.id, 'mon:near');
+});
 test('healTriage: ally downed and self has reviveDowned heal → trigger', () => {
   const ally = { side:'pc', name:'Cleric', downed:false, dead:false, hp:20, maxHp:20, lastHealRound:-99 };
   const wounded = { side:'pc', name:'Tank', downed:true, dead:false, hp:0, maxHp:30, lastHealRound:-99 };
