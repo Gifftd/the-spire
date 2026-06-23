@@ -212,6 +212,34 @@
         if (typeof e.map.width !== 'number' || e.map.width < 1) push('map.width', 'must be a positive number');
         if (typeof e.map.height !== 'number' || e.map.height < 1) push('map.height', 'must be a positive number');
         if (e.map.width > 200 || e.map.height > 200) push('map', 'dimensions exceed 200×200 hard cap');
+
+        // v2 terrain: optional map.terrain 2D array.
+        if (e.map.terrain !== undefined && e.map.terrain !== null) {
+          if (!Array.isArray(e.map.terrain) || e.map.terrain.length !== e.map.height) {
+            push('map.terrain', 'must be a ' + e.map.height + '-row 2D array');
+          } else {
+            for (let y = 0; y < e.map.terrain.length; y++) {
+              const row = e.map.terrain[y];
+              if (!Array.isArray(row) || row.length !== e.map.width) {
+                push('map.terrain[' + y + ']', 'row must be ' + e.map.width + ' cells wide');
+                continue;
+              }
+              for (let x = 0; x < row.length; x++) {
+                const c = row[x];
+                if (c === null || c === undefined) continue;
+                if (typeof c !== 'object') { push('map.terrain[' + y + '][' + x + ']', 'cell must be null or object'); continue; }
+                if (!['wall','difficult','damaging'].includes(c.type)) {
+                  push('map.terrain[' + y + '][' + x + '].type', 'unknown terrain type: ' + c.type);
+                }
+                if (c.type === 'damaging') {
+                  if (c.dice && typeof c.dice !== 'string') push('map.terrain[' + y + '][' + x + '].dice', 'must be a dice string');
+                  if (c.mod !== undefined && typeof c.mod !== 'number') push('map.terrain[' + y + '][' + x + '].mod', 'must be a number');
+                  if (c.dmgType && typeof c.dmgType !== 'string') push('map.terrain[' + y + '][' + x + '].dmgType', 'must be a string');
+                }
+              }
+            }
+          }
+        }
       }
     }
     if (e.placement !== undefined && e.placement !== null && !Array.isArray(e.placement)) {
