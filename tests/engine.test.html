@@ -1758,6 +1758,75 @@ test('runTrial: AoE action on PC list emits aoe event in the trial', () => {
   const aoe = trial.events.find(e => e.type === 'aoe');
   assertTrue(aoe, 'expected aoe event in trial');
 });
+
+test('actionRange: monster reach (5 ft) → 1 cell', () => {
+  assertEq(Crucible.actionRange({ reach: 5 }), 1);
+});
+test('actionRange: monster reach (10 ft) → 2 cells', () => {
+  assertEq(Crucible.actionRange({ reach: 10 }), 2);
+});
+test('actionRange: monster range array [80, 320] → 16 cells', () => {
+  assertEq(Crucible.actionRange({ range: [80, 320] }), 16);
+});
+test('actionRange: monster melee with no reach field → 1 cell (default)', () => {
+  assertEq(Crucible.actionRange({ kind: 'attack', toHit: 4 }), 1);
+});
+
+test('multiattackRange: max across sub-actions', () => {
+  const subs = [
+    { sourceActionName: 'Scimitar', reach: 5, kind: 'attack' },
+    { sourceActionName: 'Shortbow', range: [80, 320], kind: 'attack' },
+  ];
+  const ma = { kind: 'multiattack',
+               multiattackPlan: [{ actionName: 'Scimitar', count: 1 },
+                                 { actionName: 'Shortbow', count: 1 }] };
+  assertEq(Crucible.multiattackRange(ma, subs), 16);
+});
+test('multiattackRange: all melee sub-actions → 1', () => {
+  const subs = [
+    { sourceActionName: 'Greataxe', reach: 5, kind: 'attack' },
+    { sourceActionName: 'Slam', reach: 5, kind: 'attack' },
+  ];
+  const ma = { kind: 'multiattack',
+               multiattackPlan: [{ actionName: 'Greataxe', count: 1 },
+                                 { actionName: 'Slam', count: 1 }] };
+  assertEq(Crucible.multiattackRange(ma, subs), 1);
+});
+
+test('runTrial: multiattacking monster moves toward distant PC before swinging', () => {
+  const pm = {
+    id: 'pm1', identity: { name: 'PC', level: 5 },
+    abilities: { dex: 14, str: 14 },
+    combat: { hp: 100, maxHp: 100, ac: 18, initBonus: 0, speed: 6 },
+    actions: [{ type: 'attack', name: 'Sword', actionRange: 'melee',
+                atkAbility: 'str', damage: { dice: '1d8', mod: '+atkAbility', type: 'slashing' } }],
+  };
+  const orc = {
+    pickId: 'mon0', name: 'Orc', cr: '1', count: 1,
+    monster: {
+      name: 'Orc', ac: 13, hp: 30, maxHp: 30, initiative: -5,
+      abilities: { str: { mod: 3 }, dex: { mod: 1 } },
+      speed: { walk: 30 },
+      parsedActions: [
+        { kind: 'multiattack', sourceActionName: 'Multiattack',
+          name: 'Multiattack',
+          multiattackPlan: [{ actionName: 'Greataxe', count: 2 }] },
+        { kind: 'attack', sourceActionName: 'Greataxe', name: 'Greataxe',
+          reach: 5, toHit: 5,
+          damage: [{ dice: '1d12', mod: 3, type: 'slashing' }] },
+      ],
+    },
+  };
+  const party = [pm];
+  party._encounter = {
+    map: { width: 20, height: 20, blocked: null },
+    placement: [{ id: 'pc:pm1', x: 5, y: 5 }, { id: 'mon0:1', x: 15, y: 5 }],
+  };
+  const rng = () => 0.5;
+  const trial = Crucible.runTrial(party, [orc], { aiHint: 'focus' }, rng);
+  const moves = trial.events.filter(e => e.type === 'move' && e.who === 'mon0:1');
+  assertTrue(moves.length > 0, 'Orc should move toward the PC before its multiattack fires');
+});
 </script>
 </body>
 </html>

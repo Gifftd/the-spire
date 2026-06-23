@@ -34,6 +34,7 @@ fm-*.json
 .vscode/
 .idea/
 .claude/
+.superpowers/
 *.swp
 *.swo
 
