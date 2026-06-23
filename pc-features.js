@@ -1,7 +1,7 @@
 // pc-features.js
 // Framework for modeling 5e PC class features in the Crucible simulator.
 // Exports a global PCFeatures namespace with:
-//   - HOOK_NAMES: the 9 hook points the engine calls
+//   - HOOK_NAMES: the 10 hook points the engine calls
 //   - MODE_PREDICATES: named predicate functions for mode policies
 //   - LIBRARY: built-in features (Rage, Sneak Attack, etc.) by id
 //   - resolve(featureRef): given {id, source, params}, return the full feature def
@@ -49,6 +49,13 @@
     'onAllyDowned',
     'onMonsterDowned',
     'onRoundEnd',
+    // Fires inside resolveAttackPc / resolveAttackMonster AFTER the v2 range
+    // guard but BEFORE the d20 roll. Signature: (self, action, target, attackCtx)
+    // where attackCtx = { round, combatants, eventLog }. Use it for features
+    // that activate or consume resources when their owner is *actually* about
+    // to swing — Rage, Action Surge, Hex initialization, etc. PC-only: the
+    // engine never dispatches this from monster code paths.
+    'onBeforeOwnAttack',
   ];
 
   const MODE_PREDICATES = {
@@ -199,27 +206,38 @@
     ],
 
     modePolicy: {
-      nova:      { triggerRound: 1, conditionFn: 'always' },
-      sustained: { triggerRound: 1, conditionFn: 'whenAnyEnemyAlive' },
-      defensive: { triggerRound: 1, conditionFn: 'whenHpBelowHalf' },
+      nova:      { conditionFn: 'always' },
+      sustained: { conditionFn: 'whenAnyEnemyAlive' },
+      defensive: { conditionFn: 'whenHpBelowHalf' },
     },
 
     initialState() { return { active: false, roundsLeft: 0 }; },
 
     hooks: {
       onCombatStart(self, ctx) {
-        const ref = self.pm.features.find(f => f.id === 'rage');
+        // Rage no longer pre-activates at combat start; it activates the first
+        // time the barbarian actually swings (see onBeforeOwnAttack below).
+        // initialState() already returns { active:false, roundsLeft:0 }, so
+        // there's nothing to do here. Left as a no-op placeholder.
+      },
+
+      onBeforeOwnAttack(self, action, target, attackCtx) {
+        const state = self.featureState.rage;
+        if (!state || state.active) return;  // already raging
+        // Rage requires a melee attack (mirrors the existing onAttackHit guard).
+        if (!action || action.actionRange === 'ranged') return;
         const mode = (self.pm.tactics && self.pm.tactics.mode) || 'sustained';
         const policy = this.modePolicy[mode] || this.modePolicy.sustained;
-        if (ctx.round >= (policy.triggerRound || 1)) {
-          const pred = MODE_PREDICATES[policy.conditionFn] || MODE_PREDICATES.always;
-          if (pred(self, ctx, 'rage')) {
-            const params = (ref && ref.params) || this.deriveParams(self.pm);
-            self.featureState.rage.active = true;
-            self.featureState.rage.roundsLeft = params.duration || 10;
-            if (ctx.eventLog) ctx.eventLog.push({ round: ctx.round, type: 'feature', who: self.id, what: 'Rage activated', featureName: 'Rage', source: 'rage' });
-          }
-        }
+        const pred = MODE_PREDICATES[policy.conditionFn] || MODE_PREDICATES.always;
+        if (!pred(self, attackCtx, 'rage')) return;
+        const ref = self.pm.features.find(f => f.id === 'rage');
+        const params = (ref && ref.params) || this.deriveParams(self.pm);
+        state.active = true;
+        state.roundsLeft = params.duration || 10;
+        if (attackCtx && attackCtx.eventLog) attackCtx.eventLog.push({
+          round: attackCtx.round, type: 'feature', who: self.id,
+          what: 'Rage activated', featureName: 'Rage', source: 'rage',
+        });
       },
 
       onAttackHit(self, action, target, dmgCtx) {
@@ -280,9 +298,9 @@
     ],
 
     modePolicy: {
-      nova:      { triggerRound: 1, conditionFn: 'always' },
-      sustained: { triggerRound: 1, conditionFn: 'always' },
-      defensive: { triggerRound: 1, conditionFn: 'always' },
+      nova:      { conditionFn: 'always' },
+      sustained: { conditionFn: 'always' },
+      defensive: { conditionFn: 'always' },
     },
 
     initialState() { return { usedThisTurn: false }; },
@@ -325,9 +343,9 @@
     ],
 
     modePolicy: {
-      nova:      { triggerRound: 1, conditionFn: 'always' },
-      sustained: { triggerRound: 2, conditionFn: 'whenAnyEnemyAlive' },
-      defensive: { triggerRound: 1, conditionFn: 'whenAllyDowned' },
+      nova:      { conditionFn: 'always' },
+      sustained: { conditionFn: 'whenAnyEnemyAlive' },
+      defensive: { conditionFn: 'whenAllyDowned' },
     },
 
     initialState() { return { usesLeft: 0 }; },
@@ -339,18 +357,32 @@
         self.featureState.actionSurge.usesLeft = params.maxUses || 1;
       },
 
-      onTurnStart(self, ctx) {
+      onBeforeOwnAttack(self, action, target, attackCtx) {
         const state = self.featureState.actionSurge;
         if (!state || state.usesLeft <= 0) return;
+        // _firedThisTurn prevents Action Surge from firing again on each
+        // subsequent swing of the same turn (multiattack budget). Reset
+        // happens in onTurnStart below.
+        if (state._firedThisTurn) return;
         const mode = (self.pm.tactics && self.pm.tactics.mode) || 'sustained';
         const policy = this.modePolicy[mode] || this.modePolicy.sustained;
-        if (ctx.round < (policy.triggerRound || 1)) return;
         const pred = MODE_PREDICATES[policy.conditionFn] || MODE_PREDICATES.always;
-        if (!pred(self, ctx, 'actionSurge')) return;
+        if (!pred(self, attackCtx, 'actionSurge')) return;
         if (typeof self.actionsAvailable !== 'number') self.actionsAvailable = 1;
         self.actionsAvailable += 1;
         state.usesLeft -= 1;
-        if (ctx.eventLog) ctx.eventLog.push({ round: ctx.round, type: 'feature', who: self.id, what: 'Action Surge activated', featureName: 'Action Surge', source: 'actionSurge' });
+        state._firedThisTurn = true;
+        if (attackCtx && attackCtx.eventLog) attackCtx.eventLog.push({
+          round: attackCtx.round, type: 'feature', who: self.id,
+          what: 'Action Surge activated', featureName: 'Action Surge', source: 'actionSurge',
+        });
+      },
+
+      onTurnStart(self, ctx) {
+        // Reset the per-turn firing flag so the next turn's first attack can
+        // surge if uses remain.
+        const state = self.featureState.actionSurge;
+        if (state) state._firedThisTurn = false;
       },
     },
   };
@@ -390,9 +422,9 @@
     paramSchema: [],
 
     modePolicy: {
-      nova:      { triggerRound: 1, conditionFn: 'always', spendOn: 'everyHit' },
-      sustained: { triggerRound: 1, conditionFn: 'always', spendOn: 'paced' },
-      defensive: { triggerRound: 1, conditionFn: 'always', spendOn: 'critOnly' },
+      nova:      { conditionFn: 'always', spendOn: 'everyHit' },
+      sustained: { conditionFn: 'always', spendOn: 'paced' },
+      defensive: { conditionFn: 'always', spendOn: 'critOnly' },
     },
 
     initialState() { return { slotsLeft: {}, hitsThisFight: 0, smitesThisFight: 0 }; },
@@ -494,9 +526,9 @@
     ],
 
     modePolicy: {
-      nova:      { triggerRound: 1, conditionFn: 'whenAllyHpBelowHalf' },
-      sustained: { triggerRound: 1, conditionFn: 'whenAllyDowned' },
-      defensive: { triggerRound: 1, conditionFn: 'whenAllyDowned' },
+      nova:      { conditionFn: 'whenAllyHpBelowHalf' },
+      sustained: { conditionFn: 'whenAllyDowned' },
+      defensive: { conditionFn: 'whenAllyDowned' },
     },
 
     initialState() { return { slotsLeft: {} }; },
@@ -559,9 +591,9 @@
     ],
 
     modePolicy: {
-      nova:      { triggerRound: 1, threshold: 'whileSlotsLeft' },
-      sustained: { triggerRound: 1, threshold: 3 },
-      defensive: { triggerRound: 1, threshold: 'wouldDrop' },
+      nova:      { threshold: 'whileSlotsLeft' },
+      sustained: { threshold: 3 },
+      defensive: { threshold: 'wouldDrop' },
     },
 
     initialState() { return { slotsLeft: {} }; },
@@ -973,9 +1005,7 @@
           featureName: spec.name || spec.id,
         };
         // Round + combatants might live on any of ctx/dmgCtx/rollCtx depending
-        // on the hook. Pulling from any source available so a feature on
-        // onAttackHit etc. doesn't get stuck on triggerRound=1 (which used to
-        // be the silent-no-op cause for nearly every custom feature).
+        // on the hook. Pull from whichever is available.
         const round =
           (hookCtx.ctx     && hookCtx.ctx.round) ||
           (hookCtx.dmgCtx  && hookCtx.dmgCtx.round) ||
@@ -992,14 +1022,6 @@
           (hookCtx.ctx     && hookCtx.ctx.eventLog) ||
           (hookCtx.rollCtx && hookCtx.rollCtx.eventLog) || null;
         const featureName = spec.name || spec.id;
-        if (policy.triggerRound && round < policy.triggerRound) {
-          if (eventLog) eventLog.push({
-            round, type: 'feature', who: self && self.id,
-            what: featureName + ': gated — round ' + round + ' < triggerRound ' + policy.triggerRound,
-            featureName, source: spec.id, isGate: true,
-          });
-          return;
-        }
         if (policy.conditionFn) {
           const pred = MODE_PREDICATES[policy.conditionFn];
           if (pred && !pred(self, predCtx, spec.id)) {
