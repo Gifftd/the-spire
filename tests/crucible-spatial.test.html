@@ -124,6 +124,70 @@ test('findPath: empty path if start === goal', () => {
   const path = CrucibleSpatial.findPath({x:3,y:3}, {x:3,y:3}, map, {});
   assertEq(path, []);
 });
+
+group('placeCombatants');
+
+test('placeCombatants: 2 PCs, 2 monsters on a 10×10 map', () => {
+  const combatants = [
+    { id: 'pc:1', side: 'pc' },
+    { id: 'pc:2', side: 'pc' },
+    { id: 'mon:0', side: 'monster' },
+    { id: 'mon:1', side: 'monster' },
+  ];
+  const map = { width: 10, height: 10, blocked: null };
+  CrucibleSpatial.placeCombatants(combatants, map, null);
+  // PCs at y=1, monsters at y=8.
+  assertEq(combatants[0].y, 1);
+  assertEq(combatants[1].y, 1);
+  assertEq(combatants[2].y, 8);
+  assertEq(combatants[3].y, 8);
+  // PCs and monsters spread across width.
+  assert(combatants[0].x !== combatants[1].x, 'PCs shouldnt overlap');
+  assert(combatants[2].x !== combatants[3].x, 'monsters shouldnt overlap');
+});
+
+test('placeCombatants: override array sets explicit positions', () => {
+  const combatants = [
+    { id: 'pc:a', side: 'pc' },
+    { id: 'mon:b', side: 'monster' },
+  ];
+  const map = { width: 10, height: 10, blocked: null };
+  const override = [{ id: 'pc:a', x: 4, y: 4 }, { id: 'mon:b', x: 7, y: 7 }];
+  CrucibleSpatial.placeCombatants(combatants, map, override);
+  assertEq(combatants[0].x, 4);
+  assertEq(combatants[0].y, 4);
+  assertEq(combatants[1].x, 7);
+  assertEq(combatants[1].y, 7);
+});
+
+test('placeCombatants: 6 PCs evenly spaced on a 20-wide map', () => {
+  const combatants = Array.from({length: 6}, (_, i) => ({ id: 'pc:' + i, side: 'pc' }));
+  const map = { width: 20, height: 20, blocked: null };
+  CrucibleSpatial.placeCombatants(combatants, map, null);
+  const xs = combatants.map(c => c.x).sort((a,b) => a-b);
+  // No two PCs at same x.
+  for (let i = 1; i < xs.length; i++) assert(xs[i] > xs[i-1], 'PCs overlap at x=' + xs[i]);
+  // All within map bounds.
+  for (const c of combatants) {
+    assert(c.x >= 0 && c.x < map.width);
+    assertEq(c.y, 1);
+  }
+});
+
+test('placeCombatants: lone PC centered at x=floor(width/2)', () => {
+  const combatants = [{ id: 'pc:0', side: 'pc' }];
+  const map = { width: 11, height: 11, blocked: null };
+  CrucibleSpatial.placeCombatants(combatants, map, null);
+  assertEq(combatants[0].x, 5);
+  assertEq(combatants[0].y, 1);
+});
+
+test('placeCombatants: monsters at height-2', () => {
+  const combatants = [{ id: 'mon:0', side: 'monster' }];
+  const map = { width: 10, height: 15, blocked: null };
+  CrucibleSpatial.placeCombatants(combatants, map, null);
+  assertEq(combatants[0].y, 13);
+});
 </script>
 </body>
 </html>

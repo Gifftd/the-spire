@@ -84,6 +84,38 @@
 
   CrucibleSpatial.findPath = findPath;
 
+  // Default layout: place combatants on the map.
+  // If override is provided, use explicit positions from it.
+  // Otherwise, PCs at y=1, monsters at y=height-2, spread evenly across width.
+  function placeCombatants(combatants, map, override) {
+    if (Array.isArray(override) && override.length > 0) {
+      const byId = new Map(override.map(o => [o.id, o]));
+      for (const c of combatants) {
+        const o = byId.get(c.id);
+        if (o) { c.x = o.x; c.y = o.y; }
+      }
+      return;
+    }
+    // Default layout: PCs at y=1, monsters at y=height-2. Spread evenly across width.
+    const pcs = combatants.filter(c => c.side === 'pc');
+    const mons = combatants.filter(c => c.side === 'monster');
+    spreadRow(pcs, map.width, 1);
+    spreadRow(mons, map.width, map.height - 2);
+  }
+
+  function spreadRow(group, width, y) {
+    const n = group.length;
+    if (n === 0) return;
+    if (n === 1) { group[0].x = Math.floor(width / 2); group[0].y = y; return; }
+    // Evenly spaced positions. For n=2 on width=10: indices 0..1 map to x ≈ 3.3 and 6.6.
+    for (let i = 0; i < n; i++) {
+      group[i].x = Math.floor((width - 1) * (i + 1) / (n + 1));
+      group[i].y = y;
+    }
+  }
+
+  CrucibleSpatial.placeCombatants = placeCombatants;
+
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = CrucibleSpatial;
   } else {
