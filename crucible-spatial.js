@@ -107,17 +107,19 @@
   // If override is provided, use explicit positions from it.
   // Otherwise, PCs at y=1, monsters at y=height-2, spread evenly across width.
   function placeCombatants(combatants, map, override) {
+    const overridden = new Set();
     if (Array.isArray(override) && override.length > 0) {
       const byId = new Map(override.map(o => [o.id, o]));
       for (const c of combatants) {
         const o = byId.get(c.id);
-        if (o) { c.x = o.x; c.y = o.y; }
+        if (o) { c.x = o.x; c.y = o.y; overridden.add(c.id); }
       }
-      return;
     }
+    const remaining = combatants.filter(c => !overridden.has(c.id));
+    if (remaining.length === 0) return;
     // Default layout: PCs at y=1, monsters at y=height-2. Spread evenly across width.
-    const pcs = combatants.filter(c => c.side === 'pc');
-    const mons = combatants.filter(c => c.side === 'monster');
+    const pcs = remaining.filter(c => c.side === 'pc');
+    const mons = remaining.filter(c => c.side === 'monster');
     spreadRow(pcs, map.width, 1);
     spreadRow(mons, map.width, map.height - 2);
   }

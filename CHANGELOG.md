@@ -17,7 +17,8 @@ Position-aware tactical combat simulator replacing v1's abstract trial mode.
 - Movement, opportunity attacks, smart target selection (closest + lowest-HP + threat-weighted + OoA-aware), AoE templates (sphere/cube/cone/line).
 - New event types: `placement`, `move`, `aoe`, `opportunity-attack`. Existing v1.1 events keep their schema.
 - New 2D SVG viewer in the Results panel — event-sourced replay with step / step-back / play / pause / scrub / speed-pick controls. Clicking any log line jumps the board to that moment.
-- `crucible-spatial.js` (new, ~400 lines, ~52 tests); `crucible-viewer.js` (new, ~350 lines, ~10 tests).
+- `crucible-spatial.js` (new, ~400 lines, ~53 tests); `crucible-viewer.js` (new, ~350 lines, ~10 tests).
+- `placeCombatants` now applies default row placement to combatants the override array doesn't cover, instead of leaving them stacked at (0,0).
 - PC migration: `combat.speed` normalized to cells (was feet on legacy records); `combat.reach` defaults to 1.
 - Encounter schema gains optional `map` (width/height/blocked) and `placement` (per-combatant `{ id, x, y }` overrides). Defaults to 20×20 with PCs at y=1 and monsters at y=height-2.
 
