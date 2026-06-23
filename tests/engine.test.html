@@ -22,6 +22,7 @@
 <div id="results"></div>
 <div id="summary"></div>
 
+<script src="../crucible-parser.js"></script>
 <script src="../crucible-spatial.js"></script>
 <script src="../crucible-engine.js"></script>
 <script>
@@ -1826,6 +1827,89 @@ test('runTrial: multiattacking monster moves toward distant PC before swinging',
   const trial = Crucible.runTrial(party, [orc], { aiHint: 'focus' }, rng);
   const moves = trial.events.filter(e => e.type === 'move' && e.who === 'mon0:1');
   assertTrue(moves.length > 0, 'Orc should move toward the PC before its multiattack fires');
+});
+
+test('monsterSpeedCells: { walk: 30 } → 6 cells', () => {
+  assertEq(Crucible.monsterSpeedCells({ speed: { walk: 30 } }), 6);
+});
+test('monsterSpeedCells: { walk: 40 } → 8 cells', () => {
+  assertEq(Crucible.monsterSpeedCells({ speed: { walk: 40 } }), 8);
+});
+test('monsterSpeedCells: speedText "30 ft." → 6 cells', () => {
+  assertEq(Crucible.monsterSpeedCells({ speedText: '30 ft.' }), 6);
+});
+test('monsterSpeedCells: speedText "40 ft., fly 60 ft." → 8 cells (first match)', () => {
+  assertEq(Crucible.monsterSpeedCells({ speedText: '40 ft., fly 60 ft.' }), 8);
+});
+test('monsterSpeedCells: missing data → 6 (default 30 ft)', () => {
+  assertEq(Crucible.monsterSpeedCells({}), 6);
+});
+test('monsterSpeedCells: numeric speed 25 → 5 cells', () => {
+  assertEq(Crucible.monsterSpeedCells({ speed: 25 }), 5);
+});
+
+test('monsterReachCells: missing → 1 cell', () => {
+  assertEq(Crucible.monsterReachCells({}), 1);
+});
+test('monsterReachCells: reach 5 (feet) → 1 cell', () => {
+  assertEq(Crucible.monsterReachCells({ reach: 5 }), 1);
+});
+test('monsterReachCells: reach 10 (feet) → 2 cells', () => {
+  assertEq(Crucible.monsterReachCells({ reach: 10 }), 2);
+});
+
+test('parser: tryAttack stamps actionRange="melee" from Melee Attack header', () => {
+  const a = CrucibleParser.parseAction('Bite',
+    'Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) piercing damage.', {}, 2);
+  assertEq(a.kind, 'attack');
+  assertEq(a.actionRange, 'melee');
+});
+test('parser: tryAttack stamps actionRange="ranged" from Ranged Attack header', () => {
+  const a = CrucibleParser.parseAction('Shortbow',
+    'Ranged Attack Roll: +4, range 80/320 ft. Hit: 5 (1d6 + 2) piercing damage.', {}, 2);
+  assertEq(a.kind, 'attack');
+  assertEq(a.actionRange, 'ranged');
+});
+test('parser: tryAttack stamps actionRange="both" from "Melee or Ranged" header', () => {
+  const a = CrucibleParser.parseAction('Dagger',
+    'Melee or Ranged Attack Roll: +4, reach 5 ft. or range 20/60 ft. Hit: 4 (1d4 + 2) piercing damage.', {}, 2);
+  assertEq(a.actionRange, 'both');
+});
+test('runTrial: monster with only a ranged attack (no reach in body) fires from distance', () => {
+  const pm = {
+    id: 'pm1', identity: { name: 'PC', level: 5 },
+    abilities: { dex: 14, str: 14 },
+    combat: { hp: 30, maxHp: 30, ac: 18, initBonus: 0, speed: 6 },
+    actions: [{ type: 'attack', name: 'Sword', actionRange: 'melee',
+                atkAbility: 'str', damage: { dice: '1d8', mod: '+atkAbility', type: 'slashing' } }],
+  };
+  const archer = {
+    pickId: 'arch', name: 'Archer', cr: '1', count: 1,
+    monster: {
+      name: 'Archer', ac: 13, hp: 20, maxHp: 20, initiative: 5,
+      abilities: { str: { mod: 0 }, dex: { mod: 3 } },
+      speed: { walk: 30 },
+      parsedActions: [{
+        kind: 'attack', sourceActionName: 'Shortbow', name: 'Shortbow',
+        actionRange: 'ranged',  // parser set this
+        toHit: 5,
+        reach: null, range: null,  // body omitted explicit numbers
+        damage: [{ dice: '1d6', mod: 3, type: 'piercing' }],
+      }],
+    },
+  };
+  const party = [pm];
+  party._encounter = {
+    map: { width: 20, height: 20, blocked: null },
+    placement: [{ id: 'pc:pm1', x: 5, y: 5 }, { id: 'arch:1', x: 12, y: 5 }],
+  };
+  const rng = () => 0.5;
+  const trial = Crucible.runTrial(party, [archer], { aiHint: 'focus' }, rng);
+  const attacks = trial.events.filter(e => e.type === 'attack' && e.actor === 'Archer');
+  // Archer at (12,5) is 7 cells from PC. With ranged=6 cells (default for
+  // actionRange:'ranged'), they need to close 1 cell — but should still
+  // attack same round.
+  assertTrue(attacks.length > 0, 'Archer should attack the PC from range');
 });
 </script>
 </body>
