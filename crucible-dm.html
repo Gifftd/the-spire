@@ -186,6 +186,11 @@ function migratePCRecord(pm) {
     else pm.tactics.mode = 'sustained';
   }
   if (!Array.isArray(pm.features)) pm.features = [];
+  // v2 spatial: speed/reach defaults (in cells, where 1 cell = 5 ft).
+  // Legacy records may have speed stored in feet (e.g. 30 ft); convert.
+  if (typeof pm.combat.speed !== 'number') pm.combat.speed = 6;
+  else if (pm.combat.speed > 9) pm.combat.speed = Math.max(1, Math.floor(pm.combat.speed / 5));
+  if (typeof pm.combat.reach !== 'number') pm.combat.reach = 1;
   return pm;
 }
 function saveParty() {
@@ -199,7 +204,7 @@ function defaultPC() {
     identity: { name:'New PC', player:'', class:'', subclass:'', level:5, race:'' },
     abilities: { str:14, dex:14, con:14, int:10, wis:12, cha:10 },
     profs:    { saves: { str:false, dex:false, con:false, int:false, wis:false, cha:false } },
-    combat:   { hp:30, maxHp:30, ac:16, initBonus:2, speed:30 },
+    combat:   { hp:30, maxHp:30, ac:16, initBonus:2, speed:6, reach:1 },
     actions:  [{ id:'a-' + Math.random().toString(36).slice(2,6),
                  name:'Longsword', source:'weapon', type:'attack',
                  atkAbility:'str', atkBonusOverride:null, actionRange:'melee',
