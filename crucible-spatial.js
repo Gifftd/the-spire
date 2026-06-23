@@ -214,6 +214,36 @@
   }
   CrucibleSpatial.coneCells = coneCells;
 
+  function enumerateCastPoints(attacker, action, map) {
+    const range = action.range || 0;
+    const shape = action.shape;
+    if (shape === 'cone' || shape === 'line') {
+      const out = [];
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          out.push({ x: attacker.x, y: attacker.y, dir: { dx, dy } });
+        }
+      }
+      return out;
+    }
+    const out = [];
+    for (let y = Math.max(0, attacker.y - range); y <= Math.min(map.height - 1, attacker.y + range); y++) {
+      for (let x = Math.max(0, attacker.x - range); x <= Math.min(map.width - 1, attacker.x + range); x++) {
+        if (chebyshev({x,y}, attacker) > range) continue;
+        out.push({ x, y });
+      }
+    }
+    return out;
+  }
+  CrucibleSpatial.enumerateCastPoints = enumerateCastPoints;
+
+  function combatantsAt(cells, combatants) {
+    const set = new Set(cells.map(c => c.x + ',' + c.y));
+    return combatants.filter(c => !c.dead && !c.downed && set.has(c.x + ',' + c.y));
+  }
+  CrucibleSpatial.combatantsAt = combatantsAt;
+
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = CrucibleSpatial;
   } else {
