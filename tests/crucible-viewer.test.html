@@ -116,6 +116,38 @@ test('renderSVG: produces an svg with W*CELL × H*CELL viewBox and one token per
   const tokens = svg.querySelectorAll('.token');
   assertEq(tokens.length, 2);
 });
+
+test('mount: renders viewer with controls, cursor starts at 0', () => {
+  const host = document.getElementById('host');
+  host.innerHTML = '';
+  const trial = syntheticTrial();
+  const v = CrucibleViewer.mount(host, trial);
+  assertEq(v.cursor, 0);
+  assert(host.querySelector('.viewer-controls'), 'controls rendered');
+  assert(host.querySelector('svg.tactical-board'), 'board rendered');
+});
+
+test('mount + stepForward: advances cursor and re-renders', () => {
+  const host = document.getElementById('host');
+  host.innerHTML = '';
+  const trial = syntheticTrial();
+  const v = CrucibleViewer.mount(host, trial);
+  v.stepForward();
+  assertEq(v.cursor, 1);
+  const pcToken = host.querySelector('[data-id="pc:1"]');
+  assert(pcToken.getAttribute('transform').includes('translate'));
+});
+
+test('mount + stepBack from cursor=2 returns to cursor=1', () => {
+  const host = document.getElementById('host');
+  host.innerHTML = '';
+  const trial = syntheticTrial();
+  const v = CrucibleViewer.mount(host, trial);
+  v.stepForward(); v.stepForward();
+  assertEq(v.cursor, 2);
+  v.stepBack();
+  assertEq(v.cursor, 1);
+});
 </script>
 </body>
 </html>
