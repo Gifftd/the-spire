@@ -184,6 +184,17 @@
   }
   CrucibleSpatial.cubeCells = cubeCells;
 
+  function lineCells(origin, direction, length) {
+    const len = Math.max(0, Math.floor(length));
+    if (len === 0 || (direction.dx === 0 && direction.dy === 0)) return [];
+    const out = [];
+    for (let i = 1; i <= len; i++) {
+      out.push({ x: origin.x + direction.dx * i, y: origin.y + direction.dy * i });
+    }
+    return out;
+  }
+  CrucibleSpatial.lineCells = lineCells;
+
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = CrucibleSpatial;
   } else {
