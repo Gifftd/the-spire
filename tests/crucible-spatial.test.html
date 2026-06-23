@@ -280,6 +280,34 @@ test('lineCells: length 0 → empty', () => {
 test('lineCells: zero direction → empty', () => {
   assertEq(CrucibleSpatial.lineCells({x:5,y:5}, {dx:0,dy:0}, 3), []);
 });
+
+group('AoE: coneCells');
+
+test('coneCells: length 1 east → 1 cell', () => {
+  const cells = CrucibleSpatial.coneCells({x:5,y:5}, {dx:1,dy:0}, 1);
+  assertEq(cells, [{x:6,y:5}]);
+});
+
+test('coneCells: length 3 east → 1+2+3 = 6 cells', () => {
+  const cells = CrucibleSpatial.coneCells({x:5,y:5}, {dx:1,dy:0}, 3);
+  assertEq(cells.length, 6);
+});
+
+test('coneCells: length 3 east cells form widening pattern', () => {
+  const cells = CrucibleSpatial.coneCells({x:5,y:5}, {dx:1,dy:0}, 3);
+  assert(cells.find(c => c.x === 6 && c.y === 5), 'missing (6,5)');
+  assert(cells.find(c => c.x === 7 && c.y === 5), 'missing (7,5)');
+  assert(cells.find(c => c.x === 8 && c.y === 3), 'missing (8,3)');
+});
+
+test('coneCells: diagonal direction works', () => {
+  const cells = CrucibleSpatial.coneCells({x:0,y:0}, {dx:1,dy:1}, 2);
+  assert(cells.length > 0, 'should produce cells');
+});
+
+test('coneCells: length 0 → empty', () => {
+  assertEq(CrucibleSpatial.coneCells({x:5,y:5}, {dx:1,dy:0}, 0), []);
+});
 </script>
 </body>
 </html>
