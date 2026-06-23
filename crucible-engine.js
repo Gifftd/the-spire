@@ -932,6 +932,71 @@
     return { totalDmg };
   }
 
+  // ─────────── v2 spatial: resolve an AoE action ───────────
+  // For sphere/cube/cone/line actions, enumerate viable cast points, score each
+  // by expected damage on enemies minus friendly-fire on allies, then run the
+  // save pipeline per affected target. Damage is applied by resolveSave
+  // internally — we don't re-apply here. Emits one 'aoe' event summarizing the
+  // shape, center, and per-target outcome (alongside the per-target 'save'
+  // events resolveSave pushes).
+  function resolveAoE(c, action, combatants, map, rng, events, round) {
+    if (typeof CrucibleSpatial === 'undefined') return null;
+    const Spatial = CrucibleSpatial;
+    const candidates = Spatial.enumerateCastPoints(c, action, map);
+    const ev = Spatial.expectedDamage(action);
+    let best = null;
+    for (const point of candidates) {
+      let cells;
+      switch (action.shape) {
+        case 'sphere': cells = Spatial.sphereCells(point, action.size); break;
+        case 'cube':   cells = Spatial.cubeCells(point, action.size); break;
+        case 'cone':   cells = Spatial.coneCells(point, point.dir, action.size); break;
+        case 'line':   cells = Spatial.lineCells(point, point.dir, action.size); break;
+        default: return null;
+      }
+      const hit = Spatial.combatantsAt(cells, combatants);
+      const enemies = hit.filter(t => t.side !== c.side);
+      const allies  = hit.filter(t => t.side === c.side && t !== c);
+      const score = enemies.length * ev - allies.length * ev * 0.5;
+      if (!best || score > best.score) best = { point, cells, score, enemies, allies };
+    }
+    if (!best || best.score <= 0) return null;
+    const targets = [];
+    const allHit = best.enemies.concat(best.allies);
+    const dmgType = (action.damageOnFail && action.damageOnFail[0] && action.damageOnFail[0].type)
+                 || (action.damage && action.damage.type)
+                 || 'untyped';
+    for (const t of allHit) {
+      // resolveSave applies damage internally and pushes a per-target 'save'
+      // event into `events`. Snapshot length before so we can find this
+      // target's save event for the `saved` flag.
+      const evBefore = events.length;
+      const saveResult = resolveSave(c, [t], action, rng, events, round, combatants);
+      const tDmg = (saveResult && saveResult.totalDmg) || 0;
+      let saved = false;
+      for (let i = evBefore; i < events.length; i++) {
+        const ev = events[i];
+        if (ev && ev.type === 'save' && ev.target === t.name) {
+          saved = !!ev.passed; break;
+        }
+      }
+      targets.push({
+        id: t.id, name: t.name, pos: { x: t.x, y: t.y },
+        dmg: tDmg, dmgType,
+        saved,
+      });
+    }
+    events.push({
+      type: 'aoe', round, source: c.id, action: action.sourceActionName || action.name,
+      shape: action.shape, center: { x: best.point.x, y: best.point.y },
+      direction: best.point.dir || null,
+      size: action.size,
+      cellsCovered: best.cells,
+      targets,
+    });
+    return best;
+  }
+
   // ─────────── Resolve a heal action ───────────
   function resolveHeal(me, targets, action, rng, events, round) {
     let totalHealed = 0, revives = 0;
@@ -1665,7 +1730,7 @@
     aliveEnemies, aliveAllies,
     damageMultiplier, resolveAttackMonster, resolveAttackPc,
     resolveOpportunityAttack,
-    resolveSave, resolveHeal,
+    resolveSave, resolveAoE, resolveHeal,
     applyDamage, resolveMultiattack, pickAction,
     runTrial, runSim,
     // Role-policy helpers

@@ -1683,6 +1683,42 @@ test('resolveOpportunityAttack: emits opportunity-attack event with hit/damage f
   assertTrue(typeof oa.hit === 'boolean', 'hit field present');
   assertTrue(typeof oa.damageDealt === 'number', 'damageDealt present');
 });
+
+test('resolveAoE: sphere catches multiple enemies in a cluster', () => {
+  const c = {
+    id: 'pc:wiz', side: 'pc', name: 'Wizard', x: 5, y: 5,
+    pm: { identity: { level: 5 }, abilities: { int: 16 } },
+    damageTypesReceivedThisTurn: new Set(),
+    conditions: new Map(),
+  };
+  const e1 = { id: 'mon:1', side: 'monster', name: 'A', x: 10, y: 10,
+               hp: 20, maxHp: 20, ac: 12, dead: false, downed: false,
+               conditions: new Map(),
+               damageTypesReceivedThisTurn: new Set() };
+  const e2 = { id: 'mon:2', side: 'monster', name: 'B', x: 11, y: 10,
+               hp: 20, maxHp: 20, ac: 12, dead: false, downed: false,
+               conditions: new Map(),
+               damageTypesReceivedThisTurn: new Set() };
+  const e3 = { id: 'mon:3', side: 'monster', name: 'C', x: 10, y: 11,
+               hp: 20, maxHp: 20, ac: 12, dead: false, downed: false,
+               conditions: new Map(),
+               damageTypesReceivedThisTurn: new Set() };
+  const all = [c, e1, e2, e3];
+  const action = { kind: 'save', name: 'Fireball', sourceActionName: 'Fireball',
+                   shape: 'sphere', size: 2, range: 12,
+                   saveAbility: 'dex', saveDc: 14,
+                   damage: { dice: '8d6', mod: 0, type: 'fire' },
+                   damageOnFail: [{ dice: '8d6', mod: 0, type: 'fire' }],
+                   halfOnSave: true };
+  const map = { width: 20, height: 20, blocked: null };
+  const events = [];
+  const rng = () => 0.5;
+  Crucible.resolveAoE(c, action, all, map, rng, events, 1);
+  const aoe = events.find(ev => ev.type === 'aoe');
+  assertTrue(aoe, 'aoe event emitted');
+  assertEq(aoe.shape, 'sphere');
+  assertTrue(aoe.targets.length >= 2, 'expected 2+ enemies caught: ' + aoe.targets.length);
+});
 </script>
 </body>
 </html>
