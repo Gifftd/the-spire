@@ -1580,6 +1580,33 @@ test('runTrial: adjacent-start scenarios produce no move events', () => {
   const moveEvents = trial.events.filter(e => e.type === 'move');
   assertEq(moveEvents.length, 0, 'no move events when starting adjacent');
 });
+
+test('resolveOpportunityAttack: emits opportunity-attack event with hit/damage fields', () => {
+  const defender = {
+    id: 'mon:1', name: 'Goblin', side: 'monster', x: 3, y: 3,
+    monster: { parsedActions: [{ kind: 'attack', name: 'Bite', sourceActionName: 'Bite',
+                                 toHit: 4, damage: [{ dice: '1d4', mod: 0, type: 'piercing' }] }] },
+    naturalReach: 1, reactionAvailableThisRound: true,
+    dead: false, downed: false, conditions: new Map(),
+    damageTypesReceivedThisTurn: new Set(),
+  };
+  const leaver = {
+    id: 'pc:1', name: 'PC', side: 'pc', x: 4, y: 3,
+    hp: 20, maxHp: 20, ac: 14,
+    damageTypesReceivedThisTurn: new Set(),
+    conditions: new Map(),
+    dead: false, downed: false,
+  };
+  const events = [];
+  const rng = () => 0.99;  // force hit (and high damage)
+  Crucible.resolveOpportunityAttack(defender, leaver, rng, events, 1, [defender, leaver]);
+  const oa = events.find(e => e.type === 'opportunity-attack');
+  assertTrue(oa, 'opportunity-attack event not emitted');
+  assertEq(oa.attacker, 'mon:1');
+  assertEq(oa.target, 'pc:1');
+  assertTrue(typeof oa.hit === 'boolean', 'hit field present');
+  assertTrue(typeof oa.damageDealt === 'number', 'damageDealt present');
+});
 </script>
 </body>
 </html>

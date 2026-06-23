@@ -848,6 +848,38 @@
     return { roll, crit:isCrit, hit, damageDealt, damageByType };
   }
 
+  // ─────────── Resolve an opportunity attack ───────────
+  // Resolve an opportunity attack from `defender` against `leaver`. Picks the
+  // defender's best melee single-target attack and runs it through the normal
+  // attack pipeline so feature dice (Sneak Attack / Hex / etc.) still ride along.
+  function resolveOpportunityAttack(defender, leaver, rng, events, round, combatants) {
+    const list = defender.side === 'monster'
+      ? (defender.monster && defender.monster.parsedActions) || []
+      : ((defender.pm && defender.pm.actions) || []).map(a => ({
+          ...a, sourceActionName: a.name, kind: a.type,
+        }));
+    const action = list.find(a =>
+      a.kind === 'attack' && (a.actionRange === 'melee' || !a.actionRange));
+    if (!action) return;
+    const r = defender.side === 'monster'
+      ? resolveAttackMonster(defender, leaver, action, rng, events, round, combatants)
+      : resolveAttackPc(defender, leaver, action, rng, events, round, combatants);
+    events.push({
+      type: 'opportunity-attack', round,
+      attacker: defender.id, attackerName: defender.name,
+      target: leaver.id, targetName: leaver.name,
+      fromCell: { x: defender.x, y: defender.y },
+      triggerCell: { x: leaver.x, y: leaver.y },
+      roll: r.roll, hit: r.hit, damageDealt: r.damageDealt,
+    });
+    if (r.hit && r.damageDealt > 0) {
+      for (const [t, dmg] of Object.entries(r.damageByType || {})) {
+        applyDamage(leaver, dmg, t, defender, events, round, defender.name,
+                    'opportunity ' + (action.sourceActionName || action.name));
+      }
+    }
+  }
+
   // ─────────── Resolve a save effect ───────────
   function resolveSave(me, targets, action, rng, events, round, combatants) {
     let totalDmg = 0;
@@ -1613,6 +1645,7 @@
     pickEnemyTarget, isAvailable, consumeUse, healTriage,
     aliveEnemies, aliveAllies,
     damageMultiplier, resolveAttackMonster, resolveAttackPc,
+    resolveOpportunityAttack,
     resolveSave, resolveHeal,
     applyDamage, resolveMultiattack, pickAction,
     runTrial, runSim,
