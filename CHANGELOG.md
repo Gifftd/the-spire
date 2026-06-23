@@ -9,6 +9,28 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-16
 
+### Crucible v2 — spatial combat foundation
+
+Position-aware tactical combat simulator replacing v1's abstract trial mode.
+
+- 5ft grid with A* pathfinding around obstacles. Combatants gain `x`/`y`/`speed`/`naturalReach`; actions gain `range`/`shape`/`size`.
+- Movement, opportunity attacks, smart target selection (closest + lowest-HP + threat-weighted + OoA-aware), AoE templates (sphere/cube/cone/line).
+- New event types: `placement`, `move`, `aoe`, `opportunity-attack`. Existing v1.1 events keep their schema.
+- New 2D SVG viewer in the Results panel — event-sourced replay with step / step-back / play / pause / scrub / speed-pick controls. Clicking any log line jumps the board to that moment.
+- `crucible-spatial.js` (new, ~400 lines, ~52 tests); `crucible-viewer.js` (new, ~350 lines, ~10 tests).
+- PC migration: `combat.speed` normalized to cells (was feet on legacy records); `combat.reach` defaults to 1.
+- Encounter schema gains optional `map` (width/height/blocked) and `placement` (per-combatant `{ id, x, y }` overrides). Defaults to 20×20 with PCs at y=1 and monsters at y=height-2.
+
+Spec: `docs/superpowers/specs/2026-06-22-crucible-v2-spatial-design.md`
+Plan: `docs/superpowers/plans/2026-06-22-crucible-v2-spatial.md`
+
+**Manual UI checklist:**
+- [ ] Run a sim. Tactical board shows on the Results panel with PCs and monsters in default positions.
+- [ ] PCs and monsters walk toward each other; move-trail dashed line shows the active mover's path.
+- [ ] Step / play / scrub controls work; log lines on the right are clickable and jump the board.
+- [ ] Damage / heal / move / AoE events appear in the log.
+- [ ] No console errors.
+
 ### Crucible PC features v1.1 — DSL editor + action granting + target state
 
 Polish + extension pass on the v1 PC class features framework. Five gaps
