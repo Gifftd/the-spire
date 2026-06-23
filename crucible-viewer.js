@@ -71,6 +71,11 @@
         state.lastAoE = ev;
         break;
       }
+      case 'terrain-damage': {
+        const c = state.combatants.find(cc => cc.id === ev.who);
+        if (c) c.hp = Math.max(0, c.hp - (ev.amount || 0));
+        break;
+      }
       // attack/save/feature events don't change state — they're informational.
     }
   }
@@ -107,6 +112,30 @@
     for (let i = 0; i <= state.map.height; i++) {
       gridLines.push(`<line x1="0" y1="${i*CELL}" x2="${w}" y2="${i*CELL}" class="grid-line" />`);
     }
+    const terrainHtml = [];
+    if (state.map.terrain) {
+      for (let y = 0; y < state.map.height; y++) {
+        const row = state.map.terrain[y] || [];
+        for (let x = 0; x < state.map.width; x++) {
+          const t = row[x];
+          if (!t) continue;
+          const px = x * CELL, py = y * CELL;
+          if (t.type === 'wall') {
+            terrainHtml.push(`<rect x="${px}" y="${py}" width="${CELL}" height="${CELL}" class="terrain-wall" />`);
+          } else if (t.type === 'difficult') {
+            terrainHtml.push(`<rect x="${px}" y="${py}" width="${CELL}" height="${CELL}" class="terrain-difficult" />`);
+          } else if (t.type === 'damaging') {
+            const label = t.dice ? `${t.dice}${t.mod ? (t.mod > 0 ? '+' + t.mod : t.mod) : ''}` : '!';
+            terrainHtml.push(
+              `<g class="terrain-damaging" transform="translate(${px}, ${py})">
+                 <rect width="${CELL}" height="${CELL}" />
+                 <text x="${CELL/2}" y="${CELL/2 + 4}" text-anchor="middle">${label}</text>
+               </g>`
+            );
+          }
+        }
+      }
+    }
     const aoeHtml = state.lastAoE
       ? state.lastAoE.cellsCovered.map(c => `<rect x="${c.x*CELL}" y="${c.y*CELL}" width="${CELL}" height="${CELL}" class="aoe-cell" />`).join('')
       : '';
@@ -115,6 +144,7 @@
       : '';
     host.innerHTML = `<svg class="tactical-board" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
       <g class="grid-lines">${gridLines.join('')}</g>
+      <g class="terrain-overlay">${terrainHtml.join('')}</g>
       <g class="aoe-overlay">${aoeHtml}</g>
       <g class="move-trail-group">${trailHtml}</g>
       <g class="tokens">${tokensHtml}</g>
@@ -214,6 +244,7 @@
         case 'aoe':       return 'R' + ev.round + ' · AoE ' + ev.shape + ' @ (' + ev.center.x + ',' + ev.center.y + ') hits ' + ev.targets.length;
         case 'opportunity-attack': return 'R' + ev.round + ' · OoA ' + ev.attackerName + ' on ' + ev.targetName + ' → ' + (ev.hit ? 'hit ' + ev.damageDealt : 'miss');
         case 'feature':   return 'R' + ev.round + ' · ⚡ ' + (ev.what || '');
+        case 'terrain-damage': return 'R' + ev.round + ' · ' + ev.name + ' takes ' + ev.amount + ' ' + ev.dmgType + ' (terrain)';
         default:          return ev.type;
       }
     }
