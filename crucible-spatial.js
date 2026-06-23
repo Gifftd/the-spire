@@ -172,6 +172,18 @@
   }
   CrucibleSpatial.sphereCells = sphereCells;
 
+  function cubeCells(origin, side) {
+    const s = Math.max(1, Math.floor(side));
+    const out = [];
+    for (let dy = 0; dy < s; dy++) {
+      for (let dx = 0; dx < s; dx++) {
+        out.push({ x: origin.x + dx, y: origin.y + dy });
+      }
+    }
+    return out;
+  }
+  CrucibleSpatial.cubeCells = cubeCells;
+
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = CrucibleSpatial;
   } else {
