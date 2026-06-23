@@ -926,6 +926,53 @@
     }
   }
 
+  // ─────────── Move a combatant toward a target ───────────
+  // Walks an A* path cell-by-cell up to `maxSteps`, firing opportunity
+  // attacks whenever the mover leaves an enemy's threatened reach. Emits a
+  // single `move` event tagged with `reason` (e.g. 'engage' for free
+  // movement, 'dash' when the action is being spent as Dash). Returns the
+  // number of cells actually traversed (may be 0 if blocked or dead mid-step).
+  function executeMove(c, target, maxSteps, reason, combatants, map, rng, events, round) {
+    if (typeof CrucibleSpatial === 'undefined') return 0;
+    if (maxSteps <= 0) return 0;
+    const path = CrucibleSpatial.findPath(
+      { x: c.x, y: c.y },
+      { x: target.x, y: target.y },
+      map,
+      { maxSteps, stopWhenAdjacent: target }
+    );
+    if (path.length === 0) return 0;
+    const from = { x: c.x, y: c.y };
+    const stepped = [];
+    for (const cell of path) {
+      const prev = { x: c.x, y: c.y };
+      // OoA detection: any enemy adjacent before step, not after.
+      for (const d of combatants) {
+        if (d.side === c.side || d.dead || d.downed) continue;
+        if (!d.reactionAvailableThisRound) continue;
+        const reach = d.naturalReach || 1;
+        const dPrev = CrucibleSpatial.chebyshev(d, prev);
+        const dCur  = CrucibleSpatial.chebyshev(d, cell);
+        if (dPrev > 0 && dPrev <= reach && dCur > reach) {
+          resolveOpportunityAttack(d, c, rng, events, round, combatants);
+          d.reactionAvailableThisRound = false;
+          if (c.dead || c.downed) break;
+        }
+      }
+      if (c.dead || c.downed) break;
+      c.x = cell.x;
+      c.y = cell.y;
+      stepped.push(cell);
+    }
+    if (stepped.length > 0) {
+      events.push({
+        type: 'move', round, who: c.id, name: c.name,
+        from, to: { x: c.x, y: c.y }, path: stepped, reason: reason || 'engage',
+      });
+    }
+    return stepped.length;
+  }
+
   // ─────────── Resolve a save effect ───────────
   function resolveSave(me, targets, action, rng, events, round, combatants) {
     let totalDmg = 0;
@@ -1284,6 +1331,9 @@
         // Reset per-turn action budgets.
         c.actionsAvailable = 1;
         c.bonusActionAvailable = true;
+        // v2 spatial: free movement budget refreshes each turn. Spending the
+        // action on Dash later in the loop refills it with another c.speed.
+        c.movementBudgetThisTurn = c.speed || 0;
         // reactionAvailableThisRound resets at onRoundEnd, not per turn.
 
         // Fire onTurnStart for PC features.
@@ -1350,8 +1400,10 @@
             action = pickAction(c);
             if (!action) break;
           }
-          // v2 spatial: range check + cell-by-cell movement, firing OoA on
-          // any enemy whose reach the mover leaves during the path.
+          // v2 spatial: range check + movement. Free movement (c.speed cells)
+          // is spent first to close the gap. If still out of range, the
+          // action becomes Dash: the combatant moves another c.speed cells
+          // and ends the turn without attacking.
           if (action && (!action.shape || action.shape === 'single')
               && typeof CrucibleSpatial !== 'undefined') {
             const tgtCandidate = (c.side === 'monster' && targets && targets[0])
@@ -1365,48 +1417,31 @@
                 ? multiattackRange(action, myActions)
                 : actionRange(action);
               let dist = CrucibleSpatial.chebyshev(c, tgtCandidate);
-              if (dist > need) {
-                const path = CrucibleSpatial.findPath(
-                  { x: c.x, y: c.y },
-                  { x: tgtCandidate.x, y: tgtCandidate.y },
-                  map,
-                  { maxSteps: c.speed, stopWhenAdjacent: tgtCandidate }
+              // Step 1: free movement.
+              if (dist > need && c.movementBudgetThisTurn > 0) {
+                const stepped = executeMove(
+                  c, tgtCandidate, c.movementBudgetThisTurn, 'engage',
+                  combatants, map, rng, events, round
                 );
-                if (path.length > 0) {
-                  const from = { x: c.x, y: c.y };
-                  const stepped = [];
-                  for (const cell of path) {
-                    const prev = { x: c.x, y: c.y };
-                    // OoA detection: any enemy adjacent before step, not after.
-                    for (const d of combatants) {
-                      if (d.side === c.side || d.dead || d.downed) continue;
-                      if (!d.reactionAvailableThisRound) continue;
-                      const reach = d.naturalReach || 1;
-                      const dPrev = CrucibleSpatial.chebyshev(d, prev);
-                      const dCur  = CrucibleSpatial.chebyshev(d, cell);
-                      // Was adjacent (within reach, not on the same cell)
-                      // before and now out of reach → provokes.
-                      if (dPrev > 0 && dPrev <= reach && dCur > reach) {
-                        resolveOpportunityAttack(d, c, rng, events, round, combatants);
-                        d.reactionAvailableThisRound = false;
-                        if (c.dead || c.downed) break;
-                      }
-                    }
-                    if (c.dead || c.downed) break;
-                    c.x = cell.x;
-                    c.y = cell.y;
-                    stepped.push(cell);
-                  }
-                  if (stepped.length > 0) {
-                    events.push({
-                      type: 'move', round, who: c.id, name: c.name,
-                      from, to: { x: c.x, y: c.y }, path: stepped, reason: 'engage',
-                    });
-                  }
-                }
+                c.movementBudgetThisTurn = Math.max(0, c.movementBudgetThisTurn - stepped);
                 if (c.dead || c.downed) continue;
                 dist = CrucibleSpatial.chebyshev(c, tgtCandidate);
-                if (dist > need) continue;
+              }
+              // Step 2: if still out of range, use the action as Dash.
+              if (dist > need) {
+                const dashed = executeMove(
+                  c, tgtCandidate, c.speed || 0, 'dash',
+                  combatants, map, rng, events, round
+                );
+                if (dashed > 0) {
+                  events.push({
+                    type: 'dash', round, who: c.id, name: c.name,
+                    cells: dashed,
+                  });
+                  tally(c.side, 'Dash', 'dash', false, 0, 0, 0, 0);
+                }
+                // Dash consumes the action whether or not it closed the gap.
+                continue;
               }
             }
           }

@@ -244,7 +244,8 @@
     function formatEvent(ev) {
       switch (ev.type) {
         case 'placement': return 'Placement: ' + ev.placements.length + ' combatants on ' + ev.map.width + '×' + ev.map.height;
-        case 'move':      return 'R' + ev.round + ' · ' + ev.name + ' walks to (' + ev.to.x + ',' + ev.to.y + ')';
+        case 'move':      return 'R' + ev.round + ' · ' + ev.name + ' ' + (ev.reason === 'dash' ? 'dashes' : 'walks') + ' to (' + ev.to.x + ',' + ev.to.y + ')';
+        case 'dash':      return 'R' + ev.round + ' · ' + ev.name + ' uses Dash (+' + ev.cells + ' cells)';
         case 'attack':    return 'R' + ev.round + ' · ' + ev.actor + ' → ' + ev.target + ' · ' + ev.action + ' (roll ' + ev.roll + ') → ' + (ev.hit ? 'hit ' + ev.damageDealt : 'miss');
         case 'damage':    return 'R' + ev.round + ' · ' + ev.target + ' takes ' + ev.amount + ' ' + ev.dmgType;
         case 'heal':      return 'R' + ev.round + ' · ' + ev.actor + ' heals ' + ev.target + ' +' + ev.amount + (ev.revived ? ' REVIVED' : '');
