@@ -414,6 +414,38 @@ test('scoreTarget: ranged attack penalized in melee', () => {
   const sR = CrucibleSpatial.scoreTarget(adjacent, attacker, rangedAction, cs, mkMap(10,10,[]));
   assert(sM > sR, 'melee should outscore ranged when adjacent');
 });
+
+group('provokesOoAOnPath');
+
+test('provokesOoAOnPath: straight path with no enemies → false', () => {
+  const attacker = { id:'a', side: 'pc', x: 0, y: 0 };
+  const target   = { id:'t', side: 'monster', x: 5, y: 0 };
+  const cs = [attacker, target];
+  assertEq(CrucibleSpatial.provokesOoAOnPath(attacker, target, cs, mkMap(10,10,[])), false);
+});
+
+test('provokesOoAOnPath: another enemy adjacent to the path → true', () => {
+  const attacker = { id:'a', side: 'pc', x: 0, y: 0 };
+  const target   = { id:'t', side: 'monster', x: 5, y: 0 };
+  const blocker  = { id:'b', side: 'monster', x: 3, y: 1, naturalReach: 1, reactionAvailableThisRound: true };
+  const cs = [attacker, target, blocker];
+  assertEq(CrucibleSpatial.provokesOoAOnPath(attacker, target, cs, mkMap(10,10,[])), true);
+});
+
+test('provokesOoAOnPath: enemy without reaction → no provoke', () => {
+  const attacker = { id:'a', side: 'pc', x: 0, y: 0 };
+  const target   = { id:'t', side: 'monster', x: 5, y: 0 };
+  const blocker  = { id:'b', side: 'monster', x: 3, y: 1, naturalReach: 1, reactionAvailableThisRound: false };
+  const cs = [attacker, target, blocker];
+  assertEq(CrucibleSpatial.provokesOoAOnPath(attacker, target, cs, mkMap(10,10,[])), false);
+});
+
+test('provokesOoAOnPath: already adjacent (path empty) → false', () => {
+  const attacker = { id:'a', side: 'pc', x: 4, y: 0 };
+  const target   = { id:'t', side: 'monster', x: 5, y: 0 };
+  const cs = [attacker, target];
+  assertEq(CrucibleSpatial.provokesOoAOnPath(attacker, target, cs, mkMap(10,10,[])), false);
+});
 </script>
 </body>
 </html>

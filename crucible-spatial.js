@@ -308,8 +308,35 @@
   }
   CrucibleSpatial.scoreTarget = scoreTarget;
 
-  // Stub — real implementation lands in Task 3.2.
-  function provokesOoAOnPath() { return false; }
+  function provokesOoAOnPath(attacker, target, combatants, map) {
+    const path = findPath(attacker, target, map, { stopWhenAdjacent: target });
+    if (path.length === 0) return false;
+    // For each cell along the path (including start), check if any other-side
+    // combatant with melee reach + available reaction is adjacent to it.
+    // We append the target's cell as the implicit final step — the attacker
+    // functionally enters target's square to make the melee attack, and that
+    // last step is the one that typically leaves a side-blocker's reach when
+    // the rest of the path hugs y=0 alongside a blocker at e.g. (3,1).
+    const fullPath = [
+      { x: attacker.x, y: attacker.y },
+      ...path,
+      { x: target.x, y: target.y },
+    ];
+    for (let i = 1; i < fullPath.length; i++) {
+      const prev = fullPath[i - 1];
+      const cur  = fullPath[i];
+      for (const d of combatants) {
+        if (d.side === attacker.side || d.dead || d.downed) continue;
+        if (d.id === target.id) continue;  // the actual goal doesn't count
+        if (!d.reactionAvailableThisRound) continue;
+        const reach = d.naturalReach || 1;
+        const wasInReach   = chebyshev(d, prev) <= reach;
+        const stillInReach = chebyshev(d, cur)  <= reach;
+        if (wasInReach && !stillInReach) return true;
+      }
+    }
+    return false;
+  }
   CrucibleSpatial.provokesOoAOnPath = provokesOoAOnPath;
 
   if (typeof module !== 'undefined' && module.exports) {
