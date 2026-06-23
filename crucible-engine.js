@@ -533,6 +533,9 @@
         actionsAvailable: 1,
         bonusActionAvailable: true,
         reactionAvailableThisRound: true,
+        speed: typeof pm.combat.speed === 'number' ? pm.combat.speed : 6,
+        naturalReach: typeof pm.combat.reach === 'number' ? pm.combat.reach : 1,
+        x: 0, y: 0,  // populated by placeCombatants in runTrial
       });
       // Initialize feature state for any PC class features on this PC.
       // (No-op when PC has no features array — backward compatible.)
@@ -568,6 +571,10 @@
           damageTypesReceivedThisTurn: new Set(),
           lastHealRound: -99,
           regeneration: m.regeneration || null,
+          speed: Math.max(1, Math.floor(((m.speed && m.speed.walk) || 30) / 5)),
+          naturalReach: typeof m.reach === 'number' ? Math.max(1, Math.floor(m.reach / 5)) : 1,
+          x: 0, y: 0,
+          reactionAvailableThisRound: true,
         });
       }
     }

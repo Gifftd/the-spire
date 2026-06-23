@@ -22,6 +22,7 @@
 <div id="results"></div>
 <div id="summary"></div>
 
+<script src="../crucible-spatial.js"></script>
 <script src="../crucible-engine.js"></script>
 <script>
 const TESTS = [];
@@ -1461,6 +1462,30 @@ test('Scenario 10: Brute multiattack honors frontline preference (regression)', 
   const backDmg  = back.reduce ((s, p) => s + (p.maxHp - p.avgHpRemaining), 0);
   assertTrue(frontDmg > backDmg * 1.2,
     `Brute multiattack must honor frontline; front=${frontDmg.toFixed(1)} back=${backDmg.toFixed(1)}`);
+});
+
+// ────── Phase 4: spatial wiring ──────
+test('buildCombatants: PCs and monsters get x/y/speed default fields', () => {
+  const pm = {
+    id: 'pm1', identity: { name: 'Warlock', level: 5 },
+    abilities: { dex: 14 },
+    combat: { hp: 30, maxHp: 30, ac: 14, initBonus: 2 },
+    actions: [],
+  };
+  const monsterPick = {
+    pickId: 'mon', name: 'Goblin', cr: '1/4', count: 1,
+    monster: { name: 'Goblin', ac: 13, hp: 7, maxHp: 7,
+               abilities: { str: { mod: 0 } }, parsedActions: [] },
+  };
+  const rng = () => 0.5;
+  const out = Crucible.buildCombatants([pm], [monsterPick], rng, false);
+  const pc = out.find(c => c.side === 'pc');
+  const mon = out.find(c => c.side === 'monster');
+  assertTrue(typeof pc.x === 'number',  'pc.x slot exists');
+  assertEq(pc.speed, 6);
+  assertEq(pc.naturalReach, 1);
+  assertTrue(typeof mon.speed === 'number', 'mon.speed required');
+  assertEq(mon.reactionAvailableThisRound, true);
 });
 </script>
 </body>
