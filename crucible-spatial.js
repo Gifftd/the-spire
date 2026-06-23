@@ -293,8 +293,8 @@
   };
   CrucibleSpatial.SCORER_WEIGHTS = SCORER_WEIGHTS;
 
-  function scoreTarget(target, attacker, action, combatants, map) {
-    const w = SCORER_WEIGHTS;
+  function scoreTarget(target, attacker, action, combatants, map, tactics) {
+    const w = applyAiHint(SCORER_WEIGHTS, tactics);
     const dist = chebyshev(attacker, target);
     const ooaPath = provokesOoAOnPath(attacker, target, combatants, map) ? 1 : 0;
     const rangedInMelee = (action.actionRange === 'ranged' && dist <= 1) ? 1 : 0;
@@ -307,6 +307,14 @@
     );
   }
   CrucibleSpatial.scoreTarget = scoreTarget;
+
+  function applyAiHint(weights, tactics) {
+    const hint = tactics && tactics.aiHint;
+    if (hint === 'focus')    return { ...weights, lowHpInv: weights.lowHpInv * 2 };
+    if (hint === 'survival') return { ...weights, threat: weights.threat * 0.5, ooaPath: weights.ooaPath * 2 };
+    if (hint === 'spread')   return { ...weights, lowHpInv: weights.lowHpInv * 0.5 };
+    return weights;
+  }
 
   function provokesOoAOnPath(attacker, target, combatants, map) {
     const path = findPath(attacker, target, map, { stopWhenAdjacent: target });
