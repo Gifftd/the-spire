@@ -148,6 +148,17 @@ test('mount + stepBack from cursor=2 returns to cursor=1', () => {
   v.stepBack();
   assertEq(v.cursor, 1);
 });
+
+test('renderSVG: draws a move-trail polyline when state.lastMove is set', () => {
+  const trial = syntheticTrial();
+  const state = CrucibleViewer.initialState(trial.events[0]);
+  CrucibleViewer.applyEvent(state, trial.events[1]);  // move event
+  const host = document.getElementById('host');
+  host.innerHTML = '';
+  CrucibleViewer.renderSVG(host, state);
+  const trail = host.querySelector('.move-trail');
+  assert(trail, 'move trail polyline rendered');
+});
 </script>
 </body>
 </html>

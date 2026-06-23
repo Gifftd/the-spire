@@ -110,9 +110,13 @@
     const aoeHtml = state.lastAoE
       ? state.lastAoE.cellsCovered.map(c => `<rect x="${c.x*CELL}" y="${c.y*CELL}" width="${CELL}" height="${CELL}" class="aoe-cell" />`).join('')
       : '';
+    const trailHtml = state.lastMove
+      ? `<polyline points="${[state.lastMove.from, ...state.lastMove.path].map(c => (c.x*CELL + CELL/2) + ',' + (c.y*CELL + CELL/2)).join(' ')}" class="move-trail" />`
+      : '';
     host.innerHTML = `<svg class="tactical-board" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
       <g class="grid-lines">${gridLines.join('')}</g>
       <g class="aoe-overlay">${aoeHtml}</g>
+      <g class="move-trail-group">${trailHtml}</g>
       <g class="tokens">${tokensHtml}</g>
     </svg>`;
   }
