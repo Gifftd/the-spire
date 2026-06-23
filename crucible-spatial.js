@@ -195,16 +195,17 @@
   }
   CrucibleSpatial.lineCells = lineCells;
 
-  // 5e 60° cone: at distance d (1..length) from origin, the cone is d cells
-  // wide perpendicular to direction.
+  // 5e RAW cone: at distance d (1..length), the cone is d cells wide
+  // perpendicular to direction. Asymmetric for even d.
   function coneCells(origin, direction, length) {
     const len = Math.max(0, Math.floor(length));
     if (len === 0 || (direction.dx === 0 && direction.dy === 0)) return [];
     const out = [];
     const px = -direction.dy, py = direction.dx;
     for (let d = 1; d <= len; d++) {
-      const halfWidth = Math.floor((d + 1) / 2);
-      for (let w = -halfWidth; w <= halfWidth; w++) {
+      const halfMin = Math.floor((d - 1) / 2);
+      const halfMax = d - 1 - halfMin;
+      for (let w = -halfMin; w <= halfMax; w++) {
         const x = origin.x + direction.dx * d + px * w;
         const y = origin.y + direction.dy * d + py * w;
         out.push({ x, y });
