@@ -1,0 +1,231 @@
+// ═══════════════════════════════════════════════════════════════════════
+//  crucible-viewer.js
+//  SVG event-sourced replay viewer for Crucible v2 tactical trials.
+//
+//  Public surface:
+//    CrucibleViewer.mount(rootEl, trialResult)     — render board + controls
+//    CrucibleViewer.initialState(placementEvent)   — derive starting state
+//    CrucibleViewer.applyEvent(state, event)       — mutate state in place
+//    CrucibleViewer.renderSVG(host, state)         — paint the board
+//
+//  No engine coupling beyond reading trial.events.
+// ═══════════════════════════════════════════════════════════════════════
+(function (global) {
+  'use strict';
+  const CrucibleViewer = {};
+
+  const CELL = 24;  // pixels per cell
+  CrucibleViewer.CELL = CELL;
+
+  function initialState(placementEvent) {
+    if (!placementEvent || placementEvent.type !== 'placement') {
+      return { map: { width: 20, height: 20, blocked: null }, combatants: [],
+               lastMove: null, lastAoE: null };
+    }
+    const combatants = placementEvent.placements.map(p => ({
+      id: p.id, name: p.name, side: p.side,
+      x: p.pos.x, y: p.pos.y,
+      hp: p.hp, maxHp: p.maxHp, ac: p.ac, speed: p.speed,
+      dead: false, downed: false,
+    }));
+    return { map: placementEvent.map, combatants, lastMove: null, lastAoE: null };
+  }
+  CrucibleViewer.initialState = initialState;
+
+  function applyEvent(state, ev) {
+    if (!ev) return;
+    state.lastMove = null;
+    state.lastAoE = null;
+    switch (ev.type) {
+      case 'move': {
+        const c = state.combatants.find(cc => cc.id === ev.who);
+        if (c) { c.x = ev.to.x; c.y = ev.to.y; }
+        state.lastMove = ev;
+        break;
+      }
+      case 'damage': {
+        const c = state.combatants.find(cc => cc.name === ev.target);
+        if (c) {
+          c.hp = Math.max(0, c.hp - (ev.amount || 0));
+          if (c.hp === 0) {
+            if (c.side === 'pc') c.downed = true;
+            else c.dead = true;
+          }
+        }
+        break;
+      }
+      case 'heal': {
+        const c = state.combatants.find(cc => cc.name === ev.target);
+        if (c) {
+          c.hp = Math.min(c.maxHp || (c.hp + (ev.amount || 0)), c.hp + (ev.amount || 0));
+          if (ev.revived) c.downed = false;
+        }
+        break;
+      }
+      case 'regen': {
+        const c = state.combatants.find(cc => cc.name === ev.actor);
+        if (c && typeof ev.hpAfter === 'number') c.hp = ev.hpAfter;
+        break;
+      }
+      case 'aoe': {
+        state.lastAoE = ev;
+        break;
+      }
+      // attack/save/feature events don't change state — they're informational.
+    }
+  }
+  CrucibleViewer.applyEvent = applyEvent;
+
+  function renderTo(state, events, idx) {
+    // Replay from event 1 (skip placement, already used by initialState) up to idx inclusive.
+    for (let i = 1; i <= idx && i < events.length; i++) applyEvent(state, events[i]);
+    return state;
+  }
+  CrucibleViewer.renderTo = renderTo;
+
+  function renderSVG(host, state) {
+    const w = state.map.width * CELL;
+    const h = state.map.height * CELL;
+    const tokensHtml = state.combatants.map(c => {
+      const cx = c.x * CELL + CELL / 2;
+      const cy = c.y * CELL + CELL / 2;
+      const r  = CELL * 0.4;
+      const cls = c.side === 'pc' ? 'token pc' : 'token monster';
+      const dead = c.dead ? ' dead' : '';
+      const downed = c.downed ? ' downed' : '';
+      const hpFrac = c.maxHp ? Math.max(0, c.hp / c.maxHp) : 1;
+      return `<g class="${cls}${dead}${downed}" data-id="${c.id}" transform="translate(${cx}, ${cy})">
+        <circle r="${r}" />
+        <text dy="0.35em" text-anchor="middle">${(c.name || '?').charAt(0)}</text>
+        <rect class="hp-bar" x="${-r}" y="${-r - 6}" width="${2*r*hpFrac}" height="3" />
+      </g>`;
+    }).join('');
+    const gridLines = [];
+    for (let i = 0; i <= state.map.width; i++) {
+      gridLines.push(`<line x1="${i*CELL}" y1="0" x2="${i*CELL}" y2="${h}" class="grid-line" />`);
+    }
+    for (let i = 0; i <= state.map.height; i++) {
+      gridLines.push(`<line x1="0" y1="${i*CELL}" x2="${w}" y2="${i*CELL}" class="grid-line" />`);
+    }
+    const aoeHtml = state.lastAoE
+      ? state.lastAoE.cellsCovered.map(c => `<rect x="${c.x*CELL}" y="${c.y*CELL}" width="${CELL}" height="${CELL}" class="aoe-cell" />`).join('')
+      : '';
+    const trailHtml = state.lastMove
+      ? `<polyline points="${[state.lastMove.from, ...state.lastMove.path].map(c => (c.x*CELL + CELL/2) + ',' + (c.y*CELL + CELL/2)).join(' ')}" class="move-trail" />`
+      : '';
+    host.innerHTML = `<svg class="tactical-board" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
+      <g class="grid-lines">${gridLines.join('')}</g>
+      <g class="aoe-overlay">${aoeHtml}</g>
+      <g class="move-trail-group">${trailHtml}</g>
+      <g class="tokens">${tokensHtml}</g>
+    </svg>`;
+  }
+  CrucibleViewer.renderSVG = renderSVG;
+
+  function mount(host, trial) {
+    const events = trial.events || [];
+    const state = initialState(events[0] || null);
+    const inst = {
+      cursor: 0,
+      playing: false,
+      speedMs: 600,
+      timer: null,
+    };
+
+    host.innerHTML = `<div class="viewer-flex">
+      <div class="viewer-left">
+        <div class="viewer-board"></div>
+        <div class="viewer-controls">
+          <button class="vc-back">◀</button>
+          <button class="vc-playpause">▶</button>
+          <button class="vc-forward">▶</button>
+          <input type="range" min="0" max="${Math.max(0, events.length - 1)}" value="0" class="viewer-scrub" />
+          <select class="viewer-speed">
+            <option value="1200">0.5×</option>
+            <option value="600" selected>1×</option>
+            <option value="300">2×</option>
+            <option value="150">4×</option>
+          </select>
+        </div>
+      </div>
+      <div class="viewer-log"></div>
+    </div>`;
+    const boardEl = host.querySelector('.viewer-board');
+    const logEl   = host.querySelector('.viewer-log');
+    const scrub   = host.querySelector('.viewer-scrub');
+    const speed   = host.querySelector('.viewer-speed');
+    const backBtn = host.querySelector('.vc-back');
+    const ppBtn   = host.querySelector('.vc-playpause');
+    const fwdBtn  = host.querySelector('.vc-forward');
+
+    function rerender() {
+      renderSVG(boardEl, state);
+      updateLog();
+    }
+    function setCursor(idx) {
+      idx = Math.max(0, Math.min(events.length - 1, idx));
+      if (idx === inst.cursor) return;
+      if (idx < inst.cursor) {
+        Object.assign(state, initialState(events[0]));
+      }
+      const from = Math.max(1, idx < inst.cursor ? 1 : inst.cursor + 1);
+      for (let i = from; i <= idx; i++) applyEvent(state, events[i]);
+      inst.cursor = idx;
+      rerender();
+    }
+    inst.stepForward = () => setCursor(inst.cursor + 1);
+    inst.stepBack    = () => setCursor(inst.cursor - 1);
+    inst.scrub       = idx => setCursor(idx);
+    inst.play  = () => {
+      if (inst.playing) return;
+      inst.playing = true;
+      inst.timer = setInterval(() => {
+        if (inst.cursor >= events.length - 1) { inst.pause(); return; }
+        inst.stepForward();
+      }, inst.speedMs);
+    };
+    inst.pause = () => { inst.playing = false; if (inst.timer) clearInterval(inst.timer); inst.timer = null; };
+    inst.setSpeed = ms => { inst.speedMs = ms; if (inst.playing) { inst.pause(); inst.play(); } };
+
+    backBtn.onclick = () => inst.stepBack();
+    ppBtn.onclick   = () => inst.playing ? inst.pause() : inst.play();
+    fwdBtn.onclick  = () => inst.stepForward();
+    scrub.oninput   = e => inst.scrub(parseInt(e.target.value, 10));
+    speed.onchange  = e => inst.setSpeed(parseInt(e.target.value, 10));
+
+    function updateLog() {
+      const lines = events.slice(0, inst.cursor + 1).map((ev, i) =>
+        `<div class="log-line log-${ev.type}${i === inst.cursor ? ' log-active' : ''}" data-idx="${i}">${escapeText(formatEvent(ev))}</div>`).join('');
+      logEl.innerHTML = lines;
+      Array.from(logEl.querySelectorAll('.log-line')).forEach(el => {
+        el.onclick = () => inst.scrub(parseInt(el.dataset.idx, 10));
+      });
+      scrub.value = inst.cursor;
+    }
+    function escapeText(s) { return String(s).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+    function formatEvent(ev) {
+      switch (ev.type) {
+        case 'placement': return 'Placement: ' + ev.placements.length + ' combatants on ' + ev.map.width + '×' + ev.map.height;
+        case 'move':      return 'R' + ev.round + ' · ' + ev.name + ' walks to (' + ev.to.x + ',' + ev.to.y + ')';
+        case 'attack':    return 'R' + ev.round + ' · ' + ev.actor + ' → ' + ev.target + ' · ' + ev.action + ' (roll ' + ev.roll + ') → ' + (ev.hit ? 'hit ' + ev.damageDealt : 'miss');
+        case 'damage':    return 'R' + ev.round + ' · ' + ev.target + ' takes ' + ev.amount + ' ' + ev.dmgType;
+        case 'heal':      return 'R' + ev.round + ' · ' + ev.actor + ' heals ' + ev.target + ' +' + ev.amount + (ev.revived ? ' REVIVED' : '');
+        case 'save':      return 'R' + ev.round + ' · ' + ev.actor + ' → ' + ev.target + ' · ' + ev.action + ' save ' + (ev.passed ? 'passed' : 'failed');
+        case 'aoe':       return 'R' + ev.round + ' · AoE ' + ev.shape + ' @ (' + ev.center.x + ',' + ev.center.y + ') hits ' + ev.targets.length;
+        case 'opportunity-attack': return 'R' + ev.round + ' · OoA ' + ev.attackerName + ' on ' + ev.targetName + ' → ' + (ev.hit ? 'hit ' + ev.damageDealt : 'miss');
+        case 'feature':   return 'R' + ev.round + ' · ⚡ ' + (ev.what || '');
+        default:          return ev.type;
+      }
+    }
+
+    rerender();
+    return inst;
+  }
+  CrucibleViewer.mount = mount;
+
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = CrucibleViewer;
+  } else {
+    global.CrucibleViewer = CrucibleViewer;
+  }
+})(typeof window !== 'undefined' ? window : globalThis);

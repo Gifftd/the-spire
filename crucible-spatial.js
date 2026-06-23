@@ -18,7 +18,8 @@
   CrucibleSpatial.chebyshev = chebyshev;
 
   // A* with Chebyshev heuristic. Returns the cell list from start (excluded)
-  // to the chosen endpoint (included). Empty array if unreachable.
+  // to the chosen endpoint (included). On maxSteps exhaustion, returns the
+  // best-effort partial path toward the goal. Empty array if no progress.
   function findPath(start, goal, map, options) {
     options = options || {};
     const maxSteps = options.maxSteps != null ? options.maxSteps : Infinity;
@@ -32,17 +33,31 @@
     function inBounds(x, y) { return x >= 0 && x < w && y >= 0 && y < h; }
     function isBlocked(x, y) { return blocked && blocked[y] && blocked[y][x] === true; }
     function key(x, y) { return y * w + x; }
+    function heuristic(x, y) { return Math.max(Math.abs(goal.x - x), Math.abs(goal.y - y)); }
 
-    // Goal test: are we at goal, or (if stopAdj is set) adjacent to it?
     function isGoal(x, y) {
       if (stopAdj) return Math.max(Math.abs(x - stopAdj.x), Math.abs(y - stopAdj.y)) <= 1
                          && !(x === stopAdj.x && y === stopAdj.y);
       return x === goal.x && y === goal.y;
     }
 
-    const open = [{ x: start.x, y: start.y, g: 0, f: 0, parent: null }];
+    const startNode = { x: start.x, y: start.y, g: 0, f: heuristic(start.x, start.y), parent: null };
+    const open = [startNode];
     const seen = new Map();
-    seen.set(key(start.x, start.y), open[0]);
+    seen.set(key(start.x, start.y), startNode);
+
+    // Track best-h node ever expanded (excluding start), for partial-path fallback.
+    let bestNode = null;
+    let bestH = Infinity;
+    // Whether maxSteps was the limiting factor on at least one neighbor expansion.
+    let hitMaxSteps = false;
+
+    function reconstruct(node) {
+      const path = [];
+      let n = node;
+      while (n.parent) { path.unshift({ x: n.x, y: n.y }); n = n.parent; }
+      return path;
+    }
 
     while (open.length > 0) {
       // Pick the node with lowest f. Linear scan — fine for our grid sizes.
@@ -50,13 +65,15 @@
       for (let i = 1; i < open.length; i++) if (open[i].f < open[bestIdx].f) bestIdx = i;
       const cur = open.splice(bestIdx, 1)[0];
 
-      if (isGoal(cur.x, cur.y)) {
-        // Reconstruct path from cur back to start (exclusive).
-        const path = [];
-        let node = cur;
-        while (node.parent) { path.unshift({ x: node.x, y: node.y }); node = node.parent; }
-        // Trim to maxSteps.
-        return path.slice(0, maxSteps);
+      if (isGoal(cur.x, cur.y)) return reconstruct(cur);
+
+      // Track best-h seen so far (only nodes we've actually moved to, g > 0).
+      if (cur.g > 0) {
+        const ch = heuristic(cur.x, cur.y);
+        if (ch < bestH || (ch === bestH && bestNode && cur.g < bestNode.g)) {
+          bestH = ch;
+          bestNode = cur;
+        }
       }
 
       // Expand 8 neighbors.
@@ -67,18 +84,20 @@
           if (!inBounds(nx, ny)) continue;
           if (isBlocked(nx, ny)) continue;
           const ng = cur.g + 1;
-          if (ng > maxSteps) continue;
+          if (ng > maxSteps) { hitMaxSteps = true; continue; }
           const k = key(nx, ny);
           const prev = seen.get(k);
           if (prev && prev.g <= ng) continue;
-          const hCost = Math.max(Math.abs(goal.x - nx), Math.abs(goal.y - ny));
-          const node = { x: nx, y: ny, g: ng, f: ng + hCost, parent: cur };
+          const node = { x: nx, y: ny, g: ng, f: ng + heuristic(nx, ny), parent: cur };
           seen.set(k, node);
           open.push(node);
         }
       }
     }
 
+    // Goal not reached. Return partial path ONLY when maxSteps was the
+    // limiting factor; if the goal is genuinely unreachable, return [].
+    if (hitMaxSteps && bestNode && bestH < heuristic(start.x, start.y)) return reconstruct(bestNode);
     return [];
   }
 
@@ -159,6 +178,174 @@
 
   CrucibleSpatial.computeThreat = computeThreat;
   CrucibleSpatial.diceAverage = diceAverage;  // exposed for expectedDamage in Phase 2
+
+  function sphereCells(origin, radius) {
+    const r = Math.max(0, Math.floor(radius));
+    const out = [];
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        out.push({ x: origin.x + dx, y: origin.y + dy });
+      }
+    }
+    return out;
+  }
+  CrucibleSpatial.sphereCells = sphereCells;
+
+  function cubeCells(origin, side) {
+    const s = Math.max(1, Math.floor(side));
+    const out = [];
+    for (let dy = 0; dy < s; dy++) {
+      for (let dx = 0; dx < s; dx++) {
+        out.push({ x: origin.x + dx, y: origin.y + dy });
+      }
+    }
+    return out;
+  }
+  CrucibleSpatial.cubeCells = cubeCells;
+
+  function lineCells(origin, direction, length) {
+    const len = Math.max(0, Math.floor(length));
+    if (len === 0 || (direction.dx === 0 && direction.dy === 0)) return [];
+    const out = [];
+    for (let i = 1; i <= len; i++) {
+      out.push({ x: origin.x + direction.dx * i, y: origin.y + direction.dy * i });
+    }
+    return out;
+  }
+  CrucibleSpatial.lineCells = lineCells;
+
+  // 5e RAW cone: at distance d (1..length), the cone is d cells wide
+  // perpendicular to direction. Asymmetric for even d.
+  function coneCells(origin, direction, length) {
+    const len = Math.max(0, Math.floor(length));
+    if (len === 0 || (direction.dx === 0 && direction.dy === 0)) return [];
+    const out = [];
+    const px = -direction.dy, py = direction.dx;
+    for (let d = 1; d <= len; d++) {
+      const halfMin = Math.floor((d - 1) / 2);
+      const halfMax = d - 1 - halfMin;
+      for (let w = -halfMin; w <= halfMax; w++) {
+        const x = origin.x + direction.dx * d + px * w;
+        const y = origin.y + direction.dy * d + py * w;
+        out.push({ x, y });
+      }
+    }
+    return out;
+  }
+  CrucibleSpatial.coneCells = coneCells;
+
+  function enumerateCastPoints(attacker, action, map) {
+    const range = action.range || 0;
+    const shape = action.shape;
+    if (shape === 'cone' || shape === 'line') {
+      const out = [];
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          out.push({ x: attacker.x, y: attacker.y, dir: { dx, dy } });
+        }
+      }
+      return out;
+    }
+    const out = [];
+    for (let y = Math.max(0, attacker.y - range); y <= Math.min(map.height - 1, attacker.y + range); y++) {
+      for (let x = Math.max(0, attacker.x - range); x <= Math.min(map.width - 1, attacker.x + range); x++) {
+        if (chebyshev({x,y}, attacker) > range) continue;
+        out.push({ x, y });
+      }
+    }
+    return out;
+  }
+  CrucibleSpatial.enumerateCastPoints = enumerateCastPoints;
+
+  function combatantsAt(cells, combatants) {
+    const set = new Set(cells.map(c => c.x + ',' + c.y));
+    return combatants.filter(c => !c.dead && !c.downed && set.has(c.x + ',' + c.y));
+  }
+  CrucibleSpatial.combatantsAt = combatantsAt;
+
+  function expectedDamage(action) {
+    if (!action) return 0;
+    if (action.kind === 'save' && Array.isArray(action.damageOnFail)) {
+      let fail = 0;
+      for (const d of action.damageOnFail) fail += diceAverage(d.dice) + (Number(d.mod) || 0);
+      return action.halfOnSave ? (fail + fail / 2) / 2 : fail / 2;
+    }
+    const dmg = action.damage;
+    if (dmg && dmg.dice) return diceAverage(dmg.dice) + (Number(dmg.mod) || 0);
+    if (Array.isArray(action.damage)) {
+      let total = 0;
+      for (const d of action.damage) total += diceAverage(d.dice) + (Number(d.mod) || 0);
+      return total;
+    }
+    return 0;
+  }
+  CrucibleSpatial.expectedDamage = expectedDamage;
+
+  // Tunable scorer coefficients. Exposed for hand-tuning + tactics.aiHint
+  // weighting in Phase 6. Defaults match the spec's starting values.
+  const SCORER_WEIGHTS = {
+    distance:  -0.5,
+    lowHpInv:   1.0,
+    threat:     0.3,
+    ooaPath:   -2.0,
+    rangedInMelee: -1.5,
+  };
+  CrucibleSpatial.SCORER_WEIGHTS = SCORER_WEIGHTS;
+
+  function scoreTarget(target, attacker, action, combatants, map, tactics) {
+    const w = applyAiHint(SCORER_WEIGHTS, tactics);
+    const dist = chebyshev(attacker, target);
+    const ooaPath = provokesOoAOnPath(attacker, target, combatants, map) ? 1 : 0;
+    const rangedInMelee = (action.actionRange === 'ranged' && dist <= 1) ? 1 : 0;
+    return (
+      w.distance      * dist
+    + w.lowHpInv      * (1 / Math.max(1, target.hp))
+    + w.threat        * (target.threat || 0)
+    + w.ooaPath       * ooaPath
+    + w.rangedInMelee * rangedInMelee
+    );
+  }
+  CrucibleSpatial.scoreTarget = scoreTarget;
+
+  function applyAiHint(weights, tactics) {
+    const hint = tactics && tactics.aiHint;
+    if (hint === 'focus')    return { ...weights, lowHpInv: weights.lowHpInv * 2 };
+    if (hint === 'survival') return { ...weights, threat: weights.threat * 0.5, ooaPath: weights.ooaPath * 2 };
+    if (hint === 'spread')   return { ...weights, lowHpInv: weights.lowHpInv * 0.5 };
+    return weights;
+  }
+
+  function provokesOoAOnPath(attacker, target, combatants, map) {
+    const path = findPath(attacker, target, map, { stopWhenAdjacent: target });
+    if (path.length === 0) return false;
+    // For each cell along the path (including start), check if any other-side
+    // combatant with melee reach + available reaction is adjacent to it.
+    // We append the target's cell as the implicit final step — the attacker
+    // functionally enters target's square to make the melee attack, and that
+    // last step is the one that typically leaves a side-blocker's reach when
+    // the rest of the path hugs y=0 alongside a blocker at e.g. (3,1).
+    const fullPath = [
+      { x: attacker.x, y: attacker.y },
+      ...path,
+      { x: target.x, y: target.y },
+    ];
+    for (let i = 1; i < fullPath.length; i++) {
+      const prev = fullPath[i - 1];
+      const cur  = fullPath[i];
+      for (const d of combatants) {
+        if (d.side === attacker.side || d.dead || d.downed) continue;
+        if (d.id === target.id) continue;  // the actual goal doesn't count
+        if (!d.reactionAvailableThisRound) continue;
+        const reach = d.naturalReach || 1;
+        const wasInReach   = chebyshev(d, prev) <= reach;
+        const stillInReach = chebyshev(d, cur)  <= reach;
+        if (wasInReach && !stillInReach) return true;
+      }
+    }
+    return false;
+  }
+  CrucibleSpatial.provokesOoAOnPath = provokesOoAOnPath;
 
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = CrucibleSpatial;

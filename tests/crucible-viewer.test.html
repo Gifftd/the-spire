@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>crucible-viewer tests</title>
+<style>
+  body { font-family: monospace; background: #0e1418; color: #dde7e9; padding: 1rem; }
+  .pass { color: #6dd58c; } .fail { color: #d97a7a; }
+  button { padding: 0.5rem 1rem; background: #1d3a4a; color: #dde7e9; border: 1px solid #1c2429; cursor: pointer; }
+  pre { white-space: pre-wrap; margin-top: 0.5rem; }
+  #host { display: none; }
+</style>
+</head>
+<body>
+<h1>crucible-viewer tests</h1>
+<button onclick="runAll()">Run tests</button>
+<pre id="out"></pre>
+<div id="host"></div>
+<script src="../crucible-spatial.js"></script>
+<script src="../crucible-viewer.js"></script>
+<script>
+const TESTS = [];
+function test(name, fn) { TESTS.push({ name, fn }); }
+function assert(cond, msg) { if (!cond) throw new Error(msg || 'assertion failed'); }
+function assertEq(a, b, m) {
+  const x = JSON.stringify(a), y = JSON.stringify(b);
+  if (x !== y) throw new Error((m || 'mismatch') + ': ' + x + ' vs ' + y);
+}
+function runAll() {
+  const out = document.getElementById('out');
+  let passed = 0, failed = 0;
+  const lines = [];
+  for (const t of TESTS) {
+    try { t.fn(); lines.push('<span class="pass">✓ ' + t.name + '</span>'); passed++; }
+    catch (e) { lines.push('<span class="fail">✗ ' + t.name + ' — ' + e.message + '</span>'); failed++; }
+  }
+  lines.push('\n' + passed + ' passed, ' + failed + ' failed');
+  out.innerHTML = lines.join('\n');
+}
+function syntheticTrial() {
+  return {
+    events: [
+      { type: 'placement', round: 0, map: { width: 10, height: 10, blocked: null },
+        placements: [
+          { id: 'pc:1', name: 'PC', side: 'pc', pos: { x: 1, y: 1 }, hp: 30, maxHp: 30, ac: 14, speed: 6 },
+          { id: 'mon:0', name: 'Goblin', side: 'monster', pos: { x: 8, y: 8 }, hp: 7, maxHp: 7, ac: 13, speed: 6 },
+        ] },
+      { type: 'move', round: 1, who: 'pc:1', name: 'PC', from: { x: 1, y: 1 }, to: { x: 4, y: 4 },
+        path: [{x:2,y:2},{x:3,y:3},{x:4,y:4}], reason: 'engage' },
+      { type: 'attack', round: 1, actor: 'PC', target: 'Goblin', action: 'Sword', roll: 17, hit: true, damageDealt: 8,
+        pos: { x: 4, y: 4 }, targetPos: { x: 8, y: 8 } },
+      { type: 'damage', round: 1, actor: 'PC', target: 'Goblin', amount: 8, dmgType: 'slashing', action: 'Sword',
+        pos: { x: 4, y: 4 }, targetPos: { x: 8, y: 8 } },
+    ],
+    rounds: 1, winner: 'pc', partyView: [{ name: 'PC', hp: 30 }],
+  };
+}
+// === Tests below this line ===
+test('initialState: extracts combatants + map from placement event', () => {
+  const trial = syntheticTrial();
+  const state = CrucibleViewer.initialState(trial.events[0]);
+  assertEq(state.map, { width: 10, height: 10, blocked: null });
+  assertEq(state.combatants.length, 2);
+  const pc = state.combatants.find(c => c.id === 'pc:1');
+  assertEq(pc.x, 1);
+  assertEq(pc.y, 1);
+  assertEq(pc.hp, 30);
+});
+
+test('applyEvent: move updates combatant position', () => {
+  const trial = syntheticTrial();
+  const state = CrucibleViewer.initialState(trial.events[0]);
+  CrucibleViewer.applyEvent(state, trial.events[1]);
+  const pc = state.combatants.find(c => c.id === 'pc:1');
+  assertEq(pc.x, 4);
+  assertEq(pc.y, 4);
+});
+
+test('applyEvent: damage event reduces target hp', () => {
+  const trial = syntheticTrial();
+  const state = CrucibleViewer.initialState(trial.events[0]);
+  CrucibleViewer.applyEvent(state, { type: 'damage', target: 'Goblin', amount: 5 });
+  const mon = state.combatants.find(c => c.name === 'Goblin');
+  assertEq(mon.hp, 2);
+});
+
+test('applyEvent: damage to 0 marks dead (monster) / downed (pc)', () => {
+  const trial = syntheticTrial();
+  const state = CrucibleViewer.initialState(trial.events[0]);
+  CrucibleViewer.applyEvent(state, { type: 'damage', target: 'Goblin', amount: 99 });
+  const mon = state.combatants.find(c => c.name === 'Goblin');
+  assertEq(mon.hp, 0);
+  assert(mon.dead);
+});
+
+test('applyEvent: aoe event records lastAoE', () => {
+  const trial = syntheticTrial();
+  const state = CrucibleViewer.initialState(trial.events[0]);
+  CrucibleViewer.applyEvent(state, {
+    type: 'aoe', shape: 'sphere', center: { x: 5, y: 5 }, size: 2,
+    cellsCovered: [{x:4,y:4},{x:5,y:5},{x:6,y:6}], targets: [],
+  });
+  assert(state.lastAoE);
+  assertEq(state.lastAoE.shape, 'sphere');
+});
+
+test('renderSVG: produces an svg with W*CELL × H*CELL viewBox and one token per combatant', () => {
+  const trial = syntheticTrial();
+  const state = CrucibleViewer.initialState(trial.events[0]);
+  const host = document.getElementById('host');
+  host.innerHTML = '';
+  CrucibleViewer.renderSVG(host, state);
+  const svg = host.querySelector('svg');
+  assert(svg, 'svg present');
+  assert(svg.getAttribute('viewBox').includes('240 240'));  // 10×24 = 240
+  const tokens = svg.querySelectorAll('.token');
+  assertEq(tokens.length, 2);
+});
+
+test('mount: renders viewer with controls, cursor starts at 0', () => {
+  const host = document.getElementById('host');
+  host.innerHTML = '';
+  const trial = syntheticTrial();
+  const v = CrucibleViewer.mount(host, trial);
+  assertEq(v.cursor, 0);
+  assert(host.querySelector('.viewer-controls'), 'controls rendered');
+  assert(host.querySelector('svg.tactical-board'), 'board rendered');
+});
+
+test('mount + stepForward: advances cursor and re-renders', () => {
+  const host = document.getElementById('host');
+  host.innerHTML = '';
+  const trial = syntheticTrial();
+  const v = CrucibleViewer.mount(host, trial);
+  v.stepForward();
+  assertEq(v.cursor, 1);
+  const pcToken = host.querySelector('[data-id="pc:1"]');
+  assert(pcToken.getAttribute('transform').includes('translate'));
+});
+
+test('mount + stepBack from cursor=2 returns to cursor=1', () => {
+  const host = document.getElementById('host');
+  host.innerHTML = '';
+  const trial = syntheticTrial();
+  const v = CrucibleViewer.mount(host, trial);
+  v.stepForward(); v.stepForward();
+  assertEq(v.cursor, 2);
+  v.stepBack();
+  assertEq(v.cursor, 1);
+});
+
+test('renderSVG: draws a move-trail polyline when state.lastMove is set', () => {
+  const trial = syntheticTrial();
+  const state = CrucibleViewer.initialState(trial.events[0]);
+  CrucibleViewer.applyEvent(state, trial.events[1]);  // move event
+  const host = document.getElementById('host');
+  host.innerHTML = '';
+  CrucibleViewer.renderSVG(host, state);
+  const trail = host.querySelector('.move-trail');
+  assert(trail, 'move trail polyline rendered');
+});
+</script>
+</body>
+</html>

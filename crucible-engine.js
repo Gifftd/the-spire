@@ -110,6 +110,14 @@
     return false;
   }
 
+  // v2 spatial: resolve an action's range in cells. Honors explicit
+  // action.range; falls back to deriving from actionRange string.
+  function actionRange(action) {
+    if (typeof action.range === 'number') return action.range;
+    if (action.actionRange === 'ranged') return 6;
+    return 1;
+  }
+
   function targetSaveBonus(target, ability) {
     if (!target || !ability) return 0;
     if (target.side === 'pc' && target.pm) return saveBonus(target.pm, ability);
@@ -533,6 +541,9 @@
         actionsAvailable: 1,
         bonusActionAvailable: true,
         reactionAvailableThisRound: true,
+        speed: typeof pm.combat.speed === 'number' ? pm.combat.speed : 6,
+        naturalReach: typeof pm.combat.reach === 'number' ? pm.combat.reach : 1,
+        x: 0, y: 0,  // populated by placeCombatants in runTrial
       });
       // Initialize feature state for any PC class features on this PC.
       // (No-op when PC has no features array — backward compatible.)
@@ -568,6 +579,10 @@
           damageTypesReceivedThisTurn: new Set(),
           lastHealRound: -99,
           regeneration: m.regeneration || null,
+          speed: Math.max(1, Math.floor(((m.speed && m.speed.walk) || 30) / 5)),
+          naturalReach: typeof m.reach === 'number' ? Math.max(1, Math.floor(m.reach / 5)) : 1,
+          x: 0, y: 0,
+          reactionAvailableThisRound: true,
         });
       }
     }
@@ -658,22 +673,20 @@
     return all.filter(c => c.side === me.side && !c.dead && (includeSelf || c !== me));
   }
 
-  function pickEnemyTarget(me, all, tactics, rng) {
-    const candidates = aliveEnemies(me, all);
-    if (!candidates.length) return null;
-    const mode = (tactics && tactics.aiHint) || 'focus';
-    if (mode === 'random') {
-      return candidates[Math.floor(rng() * candidates.length)];
+  function pickEnemyTarget(me, all, tactics, rng, action) {
+    const enemies = all.filter(t => t.side !== me.side && !t.dead && !t.downed);
+    if (enemies.length === 0) return null;
+    if (typeof CrucibleSpatial !== 'undefined' && action) {
+      const map = me._mapRef || { width: 20, height: 20, blocked: null };
+      let best = null, bestScore = -Infinity;
+      for (const e of enemies) {
+        const s = CrucibleSpatial.scoreTarget(e, me, action, all, map, tactics);
+        if (s > bestScore) { bestScore = s; best = e; }
+      }
+      return best;
     }
-    // focus (default): lowest HP, then lowest AC, then random.
-    let best = candidates[0];
-    for (const c of candidates) {
-      if (c.hp < best.hp) best = c;
-      else if (c.hp === best.hp && c.ac < best.ac) best = c;
-    }
-    // Final random tiebreak among true ties.
-    const ties = candidates.filter(c => c.hp === best.hp && c.ac === best.ac);
-    return ties[Math.floor(rng() * ties.length)];
+    // v1 fallback: lowest-HP heuristic.
+    return enemies.slice().sort((a, b) => a.hp - b.hp)[0];
   }
 
   // ─────────── Action availability ───────────
@@ -833,6 +846,38 @@
     return { roll, crit:isCrit, hit, damageDealt, damageByType };
   }
 
+  // ─────────── Resolve an opportunity attack ───────────
+  // Resolve an opportunity attack from `defender` against `leaver`. Picks the
+  // defender's best melee single-target attack and runs it through the normal
+  // attack pipeline so feature dice (Sneak Attack / Hex / etc.) still ride along.
+  function resolveOpportunityAttack(defender, leaver, rng, events, round, combatants) {
+    const list = defender.side === 'monster'
+      ? (defender.monster && defender.monster.parsedActions) || []
+      : ((defender.pm && defender.pm.actions) || []).map(a => ({
+          ...a, sourceActionName: a.name, kind: a.type,
+        }));
+    const action = list.find(a =>
+      a.kind === 'attack' && (a.actionRange === 'melee' || !a.actionRange));
+    if (!action) return;
+    const r = defender.side === 'monster'
+      ? resolveAttackMonster(defender, leaver, action, rng, events, round, combatants)
+      : resolveAttackPc(defender, leaver, action, rng, events, round, combatants);
+    events.push({
+      type: 'opportunity-attack', round,
+      attacker: defender.id, attackerName: defender.name,
+      target: leaver.id, targetName: leaver.name,
+      fromCell: { x: defender.x, y: defender.y },
+      triggerCell: { x: leaver.x, y: leaver.y },
+      roll: r.roll, hit: r.hit, damageDealt: r.damageDealt,
+    });
+    if (r.hit && r.damageDealt > 0) {
+      for (const [t, dmg] of Object.entries(r.damageByType || {})) {
+        applyDamage(leaver, dmg, t, defender, events, round, defender.name,
+                    'opportunity ' + (action.sourceActionName || action.name));
+      }
+    }
+  }
+
   // ─────────── Resolve a save effect ───────────
   function resolveSave(me, targets, action, rng, events, round, combatants) {
     let totalDmg = 0;
@@ -885,6 +930,71 @@
                     action: action.sourceActionName, roll, passed, damageDealt: dmg });
     }
     return { totalDmg };
+  }
+
+  // ─────────── v2 spatial: resolve an AoE action ───────────
+  // For sphere/cube/cone/line actions, enumerate viable cast points, score each
+  // by expected damage on enemies minus friendly-fire on allies, then run the
+  // save pipeline per affected target. Damage is applied by resolveSave
+  // internally — we don't re-apply here. Emits one 'aoe' event summarizing the
+  // shape, center, and per-target outcome (alongside the per-target 'save'
+  // events resolveSave pushes).
+  function resolveAoE(c, action, combatants, map, rng, events, round) {
+    if (typeof CrucibleSpatial === 'undefined') return null;
+    const Spatial = CrucibleSpatial;
+    const candidates = Spatial.enumerateCastPoints(c, action, map);
+    const ev = Spatial.expectedDamage(action);
+    let best = null;
+    for (const point of candidates) {
+      let cells;
+      switch (action.shape) {
+        case 'sphere': cells = Spatial.sphereCells(point, action.size); break;
+        case 'cube':   cells = Spatial.cubeCells(point, action.size); break;
+        case 'cone':   cells = Spatial.coneCells(point, point.dir, action.size); break;
+        case 'line':   cells = Spatial.lineCells(point, point.dir, action.size); break;
+        default: return null;
+      }
+      const hit = Spatial.combatantsAt(cells, combatants);
+      const enemies = hit.filter(t => t.side !== c.side);
+      const allies  = hit.filter(t => t.side === c.side && t !== c);
+      const score = enemies.length * ev - allies.length * ev * 0.5;
+      if (!best || score > best.score) best = { point, cells, score, enemies, allies };
+    }
+    if (!best || best.score <= 0) return null;
+    const targets = [];
+    const allHit = best.enemies.concat(best.allies);
+    const dmgType = (action.damageOnFail && action.damageOnFail[0] && action.damageOnFail[0].type)
+                 || (action.damage && action.damage.type)
+                 || 'untyped';
+    for (const t of allHit) {
+      // resolveSave applies damage internally and pushes a per-target 'save'
+      // event into `events`. Snapshot length before so we can find this
+      // target's save event for the `saved` flag.
+      const evBefore = events.length;
+      const saveResult = resolveSave(c, [t], action, rng, events, round, combatants);
+      const tDmg = (saveResult && saveResult.totalDmg) || 0;
+      let saved = false;
+      for (let i = evBefore; i < events.length; i++) {
+        const ev = events[i];
+        if (ev && ev.type === 'save' && ev.target === t.name) {
+          saved = !!ev.passed; break;
+        }
+      }
+      targets.push({
+        id: t.id, name: t.name, pos: { x: t.x, y: t.y },
+        dmg: tDmg, dmgType,
+        saved,
+      });
+    }
+    events.push({
+      type: 'aoe', round, source: c.id, action: action.sourceActionName || action.name,
+      shape: action.shape, center: { x: best.point.x, y: best.point.y },
+      direction: best.point.dir || null,
+      size: action.size,
+      cellsCovered: best.cells,
+      targets,
+    });
+    return best;
   }
 
   // ─────────── Resolve a heal action ───────────
@@ -970,7 +1080,7 @@
         return Array.isArray(t) ? t[0] : t;
       };
     } else {
-      pickSubTarget = () => pickEnemyTarget(me, all, tactics, rng);
+      pickSubTarget = (subAction) => pickEnemyTarget(me, all, tactics, rng, subAction);
     }
 
     for (const step of (multiAction.multiattackPlan || [])) {
@@ -981,7 +1091,7 @@
         continue;
       }
       for (let i = 0; i < (step.count || 1); i++) {
-        const tgt = pickSubTarget();
+        const tgt = pickSubTarget(sub);
         if (!tgt) break;
         if (sub.kind === 'attack') {
           const r = me.side === 'monster'
@@ -1063,6 +1173,22 @@
       }
     }
     const combatants = buildCombatants(party, monsterPicks, rng, false);
+    // v2 spatial: place combatants on the map, then emit a placement event.
+    const encounter = (party && party._encounter) || null;
+    const map = (encounter && encounter.map) || { width: 20, height: 20, blocked: null };
+    if (typeof CrucibleSpatial !== 'undefined') {
+      CrucibleSpatial.placeCombatants(combatants, map, encounter && encounter.placement);
+      CrucibleSpatial.computeThreat(combatants);
+    }
+    for (const c of combatants) c._mapRef = map;
+    events.push({
+      type: 'placement', round: 0, map,
+      placements: combatants.map(c => ({
+        id: c.id, name: c.name, side: c.side,
+        pos: { x: c.x, y: c.y },
+        hp: c.hp, maxHp: c.maxHp, ac: c.ac, speed: c.speed,
+      })),
+    });
     rollInitiative(combatants, rng);
     const slots = initOrder(combatants);
 
@@ -1176,6 +1302,71 @@
             action = pickAction(c);
             if (!action) break;
           }
+          // v2 spatial: range check + cell-by-cell movement, firing OoA on
+          // any enemy whose reach the mover leaves during the path.
+          if (action && action.kind !== 'multiattack'
+              && (!action.shape || action.shape === 'single')
+              && typeof CrucibleSpatial !== 'undefined') {
+            const tgtCandidate = (c.side === 'monster' && targets && targets[0])
+              ? targets[0]
+              : pickEnemyTarget(c, all, tactics, rng, action);
+            if (tgtCandidate) {
+              const need = actionRange(action);
+              let dist = CrucibleSpatial.chebyshev(c, tgtCandidate);
+              if (dist > need) {
+                const path = CrucibleSpatial.findPath(
+                  { x: c.x, y: c.y },
+                  { x: tgtCandidate.x, y: tgtCandidate.y },
+                  map,
+                  { maxSteps: c.speed, stopWhenAdjacent: tgtCandidate }
+                );
+                if (path.length > 0) {
+                  const from = { x: c.x, y: c.y };
+                  const stepped = [];
+                  for (const cell of path) {
+                    const prev = { x: c.x, y: c.y };
+                    // OoA detection: any enemy adjacent before step, not after.
+                    for (const d of combatants) {
+                      if (d.side === c.side || d.dead || d.downed) continue;
+                      if (!d.reactionAvailableThisRound) continue;
+                      const reach = d.naturalReach || 1;
+                      const dPrev = CrucibleSpatial.chebyshev(d, prev);
+                      const dCur  = CrucibleSpatial.chebyshev(d, cell);
+                      // Was adjacent (within reach, not on the same cell)
+                      // before and now out of reach → provokes.
+                      if (dPrev > 0 && dPrev <= reach && dCur > reach) {
+                        resolveOpportunityAttack(d, c, rng, events, round, combatants);
+                        d.reactionAvailableThisRound = false;
+                        if (c.dead || c.downed) break;
+                      }
+                    }
+                    if (c.dead || c.downed) break;
+                    c.x = cell.x;
+                    c.y = cell.y;
+                    stepped.push(cell);
+                  }
+                  if (stepped.length > 0) {
+                    events.push({
+                      type: 'move', round, who: c.id, name: c.name,
+                      from, to: { x: c.x, y: c.y }, path: stepped, reason: 'engage',
+                    });
+                  }
+                }
+                if (c.dead || c.downed) continue;
+                dist = CrucibleSpatial.chebyshev(c, tgtCandidate);
+                if (dist > need) continue;
+              }
+            }
+          }
+          // v2 spatial: AoE-shape actions (sphere/cube/cone/line) go through
+          // the spatial resolver, which picks the best cast point.
+          if (action && action.shape && action.shape !== 'single'
+              && typeof CrucibleSpatial !== 'undefined') {
+            consumeUse(c, action);
+            resolveAoE(c, action, combatants, map, rng, events, round);
+            tally(c.side, action.sourceActionName || action.name, 'aoe', false, 0, 0, 0, 0);
+            continue;
+          }
           if (action.kind === 'multiattack') {
             consumeUse(c, action);
             const r = resolveMultiattack(c, all, action, tactics, rng, events, round);
@@ -1184,7 +1375,7 @@
           } else if (action.kind === 'attack') {
             const tgt = (c.side === 'monster' && targets && targets[0])
                           ? targets[0]
-                          : pickEnemyTarget(c, all, tactics, rng);
+                          : pickEnemyTarget(c, all, tactics, rng, action);
             if (!tgt) continue;
             consumeUse(c, action);
             const r = c.side === 'pc'
@@ -1334,6 +1525,8 @@
         if (!pcsAlive) { winner = 'monster'; break; }
         if (!monAlive) { winner = 'pc';      break; }
       }
+      // v2: reset reactions at end of round so OoAs can fire again.
+      for (const cc of combatants) cc.reactionAvailableThisRound = true;
       // End-of-round hook for PC features (Rage duration tick, reaction reset).
       if (!winner && typeof PCFeatures !== 'undefined') {
         const endCtx = { round, combatants, rng, eventLog: events };
@@ -1545,11 +1738,12 @@
     pickEnemyTarget, isAvailable, consumeUse, healTriage,
     aliveEnemies, aliveAllies,
     damageMultiplier, resolveAttackMonster, resolveAttackPc,
-    resolveSave, resolveHeal,
+    resolveOpportunityAttack,
+    resolveSave, resolveAoE, resolveHeal,
     applyDamage, resolveMultiattack, pickAction,
     runTrial, runSim,
     // Role-policy helpers
-    clamp01, sumDice, actionIsMelee, actionIsRanged, targetSaveBonus, actionEv,
+    clamp01, sumDice, actionIsMelee, actionIsRanged, actionRange, targetSaveBonus, actionEv,
     tagActions, bestEvAction, lowestPick, targetsInBucket,
     rangedness, bucket, position, positionOf,
     crHpMedian, inferRole, resolveRole, normalizeRole,

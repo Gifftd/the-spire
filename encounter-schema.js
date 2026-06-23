@@ -205,6 +205,19 @@
       push('lastOutcome', `unknown outcome: ${e.lastOutcome}`);
     }
 
+    // v2 spatial: optional map + placement fields.
+    if (e.map !== undefined && e.map !== null) {
+      if (typeof e.map !== 'object') push('map', 'must be an object');
+      else {
+        if (typeof e.map.width !== 'number' || e.map.width < 1) push('map.width', 'must be a positive number');
+        if (typeof e.map.height !== 'number' || e.map.height < 1) push('map.height', 'must be a positive number');
+        if (e.map.width > 200 || e.map.height > 200) push('map', 'dimensions exceed 200×200 hard cap');
+      }
+    }
+    if (e.placement !== undefined && e.placement !== null && !Array.isArray(e.placement)) {
+      push('placement', 'must be an array or null');
+    }
+
     return { ok: errors.length === 0, errors };
   }
 

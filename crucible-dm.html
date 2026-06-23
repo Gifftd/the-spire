@@ -82,6 +82,36 @@
     .log-feature.is-prevented { color: #6da3d9; }
     .log-feature.is-gate      { color: var(--c-ink-faint, #8b9da3); font-style: italic; font-weight: normal; }
     .log-killed { font-weight: 600; }
+
+    /* v2 tactical viewer */
+    .tactical-board { background: var(--c-bg); border: 1px solid var(--c-border); }
+    .tactical-board .grid-line { stroke: var(--c-border); stroke-width: 0.5; opacity: 0.5; }
+    .tactical-board .token { cursor: pointer; }
+    .tactical-board .token circle { fill: var(--c-accent); stroke: var(--c-brass); stroke-width: 1.5; transition: transform 600ms ease-out; }
+    .tactical-board .token.monster circle { fill: #c43838; }
+    .tactical-board .token text { fill: var(--c-bg); font-family: Cinzel, serif; font-weight: 600; font-size: 0.65rem; pointer-events: none; }
+    .tactical-board .token.dead { opacity: 0.35; }
+    .tactical-board .token.dead text { text-decoration: line-through; }
+    .tactical-board .token.downed circle { fill: #8b9da3; }
+    .tactical-board .hp-bar { fill: #6dd58c; }
+    .tactical-board .aoe-cell { fill: #c87cd4; opacity: 0.35; transition: opacity 600ms ease-out; }
+    .tactical-board .move-trail { fill: none; stroke: var(--c-accent); stroke-width: 1.5; stroke-dasharray: 3 3; opacity: 0.6; }
+
+    .viewer-flex { display: flex; gap: 1rem; align-items: flex-start; }
+    .viewer-left { flex: 0 0 auto; }
+    .viewer-log  { flex: 1; min-width: 0; max-height: 400px; overflow-y: auto;
+                   padding: 0.5rem; background: var(--c-bg); border: 1px solid var(--c-border);
+                   font-size: 0.8rem; }
+    .viewer-log .log-line { cursor: pointer; padding: 2px 0; }
+    .viewer-log .log-active { background: rgba(126, 197, 197, 0.15);
+                              border-left: 2px solid var(--c-accent); padding-left: 6px; }
+    .viewer-controls { display: flex; gap: 8px; align-items: center; margin-top: 0.5rem; }
+    .viewer-controls button { padding: 4px 10px; font-size: 1rem;
+                              background: var(--c-surface-2); color: var(--c-ink);
+                              border: 1px solid var(--c-border); cursor: pointer; }
+    .viewer-scrub { flex: 1; }
+    .viewer-speed { background: var(--c-surface); color: var(--c-ink); border: 1px solid var(--c-border); }
+    @media (max-width: 1200px) { .viewer-flex { flex-direction: column; } }
   </style>
 </head>
 <body>
@@ -125,7 +155,9 @@
 <script src="bestiary-merge.js"></script>
 <script src="crucible-parser.js"></script>
 <script src="pc-features.js"></script>
+<script src="crucible-spatial.js"></script>
 <script src="crucible-engine.js"></script>
+<script src="crucible-viewer.js"></script>
 <script>
 // ─────────── DM auth gate ───────────
 Auth.requireRole('dm', { redirect: 'home.html?notice=dm-only' });
@@ -154,6 +186,11 @@ function migratePCRecord(pm) {
     else pm.tactics.mode = 'sustained';
   }
   if (!Array.isArray(pm.features)) pm.features = [];
+  // v2 spatial: speed/reach defaults (in cells, where 1 cell = 5 ft).
+  // Legacy records may have speed stored in feet (e.g. 30 ft); convert.
+  if (typeof pm.combat.speed !== 'number') pm.combat.speed = 6;
+  else if (pm.combat.speed > 9) pm.combat.speed = Math.max(1, Math.floor(pm.combat.speed / 5));
+  if (typeof pm.combat.reach !== 'number') pm.combat.reach = 1;
   return pm;
 }
 function saveParty() {
@@ -167,7 +204,7 @@ function defaultPC() {
     identity: { name:'New PC', player:'', class:'', subclass:'', level:5, race:'' },
     abilities: { str:14, dex:14, con:14, int:10, wis:12, cha:10 },
     profs:    { saves: { str:false, dex:false, con:false, int:false, wis:false, cha:false } },
-    combat:   { hp:30, maxHp:30, ac:16, initBonus:2, speed:30 },
+    combat:   { hp:30, maxHp:30, ac:16, initBonus:2, speed:6, reach:1 },
     actions:  [{ id:'a-' + Math.random().toString(36).slice(2,6),
                  name:'Longsword', source:'weapon', type:'attack',
                  atkAbility:'str', atkBonusOverride:null, actionRange:'melee',
@@ -1214,21 +1251,19 @@ function renderFeatureImpact(r) {
 }
 
 let activeReplay = 'median';
+let activeReplayInst = null;
 function renderReplays(r) {
   const root = document.getElementById('result-replays');
   if (!r.representative || !r.representative.low) { root.innerHTML = ''; return; }
   root.innerHTML = `
-    <details style="margin-top:0.5rem;">
-      <summary style="font-family:'Cinzel',serif; color:var(--c-accent); cursor:pointer;">Representative fights</summary>
+    <details open style="margin-top:0.5rem;">
+      <summary style="font-family:'Cinzel',serif; color:var(--c-accent); cursor:pointer;">Tactical replay</summary>
       <div style="margin-top:0.5rem; display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
         <button class="btn" onclick="switchReplay('low')">Low (p10)</button>
         <button class="btn" onclick="switchReplay('median')">Median</button>
         <button class="btn" onclick="switchReplay('high')">High (p90)</button>
-        <label style="margin-left:0.5rem; font-size:0.85rem; color:var(--c-ink-faint);">
-          <input type="checkbox" id="show-feature-events" checked onchange="toggleFeatureLogs(this.checked)"> Show feature events
-        </label>
       </div>
-      <pre id="replay-pre" style="margin-top:0.5rem; font-size:0.8rem; max-height:400px; overflow-y:auto; padding:0.5rem; background:var(--c-bg); border:1px solid var(--c-border); border-radius:4px; white-space:pre-wrap;"></pre>
+      <div id="result-viewer-host" style="margin-top:0.5rem;"></div>
     </details>`;
   switchReplay(activeReplay);
 }
@@ -1238,33 +1273,13 @@ function switchReplay(which) {
   if (!lastSimResult || !lastSimResult.representative) return;
   const trial = lastSimResult.representative[which];
   if (!trial) return;
-  const pre = document.getElementById('replay-pre');
-  if (!pre) return;
-  const showFeature = !document.getElementById('show-feature-events') ||
-    document.getElementById('show-feature-events').checked;
-  // Render per-event divs so the feature filter toggle can show/hide them.
-  const lines = trial.events.map(ev => {
-    const classes = ['log-line', 'log-' + (ev.type || 'misc')];
-    if (ev.type === 'attack') {
-      if (ev.crit) classes.push('crit');
-      else if (!ev.hit) classes.push('miss');
-    } else if (ev.type === 'save') {
-      if (ev.passed === false) classes.push('failed');
-    } else if (ev.type === 'feature') {
-      if (ev.isDamage)    classes.push('is-damage');
-      if (ev.isPrevented) classes.push('is-prevented');
-      if (ev.isGate)      classes.push('is-gate');
-    }
-    const text = formatEvent(ev);
-    const isFeatureEv = ev.type === 'feature';
-    const display = (isFeatureEv && !showFeature) ? ' style="display:none"' : '';
-    return '<div class="' + classes.join(' ') + '"' + display + '>' + escapeHtml(text) + '</div>';
-  });
-  const footer = '\n===\nWinner: ' + trial.winner +
-    '\nRounds: ' + trial.rounds +
-    '\nPCs surviving HP: ' + trial.partyView.map(p =>
-      `${p.name}=${p.hp}${p.downed?'(downed)':''}`).join(', ');
-  pre.innerHTML = lines.join('') + '<div class="log-line" style="margin-top:0.5rem; color:var(--c-ink-faint)">' + escapeHtml(footer) + '</div>';
+  const host = document.getElementById('result-viewer-host');
+  if (!host) return;
+  if (activeReplayInst && typeof activeReplayInst.pause === 'function') {
+    activeReplayInst.pause();  // stop autoplay on previous viewer
+  }
+  host.innerHTML = '';
+  activeReplayInst = CrucibleViewer.mount(host, trial);
 }
 
 function toggleFeatureLogs(visible) {
