@@ -116,6 +116,50 @@
 
   CrucibleSpatial.placeCombatants = placeCombatants;
 
+  function computeThreat(combatants) {
+    for (const c of combatants) {
+      c.threat = threatScore(c);
+    }
+  }
+
+  function threatScore(c) {
+    const dpr = estimateDPR(c);
+    const hpFactor = Math.max(1, c.hp || c.maxHp || 1);
+    // Sqrt so a tank doesn't run away with the metric; DPR weighted more.
+    return dpr * Math.sqrt(hpFactor);
+  }
+
+  function estimateDPR(c) {
+    // Pick the first action with a damage block as a rough proxy.
+    let actions = [];
+    if (c.pm && Array.isArray(c.pm.actions)) actions = c.pm.actions;
+    else if (c.monster && Array.isArray(c.monster.parsedActions)) actions = c.monster.parsedActions;
+    for (const a of actions) {
+      const dmg = a.damage || (Array.isArray(a.damage) ? a.damage[0] : null);
+      if (!dmg) continue;
+      if (Array.isArray(dmg)) {
+        let total = 0;
+        for (const d of dmg) total += diceAverage(d.dice) + (Number(d.mod) || 0);
+        return total;
+      }
+      return diceAverage(dmg.dice) + (Number(dmg.mod) || 0);
+    }
+    return 1;
+  }
+
+  function diceAverage(formula) {
+    // '1d6', '2d6', '1d8+1', etc. Strip flat mod (we add it separately).
+    if (!formula) return 0;
+    const m = /^(\d+)d(\d+)/.exec(String(formula));
+    if (!m) return 0;
+    const count = parseInt(m[1], 10);
+    const sides = parseInt(m[2], 10);
+    return count * (sides + 1) / 2;
+  }
+
+  CrucibleSpatial.computeThreat = computeThreat;
+  CrucibleSpatial.diceAverage = diceAverage;  // exposed for expectedDamage in Phase 2
+
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = CrucibleSpatial;
   } else {
