@@ -165,6 +165,21 @@ test('placeCombatants: override array sets explicit positions', () => {
   assertEq(combatants[1].y, 7);
 });
 
+test('placeCombatants: partial override fills the rest with default placement', () => {
+  const combatants = [
+    { id: 'pc:1', side: 'pc' },
+    { id: 'pc:2', side: 'pc' },
+    { id: 'mon:0', side: 'monster' },
+  ];
+  const map = { width: 10, height: 10, blocked: null };
+  // Only override PCs.
+  const override = [{ id: 'pc:1', x: 2, y: 2 }, { id: 'pc:2', x: 4, y: 2 }];
+  CrucibleSpatial.placeCombatants(combatants, map, override);
+  assertEq(combatants[0].x, 2);
+  assertEq(combatants[2].y, 8);  // monster gets default y=height-2=8
+  assert(combatants[2].x >= 0 && combatants[2].x < map.width, 'monster placed in bounds');
+});
+
 test('placeCombatants: 6 PCs evenly spaced on a 20-wide map', () => {
   const combatants = Array.from({length: 6}, (_, i) => ({ id: 'pc:' + i, side: 'pc' }));
   const map = { width: 20, height: 20, blocked: null };
