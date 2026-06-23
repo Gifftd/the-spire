@@ -282,6 +282,36 @@
   }
   CrucibleSpatial.expectedDamage = expectedDamage;
 
+  // Tunable scorer coefficients. Exposed for hand-tuning + tactics.aiHint
+  // weighting in Phase 6. Defaults match the spec's starting values.
+  const SCORER_WEIGHTS = {
+    distance:  -0.5,
+    lowHpInv:   1.0,
+    threat:     0.3,
+    ooaPath:   -2.0,
+    rangedInMelee: -1.5,
+  };
+  CrucibleSpatial.SCORER_WEIGHTS = SCORER_WEIGHTS;
+
+  function scoreTarget(target, attacker, action, combatants, map) {
+    const w = SCORER_WEIGHTS;
+    const dist = chebyshev(attacker, target);
+    const ooaPath = provokesOoAOnPath(attacker, target, combatants, map) ? 1 : 0;
+    const rangedInMelee = (action.actionRange === 'ranged' && dist <= 1) ? 1 : 0;
+    return (
+      w.distance      * dist
+    + w.lowHpInv      * (1 / Math.max(1, target.hp))
+    + w.threat        * (target.threat || 0)
+    + w.ooaPath       * ooaPath
+    + w.rangedInMelee * rangedInMelee
+    );
+  }
+  CrucibleSpatial.scoreTarget = scoreTarget;
+
+  // Stub — real implementation lands in Task 3.2.
+  function provokesOoAOnPath() { return false; }
+  CrucibleSpatial.provokesOoAOnPath = provokesOoAOnPath;
+
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = CrucibleSpatial;
   } else {
