@@ -1070,6 +1070,22 @@
       }
     }
     const combatants = buildCombatants(party, monsterPicks, rng, false);
+    // v2 spatial: place combatants on the map, then emit a placement event.
+    const encounter = (party && party._encounter) || null;
+    const map = (encounter && encounter.map) || { width: 20, height: 20, blocked: null };
+    if (typeof CrucibleSpatial !== 'undefined') {
+      CrucibleSpatial.placeCombatants(combatants, map, encounter && encounter.placement);
+      CrucibleSpatial.computeThreat(combatants);
+    }
+    for (const c of combatants) c._mapRef = map;
+    events.push({
+      type: 'placement', round: 0, map,
+      placements: combatants.map(c => ({
+        id: c.id, name: c.name, side: c.side,
+        pos: { x: c.x, y: c.y },
+        hp: c.hp, maxHp: c.maxHp, ac: c.ac, speed: c.speed,
+      })),
+    });
     rollInitiative(combatants, rng);
     const slots = initOrder(combatants);
 

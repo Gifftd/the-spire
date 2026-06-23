@@ -1487,6 +1487,31 @@ test('buildCombatants: PCs and monsters get x/y/speed default fields', () => {
   assertTrue(typeof mon.speed === 'number', 'mon.speed required');
   assertEq(mon.reactionAvailableThisRound, true);
 });
+
+test('runTrial: emits a placement event at the top with map + placements', () => {
+  const pm = {
+    id: 'pm1', identity: { name: 'Warlock', level: 5 },
+    abilities: { dex: 14, str: 10 },
+    combat: { hp: 30, maxHp: 30, ac: 14, initBonus: 2 },
+    actions: [{ type: 'attack', name: 'Punch', actionRange: 'melee',
+                atkAbility: 'str', damage: { dice: '1d4', mod: '+atkAbility', type: 'bludgeoning' } }],
+  };
+  const monsterPick = {
+    pickId: 'mon', name: 'Goblin', cr: '1/4', count: 1,
+    monster: { name: 'Goblin', ac: 13, hp: 7, maxHp: 7,
+               abilities: { str: { mod: 0 }, dex: { mod: 2 } },
+               parsedActions: [{ kind: 'attack', name: 'Bite', sourceActionName: 'Bite',
+                                 toHit: 4, damage: [{ dice: '1d4', mod: 0, type: 'piercing' }] }] },
+  };
+  const rng = () => 0.5;
+  const trial = Crucible.runTrial([pm], [monsterPick], { aiHint: 'focus' }, rng);
+  const placement = trial.events.find(e => e.type === 'placement');
+  assertTrue(placement, 'placement event missing');
+  assertEq(placement.round, 0);
+  assertTrue(placement.map.width > 0, 'map width set');
+  assertTrue(placement.map.height > 0, 'map height set');
+  assertEq(placement.placements.length, 2);
+});
 </script>
 </body>
 </html>
