@@ -17,6 +17,51 @@
 
   CrucibleSpatial.chebyshev = chebyshev;
 
+  // Terrain accessors. map.terrain is an optional 2D array [y][x] of cells:
+  //   null | { type: 'wall'|'difficult'|'damaging', dice?, mod?, dmgType? }
+  // Empty/missing cells are open ground.
+  function terrainAt(map, x, y) {
+    if (!map || !map.terrain) return null;
+    const row = map.terrain[y];
+    return (row && row[x]) || null;
+  }
+  CrucibleSpatial.terrainAt = terrainAt;
+
+  function isWall(map, x, y) {
+    const t = terrainAt(map, x, y);
+    if (t && t.type === 'wall') return true;
+    // back-compat: legacy blocked array still respected
+    if (map && map.blocked && map.blocked[y] && map.blocked[y][x] === true) return true;
+    return false;
+  }
+  CrucibleSpatial.isWall = isWall;
+
+  function stepCost(map, x, y) {
+    const t = terrainAt(map, x, y);
+    return (t && t.type === 'difficult') ? 2 : 1;
+  }
+  CrucibleSpatial.stepCost = stepCost;
+
+  // Bresenham line-of-sight: returns true unless any wall blocks the line
+  // segment between (from) and (to). Endpoints don't block themselves.
+  function hasLineOfSight(map, from, to) {
+    let x0 = from.x, y0 = from.y, x1 = to.x, y1 = to.y;
+    const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+    const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+    let err = dx - dy;
+    while (true) {
+      if (!(x0 === from.x && y0 === from.y) && !(x0 === to.x && y0 === to.y)) {
+        if (isWall(map, x0, y0)) return false;
+      }
+      if (x0 === x1 && y0 === y1) break;
+      const e2 = 2 * err;
+      if (e2 > -dy) { err -= dy; x0 += sx; }
+      if (e2 <  dx) { err += dx; y0 += sy; }
+    }
+    return true;
+  }
+  CrucibleSpatial.hasLineOfSight = hasLineOfSight;
+
   // A* with Chebyshev heuristic. Returns the cell list from start (excluded)
   // to the chosen endpoint (included). On maxSteps exhaustion, returns the
   // best-effort partial path toward the goal. Empty array if no progress.
@@ -33,14 +78,8 @@
     if (start.x === goal.x && start.y === goal.y) return [];
 
     const w = map.width, h = map.height;
-    const blocked = map.blocked;
 
     function inBounds(x, y) { return x >= 0 && x < w && y >= 0 && y < h; }
-    function isBlocked(x, y) {
-      if (blocked && blocked[y] && blocked[y][x] === true) return true;
-      if (occupied && occupied.has(x + ',' + y)) return true;
-      return false;
-    }
     function key(x, y) { return y * w + x; }
     function heuristic(x, y) { return Math.max(Math.abs(goal.x - x), Math.abs(goal.y - y)); }
 
@@ -91,8 +130,9 @@
           if (dx === 0 && dy === 0) continue;
           const nx = cur.x + dx, ny = cur.y + dy;
           if (!inBounds(nx, ny)) continue;
-          if (isBlocked(nx, ny)) continue;
-          const ng = cur.g + 1;
+          if (isWall(map, nx, ny)) continue;
+          if (occupied && occupied.has(nx + ',' + ny)) continue;
+          const ng = cur.g + stepCost(map, nx, ny);
           if (ng > maxSteps) { hitMaxSteps = true; continue; }
           const k = key(nx, ny);
           const prev = seen.get(k);

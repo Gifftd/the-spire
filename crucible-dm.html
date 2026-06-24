@@ -96,6 +96,34 @@
     .tactical-board .hp-bar { fill: #6dd58c; }
     .tactical-board .aoe-cell { fill: #c87cd4; opacity: 0.35; transition: opacity 600ms ease-out; }
     .tactical-board .move-trail { fill: none; stroke: var(--c-accent); stroke-width: 1.5; stroke-dasharray: 3 3; opacity: 0.6; }
+    .tactical-board .terrain-wall { fill: var(--c-ink-faint, #4a4a52); }
+    .tactical-board .terrain-difficult { fill: #806c3a; opacity: 0.4; }
+    .tactical-board .terrain-damaging rect { fill: #c43838; opacity: 0.35; }
+    .tactical-board .terrain-damaging text { fill: #ffdd99; font-family: Cinzel, serif;
+                                              font-size: 0.55rem; pointer-events: none; }
+
+    .terrain-paint { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.5rem;
+                     background: var(--c-bg); border: 1px solid var(--c-border); border-radius: 4px;
+                     margin-bottom: 0.5rem; }
+    .terrain-paint h3 { font-family: Cinzel, serif; color: var(--c-accent); margin: 0;
+                        font-size: 0.85rem; letter-spacing: 0.06em; }
+    .terrain-paint-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .terrain-paint-row label { color: var(--c-ink-faint); font-size: 0.8rem; }
+    .terrain-paint-brushes { display: flex; gap: 0.25rem; }
+    .terrain-paint-brushes button { padding: 4px 10px; font-size: 0.78rem;
+                                    background: var(--c-surface-2); color: var(--c-ink);
+                                    border: 1px solid var(--c-border); cursor: pointer; border-radius: 3px; }
+    .terrain-paint-brushes button.active { background: var(--c-accent); color: var(--c-bg);
+                                           border-color: var(--c-accent); }
+    .terrain-paint-grid { background: var(--c-bg); border: 1px solid var(--c-border); }
+    .terrain-paint-grid .grid-line { stroke: var(--c-border); stroke-width: 0.5; opacity: 0.5; }
+    .terrain-paint-grid .cell { fill: transparent; }
+    .terrain-paint-grid .cell:hover { fill: rgba(126, 197, 197, 0.15); }
+    .terrain-paint-grid .terrain-wall { fill: var(--c-ink-faint, #4a4a52); }
+    .terrain-paint-grid .terrain-difficult { fill: #806c3a; opacity: 0.5; }
+    .terrain-paint-grid .terrain-damaging rect { fill: #c43838; opacity: 0.5; }
+    .terrain-paint-grid .terrain-damaging text { fill: #ffdd99; font-family: Cinzel, serif;
+                                                  font-size: 0.55rem; pointer-events: none; }
 
     .viewer-flex { display: flex; gap: 1rem; align-items: flex-start; }
     .viewer-left { flex: 0 0 auto; }
@@ -145,6 +173,7 @@
 
   <section class="pane" id="pane-encounter">
     <h2>ENCOUNTER</h2>
+    <div id="battlefield-panel"></div>
     <div id="encounter-list" class="empty-state">No monsters yet. (Pane B under construction.)</div>
     <button class="btn" id="btn-add-monster" style="margin-top:0.5rem">+ Add from Bestiary</button>
     <div id="fm-budget" style="margin-top:1rem; padding:0.5rem; background:var(--c-surface);
@@ -1009,6 +1038,15 @@ document.getElementById('btn-run').addEventListener('click', async () => {
       <div id="winrate-live" style="margin-top:0.5rem; color:var(--c-ink-faint);"></div>
     </div>`;
   try {
+    // v2 terrain: attach the authored battlefield map so runTrial sees it.
+    party._encounter = {
+      map: {
+        width: battlefield.width,
+        height: battlefield.height,
+        blocked: null,
+        terrain: battlefield.terrain,
+      },
+    };
     const result = await Crucible.runSim({
       party,
       monsterPicks: picks,
@@ -1385,6 +1423,182 @@ function roleBadgeColor(source) {
   if (source === 'override') return 'var(--c-accent)';   // teal
   if (source === 'fm')       return '#b88a5a';            // gold
   return 'var(--c-ink-faint)';                            // slate
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  v2 terrain: battlefield authoring state
+// ═══════════════════════════════════════════════════════════════════════
+const BATTLEFIELD_KEY = 'crucible-battlefield';
+const DMG_TYPES = ['fire','cold','acid','poison','lightning','thunder','necrotic','radiant','psychic','bludgeoning','piercing','slashing'];
+
+function emptyTerrain(w, h) {
+  return Array.from({ length: h }, () => new Array(w).fill(null));
+}
+
+function loadBattlefield() {
+  try {
+    const raw = localStorage.getItem(BATTLEFIELD_KEY);
+    if (raw) {
+      const obj = JSON.parse(raw);
+      if (obj && typeof obj.width === 'number' && typeof obj.height === 'number') {
+        if (!Array.isArray(obj.terrain) || obj.terrain.length !== obj.height) {
+          obj.terrain = emptyTerrain(obj.width, obj.height);
+        }
+        return obj;
+      }
+    }
+  } catch (e) { console.warn('battlefield load failed', e); }
+  return { width: 20, height: 20, terrain: emptyTerrain(20, 20) };
+}
+
+function saveBattlefield() {
+  localStorage.setItem(BATTLEFIELD_KEY, JSON.stringify(battlefield));
+}
+
+let battlefield = loadBattlefield();
+let currentBrush = 'erase';            // 'erase' | 'wall' | 'difficult' | 'damaging'
+let damagingBrushSpec = { dice: '1d6', mod: 0, dmgType: 'fire' };
+let isPainting = false;
+
+function setMapSize(w, h) {
+  w = Math.max(5, Math.min(50, parseInt(w) || battlefield.width));
+  h = Math.max(5, Math.min(50, parseInt(h) || battlefield.height));
+  const next = emptyTerrain(w, h);
+  // Preserve existing cells in the overlap.
+  const oldH = Math.min(h, battlefield.height);
+  const oldW = Math.min(w, battlefield.width);
+  for (let y = 0; y < oldH; y++) {
+    for (let x = 0; x < oldW; x++) {
+      next[y][x] = battlefield.terrain[y][x] || null;
+    }
+  }
+  battlefield = { width: w, height: h, terrain: next };
+  saveBattlefield();
+  renderBattlefieldPanel();
+}
+
+function setBrush(name) {
+  currentBrush = name;
+  renderBattlefieldPanel();
+}
+
+function paintCell(x, y) {
+  if (x < 0 || y < 0 || x >= battlefield.width || y >= battlefield.height) return;
+  let cell = null;
+  if (currentBrush === 'wall') cell = { type: 'wall' };
+  else if (currentBrush === 'difficult') cell = { type: 'difficult' };
+  else if (currentBrush === 'damaging') {
+    cell = { type: 'damaging',
+             dice: damagingBrushSpec.dice || '1d6',
+             mod: Number(damagingBrushSpec.mod) || 0,
+             dmgType: damagingBrushSpec.dmgType || 'fire' };
+  }
+  battlefield.terrain[y][x] = cell;
+}
+
+function clearBattlefield() {
+  battlefield.terrain = emptyTerrain(battlefield.width, battlefield.height);
+  saveBattlefield();
+  renderBattlefieldPanel();
+}
+
+function renderBattlefieldPanel() {
+  const root = document.getElementById('battlefield-panel');
+  if (!root) return;
+  const CELL = 16;  // smaller than viewer for compact editing
+  const w = battlefield.width * CELL;
+  const h = battlefield.height * CELL;
+  const cellsHtml = [];
+  for (let y = 0; y < battlefield.height; y++) {
+    for (let x = 0; x < battlefield.width; x++) {
+      const t = battlefield.terrain[y][x];
+      const px = x * CELL, py = y * CELL;
+      let overlay = '';
+      if (t && t.type === 'wall') overlay = `<rect x="${px}" y="${py}" width="${CELL}" height="${CELL}" class="terrain-wall" />`;
+      else if (t && t.type === 'difficult') overlay = `<rect x="${px}" y="${py}" width="${CELL}" height="${CELL}" class="terrain-difficult" />`;
+      else if (t && t.type === 'damaging') {
+        overlay = `<g class="terrain-damaging"><rect x="${px}" y="${py}" width="${CELL}" height="${CELL}" /></g>`;
+      }
+      cellsHtml.push(
+        overlay +
+        `<rect x="${px}" y="${py}" width="${CELL}" height="${CELL}" class="cell"
+               data-x="${x}" data-y="${y}" />`
+      );
+    }
+  }
+  const gridLines = [];
+  for (let i = 0; i <= battlefield.width; i++) gridLines.push(`<line x1="${i*CELL}" y1="0" x2="${i*CELL}" y2="${h}" class="grid-line" />`);
+  for (let i = 0; i <= battlefield.height; i++) gridLines.push(`<line x1="0" y1="${i*CELL}" x2="${w}" y2="${i*CELL}" class="grid-line" />`);
+
+  const damagingFields = currentBrush === 'damaging' ? `
+    <div class="terrain-paint-row">
+      <label>Dice <input class="pc-input" type="text" value="${escapeHtml(damagingBrushSpec.dice)}"
+                         style="width:5rem"
+                         oninput="damagingBrushSpec.dice = this.value"></label>
+      <label>Mod <input class="pc-input" type="number" value="${damagingBrushSpec.mod}"
+                        style="width:4rem"
+                        oninput="damagingBrushSpec.mod = parseInt(this.value)||0"></label>
+      <label>Type
+        <select class="pc-input" onchange="damagingBrushSpec.dmgType = this.value">
+          ${DMG_TYPES.map(t => `<option value="${t}" ${t === damagingBrushSpec.dmgType ? 'selected' : ''}>${t}</option>`).join('')}
+        </select></label>
+    </div>` : '';
+
+  root.innerHTML = `
+    <div class="terrain-paint">
+      <h3>BATTLEFIELD</h3>
+      <div class="terrain-paint-row">
+        <label>Width <input type="number" min="5" max="50" value="${battlefield.width}"
+                            class="pc-input" style="width:4.5rem"
+                            onchange="setMapSize(this.value, ${battlefield.height})"></label>
+        <label>Height <input type="number" min="5" max="50" value="${battlefield.height}"
+                             class="pc-input" style="width:4.5rem"
+                             onchange="setMapSize(${battlefield.width}, this.value)"></label>
+        <button class="btn" onclick="clearBattlefield()">Clear all</button>
+      </div>
+      <div class="terrain-paint-row">
+        <span style="color:var(--c-ink-faint); font-size:0.8rem">Brush:</span>
+        <div class="terrain-paint-brushes">
+          ${['erase','wall','difficult','damaging'].map(b =>
+            `<button class="${currentBrush === b ? 'active' : ''}" onclick="setBrush('${b}')">${b}</button>`
+          ).join('')}
+        </div>
+      </div>
+      ${damagingFields}
+      <svg class="terrain-paint-grid" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"
+           onmousedown="onTerrainPaintDown(event)"
+           onmousemove="onTerrainPaintMove(event)"
+           onmouseup="onTerrainPaintUp()"
+           onmouseleave="onTerrainPaintUp()">
+        <g class="grid-lines">${gridLines.join('')}</g>
+        <g class="cells">${cellsHtml.join('')}</g>
+      </svg>
+    </div>`;
+}
+
+function onTerrainPaintDown(ev) {
+  isPainting = true;
+  paintAtEvent(ev);
+}
+function onTerrainPaintMove(ev) {
+  if (!isPainting) return;
+  paintAtEvent(ev);
+}
+function onTerrainPaintUp() {
+  if (isPainting) {
+    saveBattlefield();
+    renderBattlefieldPanel();
+  }
+  isPainting = false;
+}
+function paintAtEvent(ev) {
+  const target = ev.target;
+  if (!target || !target.classList.contains('cell')) return;
+  const x = parseInt(target.dataset.x, 10);
+  const y = parseInt(target.dataset.y, 10);
+  paintCell(x, y);
+  // Re-render lazily on mouseup; for now refresh each paint event for visual feedback.
+  renderBattlefieldPanel();
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1945,6 +2159,7 @@ function renderFmBudget() {
 document.getElementById('btn-add-monster').onclick = openPickerModal;
 
 renderParty();
+renderBattlefieldPanel();
 
 // Eagerly start loading bestiary in the background — picker becomes instant.
 loadBestiary().catch(e => console.warn('Bestiary preload failed', e));

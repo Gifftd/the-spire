@@ -488,6 +488,108 @@ test('provokesOoAOnPath: already adjacent (path empty) → false', () => {
   const cs = [attacker, target];
   assertEq(CrucibleSpatial.provokesOoAOnPath(attacker, target, cs, mkMap(10,10,[])), false);
 });
+
+group('terrain helpers');
+
+test('terrainAt: empty map → null', () => {
+  assertEq(CrucibleSpatial.terrainAt({ width:5, height:5 }, 0, 0), null);
+});
+test('terrainAt: returns cell entry', () => {
+  const m = { width:5, height:5, terrain: [
+    [null,null,null,null,null],
+    [null,{type:'wall'},null,null,null],
+    [null,null,null,null,null],
+    [null,null,null,null,null],
+    [null,null,null,null,null],
+  ]};
+  assertEq(CrucibleSpatial.terrainAt(m, 1, 1), {type:'wall'});
+});
+test('isWall: respects terrain', () => {
+  const m = { width:5, height:5, terrain: [
+    [null,null,null,null,null],
+    [null,{type:'wall'},null,null,null],
+    [null,null,null,null,null],
+    [null,null,null,null,null],
+    [null,null,null,null,null],
+  ]};
+  assertEq(CrucibleSpatial.isWall(m, 1, 1), true);
+  assertEq(CrucibleSpatial.isWall(m, 0, 0), false);
+});
+test('isWall: respects legacy blocked array', () => {
+  const m = { width:5, height:5, blocked: [
+    [false,false,false,false,false],
+    [false,true, false,false,false],
+    [false,false,false,false,false],
+    [false,false,false,false,false],
+    [false,false,false,false,false],
+  ]};
+  assertEq(CrucibleSpatial.isWall(m, 1, 1), true);
+});
+test('stepCost: empty → 1; difficult → 2', () => {
+  const m = { width:5, height:5, terrain: [
+    [null,null,null,null,null],
+    [null,{type:'difficult'},null,null,null],
+    [null,null,null,null,null],
+    [null,null,null,null,null],
+    [null,null,null,null,null],
+  ]};
+  assertEq(CrucibleSpatial.stepCost(m, 0, 0), 1);
+  assertEq(CrucibleSpatial.stepCost(m, 1, 1), 2);
+});
+
+test('findPath: difficult terrain doubles step cost', () => {
+  // Straight 4-step path. Cells (1,0), (2,0) are difficult, each costs 2.
+  // Path along y=0 from (0,0) to (4,0): cost = 1+2+2+1 = 6 cells of speed.
+  const m = { width:10, height:5, terrain: Array.from({length:5}, () => new Array(10).fill(null)) };
+  m.terrain[0][1] = { type:'difficult' };
+  m.terrain[0][2] = { type:'difficult' };
+  // With maxSteps:5, the difficult cells force the path to find a route around if cheaper exists.
+  const path = CrucibleSpatial.findPath({x:0,y:0}, {x:4,y:0}, m, { maxSteps: 6 });
+  // Path should reach the goal — confirms cost respected without erroring out at maxSteps:6.
+  assertEq(path[path.length - 1], {x:4,y:0});
+});
+
+test('findPath: terrain walls block movement', () => {
+  const m = { width:5, height:5, terrain: Array.from({length:5}, () => new Array(5).fill(null)) };
+  m.terrain[0][1] = { type:'wall' };
+  m.terrain[1][1] = { type:'wall' };
+  m.terrain[2][1] = { type:'wall' };
+  // Path from (0,0) to (3,1) must go around the wall column.
+  const path = CrucibleSpatial.findPath({x:0,y:0}, {x:3,y:1}, m, {});
+  for (const c of path) {
+    assertTrueOrAssert(!(c.x === 1 && (c.y === 0 || c.y === 1 || c.y === 2)), 'path goes through wall at ' + JSON.stringify(c));
+  }
+});
+// Helper: tests/crucible-spatial.test.html uses `assert(cond, msg)` (not assertTrue).
+// Use a local alias so paste-friendly.
+function assertTrueOrAssert(cond, msg) { if (!cond) throw new Error(msg); }
+
+group('LOS');
+
+test('hasLineOfSight: open map → true', () => {
+  const m = { width:10, height:10 };
+  assertEq(CrucibleSpatial.hasLineOfSight(m, {x:0,y:0}, {x:5,y:5}), true);
+});
+test('hasLineOfSight: wall in path → false', () => {
+  const m = { width:10, height:10, terrain: Array.from({length:10}, () => new Array(10).fill(null)) };
+  m.terrain[2][2] = { type:'wall' };
+  assertEq(CrucibleSpatial.hasLineOfSight(m, {x:0,y:0}, {x:5,y:5}), false);
+});
+test('hasLineOfSight: wall not on path → true', () => {
+  const m = { width:10, height:10, terrain: Array.from({length:10}, () => new Array(10).fill(null)) };
+  m.terrain[5][2] = { type:'wall' };
+  assertEq(CrucibleSpatial.hasLineOfSight(m, {x:0,y:0}, {x:5,y:0}), true);
+});
+test('hasLineOfSight: wall on endpoint cell → true (doesn\'t block its own square)', () => {
+  const m = { width:10, height:10, terrain: Array.from({length:10}, () => new Array(10).fill(null)) };
+  m.terrain[3][3] = { type:'wall' };
+  assertEq(CrucibleSpatial.hasLineOfSight(m, {x:0,y:0}, {x:3,y:3}), true);
+});
+test('hasLineOfSight: difficult terrain does NOT block LOS', () => {
+  const m = { width:10, height:10, terrain: Array.from({length:10}, () => new Array(10).fill(null)) };
+  m.terrain[2][2] = { type:'difficult' };
+  assertEq(CrucibleSpatial.hasLineOfSight(m, {x:0,y:0}, {x:5,y:5}), true);
+});
 </script>
 </body>
 </html>
