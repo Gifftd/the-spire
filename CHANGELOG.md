@@ -9,6 +9,20 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-16
 
+### Crucible v2 — terrain support
+
+Three terrain types layered on the existing v2 spatial grid:
+
+- **Wall**: impassable, blocks line of sight. A* refuses these cells; ranged attacks and AoE cast points require unobstructed LOS via Bresenham.
+- **Difficult**: passable but each step costs 2 cells of speed. A* now uses a `stepCost` function instead of constant 1.
+- **Damaging**: passable, costs 1 cell. At the end of each combatant's turn standing on a damaging cell, deals `dice + mod` damage of the configured type and emits a `terrain-damage` event.
+
+Authoring lives in a new "Battlefield" panel above the Encounter list in `crucible-dm.html` — width/height inputs (5..50 clamped), brush selector (erase / wall / difficult / damaging), per-damaging-brush dice/mod/type fields, click-and-drag SVG paint grid, and Clear All. Persisted to `localStorage['crucible-battlefield']` and attached to `party._encounter.map` on every run.
+
+The viewer renders walls as solid grey, difficult as bronze tint, damaging as red wash with dice label. The new `terrain-damage` event type is rendered in the log as "R<n> · <name> takes <amount> <type> (terrain)".
+
+Encounter schema gains optional `map.terrain` validation: must be a 2D array sized `width × height`, each cell is `null` or `{ type, dice?, mod?, dmgType? }`.
+
 ### Crucible v2 — spatial combat foundation
 
 Position-aware tactical combat simulator replacing v1's abstract trial mode.
