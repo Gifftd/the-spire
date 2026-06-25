@@ -590,6 +590,71 @@ test('hasLineOfSight: difficult terrain does NOT block LOS', () => {
   m.terrain[2][2] = { type:'difficult' };
   assertEq(CrucibleSpatial.hasLineOfSight(m, {x:0,y:0}, {x:5,y:5}), true);
 });
+
+group('canAttackFrom + findShootingCell');
+
+test('canAttackFrom: melee adjacent → true', () => {
+  const map = mkMap(10, 10, []);
+  const c = { x: 4, y: 4 };
+  const t = { x: 5, y: 4 };
+  const action = { actionRange: 'melee' };
+  assertEq(CrucibleSpatial.canAttackFrom(c, t, action, map), true);
+});
+
+test('canAttackFrom: melee out of reach → false', () => {
+  const map = mkMap(10, 10, []);
+  const c = { x: 4, y: 4 };
+  const t = { x: 7, y: 4 };
+  const action = { actionRange: 'melee' };
+  assertEq(CrucibleSpatial.canAttackFrom(c, t, action, map), false);
+});
+
+test('canAttackFrom: ranged in range with LOS → true', () => {
+  const map = { width: 10, height: 10, terrain: Array.from({length: 10}, () => new Array(10).fill(null)) };
+  const c = { x: 1, y: 4 }, t = { x: 5, y: 4 };
+  const action = { actionRange: 'ranged', range: 6 };
+  assertEq(CrucibleSpatial.canAttackFrom(c, t, action, map), true);
+});
+
+test('canAttackFrom: ranged in range but wall blocks LOS → false', () => {
+  const map = { width: 10, height: 10, terrain: Array.from({length: 10}, () => new Array(10).fill(null)) };
+  map.terrain[4][3] = { type: 'wall' };
+  const c = { x: 1, y: 4 }, t = { x: 5, y: 4 };
+  const action = { actionRange: 'ranged', range: 6 };
+  assertEq(CrucibleSpatial.canAttackFrom(c, t, action, map), false);
+});
+
+test('findShootingCell: PC already in valid position → empty path', () => {
+  const map = mkMap(10, 10, []);
+  const c = { x: 1, y: 4 }, t = { x: 5, y: 4 };
+  const action = { actionRange: 'ranged', range: 6 };
+  const result = CrucibleSpatial.findShootingCell(c, t, action, map, { maxSteps: 6 });
+  assert(result);
+  assertEq(result.path, []);
+});
+
+test('findShootingCell: walks around a wall to find LOS', () => {
+  const map = { width: 12, height: 12, terrain: Array.from({length: 12}, () => new Array(12).fill(null)) };
+  // Wall column at x=3, y=2..6 — partial wall.
+  for (let y = 2; y <= 6; y++) map.terrain[y][3] = { type: 'wall' };
+  const c = { x: 0, y: 4 }, t = { x: 8, y: 4 };  // wall blocks direct LOS
+  const action = { actionRange: 'ranged', range: 10 };
+  const result = CrucibleSpatial.findShootingCell(c, t, action, map, { maxSteps: 12 });
+  assert(result, 'should find a shooting cell');
+  assert(result.path.length > 0, 'should require movement');
+  // Final cell must satisfy canAttackFrom.
+  assertEq(CrucibleSpatial.canAttackFrom(result.cell, t, action, map), true);
+});
+
+test('findShootingCell: fully walled off goal → null', () => {
+  const map = { width: 12, height: 12, terrain: Array.from({length: 12}, () => new Array(12).fill(null)) };
+  // Full vertical wall x=5, y=0..11 — no way to get LOS to t at x=8.
+  for (let y = 0; y <= 11; y++) map.terrain[y][5] = { type: 'wall' };
+  const c = { x: 1, y: 5 }, t = { x: 8, y: 5 };
+  const action = { actionRange: 'ranged', range: 10 };
+  const result = CrucibleSpatial.findShootingCell(c, t, action, map, { maxSteps: 3 });
+  assertEq(result, null);  // can't reach a shooting cell within 3 steps
+});
 </script>
 </body>
 </html>

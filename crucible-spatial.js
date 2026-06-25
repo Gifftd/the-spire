@@ -118,9 +118,18 @@
       // Track best-h seen so far (only nodes we've actually moved to, g > 0).
       if (cur.g > 0) {
         const ch = heuristic(cur.x, cur.y);
-        if (ch < bestH || (ch === bestH && bestNode && cur.g < bestNode.g)) {
+        if (ch < bestH) {
           bestH = ch;
           bestNode = cur;
+        } else if (ch === bestH && bestNode) {
+          // Deterministic tiebreak: lower g first, then lower y, then lower x.
+          // Stops oscillation when a PC pursues an unreachable target across
+          // turns — same start → same partial-path endpoint.
+          if (cur.g < bestNode.g ||
+              (cur.g === bestNode.g && cur.y < bestNode.y) ||
+              (cur.g === bestNode.g && cur.y === bestNode.y && cur.x < bestNode.x)) {
+            bestNode = cur;
+          }
         }
       }
 
@@ -151,6 +160,109 @@
   }
 
   CrucibleSpatial.findPath = findPath;
+
+  // Combined gate: dist <= need AND (melee || hasLineOfSight to target).
+  // Returns true if the attacker at (c.x, c.y) can hit target with action.
+  function canAttackFrom(c, target, action, map) {
+    if (!c || !target) return false;
+    const need = (typeof action.range === 'number') ? action.range
+      : (Array.isArray(action.range) && typeof action.range[0] === 'number')
+        ? Math.max(1, Math.floor(action.range[0] / 5))
+        : (action.actionRange === 'ranged') ? 6
+          : (typeof action.reach === 'number') ? Math.max(1, Math.floor(action.reach / 5))
+            : 1;
+    if (chebyshev(c, target) > need) return false;
+    // Ranged attacks need LOS. Melee at reach 1 doesn't.
+    if (action.actionRange === 'ranged' || need > 1) {
+      return hasLineOfSight(map, c, target);
+    }
+    return true;
+  }
+  CrucibleSpatial.canAttackFrom = canAttackFrom;
+
+  // Find the shortest path from start to ANY cell that satisfies
+  // canAttackFrom(cell, target, action, map). maxSteps caps the search.
+  // Returns { path, cell } or null if no valid shooting cell within budget.
+  function findShootingCell(start, target, action, map, options) {
+    options = options || {};
+    const maxSteps = options.maxSteps != null ? options.maxSteps : Infinity;
+    const occupied = options.occupied || null;
+    // Quick win: already in a valid spot.
+    if (canAttackFrom(start, target, action, map)) return { path: [], cell: start };
+    const w = map.width, h = map.height;
+    function inBounds(x, y) { return x >= 0 && x < w && y >= 0 && y < h; }
+    function key(x, y) { return y * w + x; }
+    function heuristic(x, y) {
+      // Cheap admissible heuristic: distance to target minus the attacker's
+      // range. Slightly under-estimates when LOS forces a detour, which keeps
+      // A* correct (admissible) while staying inexpensive.
+      const need = (typeof action.range === 'number') ? action.range
+        : (action.actionRange === 'ranged') ? 6 : 1;
+      const distToTgt = Math.max(Math.abs(target.x - x), Math.abs(target.y - y));
+      return Math.max(0, distToTgt - need);
+    }
+    const startNode = { x: start.x, y: start.y, g: 0, f: heuristic(start.x, start.y), parent: null };
+    const open = [startNode];
+    const seen = new Map();
+    seen.set(key(start.x, start.y), startNode);
+    function reconstruct(node) {
+      const out = [];
+      let n = node;
+      while (n.parent) { out.unshift({ x: n.x, y: n.y }); n = n.parent; }
+      return out;
+    }
+    // Partial-path fallback: track the explored cell with the lowest heuristic
+    // (closest to the shooting-cell goal). Deterministic tiebreak by (g, y, x).
+    let bestNode = null;
+    let bestH = heuristic(start.x, start.y);
+    let hitMaxSteps = false;
+    while (open.length > 0) {
+      let bestIdx = 0;
+      for (let i = 1; i < open.length; i++) if (open[i].f < open[bestIdx].f) bestIdx = i;
+      const cur = open.splice(bestIdx, 1)[0];
+      // Goal predicate: can attack from here?
+      if (canAttackFrom({ x: cur.x, y: cur.y }, target, action, map)) {
+        return { path: reconstruct(cur), cell: { x: cur.x, y: cur.y } };
+      }
+      if (cur.g > 0) {
+        const ch = heuristic(cur.x, cur.y);
+        if (ch < bestH) { bestH = ch; bestNode = cur; }
+        else if (ch === bestH && bestNode) {
+          if (cur.g < bestNode.g ||
+              (cur.g === bestNode.g && cur.y < bestNode.y) ||
+              (cur.g === bestNode.g && cur.y === bestNode.y && cur.x < bestNode.x)) {
+            bestNode = cur;
+          }
+        }
+      }
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = cur.x + dx, ny = cur.y + dy;
+          if (!inBounds(nx, ny)) continue;
+          if (isWall(map, nx, ny)) continue;
+          if (occupied && occupied.has(nx + ',' + ny)) continue;
+          const ng = cur.g + stepCost(map, nx, ny);
+          if (ng > maxSteps) { hitMaxSteps = true; continue; }
+          const k = key(nx, ny);
+          const prev = seen.get(k);
+          if (prev && prev.g <= ng) continue;
+          const node = { x: nx, y: ny, g: ng, f: ng + heuristic(nx, ny), parent: cur };
+          seen.set(k, node);
+          open.push(node);
+        }
+      }
+    }
+    // No cell with canAttackFrom found. If budget was the limit and we
+    // made progress toward a closer-to-target cell, return that partial
+    // path so the caller can keep closing the gap (and then Dash again).
+    // Guarded by hitMaxSteps so unreachable goals (full wall) still return null.
+    if (hitMaxSteps && bestNode) {
+      return { path: reconstruct(bestNode), cell: { x: bestNode.x, y: bestNode.y }, partial: true };
+    }
+    return null;
+  }
+  CrucibleSpatial.findShootingCell = findShootingCell;
 
   // Default layout: place combatants on the map.
   // If override is provided, use explicit positions from it.
