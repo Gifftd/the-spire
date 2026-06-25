@@ -9,6 +9,14 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-16
 
+### Crucible v2 — LOS-aware repositioning + deterministic A* tiebreak
+
+Two terrain-related engine improvements:
+
+- `CrucibleSpatial.canAttackFrom(c, target, action, map)` gates attacks on range AND LOS together, and `findShootingCell` does A* with the goal predicate "this cell can attack the target". A ranged PC with the target in range but a wall in the way now repositions to find a sightline instead of wasting the turn.
+- `findPath`'s partial-path fallback uses `(g, y, x)` lexicographic tiebreak when the heuristic ties. Across re-runs from the same start the chosen "closest unreached" cell is now deterministic — PCs stop oscillating between equivalent partial-path endpoints when pursuing an unreachable target.
+- Engine single-target attack branch swaps the old `dist <= need + LOS-skip` pattern for `canAttackFrom` + `findShootingCell` two-stage reposition (free-move budget, then Dash). Extracted `executePath` from `executeMove` so the LOS-aware path (which ends exactly on the shooting cell) can be walked OoA-aware without `stopWhenAdjacent`'s "stop one short" semantics.
+
 ### Crucible v2 — terrain support
 
 Three terrain types layered on the existing v2 spatial grid:

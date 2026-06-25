@@ -976,7 +976,14 @@
       map,
       { maxSteps, stopWhenAdjacent: target, occupied }
     );
-    if (path.length === 0) return 0;
+    return executePath(c, path, reason, combatants, rng, events, round);
+  }
+
+  // Walk c along an explicit, precomputed path. OoA-aware. Stops if c dies.
+  // Used by the LOS-aware reposition branch (which produces a path that ends
+  // exactly on the shooting cell, not one short of it).
+  function executePath(c, path, reason, combatants, rng, events, round) {
+    if (!path || path.length === 0) return 0;
     const from = { x: c.x, y: c.y };
     const stepped = [];
     for (const cell of path) {
@@ -1452,10 +1459,10 @@
             action = pickAction(c);
             if (!action) break;
           }
-          // v2 spatial: range check + movement. Free movement (c.speed cells)
-          // is spent first to close the gap. If still out of range, the
-          // action becomes Dash: the combatant moves another c.speed cells
-          // and ends the turn without attacking.
+          // v2 spatial: range + LOS check + movement, with Dash + reposition.
+          // For single-target attacks, gate on canAttackFrom (range AND LOS),
+          // and reposition via findShootingCell so a ranged PC walks around
+          // a wall rather than wasting the action with no line of sight.
           if (action && (!action.shape || action.shape === 'single')
               && typeof CrucibleSpatial !== 'undefined') {
             const tgtCandidate = (c.side === 'monster' && targets && targets[0])
@@ -1465,42 +1472,71 @@
               const myActions = c.side === 'pc'
                 ? ((c.pm && c.pm.actions) || []).map(a => ({ ...a, sourceActionName: a.sourceActionName || a.name }))
                 : ((c.monster && c.monster.parsedActions) || []);
-              const need = action.kind === 'multiattack'
-                ? multiattackRange(action, myActions)
-                : actionRange(action);
-              let dist = CrucibleSpatial.chebyshev(c, tgtCandidate);
-              // Step 1: free movement.
-              if (dist > need && c.movementBudgetThisTurn > 0) {
-                const stepped = executeMove(
-                  c, tgtCandidate, c.movementBudgetThisTurn, 'engage',
-                  combatants, map, rng, events, round
-                );
-                c.movementBudgetThisTurn = Math.max(0, c.movementBudgetThisTurn - stepped);
-                if (c.dead || c.downed) continue;
-                dist = CrucibleSpatial.chebyshev(c, tgtCandidate);
-              }
-              // Step 2: if still out of range, use the action as Dash.
-              if (dist > need) {
-                const dashed = executeMove(
-                  c, tgtCandidate, c.speed || 0, 'dash',
-                  combatants, map, rng, events, round
-                );
-                if (dashed > 0) {
-                  events.push({
-                    type: 'dash', round, who: c.id, name: c.name,
-                    cells: dashed,
-                  });
-                  tally(c.side, 'Dash', 'dash', false, 0, 0, 0, 0);
+              // For multiattack we still gate on max sub-action range; LOS
+              // matters per sub-attack and is handled inside resolveMultiattack
+              // (via resolveAttackPc/Monster's range guard).
+              if (action.kind === 'multiattack') {
+                const need = multiattackRange(action, myActions);
+                let dist = CrucibleSpatial.chebyshev(c, tgtCandidate);
+                if (dist > need && c.movementBudgetThisTurn > 0) {
+                  const stepped = executeMove(c, tgtCandidate, c.movementBudgetThisTurn, 'engage',
+                    combatants, map, rng, events, round);
+                  c.movementBudgetThisTurn = Math.max(0, c.movementBudgetThisTurn - stepped);
+                  if (c.dead || c.downed) continue;
+                  dist = CrucibleSpatial.chebyshev(c, tgtCandidate);
                 }
-                // Dash consumes the action whether or not it closed the gap.
-                continue;
-              }
-              // v2 terrain: LOS check for ranged attacks. If no LOS, skip
-              // this action — caller continues to the next iteration of the
-              // action loop (actionsAvailable was already decremented).
-              if (action.actionRange === 'ranged' || (typeof action.range === 'number' && action.range > 1)) {
-                if (!CrucibleSpatial.hasLineOfSight(map, { x: c.x, y: c.y }, { x: tgtCandidate.x, y: tgtCandidate.y })) {
+                if (dist > need) {
+                  const dashed = executeMove(c, tgtCandidate, c.speed || 0, 'dash',
+                    combatants, map, rng, events, round);
+                  if (dashed > 0) {
+                    events.push({ type: 'dash', round, who: c.id, name: c.name, cells: dashed });
+                    tally(c.side, 'Dash', 'dash', false, 0, 0, 0, 0);
+                  }
                   continue;
+                }
+              } else {
+                // Single-target attack: check both range AND LOS via canAttackFrom.
+                if (!CrucibleSpatial.canAttackFrom(c, tgtCandidate, action, map)) {
+                  // Build occupied-cell set so the reposition search doesn't
+                  // route through allies/enemies.
+                  const occupied = new Set();
+                  for (const d of combatants) {
+                    if (d === c || d.dead || d.downed) continue;
+                    if (typeof d.x !== 'number' || typeof d.y !== 'number') continue;
+                    occupied.add(d.x + ',' + d.y);
+                  }
+                  // Step 1: try with free-move budget. findShootingCell
+                  // returns a path that ends exactly on the shooting cell,
+                  // so we walk it via executePath (not executeMove, which
+                  // stops one cell short via stopWhenAdjacent).
+                  let result = c.movementBudgetThisTurn > 0
+                    ? CrucibleSpatial.findShootingCell(
+                        { x: c.x, y: c.y }, tgtCandidate, action, map,
+                        { maxSteps: c.movementBudgetThisTurn, occupied })
+                    : null;
+                  if (result && result.path.length > 0) {
+                    const stepped = executePath(c, result.path, 'engage',
+                      combatants, rng, events, round);
+                    c.movementBudgetThisTurn = Math.max(0, c.movementBudgetThisTurn - stepped);
+                    if (c.dead || c.downed) continue;
+                  }
+                  // Step 2: if STILL can't attack, try Dash.
+                  if (!CrucibleSpatial.canAttackFrom(c, tgtCandidate, action, map)) {
+                    const dashResult = CrucibleSpatial.findShootingCell(
+                      { x: c.x, y: c.y }, tgtCandidate, action, map,
+                      { maxSteps: c.speed || 0, occupied });
+                    if (dashResult && dashResult.path.length > 0) {
+                      const dashed = executePath(c, dashResult.path, 'dash',
+                        combatants, rng, events, round);
+                      if (dashed > 0) {
+                        events.push({ type: 'dash', round, who: c.id, name: c.name, cells: dashed });
+                        tally(c.side, 'Dash', 'dash', false, 0, 0, 0, 0);
+                      }
+                    }
+                    // Dash consumes the action — skip the attack even if
+                    // dashResult was null (no reachable shooting cell exists).
+                    continue;
+                  }
                 }
               }
             }
