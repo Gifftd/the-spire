@@ -9,6 +9,31 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-07-09
 
+### Restyle batch 3 — map-dm.html (Atlas Workshop) + bestiary-dm.html (The Menagerie) consume theme.css
+
+The final two (and largest) pages. Every page in The Spire now genuinely
+consumes theme.css — no page aliases theme tokens onto a local palette
+anymore.
+
+- **map-dm.html** (−101 lines): gold palette → theme tokens across CSS,
+  inline styles, and CSS values in JS template strings; local `toast()` /
+  `confirmDialog()` deleted in favor of `UI.toast`/`UI.confirmDialog` (this
+  page was their donor — thin aliases keep all call sites working);
+  `escapeHtml` delegates to `UI.escapeHtml` (verified byte-identical
+  escaping and no single-quoted interpolation sites). JS-built markup keeps
+  its `btn-gold`/`btn-ghost`/`btn-red` class names with thin CSS recipes
+  mirroring the theme variants — the canvas/inspector render pipeline is
+  untouched (diff-hunk audit: zero hunks in attachPinGesture / scheduleSave
+  / publishData / saveNPCsKV / NPCEditor integration). Whisper purple stays
+  a page accent.
+- **bestiary-dm.html** (−90 lines): alias + palette blocks deleted; tabs →
+  theme `.tab-list/.tab` (+`is-active`), modals → `.modal-overlay` +
+  `is-visible`, buttons renamed at all 34 static call sites to theme
+  variants, role badge → `.chip--dm`, toast → `UI.toast` (28 call sites
+  audited), `saveKey` → `API.dmPost`. Stat-block typography kept as page
+  identity, retinted. Live-verified with stubbed data: filters, stat-block
+  render, tabs, modals, toasts all working.
+
 ### Restyle batch 2 — initiative-dm.html (War Table) consumes theme.css
 
 - Alias `:root` block, local gold palette, and reset/body boilerplate
