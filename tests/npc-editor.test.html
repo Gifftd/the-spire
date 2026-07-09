@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>npc-editor module tests</title>
+<link rel="stylesheet" href="../theme.css?v=2">
+</head>
+<body>
+<pre id="out"></pre>
+<div id="host"></div>
+<script src="../spire-ui.js?v=1"></script>
+<script src="../npc-editor.js?v=1"></script>
+<script>
+const log = (msg) => document.getElementById('out').textContent += msg + '\n';
+let failed = 0;
+function check(cond, label) {
+  if (cond) log('✓ ' + label);
+  else { log('✗ ' + label); failed++; }
+}
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
+
+async function run() {
+  // ── createStub / uniqueId ──
+  const npcs = [];
+  const a = NPCEditor.createStub({ name: 'Sera Mott', role: 'Fence' }, npcs);
+  npcs.push(a);
+  check(a.id === 'sera-mott', 'createStub: slugified id');
+  check(a.status === 'alive' && Array.isArray(a.knownTo) && Array.isArray(a.history) && Array.isArray(a.tags), 'createStub: full model defaults');
+  const b = NPCEditor.createStub({ name: 'Sera Mott' }, npcs);
+  check(b.id === 'sera-mott-2', 'uniqueId: dedupes against existing npcs');
+  const c = NPCEditor.createStub({ name: 'Sera Mott' }, npcs, ['sera-mott-2']);
+  check(c.id === 'sera-mott-3' || c.id === 'sera-mott-2', 'uniqueId: extraUsed considered — got ' + c.id);
+  check(c.id !== 'sera-mott-2' ? c.id === 'sera-mott-3' : false || c.id === 'sera-mott-3', 'uniqueId: extraUsed forces -3');
+
+  // ── open (new NPC) → save ──
+  let persistCalls = 0;
+  const persist = async () => { persistCalls++; return true; };
+  const host = document.getElementById('host');
+  const characters = [{ id: 'aldric', name: 'Aldric' }, { id: 'mira', name: 'Mira' }];
+  const locations = [{ id: 'ironhaven', name: 'Ironhaven' }];
+  const timeline = [
+    { id: 's1', kind: 'session', title: 'Session One', dateSort: '2026-01-01', npcIds: ['sera-mott'] },
+    { id: 's2', kind: 'event', title: 'Unrelated', dateSort: '2026-01-02', npcIds: [] },
+  ];
+  let savedRec = null, savedIsNew = null;
+  NPCEditor.open({
+    host, npc: null, prefill: { currentLocationId: 'ironhaven' },
+    npcs, characters, locations, timeline,
+    entryHref: (e) => '#entry-' + e.id,
+    persist,
+    onSaved: (rec, isNew) => { savedRec = rec; savedIsNew = isNew; },
+  });
+  check(host.querySelector('.npce2'), 'open: editor rendered');
+  check(host.querySelector('[data-f="location"]').value === 'ironhaven', 'open: prefill location applied');
+  check(host.querySelector('[data-r="post-save"]').style.display === 'none', 'open(new): history/move hidden before save');
+
+  // knownTo chip toggle
+  host.querySelector('[data-char="aldric"]').click();
+  check(host.querySelector('[data-char="aldric"]').classList.contains('on'), 'knownTo: chip toggles on');
+
+  // save with empty name → rejected (no record created)
+  const beforeCount = npcs.length;
+  host.querySelector('[data-b="save"]').click();
+  await wait(30);
+  check(npcs.length === beforeCount && persistCalls === 0, 'save: empty name rejected');
+
+  host.querySelector('[data-f="name"]').value = 'Halen Vos';
+  host.querySelector('[data-f="tags"]').value = 'guild, ally';
+  host.querySelector('[data-b="save"]').click();
+  await wait(30);
+  check(npcs.length === beforeCount + 1, 'save(new): record pushed');
+  const rec = npcs.find(n => n.id === 'halen-vos');
+  check(!!rec, 'save(new): slug id assigned');
+  check(rec && rec.knownTo.includes('aldric'), 'save(new): knownTo persisted');
+  check(rec && rec.tags.join(',') === 'guild,ally', 'save(new): tags parsed');
+  check(savedIsNew === true && savedRec === rec, 'onSaved(new) fired with record');
+  check(host.querySelector('[data-r="post-save"]').style.display !== 'none', 'save(new): history/move revealed after save');
+
+  // log a history entry on the newly saved NPC
+  host.querySelector('[data-f="move-note"]').value = 'Seen at the docks';
+  host.querySelector('[data-b="log"]').click();
+  await wait(30);
+  check(rec.history.length === 1 && rec.history[0].note === 'Seen at the docks', 'logMove: history appended');
+  check(host.querySelectorAll('.npce2-hcard').length === 1, 'logMove: history rendered');
+
+  // ── open (existing) — appears-in + edit ──
+  let saved2 = null;
+  NPCEditor.open({
+    host, npc: npcs[0] /* sera-mott */, npcs, characters, locations, timeline,
+    entryHref: (e) => '#entry-' + e.id, persist,
+    onSaved: (r) => { saved2 = r; },
+  });
+  check(host.querySelector('[data-f="name"]').value === 'Sera Mott', 'open(existing): fields populated');
+  const appears = host.querySelectorAll('.npce2-appear');
+  check(appears.length === 1 && appears[0].getAttribute('href') === '#entry-s1', 'appears-in: linked entry listed with href');
+  host.querySelector('[data-f="role"]').value = 'Broker';
+  host.querySelector('[data-b="save"]').click();
+  await wait(30);
+  check(npcs[0].role === 'Broker' && saved2 === npcs[0], 'save(existing): merged in place, id stable');
+  check(npcs[0].id === 'sera-mott', 'save(existing): id unchanged');
+
+  // ── openModal smoke ──
+  const ctl = NPCEditor.openModal({
+    npc: npcs[0], npcs, characters, locations, timeline, persist,
+  });
+  check(document.querySelector('.modal-overlay.is-visible .npce2'), 'openModal: modal rendered');
+  ctl.close();
+  check(!document.querySelector('.modal-overlay.is-visible'), 'openModal: close removes overlay');
+
+  // ── delete (confirm dialog auto-accept via Enter) ──
+  NPCEditor.open({
+    host, npc: npcs.find(n => n.id === 'halen-vos'), npcs, characters, locations, timeline, persist,
+    onDeleted: (id) => { log('  (onDeleted ' + id + ')'); },
+  });
+  host.querySelector('[data-b="delete"]').click();
+  await wait(80);   // confirm dialog opens
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  await wait(50);
+  check(!npcs.find(n => n.id === 'halen-vos'), 'delete: record removed after confirm');
+
+  log(failed ? `\n${failed} FAILED` : '\nALL PASS');
+}
+run();
+</script>
+</body></html>

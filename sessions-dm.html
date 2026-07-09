@@ -387,6 +387,13 @@ body { display: flex; flex-direction: column; }
   background: rgba(74,144,212,0.22);
   color: #a3cfee;
 }
+.pick-chip-edit {
+  display: inline-block;
+  margin-left: 6px;
+  opacity: 0.5;
+  transition: opacity var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out);
+}
+.pick-chip:hover .pick-chip-edit { opacity: 1; color: var(--c-teal-bright); }
 .pick-empty { font-size: var(--text-sm); color: var(--c-ink-faint); font-style: italic; padding: 4px 0; }
 .pick-hint { font-size: var(--text-sm); color: var(--c-ink-faint); font-style: italic; margin-top: 2px; }
 
@@ -819,6 +826,9 @@ body { display: flex; flex-direction: column; }
         <button class="btn btn--brass btn--sm" type="button" onclick="openAddNpc()" style="margin-left:auto">+ ADD NPC</button>
         <button class="btn btn--ghost btn--sm" type="button" onclick="openScanPrep()" title="Find [[Wikilinks]] in your prep that aren't NPCs yet">↑ SCAN PREP</button>
       </div>
+      <input type="text" id="f-npc-search" placeholder="Search NPCs by name, role, or tag…" autocomplete="off"
+             style="width:100%;margin-bottom:6px;background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:3px;color:var(--c-ink);font-family:var(--font-body);font-size:0.9rem;padding:6px 10px;outline:none">
+      <div class="pick-hint" style="margin-bottom:4px">Click a chip to link/unlink · click ✎ to edit the NPC in place.</div>
       <div class="pick-grid" id="f-npc-chips"></div>
 
       <div class="section-header">STRUCTURED LOOT <span class="hint">— for initiative exports &amp; per-recipient tracking. Markdown lists in the Prep block stay too.</span></div>
@@ -884,38 +894,6 @@ body { display: flex; flex-direction: column; }
   </aside>
 </main>
 
-<!-- ADD NPC OVERLAY -->
-<div class="overlay" id="npc-overlay" onclick="if(event.target===this)closeAddNpc()">
-  <div class="modal-pane">
-    <h2 id="npc-modal-title">Quick-add NPC</h2>
-    <div class="field"><label>NAME</label><input type="text" id="npc-f-name" placeholder="Mistress Halen" autocomplete="off"></div>
-    <div class="field-row">
-      <div class="field"><label>ROLE</label><input type="text" id="npc-f-role" placeholder="Healer · Apothecary"></div>
-      <div class="field"><label>STATUS</label>
-        <select id="npc-f-status">
-          <option value="alive">Alive</option>
-          <option value="dead">Dead</option>
-          <option value="missing">Missing</option>
-          <option value="unknown">Unknown</option>
-        </select>
-      </div>
-    </div>
-    <div class="field"><label>CURRENT LOCATION</label>
-      <select id="npc-f-location"><option value="">— unknown / off-map —</option></select>
-    </div>
-    <div class="field"><label>CURRENT ACTIVITY</label><input type="text" id="npc-f-activity" placeholder="Running the healing house off the east market"></div>
-    <div class="field"><label>PUBLIC DESCRIPTION (visible to players who know them)</label><textarea id="npc-f-description" rows="3"></textarea></div>
-    <div class="dm-note-area">
-      <div class="dm-note-label">🔒 DM ONLY</div>
-      <textarea id="npc-f-dmNotes" rows="3" placeholder="True motives, stat block, plot hooks…"></textarea>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn--ghost btn--sm" onclick="closeAddNpc()">CANCEL</button>
-      <button class="btn btn--brass btn--sm" onclick="saveNewNpc()">CREATE &amp; LINK</button>
-    </div>
-  </div>
-</div>
-
 <!-- SCAN PREP OVERLAY -->
 <div class="overlay" id="scan-overlay" onclick="if(event.target===this)closeScanPrep()">
   <div class="modal-pane">
@@ -962,6 +940,7 @@ body { display: flex; flex-direction: column; }
 <script src="auth.js?v=2"></script>
 <script src="spire-api.js?v=1"></script>
 <script src="spire-ui.js?v=1"></script>
+<script src="npc-editor.js?v=1"></script>
 <script src="encounter-schema.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════════
@@ -1708,12 +1687,18 @@ function renderChips() {
     `<span class="pick-chip ${work.locationIds.includes(l.id) ? 'on' : ''}" onclick="toggleChip('locationIds','${l.id}')">${escapeHtml(l.name)}${l.parent ? ` <span style="opacity:0.6">· ${escapeHtml(l.parent)}</span>` : ''}</span>`
   ).join('');
   const npcEl = document.getElementById('f-npc-chips');
+  const npcQuery = (document.getElementById('f-npc-search')?.value || '').trim().toLowerCase();
   if (!npcs.length) npcEl.innerHTML = '<div class="pick-empty">No NPCs yet.</div>';
   else {
-    const sortNpcs = npcs.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    npcEl.innerHTML = sortNpcs.map(n =>
-      `<span class="pick-chip ${work.npcIds.includes(n.id) ? 'on' : ''}" onclick="toggleChip('npcIds','${n.id}')">${escapeHtml(n.name || '')}</span>`
-    ).join('');
+    const sortNpcs = npcs.slice()
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+      .filter(n => !npcQuery
+        || (n.name || '').toLowerCase().includes(npcQuery)
+        || (n.role || '').toLowerCase().includes(npcQuery)
+        || (n.tags || []).some(t => (t || '').toLowerCase().includes(npcQuery)));
+    npcEl.innerHTML = sortNpcs.length ? sortNpcs.map(n =>
+      `<span class="pick-chip ${work.npcIds.includes(n.id) ? 'on' : ''}" onclick="toggleChip('npcIds','${n.id}')">${escapeHtml(n.name || '')}${n.role ? ` <span style="opacity:0.6">· ${escapeHtml(n.role)}</span>` : ''}<span class="pick-chip-edit" onclick="event.stopPropagation();editNpc('${n.id}')" title="Edit this NPC">✎</span></span>`
+    ).join('') : '<div class="pick-empty">No NPCs match that search.</div>';
   }
 }
 
@@ -2108,15 +2093,6 @@ async function exportAll() {
 // ═══════════════════════════════════════════════════════════════
 //  NPC QUICK-ADD + PREP SCAN
 // ═══════════════════════════════════════════════════════════════
-function slugify(s) { return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
-function uniqueNpcId(name, extraUsed) {
-  const used = new Set([...npcs.map(n => n.id), ...(extraUsed || [])]);
-  let base = slugify(name) || 'npc';
-  let id = base, n = 1;
-  while (used.has(id)) id = `${base}-${++n}`;
-  return id;
-}
-
 async function saveNPCsKV() {
   localStorage.setItem('dm_npcs', JSON.stringify(npcs));
   setStatus('Saving NPCs…', 'ing');
@@ -2127,58 +2103,45 @@ async function saveNPCsKV() {
 
 let _scanCandidates = [];
 
-function refreshAddNpcLocationOptions() {
-  const sel = document.getElementById('npc-f-location');
-  if (!sel) return;
-  const locs = flattenLocations().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  sel.innerHTML = '<option value="">— unknown / off-map —</option>' +
-    locs.map(l => `<option value="${escapeHtml(l.id)}">${escapeHtml(l.name)}${l.parent ? ` · ${escapeHtml(l.parent)}` : ''}</option>`).join('');
+// Shared editor context — both editNpc() and openAddNpc() ride the
+// NPCEditor module (npc-editor.js), the same editor the Atlas uses.
+// Full model here too: knownTo grants, tags, history, APPEARS IN.
+function npcEditorCtx(extra) {
+  return {
+    npcs, characters,
+    locations: flattenLocations(),
+    timeline,
+    entryHref: (e) => '#entry-' + encodeURIComponent(e.id),
+    persist: saveNPCsKV,
+    ...extra,
+  };
+}
+
+function editNpc(id) {
+  const npc = npcs.find(n => n.id === id);
+  if (!npc) return;
+  NPCEditor.openModal(npcEditorCtx({
+    npc,
+    onSaved: () => { renderChips(); renderSidebar(); },
+    onDeleted: (deletedId) => {
+      if (work && Array.isArray(work.npcIds)) work.npcIds = work.npcIds.filter(x => x !== deletedId);
+      renderChips(); renderSidebar();
+    },
+  }));
 }
 
 function openAddNpc(prefill) {
-  refreshAddNpcLocationOptions();
-  document.getElementById('npc-modal-title').textContent = 'Quick-add NPC';
-  document.getElementById('npc-f-name').value = (prefill && prefill.name) || '';
-  document.getElementById('npc-f-role').value = (prefill && prefill.role) || '';
-  document.getElementById('npc-f-status').value = 'alive';
-  let defaultLoc = '';
-  if (work && work.locationIds && work.locationIds.length) defaultLoc = work.locationIds[0];
-  document.getElementById('npc-f-location').value = defaultLoc;
-  document.getElementById('npc-f-activity').value = '';
-  document.getElementById('npc-f-description').value = '';
-  document.getElementById('npc-f-dmNotes').value = '';
-  document.getElementById('npc-overlay').classList.add('visible');
-  setTimeout(() => document.getElementById('npc-f-name').focus(), 30);
-}
-function closeAddNpc() { document.getElementById('npc-overlay').classList.remove('visible'); }
-
-async function saveNewNpc() {
-  const name = document.getElementById('npc-f-name').value.trim();
-  if (!name) { alert('NPC needs a name.'); return; }
-  if (npcs.some(n => (n.name || '').toLowerCase() === name.toLowerCase())) {
-    if (!confirm(`An NPC named "${name}" already exists. Create a duplicate anyway?`)) return;
-  }
-  const npc = {
-    id: uniqueNpcId(name), name,
-    role: document.getElementById('npc-f-role').value.trim(),
-    status: document.getElementById('npc-f-status').value,
-    currentLocationId: document.getElementById('npc-f-location').value || null,
-    currentActivity: document.getElementById('npc-f-activity').value.trim(),
-    description: document.getElementById('npc-f-description').value.trim(),
-    notes: '',
-    dmNotes: document.getElementById('npc-f-dmNotes').value.trim(),
-    knownTo: [], history: [], tags: [],
-  };
-  npcs.push(npc);
-  const ok = await saveNPCsKV();
-  if (!ok) {
-    npcs.pop();
-    alert('Failed to save NPC — check your DM session and try again.');
-    return;
-  }
-  if (editingId) { if (!work.npcIds.includes(npc.id)) work.npcIds.push(npc.id); }
-  closeAddNpc();
-  renderChips(); renderSidebar();
+  const defaultLoc = (work && work.locationIds && work.locationIds.length) ? work.locationIds[0] : null;
+  NPCEditor.openModal(npcEditorCtx({
+    prefill: { currentLocationId: defaultLoc, ...(prefill || {}) },
+    onSaved: (rec, isNew) => {
+      // Auto-link a newly created NPC to the entry being edited.
+      if (isNew && editingId && work && Array.isArray(work.npcIds) && !work.npcIds.includes(rec.id)) {
+        work.npcIds.push(rec.id);
+      }
+      renderChips(); renderSidebar();
+    },
+  }));
 }
 
 function findCandidateNpcsInPrep(prepText) {
@@ -2249,14 +2212,11 @@ async function createScannedNpcs() {
   const created = [];
   const usedIds = [];
   for (const p of picks) {
-    const id = uniqueNpcId(p.name, usedIds);
-    usedIds.push(id);
-    const npc = {
-      id, name: p.name, role: p.role, status: 'alive',
-      currentLocationId: defaultLoc,
-      currentActivity: '', description: '', notes: '', dmNotes: '',
-      knownTo: [], history: [], tags: [],
-    };
+    const npc = NPCEditor.createStub(
+      { name: p.name, role: p.role, currentLocationId: defaultLoc },
+      npcs, usedIds
+    );
+    usedIds.push(npc.id);
     npcs.push(npc); created.push(npc.id);
   }
   const ok = await saveNPCsKV();
@@ -2281,6 +2241,9 @@ window.addEventListener('DOMContentLoaded', () => {
       collectFromForm();
       renderSidebar();
     }));
+  document.getElementById('f-npc-search')?.addEventListener('input', () => {
+    if (work) renderChips();
+  });
 });
 </script>
 </body>

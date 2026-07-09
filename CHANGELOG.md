@@ -9,6 +9,41 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-07-09
 
+### Shared NPC editor — one editor for the Atlas AND the Chronicle (npc-editor.js)
+
+Step B2 — the NPC-tracking pain-point fix. Previously full NPC editing
+(knownTo visibility, history, tags) existed only in the Atlas Workshop, while
+the Chronicle Workshop could only quick-add crippled records (hardcoded empty
+knownTo/history/tags) and couldn't edit at all — session prep meant bouncing
+between two pages.
+
+- **`npc-editor.js`** (new, `window.NPCEditor`): the single full-model NPC
+  editor — name, role, status, location, activity, description, notes, tags
+  (newly editable — the field existed in the model but no editor exposed it),
+  knownTo grants, DM notes, move/log history, and a computed **APPEARS IN**
+  section listing every chronicle entry that links the NPC (deep-links into
+  the Chronicle Workshop). Builds its DOM fresh with closure refs — no
+  element ids, no clone-of-template duplicate-id tricks. `createStub()` /
+  `uniqueId()` give quick-create paths the same slug-dedupe + full model.
+- **Atlas Workshop**: the NPC inspector now renders via `NPCEditor.open()`.
+  Deleted the whole legacy editor family (~300 lines): the `#npc-detail`
+  template, `addNPCEntity`/`editNPCEntity`/`saveNPCEntity`/`cancelNPCEdit`/
+  `deleteNPCEntity`/`renderNPCKnownToChips`/`toggleNPCKnownTo`/
+  `logNPCMovement`/`renderNPCHistory`/`deleteNPCHistoryEntry`/
+  `populateNPCLocationFilters` and the `editingNPCId`/`tempNPCKnownTo` state.
+  `addNPCv2()` now opens a blank editor instead of pushing a persisted
+  "New NPC" stub (whose `scheduleSave()` never actually saved NPCs — ghost
+  records fixed). `saveNPCsKV()` now returns success/failure.
+- **Chronicle Workshop**: the NPC chip picker is now **searchable** (name /
+  role / tag) and every chip has a ✎ button that opens the full editor in a
+  modal — knownTo grants, history, everything, without leaving session prep.
+  Quick-add (+ ADD NPC) is the full editor too (auto-links new NPCs to the
+  entry being edited), and Scan Prep bulk-create rides
+  `NPCEditor.createStub()` — no more hardcoded-empty model fields.
+- New browser test page `tests/npc-editor.test.html` (25 assertions:
+  stub/dedupe, new-save, knownTo, tags, history log, appears-in, modal,
+  delete-with-confirm). All pass.
+
 ### Shared front-end foundation — spire-api.js, spire-ui.js, map-render.js, theme.css components
 
 Step B1 of the front-end unification plan:
