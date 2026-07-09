@@ -7,6 +7,39 @@ Dates are YYYY-MM-DD.
 
 ---
 
+## [Unreleased] — 2026-07-09
+
+### Atlas Workshop — v2 promoted to `map-dm.html`, legacy editor deleted
+
+The one-release fallback window promised in the "Atlas Workshop v2" entry is
+over:
+
+- **Deleted** the legacy `map-dm.html` (3,748 lines, unreachable since home.html
+  switched its Atlas Workshop card to v2). Recoverable from git history.
+- **Renamed** `map-dm-v2.html` → `map-dm.html`; `home.html` card updated. The
+  `tests/map-dm-v2.test.html` helper-test page is now `tests/map-dm.test.html`.
+- **Dead-code sweep** inside the renamed editor (~230 lines): the DM-token
+  modal (HTML + CSS + `openDMTokenModal`/`closeDMTokenModal`/`submitDMToken` —
+  auth.js owns credentials now), the legacy null-guarded list renderers
+  (`renderNPCList`, `renderCharacterList`, `renderTimelineList` — their
+  `#npc-list`/`#char-list`/`#tl-list` targets no longer exist; the live lists
+  render via `renderFpLeftBody`) plus all 23 no-op call sites, the nested
+  location-NPC editor (`addNPC`/`removeNPC`/`renderNPCEditor` — NPCs are
+  first-class now), `switchLocTab` + the dead legacy-modal branch in
+  `openLocModal`, and the `toggleEditorExpand`/`ensureEditorExpanded` no-ops.
+  `switchTab` slimmed to a thin live wrapper over `switchFpTab` (still called
+  from cloned location panes). Kept: `#legacy-templates` clone sources
+  (`#lpane-*`, `#char-detail`, `#npc-detail`, `#tl-detail`) and
+  `inspectorScope()` — those are live.
+- CLAUDE.md file table rewritten to cover all 14 pages + shared JS (it still
+  described the pre-v2 editor and omitted six newer tools).
+
+This is step A1 of the front-end unification plan (audit 2026-07-09): next up
+is a shared foundation (`spire-api.js`, `spire-ui.js`, `map-render.js`,
+theme.css components), a shared NPC editor used by both the Atlas and
+Chronicle workshops, Chronicle-only timeline editing, and a full restyle of
+every page onto theme.css.
+
 ## [Unreleased] — 2026-06-16
 
 ### Crucible v2 — LOS-aware repositioning + deterministic A* tiebreak
