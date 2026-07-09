@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>The Spire — The Apothecary (DM)</title>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="theme.css?v=2">
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     /* Alias theme.css token names to this page's existing palette so any theme component classes inherit the local look. */
@@ -487,7 +487,7 @@
   </main>
   <div class="toast" id="toast"></div>
 
-  <script src="auth.js"></script>
+  <script src="auth.js?v=2"></script>
   <script>
     const WORKER_URL = (window.Auth && window.Auth.WORKER_URL) || 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
     function esc(s){return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}

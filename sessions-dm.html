@@ -6,7 +6,7 @@
 <title>The Spire — Chronicle Workshop (DM)</title>
 <meta name="theme-color" content="#060a0e">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="theme.css?v=2">
 <style>
 /* ──────────────────────────────────────────────────────────
    Page-specific styles (sessions-dm.html — Chronicle Workshop).
@@ -959,7 +959,9 @@ body { display: flex; flex-direction: column; }
   </div>
 </div>
 
-<script src="auth.js"></script>
+<script src="auth.js?v=2"></script>
+<script src="spire-api.js?v=1"></script>
+<script src="spire-ui.js?v=1"></script>
 <script src="encounter-schema.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════════
@@ -968,7 +970,7 @@ body { display: flex; flex-direction: column; }
 //  Manages ALL chronicle kinds: session / event / milestone / planned.
 // ═══════════════════════════════════════════════════════════════
 
-const WORKER_URL = 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+const WORKER_URL = API.WORKER_URL;
 const VALID_KINDS = ['session', 'event', 'milestone', 'planned'];
 
 // DM gate

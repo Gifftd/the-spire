@@ -9,6 +9,35 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-07-09
 
+### Shared front-end foundation — spire-api.js, spire-ui.js, map-render.js, theme.css components
+
+Step B1 of the front-end unification plan:
+
+- **`spire-api.js`** (new, `window.API`): canonical `WORKER_URL` plus `get` /
+  `dmGet` / `dmPost` fetch helpers. Kills the 12 copies of the
+  `const WORKER_URL = (window.Auth && ...) || '...'` boilerplate one page at a
+  time — map.html, map-dm.html, timeline.html and sessions-dm.html (which
+  hardcoded the raw URL) now read `API.WORKER_URL`.
+- **`spire-ui.js`** (new, `window.UI`): `escapeHtml` (canonical & < > "
+  variant), `toast(msg, kind)`, `confirmDialog()` (ported from map-dm's donor
+  implementation — Escape/Enter/backdrop/focus-cancel preserved), and
+  `mountHeader()` (shared .topbar header with identity chip / Home /
+  Sign out). Pages adopt these during the restyle phase.
+- **`map-render.js`** (new, `window.MapRender`): the pin palette
+  (`TYPE_COLORS`/`TYPE_LABELS`/`TYPE_ICONS`), `legendPinSVG()`, and
+  `injectPinCSS()` which generates the per-type `.pin`/`.submap-pin` color
+  rules at load. map.html and map-dm.html now consume it — the triplicated
+  palette constants, legend SVG builders, and 21 hand-copied CSS color rules
+  are deleted. The palette now lives in exactly one file.
+- **theme.css v2**: new `.toast`, `.topbar` (+`-title/--brass/-spacer/-actions`),
+  `.modal--confirm`/`.modal-actions`, and `.table` components.
+- All 13 pages now link shared assets with cache-busting query strings
+  (`theme.css?v=2`, `auth.js?v=2`, new modules `?v=1`) — bump on change so
+  GitHub Pages CDN staleness can't half-apply a shared-file update.
+- CLAUDE.md: pin-palette section now points at map-render.js; documented the
+  shared module APIs and the ?v= convention.
+
+
 ### Atlas Workshop — v2 promoted to `map-dm.html`, legacy editor deleted
 
 The one-release fallback window promised in the "Atlas Workshop v2" entry is

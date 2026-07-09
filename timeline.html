@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#060a0e">
   <meta name="description" content="The Chronicle — every session, event, and milestone in the campaign.">
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="theme.css?v=2">
   <style>
     /* ──────────────────────────────────────────────────────────
        Page-specific styles (timeline.html — the Chronicle).
@@ -540,9 +540,11 @@
     </footer>
   </main>
 
-  <script src="auth.js"></script>
+  <script src="auth.js?v=2"></script>
+  <script src="spire-api.js?v=1"></script>
+  <script src="spire-ui.js?v=1"></script>
   <script>
-    const WORKER_URL = (window.Auth && window.Auth.WORKER_URL) || 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+    const WORKER_URL = API.WORKER_URL;
 
     let entries  = [];
     let isDM     = false;
