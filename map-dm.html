@@ -776,70 +776,6 @@ body{overflow:hidden}
     <div class="whisper-history" id="whisper-history"></div>
   </div>
 
-  <!-- TIMELINE EDITOR (cloned by renderTimelineInspector) -->
-  <div id="tl-detail">
-    <div class="section-header" id="tl-detail-header">EDIT ENTRY</div>
-    <div class="field"><label>TITLE</label><input type="text" id="tle-title" placeholder="The duke's banquet"></div>
-    <div class="field-row">
-      <div class="field"><label>KIND</label>
-        <select id="tle-kind">
-          <option value="session">Session</option>
-          <option value="event">Event</option>
-          <option value="milestone">Milestone</option>
-          <option value="planned">Planned (DM-only)</option>
-        </select>
-      </div>
-      <div class="field"><label>IN-GAME DATE (free text)</label><input type="text" id="tle-dateInGame" placeholder="12 Mirtul, 1492 DR"></div>
-    </div>
-    <div class="field-row">
-      <div class="field"><label>SORT KEY (YYYY-MM-DD, optional)</label><input type="date" id="tle-dateSort"></div>
-      <div class="field"><label>REAL-WORLD DATE</label><input type="date" id="tle-dateReal"></div>
-    </div>
-    <div class="field"><label>BODY (player-facing)</label><textarea id="tle-body" rows="6" placeholder="What happened…"></textarea></div>
-
-    <!-- Attached combats (from initiative exports) -->
-    <div id="tle-combats-box" class="field" style="display:none">
-      <label>ATTACHED COMBATS</label>
-      <div id="tle-combats-list"></div>
-    </div>
-
-    <!-- Editable loot -->
-    <div class="field">
-      <label>LOOT (item · qty · who got it)</label>
-      <div id="tle-loot-rows"></div>
-      <button class="btn btn-ghost btn-sm" type="button" onclick="addTLLootRow()" style="margin-top:4px">+ Add loot</button>
-      <datalist id="tle-loot-recipients"></datalist>
-    </div>
-
-    <div class="field">
-      <label>LINKED LOCATIONS</label>
-      <div class="visibleto-chips" id="tle-loc-chips"></div>
-    </div>
-    <div class="field">
-      <label>LINKED CHARACTERS</label>
-      <div class="visibleto-chips" id="tle-char-chips"></div>
-    </div>
-    <div class="field">
-      <label>LINKED NPCs</label>
-      <div class="visibleto-chips" id="tle-npc-chips"></div>
-    </div>
-    <div class="field">
-      <label>VISIBLE TO (leave empty = all players who can read the chronicle)</label>
-      <div class="visibleto-chips" id="tle-visibleto-chips"></div>
-      <div class="visibleto-hint">Planned entries are DM-only regardless of this setting.</div>
-    </div>
-
-    <div class="dm-note-area">
-      <div class="dm-note-label">🔒 DM ONLY — NOT SHOWN TO PLAYERS</div>
-      <textarea id="tle-dmNotes" rows="3" style="width:100%;background:transparent;border:none;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.9rem;outline:none;resize:vertical;line-height:1.5" placeholder="Planning notes, intended outcomes, what's behind the scenes…"></textarea>
-    </div>
-
-    <div style="display:flex;gap:5px;margin-top:0.8rem;margin-bottom:0.8rem">
-      <button class="btn btn-gold btn-sm" type="button" onclick="saveTimelineEntry()">Save</button>
-      <button class="btn btn-ghost btn-sm" type="button" onclick="cancelTimelineEdit()">Cancel</button>
-      <button class="btn btn-red btn-sm" type="button" style="margin-left:auto" onclick="deleteTimelineEntry()">Delete</button>
-    </div>
-  </div>
 </div>
 
 <script src="auth.js?v=2"></script>
@@ -915,13 +851,6 @@ let journals       = [];      // [{id,characterId,title,body,date,unread}]
 let npcs           = [];      // [{id,name,role,description,currentLocationId,currentActivity,status,notes,dmNotes,knownTo,history,tags}]
 let timeline       = [];      // [{id,title,body,kind,dateInGame,dateSort,dateReal,locationIds,characterIds,npcIds,visibleTo,dmNotes}]
 let editingCharId  = null;
-let editingTLId    = null;
-let tempTLLocs     = [];
-let tempTLChars    = [];
-let tempTLNpcs     = [];
-let tempTLVisibleTo= [];
-let tempTLLoot     = [];      // working copy of loot rows being edited
-let tempTLCombats  = [];      // working copy of attached combats (editable: removal)
 let pendingDMSave  = null;    // queued save retry after token is provided
 
 // ── DM auth (delegated to shared auth.js) ────────────────────
@@ -1058,11 +987,9 @@ async function reloadCharacters() {
   if (editingCharId) renderWhisperHistory(editingCharId);
 }
 
-// ── Timeline: load + save ────────────────────────────────────
-async function saveTimelineKV() {
-  await dmPost({ type: 'timeline', payload: timeline }, saveTimelineKV);
-  saveTimelineLocal();
-}
+// ── Timeline: load only ──────────────────────────────────────
+// Timeline WRITES live in the Chronicle Workshop (sessions-dm.html) —
+// the Atlas's Timeline tab is read-only.
 function saveTimelineLocal() { localStorage.setItem('dm_timeline', JSON.stringify(timeline)); }
 async function loadTimelineKV() {
   try {
@@ -2459,9 +2386,13 @@ function renderCharacterInspector() {
   // Populate the freshly-cloned fields via the legacy editor.
   if (typeof editCharacter === 'function') editCharacter(c.id);
 }
-// Task 14: clone the legacy #tl-detail editor into the inspector body, then
-// call the legacy `editTimelineEntry(id)` to populate the cloned fields.
-// inspectorScope() makes editor helpers pick up the inspector clones first.
+// ── Timeline inspector (READ-ONLY) ────────────────────────────
+// Timeline editing consolidated into the Chronicle Workshop
+// (sessions-dm.html) — the Atlas shows entries in context and deep-links
+// out for editing. #entry-<id> / #new are handled by sessions-dm.
+function chronicleEntryURL(id) { return 'sessions-dm.html#entry-' + encodeURIComponent(id); }
+function openChronicleNew() { window.open('sessions-dm.html#new', '_blank'); }
+
 function renderTimelineInspector() {
   const t = timeline.find(x => x.id === selectedEntity.id);
   if (!t) { closeInspector(); return; }
@@ -2479,13 +2410,46 @@ function renderTimelineInspector() {
 
   const body = document.getElementById('fp-right-body');
   if (!body) return;
-  body.innerHTML = '';
-  const src = document.getElementById('tl-detail');
-  if (src) {
-    Array.from(src.children).forEach(ch => body.appendChild(ch.cloneNode(true)));
-  }
-  // Populate the freshly-cloned fields via the legacy editor.
-  if (typeof editTimelineEntry === 'function') editTimelineEntry(t.id);
+
+  const locChips = (t.locationIds || []).map(id => {
+    const l = (worldData.locations || []).find(x => x.id === id);
+    return l ? `<span class="visibleto-chip on" style="cursor:pointer" onclick="closeInspector();switchFpTab('locations');selectLocation('${l.id}')">📍 ${escapeHtml(l.name)}</span>` : '';
+  }).filter(Boolean).join('');
+  const charChips = (t.characterIds || []).map(id => {
+    const c = characters.find(x => x.id === id);
+    return c ? `<span class="visibleto-chip on">★ ${escapeHtml(c.name)}</span>` : '';
+  }).filter(Boolean).join('');
+  const npcChips = (t.npcIds || []).map(id => {
+    const n = npcs.find(x => x.id === id);
+    return n ? `<span class="visibleto-chip on" style="cursor:pointer" onclick="closeInspector();switchFpTab('npcs');selectNPCV2('${n.id}')">☉ ${escapeHtml(n.name)}</span>` : '';
+  }).filter(Boolean).join('');
+  const visNames = (t.visibleTo || []).map(id => characters.find(c => c.id === id)?.name).filter(Boolean);
+  const loot = (t.loot || []).map(l =>
+    `<div style="font-size:0.85rem;color:var(--ink-dim)">• ${escapeHtml(l.item||'')} ×${escapeHtml(String(l.qty||'1'))}${l.recipient?` → ${escapeHtml(l.recipient)}`:''}</div>`).join('');
+  const combats = (t.combats || []).map(c =>
+    `<div style="font-size:0.85rem;color:var(--ink-dim)">⚔ ${escapeHtml(c.title||'Combat')}${c.outcome?` — ${escapeHtml(c.outcome)}`:''}${c.rounds?` · ${escapeHtml(String(c.rounds))} rds`:''}</div>`).join('');
+
+  body.innerHTML = `
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:0.6rem">
+      <span class="visibleto-chip on">${escapeHtml(TL_KIND_LABELS[t.kind]||t.kind||'entry')}</span>
+      ${t.dateInGame ? `<span style="font-size:0.8rem;color:var(--ink-dim)">${escapeHtml(t.dateInGame)}</span>` : ''}
+      ${t.dateSort ? `<span style="font-size:0.72rem;color:var(--ink-faint)">(${escapeHtml(t.dateSort)})</span>` : ''}
+    </div>
+    ${t.body ? `<div style="font-size:0.92rem;line-height:1.55;color:var(--ink);white-space:pre-wrap;margin-bottom:0.8rem">${escapeHtml(t.body)}</div>` : '<div class="visibleto-empty">No player-facing body.</div>'}
+    ${locChips ? `<div class="section-header">LOCATIONS</div><div class="visibleto-chips">${locChips}</div>` : ''}
+    ${charChips ? `<div class="section-header">CHARACTERS</div><div class="visibleto-chips">${charChips}</div>` : ''}
+    ${npcChips ? `<div class="section-header">NPCs</div><div class="visibleto-chips">${npcChips}</div>` : ''}
+    ${loot ? `<div class="section-header">LOOT</div>${loot}` : ''}
+    ${combats ? `<div class="section-header">COMBATS</div>${combats}` : ''}
+    ${visNames.length ? `<div class="section-header">VISIBLE TO</div><div style="font-size:0.85rem;color:var(--ink-dim)">${escapeHtml(visNames.join(', '))}</div>` : ''}
+    ${t.dmNotes ? `<div class="dm-note-area" style="margin-top:0.8rem"><div class="dm-note-label">🔒 DM ONLY</div><div style="font-size:0.88rem;line-height:1.5;white-space:pre-wrap">${escapeHtml(t.dmNotes)}</div></div>` : ''}
+    <div style="margin-top:1rem;display:flex;gap:6px">
+      <a class="btn btn-gold btn-sm" href="${chronicleEntryURL(t.id)}" target="_blank" rel="noopener">Edit in Chronicle ↗</a>
+    </div>
+    <div style="margin-top:0.5rem;font-size:0.72rem;color:var(--ink-faint);font-style:italic">
+      Chronicle entries are edited in the Chronicle Workshop — prep sections, loot, encounters and vault round-trip live there.
+    </div>
+  `;
 }
 
 // Scope helper — used by entity editors to find inspector-cloned fields
@@ -2625,14 +2589,14 @@ function renderFpLeftToolbar() {
     locations: '+ Location',
     zones:     '+ Rect zone',
     npcs:      '+ NPC',
-    timeline:  '+ Entry',
+    timeline:  '+ New in Chronicle ↗',
     characters:'+ Character',
   }[activeTab];
   const addHandler = {
     locations: 'addLocation()',
     zones:     'addZone()',
     npcs:      'addNPCv2()',
-    timeline:  'addTimelineEntryV2()',
+    timeline:  'openChronicleNew()',
     characters:'addCharacterV2()',
   }[activeTab];
   wrap.innerHTML = `
@@ -2769,14 +2733,19 @@ function addNPCv2(prefill) {
 }
 function renderTimelineListV2(body) {
   if (!Array.isArray(timeline) || timeline.length === 0) {
-    body.innerHTML = '<div class="empty-state">No timeline entries. + Entry to add one.</div>';
+    body.innerHTML = '<div class="empty-state">No timeline entries yet. Author them in the Chronicle Workshop.</div>';
     return;
   }
   const q = listSearchQuery.trim().toLowerCase();
+  // Search also matches linked location names, so typing a place filters
+  // the chronicle to entries that happened there.
+  const locNames = {};
+  (worldData.locations || []).forEach(l => { locNames[l.id] = (l.name || '').toLowerCase(); });
   const filtered = !q ? timeline.slice() : timeline.filter(t =>
     (t.title||'').toLowerCase().includes(q) ||
     (t.kind||'').toLowerCase().includes(q) ||
-    (t.body||'').toLowerCase().includes(q)
+    (t.body||'').toLowerCase().includes(q) ||
+    (t.locationIds||[]).some(id => (locNames[id]||'').includes(q))
   );
   if (filtered.length === 0) { body.innerHTML = '<div class="empty-state">No matches.</div>'; return; }
   // Sort newest first by dateSort if present (string compare on YYYY-MM-DD)
@@ -2796,38 +2765,7 @@ function renderTimelineListV2(body) {
 }
 
 function selectTimelineV2(id) {
-  openInspector({ type:'timeline', id });
-  // openInspector → renderInspector → renderTimelineInspector handles the legacy
-  // editTimelineEntry populate call. No need to invoke it again here.
-}
-
-// First-class timeline-entry creation for the v2 toolbar (+ Entry button).
-// The legacy `addTimelineEntry()` primes a hidden form with editingTLId='__new__'
-// and never pushes to the array until Save. The v2 flow needs the row to appear
-// in the left list immediately, so we push a stub record and open the inspector.
-function addTimelineEntryV2() {
-  if (!Array.isArray(timeline)) timeline = [];
-  const entry = {
-    id: 'tl_' + Date.now() + Math.floor(Math.random()*1000),
-    title: 'New entry',
-    body: '',
-    kind: 'session',
-    dateInGame: '',
-    dateSort: '',
-    dateReal: new Date().toISOString().slice(0,10),
-    locationIds: [],
-    characterIds: [],
-    npcIds: [],
-    visibleTo: [],
-    dmNotes: '',
-    combats: [],
-    loot: []
-  };
-  timeline.push(entry);
-  if (typeof scheduleSave === 'function') scheduleSave();
-  else if (typeof saveTimelineKV === 'function') saveTimelineKV();
-  renderFpLeftBody();
-  selectTimelineV2(entry.id);
+  openInspector({ type:'timeline', id });   // → read-only renderTimelineInspector
 }
 
 function renderCharactersListV2(body) {
@@ -3612,236 +3550,6 @@ function renderLocationNPCsHere(locId) {
 //  TIMELINE TAB
 // ══════════════════════════════════════════════════════════════
 const TL_KIND_LABELS = { session:'Session', event:'Event', milestone:'Milestone', planned:'Planned' };
-
-function tlSortKey(e) { return (e.dateSort || '') + '~' + (e.id || ''); }
-function timelineSorted() {
-  return timeline.slice().sort((a,b) => tlSortKey(b).localeCompare(tlSortKey(a)));
-}
-
-function addTimelineEntry() {
-  // v2: the inspector provides its own close button. Skip the legacy close-btn
-  // injection so we don't end up cloning a dead button into the inspector.
-  editingTLId = '__new__';
-  tempTLLocs = []; tempTLChars = []; tempTLNpcs = []; tempTLVisibleTo = [];
-  tempTLLoot = []; tempTLCombats = [];
-  const $ = inspectorScope();
-  const hdr = $.qs('tl-detail-header'); if (hdr) hdr.textContent = 'NEW ENTRY';
-  if ($.qs('tle-title'))      $.qs('tle-title').value = '';
-  if ($.qs('tle-kind'))       $.qs('tle-kind').value = 'session';
-  if ($.qs('tle-dateInGame')) $.qs('tle-dateInGame').value = '';
-  if ($.qs('tle-dateSort'))   $.qs('tle-dateSort').value = '';
-  if ($.qs('tle-dateReal'))   $.qs('tle-dateReal').value = new Date().toISOString().slice(0,10);
-  if ($.qs('tle-body'))       $.qs('tle-body').value = '';
-  if ($.qs('tle-dmNotes'))    $.qs('tle-dmNotes').value = '';
-  renderTLChips();
-  renderTLLoot();
-  renderTLCombats();
-  const detail = document.getElementById('tl-detail'); if (detail) detail.style.display = 'block';
-  if ($.qs('tle-title')) $.qs('tle-title').focus();
-}
-
-function editTimelineEntry(id) {
-  const e = timeline.find(x => x.id === id);
-  if (!e) return;
-  // v2: inspector owns the close button; don't inject the legacy one.
-  editingTLId = id;
-  tempTLLocs      = Array.isArray(e.locationIds)  ? e.locationIds.slice()  : [];
-  tempTLChars     = Array.isArray(e.characterIds) ? e.characterIds.slice() : [];
-  tempTLNpcs      = Array.isArray(e.npcIds)       ? e.npcIds.slice()       : [];
-  tempTLVisibleTo = Array.isArray(e.visibleTo)    ? e.visibleTo.slice()    : [];
-  const $ = inspectorScope();
-  const hdr = $.qs('tl-detail-header'); if (hdr) hdr.textContent = 'EDIT ENTRY';
-  if ($.qs('tle-title'))      $.qs('tle-title').value      = e.title || '';
-  if ($.qs('tle-kind'))       $.qs('tle-kind').value       = e.kind || 'session';
-  if ($.qs('tle-dateInGame')) $.qs('tle-dateInGame').value = e.dateInGame || '';
-  if ($.qs('tle-dateSort'))   $.qs('tle-dateSort').value   = e.dateSort || '';
-  if ($.qs('tle-dateReal'))   $.qs('tle-dateReal').value   = e.dateReal || new Date().toISOString().slice(0,10);
-  if ($.qs('tle-body'))       $.qs('tle-body').value       = e.body || '';
-  if ($.qs('tle-dmNotes'))    $.qs('tle-dmNotes').value    = e.dmNotes || '';
-  tempTLLoot    = Array.isArray(e.loot)    ? JSON.parse(JSON.stringify(e.loot))    : [];
-  tempTLCombats = Array.isArray(e.combats) ? JSON.parse(JSON.stringify(e.combats)) : [];
-  renderTLChips();
-  renderTLLoot();
-  renderTLCombats();
-  const detail = document.getElementById('tl-detail'); if (detail) detail.style.display = 'block';
-}
-
-// ── Editable loot rows in the timeline editor ────────────────
-function tlLootRecipientOptions() {
-  const dl = inspectorScope().qs('tle-loot-recipients');
-  if (!dl) return;
-  const names = ['Party', ...characters.map(c => c.name)];
-  dl.innerHTML = names.map(n => `<option value="${escapeHtml(n)}">`).join('');
-}
-
-function renderTLLoot() {
-  const wrap = inspectorScope().qs('tle-loot-rows');
-  if (!wrap) return;
-  tlLootRecipientOptions();
-  if (tempTLLoot.length === 0) {
-    wrap.innerHTML = '<div class="visibleto-empty">No loot recorded. Add rows below or attach from the initiative tracker.</div>';
-    return;
-  }
-  wrap.innerHTML = tempTLLoot.map((l, i) => `
-    <div class="tl-loot-row">
-      <input class="tl-loot-item" type="text" placeholder="Item" value="${escapeHtml(l.item||'')}" oninput="tempTLLoot[${i}].item=this.value">
-      <input class="tl-loot-qty"  type="text" placeholder="Qty"  value="${escapeHtml(String(l.qty||'1'))}" oninput="tempTLLoot[${i}].qty=this.value">
-      <input class="tl-loot-who"  type="text" placeholder="Who" list="tle-loot-recipients" value="${escapeHtml(l.recipient||'')}" oninput="tempTLLoot[${i}].recipient=this.value">
-      <button class="tl-loot-del" type="button" onclick="removeTLLootRow(${i})" title="Remove">✕</button>
-    </div>
-  `).join('');
-}
-
-function addTLLootRow() {
-  tempTLLoot.push({ id: 'lt_' + Date.now() + Math.floor(Math.random()*100000), item: '', qty: '1', recipient: '' });
-  renderTLLoot();
-  // focus the new item input (search within the inspector-scoped wrapper first)
-  const wrap = inspectorScope().qs('tle-loot-rows');
-  const rows = wrap ? wrap.querySelectorAll('.tl-loot-row .tl-loot-item') : [];
-  if (rows.length) rows[rows.length-1].focus();
-}
-
-function removeTLLootRow(i) {
-  tempTLLoot.splice(i, 1);
-  renderTLLoot();
-}
-
-// ── Attached combats (removable) ─────────────────────────────
-function renderTLCombats() {
-  const $ = inspectorScope();
-  const box  = $.qs('tle-combats-box');
-  const list = $.qs('tle-combats-list');
-  if (!box || !list) return;
-  if (tempTLCombats.length === 0) { box.style.display = 'none'; list.innerHTML = ''; return; }
-  box.style.display = '';
-  list.innerHTML = tempTLCombats.map((c, i) => `
-    <div class="tl-combat-item">
-      <span class="tl-combat-name">⚔ ${escapeHtml(c.title||'Combat')}</span>
-      <span class="tl-combat-sub">${escapeHtml(c.outcome||'')}${c.rounds?` · ${escapeHtml(String(c.rounds))} rds`:''}</span>
-      <button class="tl-combat-del" type="button" onclick="removeTLCombat(${i})" title="Detach this combat">✕</button>
-    </div>
-  `).join('');
-}
-
-async function removeTLCombat(i) {
-  const c = tempTLCombats[i];
-  if (!(await confirmDialog(`Detach combat "${c?.title||'Combat'}" from this entry? Its log and summary are removed from the Chronicle.`))) return;
-  tempTLCombats.splice(i, 1);
-  renderTLCombats();
-}
-
-function renderTLChips() {
-  const $ = inspectorScope();
-  const locWrap  = $.qs('tle-loc-chips');
-  const charWrap = $.qs('tle-char-chips');
-  const npcWrap  = $.qs('tle-npc-chips');
-  const visWrap  = $.qs('tle-visibleto-chips');
-
-  if (locWrap) {
-    const locs = (worldData.locations || []).slice().sort((a,b) => (a.name||'').localeCompare(b.name||''));
-    locWrap.innerHTML = locs.length === 0
-      ? '<div class="visibleto-empty">No locations yet.</div>'
-      : locs.map(l => `<span class="visibleto-chip ${tempTLLocs.includes(l.id)?'on':''}" onclick="toggleTLChip('loc','${l.id}')">${escapeHtml(l.name)}</span>`).join('');
-  }
-  if (charWrap) {
-    charWrap.innerHTML = characters.length === 0
-      ? '<div class="visibleto-empty">No characters yet.</div>'
-      : characters.map(c => `<span class="visibleto-chip ${tempTLChars.includes(c.id)?'on':''}" onclick="toggleTLChip('char','${c.id}')">${escapeHtml(c.name)}</span>`).join('');
-  }
-  if (npcWrap) {
-    npcWrap.innerHTML = npcs.length === 0
-      ? '<div class="visibleto-empty">No NPCs yet.</div>'
-      : npcs.slice().sort((a,b) => (a.name||'').localeCompare(b.name||''))
-          .map(n => `<span class="visibleto-chip ${tempTLNpcs.includes(n.id)?'on':''}" onclick="toggleTLChip('npc','${n.id}')">${escapeHtml(n.name)}</span>`).join('');
-  }
-  if (visWrap) {
-    visWrap.innerHTML = characters.length === 0
-      ? '<div class="visibleto-empty">No characters to grant visibility to.</div>'
-      : characters.map(c => `<span class="visibleto-chip ${tempTLVisibleTo.includes(c.id)?'on':''}" onclick="toggleTLChip('vis','${c.id}')">${escapeHtml(c.name)}</span>`).join('');
-  }
-}
-
-function toggleTLChip(which, id) {
-  const arr = which==='loc' ? tempTLLocs
-            : which==='char'? tempTLChars
-            : which==='npc' ? tempTLNpcs
-            : which==='vis' ? tempTLVisibleTo
-            : null;
-  if (!arr) return;
-  const i = arr.indexOf(id);
-  if (i >= 0) arr.splice(i,1); else arr.push(id);
-  renderTLChips();
-}
-
-async function saveTimelineEntry() {
-  const $ = inspectorScope();
-  const title = ($.qs('tle-title')?.value || '').trim();
-  if (!title) { toast('Entry needs a title.'); return; }
-  const fields = {
-    title,
-    kind:        ($.qs('tle-kind')?.value || 'event'),
-    dateInGame:  ($.qs('tle-dateInGame')?.value || '').trim(),
-    dateSort:    ($.qs('tle-dateSort')?.value || ''),
-    dateReal:    ($.qs('tle-dateReal')?.value || new Date().toISOString().slice(0,10)),
-    body:        ($.qs('tle-body')?.value || '').trim(),
-    dmNotes:     ($.qs('tle-dmNotes')?.value || '').trim(),
-    locationIds: tempTLLocs.slice(),
-    characterIds:tempTLChars.slice(),
-    npcIds:      tempTLNpcs.slice(),
-    visibleTo:   tempTLVisibleTo.slice(),
-    // Drop blank loot rows; preserve attached combats (minus any detached).
-    loot:        tempTLLoot.filter(l => (l.item||'').trim()).map(l => ({
-                   id: l.id || ('lt_'+Date.now()+Math.floor(Math.random()*100000)),
-                   item: (l.item||'').trim(),
-                   qty: (l.qty||'1').toString().trim() || '1',
-                   recipient: (l.recipient||'').trim() || 'Party'
-                 })),
-    combats:     tempTLCombats.slice(),
-  };
-
-  if (editingTLId === '__new__') {
-    const id = 'tl_' + Date.now() + Math.floor(Math.random()*1000);
-    timeline.push({ id, ...fields });
-    editingTLId = id;
-  } else {
-    const idx = timeline.findIndex(e => e.id === editingTLId);
-    if (idx < 0) return;
-    timeline[idx] = { ...timeline[idx], ...fields };
-  }
-  await saveTimelineKV();
-  const hdr2 = $.qs('tl-detail-header'); if (hdr2) hdr2.textContent = 'EDIT ENTRY';
-  // Refresh v2 list + inspector header so the new title shows immediately.
-  if (typeof renderFpLeftBody === 'function') renderFpLeftBody();
-  if (selectedEntity && selectedEntity.type === 'timeline') {
-    selectedEntity.id = editingTLId;
-    const hdrName = document.querySelector('#fp-right-header span:nth-child(2)');
-    if (hdrName) hdrName.textContent = title || '(untitled)';
-  }
-  setSyncStatus('ok','✦ Entry saved');
-  setTimeout(()=>setSyncStatus('',''), 2000);
-}
-
-function cancelTimelineEdit() {
-  editingTLId = null;
-  const detail = document.getElementById('tl-detail'); if (detail) detail.style.display = 'none';
-  // v2: also close the inspector if it's hosting a timeline entry.
-  if (selectedEntity && selectedEntity.type === 'timeline') closeInspector();
-}
-
-async function deleteTimelineEntry() {
-  if (!editingTLId || editingTLId === '__new__') { cancelTimelineEdit(); return; }
-  const e = timeline.find(x => x.id === editingTLId);
-  if (!e) return;
-  if (!(await confirmDialog(`Delete entry "${e.title}"? Cannot be undone.`))) return;
-  const deletedId = editingTLId;
-  timeline = timeline.filter(x => x.id !== deletedId);
-  editingTLId = null;
-  const detail = document.getElementById('tl-detail'); if (detail) detail.style.display = 'none';
-  await saveTimelineKV();
-  // v2: drop the inspector and refresh the list.
-  if (selectedEntity && selectedEntity.type === 'timeline' && selectedEntity.id === deletedId) closeInspector();
-  if (typeof renderFpLeftBody === 'function') renderFpLeftBody();
-}
 
 function quickAddNPCAtLocation() {
   const locId = editingLocId;

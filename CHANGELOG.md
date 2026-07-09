@@ -9,6 +9,30 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-07-09
 
+### Timeline consolidation — the Chronicle Workshop is the ONE timeline editor
+
+Step B3. The chronicle previously had three competing interactive editors
+(Chronicle Workshop, the Atlas's Timeline tab, and the initiative export);
+edits in one place drifted from the others. Now:
+
+- **Atlas Timeline tab is read-only.** The inspector shows a clean summary
+  card — kind, dates, body, linked locations (click → jumps to the pin),
+  characters, NPCs (click → opens the NPC inspector), loot, combats,
+  visibility, DM notes — with **"Edit in Chronicle ↗"** deep-linking into
+  the Chronicle Workshop. The "+ Entry" toolbar button became
+  "+ New in Chronicle ↗". List search now also matches linked location
+  names (type a place, see what happened there).
+- Deleted the Atlas's entire timeline editor (~330 lines): the `#tl-detail`
+  template, `addTimelineEntry(V2)`, `editTimelineEntry`,
+  `saveTimelineEntry`, `cancelTimelineEdit`, `deleteTimelineEntry`, the
+  `tempTL*` working state, the TL loot/combat/chip editors, and
+  `saveTimelineKV` — the Atlas no longer writes the `timeline` KV key at
+  all. (The initiative tracker's export still appends combats — it's an
+  automated writer, not an editor.)
+- **sessions-dm.html handles deep links**: `#entry-<id>` selects that entry,
+  `#new` starts a fresh session entry — on load and on hashchange. The NPC
+  editor's APPEARS IN links use the same format.
+
 ### Shared NPC editor — one editor for the Atlas AND the Chronicle (npc-editor.js)
 
 Step B2 — the NPC-tracking pain-point fix. Previously full NPC editing

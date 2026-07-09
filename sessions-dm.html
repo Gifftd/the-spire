@@ -1612,6 +1612,21 @@ function newEntry(forceKind) {
 // Kept for any callsites (toolbar button); proxies to newEntry.
 function newSession() { newEntry('session'); }
 
+// ── Deep links ──
+// #entry-<id> selects that entry; #new starts a fresh one. Used by the
+// Atlas Workshop's read-only Timeline tab and the NPC editor's APPEARS IN
+// links. Runs after loadAll() and again on every hashchange.
+function handleHash() {
+  const h = decodeURIComponent((location.hash || '').slice(1));
+  if (!h) return;
+  if (h === 'new') { newEntry('session'); return; }
+  if (h.startsWith('entry-')) {
+    const id = h.slice('entry-'.length);
+    if (timeline.some(t => t.id === id)) selectSession(id);
+  }
+}
+window.addEventListener('hashchange', handleHash);
+
 function cancelEdit() {
   editingId = null;
   work = blankWork();
@@ -2235,7 +2250,7 @@ async function createScannedNpcs() {
 // ═══════════════════════════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', () => {
   wireDrop();
-  loadAll();
+  loadAll().then(handleHash);
   ['f-kind','f-title','f-dateReal','f-dateInGame','f-dateSort','f-tags','f-body','f-dmNotes']
     .forEach(id => document.getElementById(id)?.addEventListener('input', () => {
       collectFromForm();
