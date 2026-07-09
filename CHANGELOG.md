@@ -7,6 +7,282 @@ Dates are YYYY-MM-DD.
 
 ---
 
+## [Unreleased] — 2026-07-09
+
+### Restyle batch 3 — map-dm.html (Atlas Workshop) + bestiary-dm.html (The Menagerie) consume theme.css
+
+The final two (and largest) pages. Every page in The Spire now genuinely
+consumes theme.css — no page aliases theme tokens onto a local palette
+anymore.
+
+- **map-dm.html** (−101 lines): gold palette → theme tokens across CSS,
+  inline styles, and CSS values in JS template strings; local `toast()` /
+  `confirmDialog()` deleted in favor of `UI.toast`/`UI.confirmDialog` (this
+  page was their donor — thin aliases keep all call sites working);
+  `escapeHtml` delegates to `UI.escapeHtml` (verified byte-identical
+  escaping and no single-quoted interpolation sites). JS-built markup keeps
+  its `btn-gold`/`btn-ghost`/`btn-red` class names with thin CSS recipes
+  mirroring the theme variants — the canvas/inspector render pipeline is
+  untouched (diff-hunk audit: zero hunks in attachPinGesture / scheduleSave
+  / publishData / saveNPCsKV / NPCEditor integration). Whisper purple stays
+  a page accent.
+- **bestiary-dm.html** (−90 lines): alias + palette blocks deleted; tabs →
+  theme `.tab-list/.tab` (+`is-active`), modals → `.modal-overlay` +
+  `is-visible`, buttons renamed at all 34 static call sites to theme
+  variants, role badge → `.chip--dm`, toast → `UI.toast` (28 call sites
+  audited), `saveKey` → `API.dmPost`. Stat-block typography kept as page
+  identity, retinted. Live-verified with stubbed data: filters, stat-block
+  render, tabs, modals, toasts all working.
+
+### Restyle batch 2 — initiative-dm.html (War Table) consumes theme.css
+
+- Alias `:root` block, local gold palette, and reset/body boilerplate
+  deleted; all old tokens substituted (`--gold*` → `--c-brass*`, `--red`/
+  never-defined `--rust` → `--c-error`, `--amber` → `--c-warn`,
+  `--green-light` → `--c-success`, fonts → theme stacks). Combat-identity
+  tokens kept as page tokens: pc/enemy/lobby accents, condition + hp-bar
+  colors, `--active-glow` (retinted brass).
+- STATIC markup buttons → theme `.btn--brass/--danger/--ghost/--sm`
+  (42 swaps); JS-written button classes (`btn-gold` etc. in row builders)
+  kept and their CSS retinted to mirror the theme variants — the render
+  pipeline is untouched.
+- Deliberately NOT migrated, with reasons: local `escapeHTML`/`escapeHtml`
+  keep their bodies (they escape single quotes for onclick contexts —
+  `UI.escapeHtml` escapes fewer characters, so delegation would be unsafe);
+  `showExportToast` keeps its bottom-right/6s lingering-warning behavior
+  (`UI.toast` is 2.8s bottom-center); modals stay on `.modal-backdrop`
+  (retinted) since swapping would need JS edits outside the safe whitelist.
+- Verified: token grep 0 remaining; jsc parse clean; git-diff hunk audit
+  confirms zero hunks inside `render()`, `pushState`, `pollPlayerNotes`,
+  `uid`, or any combat-row builder.
+
+### Restyle batch 2 — crucible-dm.html (The Crucible) consumes theme.css
+
+- **crucible-dm.html**: local `.topbar/.btn/.btn-teal/.pane h2` CSS + body
+  boilerplate deleted; markup now uses theme `.topbar/.topbar-title--brass/
+  .topbar-spacer`, `.section-heading` pane headings, `.btn--primary` (Run
+  Simulation / Save to bestiary_custom), `.btn--ghost .btn--sm` (Home, modal
+  ✕ buttons), `.btn--danger .btn--sm` (Remove PC/action), `.btn--sm` for the
+  formerly font-size-shrunk buttons. `#trials-select` got a small page rule
+  (theme has no bare-select component).
+- Phantom `--c-accent` token (never defined anywhere — no-fallback usages
+  silently inherited text color) eliminated: text accents → `--c-teal-bright`,
+  fills/backgrounds (progress bar, brush active, PC tokens, move trail,
+  log-active border, distribution bars) → `--c-teal`. All stale old-palette
+  `var(--c-*, #hex)` fallbacks stripped; font stacks → `--font-display`/
+  `--font-body`; `#b88a5a` inline hexes → `var(--c-brass)`.
+- All three modals on theme `.modal-overlay/.modal` + `is-visible`: the DSL
+  feature editor (static markup; JS `style.display` toggles → classList,
+  actions row → `.modal-actions` with `.btn` classes), and the JS-created
+  bestiary picker + parsed-action review overlays (inline cssText →
+  `modal-overlay is-visible`; `data-modal` close semantics unchanged).
+  `.dsl-modal-card` reduced to a size/tint override on `.modal`.
+- Feature-impact table → theme `.table` + one-line brass th retint.
+- JS adoption: `escapeHtml` delegates to `UI.escapeHtml`; `WORKER_URL =
+  API.WORKER_URL` (dead `CRUCIBLE_WORKER_URL` override hook dropped —
+  referenced nowhere); `showWarn()` now also surfaces via `UI.toast(…,
+  'error')` in addition to console. Raw fetches kept (bestiary load needs
+  offline-catch semantics API helpers don't expose). Sim outcome band
+  colors, trial-log palette, and battlefield terrain/team colors stay
+  page-specific by design. Engine files untouched.
+
+### Restyle batch 2 — map.html (The Atlas) consumes theme.css
+
+- **map.html** (−47 lines): alias `:root` block + gold local palette +
+  reset/body boilerplate deleted; only page token left is `--topbar`. All
+  old tokens substituted per the alias map (`--gold*` → `--c-brass*`,
+  `--ink-dim` → `--c-ink-light`, `--surface2` → `--c-surface-2`,
+  `--red` → `--c-error`, `--radius` → `--radius-sm`, font stacks →
+  `--font-display`/`--font-body`) across page CSS, inline styles, and the
+  JS template strings (breadcrumb "Region"/location-name spans).
+- Topbar Home link + player-badge buttons (NPCs/Whispers/Log out) →
+  `.btn--ghost .btn--sm`; "Claim a character" → `.btn--brass .btn--sm`;
+  local `.btn/.btn-ghost/.btn-gold/.btn-pill/.btn-pill-gold` CSS deleted
+  (the first three were defined but never used in markup).
+- Login overlay → theme `.modal-overlay/.modal/.modal-close/.modal-title/
+  .modal-sub/.field/.field-error` + `.btn--primary .btn--block`; open/close
+  JS toggles `visible` → `is-visible`. Page keeps `#login-code` uppercase
+  claim-code styling and `.login-skip`.
+- Three local `esc` helpers now delegate to `UI.escapeHtml` (superset
+  escaper, null-safe).
+- Map canvas untouched beyond token substitution: pin/zone/legend
+  structural CSS, pan/zoom/drag JS, `buildRegionMap`/`showLocation`/
+  `renderLocationSubMap`/`handleHash`, and the SVG zone-label font string
+  are byte-identical.
+
+### Full restyle, batch 1 — brew, index, initiative-player, brew-dm, encounter-dm consume theme.css
+
+Steps C1–C3 of the unification plan. Each page loses its alias `:root` block
+(the shim that remapped theme token names onto a local palette), its local
+palette, and its inline re-implementations of shared components — and now
+genuinely consumes theme.css tokens/components plus the shared JS modules
+(UI.escapeHtml / UI.toast / API.WORKER_URL / API.dmPost where contracts
+matched). Page-specific tokens survive in minimal `:root` blocks defined on
+top of theme tokens (brew's potion-category colors, index's perk-tier
+colors, initiative-player's --pc-accent/--enemy-accent/--active-glow).
+
+- **brew.html** (−35 lines): local field/btn/toast CSS+JS deleted; buttons →
+  `.btn--primary`; role pill → `.chip--player` etc.
+- **index.html** (−50 lines): send CTA → `.btn--brass .btn--lg`, reset →
+  `.btn--ghost .btn--sm` (keeps its red danger hover).
+- **initiative-player.html**: gold palette → brass/teal theme tokens;
+  undefined `--amber` bug → `--c-warn`. The surgical diff-by-id render
+  pipeline (`showCombat`/`buildEmptyRow`/`updateRowContent`/`poll`) is
+  byte-for-byte untouched — verified via diff-hunk audit.
+- **brew-dm.html** (−86 lines): tabs → theme `.tab-list/.tab` (+`is-active`),
+  role pill → `.chip--dm`, buttons → `.btn--brass/--ghost/--danger`;
+  `saveKey()` rides `API.dmPost` with its boolean contract + 401 toast
+  branches preserved; toast → `UI.toast` (36 call sites audited).
+- **encounter-dm.html** (−30 lines): topbar → theme `.topbar` with brass
+  title; banner → `.banner--warn/--info`; save POST → `API.dmPost` with
+  distinct network-vs-HTTP error messages preserved; raw-fetch GETs kept
+  (their 401/fallback contracts don't match `API.dmGet`).
+
+### Data hygiene — characterIds canonical + merge-before-write saves
+
+Step B4, closing out the DM-workflow phase:
+
+- **`attendance` → `characterIds`.** sessions-dm used a parallel `attendance`
+  field for session attendance while every other writer (Atlas timeline
+  editor, initiative export) wrote the canonical `characterIds` — so
+  attendance silently went stale. sessions-dm now normalizes on load
+  (`characterIds ??= attendance`, then drops `attendance`) and reads/writes
+  `characterIds` everywhere; the first whole-blob save migrates stored data
+  for free. Markdown vault round-trip is unchanged (frontmatter key is still
+  `characters:`; a legacy `attendance:` key is still consumed, not echoed).
+- **Merge-before-write for `npcs` and `timeline`.** These KV keys are
+  whole-array last-write-wins — two DM tabs (or the Chronicle + the
+  initiative export modal left open) could silently clobber each other.
+  New `API.dmPostMerged(postType, getType, localArray, {deletedIds})`
+  re-fetches the remote array right before POSTing and merges by id: local
+  wins for ids it holds, remote-only records are kept, explicit deletions
+  are dropped (ids compared as strings, per the numeric-id boundary rule).
+  Adopted by sessions-dm (timeline + npcs), map-dm (npcs), and
+  initiative-dm's exportToChronicle (which previously re-posted a
+  potentially minutes-old copy of the whole chronicle). The NPC editor now
+  reports `persist({deletedId})` so merges can't resurrect deleted NPCs.
+- New `tests/spire-api.test.html` (10 assertions on `API.mergeById`) — all
+  pass. spire-api.js bumped to `?v=2`.
+
+### Timeline consolidation — the Chronicle Workshop is the ONE timeline editor
+
+Step B3. The chronicle previously had three competing interactive editors
+(Chronicle Workshop, the Atlas's Timeline tab, and the initiative export);
+edits in one place drifted from the others. Now:
+
+- **Atlas Timeline tab is read-only.** The inspector shows a clean summary
+  card — kind, dates, body, linked locations (click → jumps to the pin),
+  characters, NPCs (click → opens the NPC inspector), loot, combats,
+  visibility, DM notes — with **"Edit in Chronicle ↗"** deep-linking into
+  the Chronicle Workshop. The "+ Entry" toolbar button became
+  "+ New in Chronicle ↗". List search now also matches linked location
+  names (type a place, see what happened there).
+- Deleted the Atlas's entire timeline editor (~330 lines): the `#tl-detail`
+  template, `addTimelineEntry(V2)`, `editTimelineEntry`,
+  `saveTimelineEntry`, `cancelTimelineEdit`, `deleteTimelineEntry`, the
+  `tempTL*` working state, the TL loot/combat/chip editors, and
+  `saveTimelineKV` — the Atlas no longer writes the `timeline` KV key at
+  all. (The initiative tracker's export still appends combats — it's an
+  automated writer, not an editor.)
+- **sessions-dm.html handles deep links**: `#entry-<id>` selects that entry,
+  `#new` starts a fresh session entry — on load and on hashchange. The NPC
+  editor's APPEARS IN links use the same format.
+
+### Shared NPC editor — one editor for the Atlas AND the Chronicle (npc-editor.js)
+
+Step B2 — the NPC-tracking pain-point fix. Previously full NPC editing
+(knownTo visibility, history, tags) existed only in the Atlas Workshop, while
+the Chronicle Workshop could only quick-add crippled records (hardcoded empty
+knownTo/history/tags) and couldn't edit at all — session prep meant bouncing
+between two pages.
+
+- **`npc-editor.js`** (new, `window.NPCEditor`): the single full-model NPC
+  editor — name, role, status, location, activity, description, notes, tags
+  (newly editable — the field existed in the model but no editor exposed it),
+  knownTo grants, DM notes, move/log history, and a computed **APPEARS IN**
+  section listing every chronicle entry that links the NPC (deep-links into
+  the Chronicle Workshop). Builds its DOM fresh with closure refs — no
+  element ids, no clone-of-template duplicate-id tricks. `createStub()` /
+  `uniqueId()` give quick-create paths the same slug-dedupe + full model.
+- **Atlas Workshop**: the NPC inspector now renders via `NPCEditor.open()`.
+  Deleted the whole legacy editor family (~300 lines): the `#npc-detail`
+  template, `addNPCEntity`/`editNPCEntity`/`saveNPCEntity`/`cancelNPCEdit`/
+  `deleteNPCEntity`/`renderNPCKnownToChips`/`toggleNPCKnownTo`/
+  `logNPCMovement`/`renderNPCHistory`/`deleteNPCHistoryEntry`/
+  `populateNPCLocationFilters` and the `editingNPCId`/`tempNPCKnownTo` state.
+  `addNPCv2()` now opens a blank editor instead of pushing a persisted
+  "New NPC" stub (whose `scheduleSave()` never actually saved NPCs — ghost
+  records fixed). `saveNPCsKV()` now returns success/failure.
+- **Chronicle Workshop**: the NPC chip picker is now **searchable** (name /
+  role / tag) and every chip has a ✎ button that opens the full editor in a
+  modal — knownTo grants, history, everything, without leaving session prep.
+  Quick-add (+ ADD NPC) is the full editor too (auto-links new NPCs to the
+  entry being edited), and Scan Prep bulk-create rides
+  `NPCEditor.createStub()` — no more hardcoded-empty model fields.
+- New browser test page `tests/npc-editor.test.html` (25 assertions:
+  stub/dedupe, new-save, knownTo, tags, history log, appears-in, modal,
+  delete-with-confirm). All pass.
+
+### Shared front-end foundation — spire-api.js, spire-ui.js, map-render.js, theme.css components
+
+Step B1 of the front-end unification plan:
+
+- **`spire-api.js`** (new, `window.API`): canonical `WORKER_URL` plus `get` /
+  `dmGet` / `dmPost` fetch helpers. Kills the 12 copies of the
+  `const WORKER_URL = (window.Auth && ...) || '...'` boilerplate one page at a
+  time — map.html, map-dm.html, timeline.html and sessions-dm.html (which
+  hardcoded the raw URL) now read `API.WORKER_URL`.
+- **`spire-ui.js`** (new, `window.UI`): `escapeHtml` (canonical & < > "
+  variant), `toast(msg, kind)`, `confirmDialog()` (ported from map-dm's donor
+  implementation — Escape/Enter/backdrop/focus-cancel preserved), and
+  `mountHeader()` (shared .topbar header with identity chip / Home /
+  Sign out). Pages adopt these during the restyle phase.
+- **`map-render.js`** (new, `window.MapRender`): the pin palette
+  (`TYPE_COLORS`/`TYPE_LABELS`/`TYPE_ICONS`), `legendPinSVG()`, and
+  `injectPinCSS()` which generates the per-type `.pin`/`.submap-pin` color
+  rules at load. map.html and map-dm.html now consume it — the triplicated
+  palette constants, legend SVG builders, and 21 hand-copied CSS color rules
+  are deleted. The palette now lives in exactly one file.
+- **theme.css v2**: new `.toast`, `.topbar` (+`-title/--brass/-spacer/-actions`),
+  `.modal--confirm`/`.modal-actions`, and `.table` components.
+- All 13 pages now link shared assets with cache-busting query strings
+  (`theme.css?v=2`, `auth.js?v=2`, new modules `?v=1`) — bump on change so
+  GitHub Pages CDN staleness can't half-apply a shared-file update.
+- CLAUDE.md: pin-palette section now points at map-render.js; documented the
+  shared module APIs and the ?v= convention.
+
+
+### Atlas Workshop — v2 promoted to `map-dm.html`, legacy editor deleted
+
+The one-release fallback window promised in the "Atlas Workshop v2" entry is
+over:
+
+- **Deleted** the legacy `map-dm.html` (3,748 lines, unreachable since home.html
+  switched its Atlas Workshop card to v2). Recoverable from git history.
+- **Renamed** `map-dm-v2.html` → `map-dm.html`; `home.html` card updated. The
+  `tests/map-dm-v2.test.html` helper-test page is now `tests/map-dm.test.html`.
+- **Dead-code sweep** inside the renamed editor (~230 lines): the DM-token
+  modal (HTML + CSS + `openDMTokenModal`/`closeDMTokenModal`/`submitDMToken` —
+  auth.js owns credentials now), the legacy null-guarded list renderers
+  (`renderNPCList`, `renderCharacterList`, `renderTimelineList` — their
+  `#npc-list`/`#char-list`/`#tl-list` targets no longer exist; the live lists
+  render via `renderFpLeftBody`) plus all 23 no-op call sites, the nested
+  location-NPC editor (`addNPC`/`removeNPC`/`renderNPCEditor` — NPCs are
+  first-class now), `switchLocTab` + the dead legacy-modal branch in
+  `openLocModal`, and the `toggleEditorExpand`/`ensureEditorExpanded` no-ops.
+  `switchTab` slimmed to a thin live wrapper over `switchFpTab` (still called
+  from cloned location panes). Kept: `#legacy-templates` clone sources
+  (`#lpane-*`, `#char-detail`, `#npc-detail`, `#tl-detail`) and
+  `inspectorScope()` — those are live.
+- CLAUDE.md file table rewritten to cover all 14 pages + shared JS (it still
+  described the pre-v2 editor and omitted six newer tools).
+
+This is step A1 of the front-end unification plan (audit 2026-07-09): next up
+is a shared foundation (`spire-api.js`, `spire-ui.js`, `map-render.js`,
+theme.css components), a shared NPC editor used by both the Atlas and
+Chronicle workshops, Chronicle-only timeline editing, and a full restyle of
+every page onto theme.css.
+
 ## [Unreleased] — 2026-06-16
 
 ### Crucible v2 — LOS-aware repositioning + deterministic A* tiebreak

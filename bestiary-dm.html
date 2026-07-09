@@ -5,346 +5,263 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>The Spire — The Menagerie (DM)</title>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="theme.css?v=2">
   <style>
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    /* Alias theme.css token names to this page's existing palette so any theme component classes inherit the local look. */
-    :root{
-      --c-bg:var(--bg);
-      --c-bg-elevated:var(--panel-deep,var(--surface,var(--bg)));
-      --c-surface:var(--panel,var(--surface));
-      --c-surface-2:var(--panel-light,var(--surface2));
-      --c-surface-3:var(--panel-light,var(--surface3,var(--surface2)));
-      --c-border:var(--border);
-      --c-border-light:var(--border-light);
-      --c-brass:var(--brass,var(--gold));
-      --c-brass-bright:var(--brass-bright,var(--gold-light));
-      --c-brass-deep:var(--gold-faint,rgba(184,138,90,0.55));
-      --c-teal:var(--teal,#4a9595);
-      --c-teal-bright:var(--teal-bright,#7ec5c5);
-      --c-teal-deep:var(--teal-deep,#2a5454);
-      --c-ink:var(--ink);
-      --c-ink-light:var(--ink-light,var(--ink-dim));
-      --c-ink-faint:var(--ink-faint);
-      --c-ink-dim:var(--ink-faint);
-      --c-error:var(--rust,var(--red,#c4604c));
-      --c-success:var(--green-light,#5fb381);
-      --c-warn:var(--amber,#c89a4a);
-    }
-    :root{
-      --bg:#080c10;--panel:#131c22;--panel-deep:#0d141a;--panel-light:#1c2730;
-      --border:#2c4048;--border-light:#3e5862;
-      --teal:#4a9595;--teal-bright:#7ec5c5;--teal-deep:#2a5454;--teal-faint:#1b3838;
-      --ink:#dde3e5;--ink-light:#a3adb3;--ink-faint:#6c787f;
-      --brass:#b88a5a;--brass-bright:#d8b888;--rust:#a85d4a;
-      --radius:4px;
-    }
     body{
-      background:var(--bg);
+      background:var(--c-bg);
       background-image:radial-gradient(ellipse at 20% 10%, rgba(184,138,90,0.10) 0%, transparent 55%),radial-gradient(ellipse at 80% 90%, rgba(74,149,149,0.08) 0%, transparent 55%);
-      min-height:100vh;color:var(--ink);
-      font-family:'Crimson Text',Georgia,serif;
       padding:clamp(1rem,2vw + 0.5rem,2rem) 1rem 4rem;
     }
     .wrap{max-width:1180px;margin:0 auto}
+
+    /* Topbar (page variant: title + meta on one row, transparent over theme .topbar base) */
     .topbar{
       display:flex;align-items:center;justify-content:space-between;gap:1rem;
-      padding-bottom:1rem;margin-bottom:1.25rem;
-      border-bottom:1px solid var(--border);flex-wrap:wrap;
+      min-height:0;background:transparent;padding:0 0 1rem;margin-bottom:1.25rem;
+      border-bottom:1px solid var(--c-border);flex-wrap:wrap;
     }
     .topbar h1{
-      font-family:'Cinzel',serif;
+      font-family:var(--font-display);
       font-size:clamp(1.2rem,1rem + 1vw,1.55rem);font-weight:700;letter-spacing:0.18em;
-      text-transform:uppercase;color:var(--ink);
+      text-transform:uppercase;color:var(--c-ink);
       text-shadow:0 1px 24px rgba(184,138,90,0.10);
     }
-    .topbar h1 .accent{color:var(--brass-bright);font-weight:400}
-    .topbar-meta{display:flex;align-items:center;gap:8px;font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-faint);flex-wrap:wrap}
-    .role.dm{
-      padding:3px 10px;border-radius:9999px;
-      border:1px solid rgba(184,138,90,0.45);background:rgba(184,138,90,0.12);
-      color:var(--brass-bright);font-size:0.58rem;letter-spacing:0.14em;
-    }
-    .home-link{
-      font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.14em;text-transform:uppercase;
-      color:var(--ink-light);text-decoration:none;padding:7px 14px;
-      border:1px solid var(--border-light);background:var(--panel-light);border-radius:3px;
-      transition:background 120ms,border-color 120ms,color 120ms;
-    }
-    .home-link:hover{background:var(--panel);border-color:var(--brass);color:var(--brass-bright)}
+    .topbar h1 .accent{color:var(--c-brass-bright);font-weight:400}
+    .topbar-meta{display:flex;align-items:center;gap:8px;font-family:var(--font-display);font-size:0.66rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--c-ink-faint);flex-wrap:wrap}
 
-    .tabs{display:flex;gap:2px;flex-wrap:wrap;margin-bottom:1.25rem;border-bottom:1px solid var(--border)}
-    .tab{
-      font-family:'Cinzel',serif;font-size:0.7rem;font-weight:500;letter-spacing:0.12em;
-      text-transform:uppercase;color:var(--ink-light);
-      background:none;border:none;border-bottom:2px solid transparent;padding:11px 18px 10px;
-      cursor:pointer;margin-bottom:-1px;
-      transition:color 120ms,border-color 120ms,background 120ms;
-    }
-    .tab:hover:not(.active){color:var(--brass-bright);background:rgba(184,138,90,0.04)}
-    .tab.active{color:var(--brass-bright);border-bottom-color:var(--brass);background:rgba(184,138,90,0.06)}
+    /* Tabs — theme .tab-list/.tab retinted brass (DM identity), natural widths */
+    .tab-list{flex-wrap:wrap;margin-bottom:1.25rem}
+    .tab-list .tab{flex:0 0 auto;padding:11px 18px 10px}
+    .tab:hover:not(.is-active){color:var(--c-brass-bright);background:rgba(184,138,90,0.04)}
+    .tab.is-active{color:var(--c-brass-bright);border-bottom-color:var(--c-brass);background:rgba(184,138,90,0.06)}
 
     .layout{display:grid;grid-template-columns:minmax(280px,1fr) minmax(0,1.5fr);gap:1.25rem;align-items:start}
     @media (max-width:900px){.layout{grid-template-columns:1fr}}
     .col-head{
-      font-family:'Cinzel',serif;font-size:0.68rem;font-weight:500;letter-spacing:0.20em;
-      text-transform:uppercase;color:var(--brass-bright);margin-bottom:0.7rem;
+      font-family:var(--font-display);font-size:0.68rem;font-weight:500;letter-spacing:0.20em;
+      text-transform:uppercase;color:var(--c-brass-bright);margin-bottom:0.7rem;
       display:flex;justify-content:space-between;align-items:center;
-      padding-bottom:5px;border-bottom:1px solid var(--border);
+      padding-bottom:5px;border-bottom:1px solid var(--c-border);
     }
 
     .toolbar{display:flex;gap:6px;margin-bottom:0.7rem;flex-wrap:wrap}
     input,select,textarea{
-      background:var(--panel-deep);border:1px solid var(--border);border-radius:3px;
-      color:var(--ink);font-family:'Crimson Text',serif;font-size:0.95rem;padding:7px 11px;outline:none;
+      background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:3px;
+      color:var(--c-ink);font-family:var(--font-body);font-size:0.95rem;padding:7px 11px;outline:none;
       transition:border-color 120ms,box-shadow 120ms;
     }
     input:focus,select:focus,textarea:focus{
-      border-color:var(--teal);
+      border-color:var(--c-teal);
       box-shadow:0 0 0 3px rgba(74,149,149,0.16);
     }
-    input::placeholder,textarea::placeholder{color:var(--ink-faint);opacity:0.6;font-style:italic}
+    input::placeholder,textarea::placeholder{color:var(--c-ink-faint);opacity:0.6;font-style:italic}
     .toolbar input{flex:1;min-width:140px}
     .toolbar select{min-width:90px}
 
     .list{
       max-height:640px;overflow-y:auto;
-      border:1px solid var(--border);border-radius:6px;background:var(--panel-deep);
+      border:1px solid var(--c-border);border-radius:6px;background:var(--c-bg-elevated);
       box-shadow:inset 0 0 0 1px rgba(255,255,255,0.02);
     }
     .row{
       display:flex;align-items:center;gap:8px;padding:8px 11px;
-      border-bottom:1px solid var(--border);cursor:pointer;
+      border-bottom:1px solid var(--c-border);cursor:pointer;
       transition:background 120ms,padding 120ms;
     }
     .row:last-child{border-bottom:none}
-    .row:hover{background:var(--panel-light);padding-left:13px}
-    .row.active{background:var(--teal-faint);border-left:3px solid var(--teal);padding-left:8px}
-    .row .nm{flex:1;font-size:0.95rem;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .row .nm small{display:block;font-family:'Cinzel',serif;font-size:0.55rem;color:var(--ink-faint);letter-spacing:0.10em;text-transform:uppercase;margin-top:2px}
+    .row:hover{background:var(--c-surface-2);padding-left:13px}
+    .row.active{background:var(--c-teal-faint);border-left:3px solid var(--c-teal);padding-left:8px}
+    .row .nm{flex:1;font-size:0.95rem;color:var(--c-ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .row .nm small{display:block;font-family:var(--font-display);font-size:0.55rem;color:var(--c-ink-faint);letter-spacing:0.10em;text-transform:uppercase;margin-top:2px}
     .cr-chip{
-      font-family:'Cinzel',serif;font-size:0.55rem;font-weight:500;letter-spacing:0.10em;text-transform:uppercase;
-      padding:3px 8px;border-radius:9999px;border:1px solid var(--border-light);
-      color:var(--ink-light);white-space:nowrap;
+      font-family:var(--font-display);font-size:0.55rem;font-weight:500;letter-spacing:0.10em;text-transform:uppercase;
+      padding:3px 8px;border-radius:9999px;border:1px solid var(--c-border-light);
+      color:var(--c-ink-light);white-space:nowrap;
     }
-    .cr-chip.t-low{color:var(--ink-light);border-color:var(--border-light)}
-    .cr-chip.t-mid{color:var(--teal-bright);border-color:var(--teal);background:rgba(74,149,149,0.10)}
-    .cr-chip.t-high{color:var(--brass-bright);border-color:var(--brass);background:rgba(184,138,90,0.10)}
-    .cr-chip.t-epic{color:#e3a08e;border-color:var(--rust);background:rgba(168,93,74,0.10)}
+    .cr-chip.t-low{color:var(--c-ink-light);border-color:var(--c-border-light)}
+    .cr-chip.t-mid{color:var(--c-teal-bright);border-color:var(--c-teal);background:rgba(74,149,149,0.10)}
+    .cr-chip.t-high{color:var(--c-brass-bright);border-color:var(--c-brass);background:rgba(184,138,90,0.10)}
+    .cr-chip.t-epic{color:#e3a08e;border-color:var(--c-error);background:rgba(168,93,74,0.10)}
 
-    .btn{
-      font-family:'Cinzel',serif;font-size:0.7rem;font-weight:500;letter-spacing:0.14em;
-      text-transform:uppercase;padding:9px 18px;border-radius:3px;
-      border:1px solid var(--teal);background:var(--teal-deep);color:#eafafa;
-      cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;
-      transition:
-        background 120ms cubic-bezier(0.16,1,0.3,1),
-        border-color 120ms cubic-bezier(0.16,1,0.3,1),
-        color 120ms cubic-bezier(0.16,1,0.3,1),
-        transform 120ms cubic-bezier(0.16,1,0.3,1),
-        box-shadow 120ms cubic-bezier(0.16,1,0.3,1);
-    }
-    .btn:hover{background:var(--teal);color:var(--bg);border-color:var(--teal-bright);box-shadow:0 0 14px rgba(74,149,149,0.30)}
-    .btn:active{transform:translateY(1px)}
-    .btn:disabled{opacity:0.4;cursor:not-allowed;pointer-events:none}
-    .btn.brass{border-color:var(--brass);background:rgba(184,138,90,0.18);color:var(--brass-bright)}
-    .btn.brass:hover{background:var(--brass);color:var(--bg);border-color:var(--brass-bright);box-shadow:0 0 14px rgba(184,138,90,0.30)}
-    .btn.ghost{background:transparent;border-color:var(--border-light);color:var(--ink-light)}
-    .btn.ghost:hover{background:var(--panel-light);border-color:var(--teal);color:var(--teal-bright);box-shadow:none}
-    .btn.sm{padding:5px 11px;font-size:0.60rem;letter-spacing:0.10em}
-
-    .empty-note{padding:1.5rem 1rem;text-align:center;color:var(--ink-faint);font-style:italic;font-size:0.92rem}
-    .hint{font-size:0.9rem;color:var(--ink-faint);font-style:italic;line-height:1.5;margin-bottom:0.8rem}
-    .warn{border:1px solid rgba(168,93,74,0.5);background:rgba(168,93,74,0.08);border-radius:var(--radius);padding:0.8rem 0.9rem;color:#e3a08e;font-size:0.92rem;line-height:1.5;margin-bottom:0.9rem}
+    .empty-note{padding:1.5rem 1rem;text-align:center;color:var(--c-ink-faint);font-style:italic;font-size:0.92rem}
+    .hint{font-size:0.9rem;color:var(--c-ink-faint);font-style:italic;line-height:1.5;margin-bottom:0.8rem}
+    .warn{border:1px solid rgba(168,93,74,0.5);background:rgba(168,93,74,0.08);border-radius:var(--radius-sm);padding:0.8rem 0.9rem;color:#e3a08e;font-size:0.92rem;line-height:1.5;margin-bottom:0.9rem}
 
     /* Stat block */
     .statblock{
-      background:var(--panel);
-      border:1px solid var(--border);border-top:3px solid var(--brass);
+      background:var(--c-surface);
+      border:1px solid var(--c-border);border-top:3px solid var(--c-brass);
       border-radius:6px;padding:1.2rem 1.3rem;font-size:0.95rem;line-height:1.55;
       box-shadow:0 4px 16px rgba(0,0,0,0.30), 0 0 0 1px rgba(184,138,90,0.08);
     }
-    .statblock h2{font-family:'Cinzel',serif;font-size:1.3rem;font-weight:700;letter-spacing:0.06em;color:var(--brass-bright);margin-bottom:0.2rem;text-shadow:0 1px 8px rgba(184,138,90,0.10)}
-    .statblock .sub-line{font-style:italic;color:var(--ink-light);font-size:0.92rem;margin-bottom:0.7rem}
-    .statblock .divider{height:1px;background:var(--brass);opacity:0.5;margin:0.7rem 0}
+    .statblock h2{font-family:var(--font-display);font-size:1.3rem;font-weight:700;letter-spacing:0.06em;color:var(--c-brass-bright);margin-bottom:0.2rem;text-shadow:0 1px 8px rgba(184,138,90,0.10)}
+    .statblock .sub-line{font-style:italic;color:var(--c-ink-light);font-size:0.92rem;margin-bottom:0.7rem}
+    .statblock .divider{height:1px;background:var(--c-brass);opacity:0.5;margin:0.7rem 0}
     .sb-kv{display:flex;flex-wrap:wrap;gap:0.4rem 1.2rem;font-size:0.93rem}
     .sb-kv > div{min-width:0}
-    .sb-kv b{font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--brass);margin-right:0.3rem;font-weight:600}
+    .sb-kv b{font-family:var(--font-display);font-size:0.7rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--c-brass);margin-right:0.3rem;font-weight:600}
     .abilities{display:grid;grid-template-columns:repeat(6,1fr);gap:0.4rem;text-align:center;margin:0.4rem 0}
-    .ab{background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius);padding:0.4rem 0.2rem}
-    .ab .lbl{font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--brass);margin-bottom:0.15rem}
-    .ab .score{font-family:'Cinzel',serif;font-size:1.05rem;color:var(--ink)}
-    .ab .mod{font-size:0.85rem;color:var(--ink-light)}
-    .ab .save{display:block;font-size:0.7rem;color:var(--teal-bright);margin-top:1px}
-    .sb-section h4{font-family:'Cinzel',serif;font-size:0.78rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--brass);margin:0.6rem 0 0.3rem;padding-bottom:0.2rem;border-bottom:1px solid var(--border)}
+    .ab{background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:var(--radius-sm);padding:0.4rem 0.2rem}
+    .ab .lbl{font-family:var(--font-display);font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--c-brass);margin-bottom:0.15rem}
+    .ab .score{font-family:var(--font-display);font-size:1.05rem;color:var(--c-ink)}
+    .ab .mod{font-size:0.85rem;color:var(--c-ink-light)}
+    .ab .save{display:block;font-size:0.7rem;color:var(--c-teal-bright);margin-top:1px}
+    .sb-section h4{font-family:var(--font-display);font-size:0.78rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--c-brass);margin:0.6rem 0 0.3rem;padding-bottom:0.2rem;border-bottom:1px solid var(--c-border)}
     .feature{margin-bottom:0.5rem}
-    .feature b{color:var(--brass-bright);font-style:italic;font-weight:600}
-    .desc{margin-top:0.8rem;padding-top:0.7rem;border-top:1px dashed var(--border);color:var(--ink-light);font-size:0.92rem;white-space:pre-wrap}
+    .feature b{color:var(--c-brass-bright);font-style:italic;font-weight:600}
+    .desc{margin-top:0.8rem;padding-top:0.7rem;border-top:1px dashed var(--c-border);color:var(--c-ink-light);font-size:0.92rem;white-space:pre-wrap}
 
     /* Import */
-    .form{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;max-width:680px}
-    .form h3{font-family:'Cinzel',serif;font-size:0.78rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--brass-bright);margin-bottom:0.8rem}
+    .form{background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-sm);padding:1rem 1.1rem;max-width:680px}
+    .form h3{font-family:var(--font-display);font-size:0.78rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--c-brass-bright);margin-bottom:0.8rem}
     .fg{margin-bottom:0.7rem;display:flex;flex-direction:column;gap:4px}
-    .fg label{font-family:'Cinzel',serif;font-size:0.56rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint)}
+    .fg label{font-family:var(--font-display);font-size:0.56rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--c-ink-faint)}
     .form-actions{display:flex;gap:8px;margin-top:0.8rem;flex-wrap:wrap}
 
-    .state{text-align:center;padding:3rem 1rem;color:var(--ink-faint);font-style:italic}
-    .state.error{color:var(--rust)}
-    .toast{
-      position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(8px);
-      background:var(--panel-light);border:1px solid var(--teal);
-      border-radius:6px;padding:11px 20px;
-      color:var(--ink);font-size:0.92rem;font-family:'Cinzel',serif;letter-spacing:0.04em;
-      box-shadow:0 8px 24px rgba(0,0,0,0.55), 0 0 0 1px rgba(74,149,149,0.18), 0 0 24px rgba(74,149,149,0.10);
-      opacity:0;
-      transition:opacity 220ms cubic-bezier(0.16,1,0.3,1),transform 220ms cubic-bezier(0.16,1,0.3,1);
-      pointer-events:none;z-index:50;
-    }
-    .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-    .toast.err{border-color:var(--rust);color:#e3a08e;box-shadow:0 8px 24px rgba(0,0,0,0.55), 0 0 0 1px rgba(168,93,74,0.25), 0 0 24px rgba(168,93,74,0.10)}
-
+    .state{text-align:center;padding:3rem 1rem;color:var(--c-ink-faint);font-style:italic}
+    .state.error{color:var(--c-error)}
     /* Editor tab */
     .ed-layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:1.25rem;align-items:start}
     @media (max-width:1020px){.ed-layout{grid-template-columns:1fr}}
-    .ed-strip{display:flex;flex-wrap:wrap;gap:6px;padding:6px 8px;background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:0.9rem;align-items:center}
-    .ed-strip .lbl{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-faint);margin-right:6px}
-    .ed-chip{font-family:'Cinzel',serif;font-size:0.62rem;font-weight:500;letter-spacing:0.08em;padding:5px 11px;border-radius:9999px;border:1px solid var(--border-light);color:var(--ink-light);background:var(--panel);cursor:pointer;white-space:nowrap;transition:border-color 120ms,background 120ms,color 120ms}
-    .ed-chip:hover{border-color:var(--teal);color:var(--teal-bright);background:var(--panel-light)}
-    .ed-chip.active{border-color:var(--brass);background:rgba(184,138,90,0.18);color:var(--brass-bright);box-shadow:0 0 0 1px rgba(184,138,90,0.25)}
-    .ed-form{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:0.9rem 1rem;max-height:78vh;overflow-y:auto}
+    .ed-strip{display:flex;flex-wrap:wrap;gap:6px;padding:6px 8px;background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:var(--radius-sm);margin-bottom:0.9rem;align-items:center}
+    .ed-strip .lbl{font-family:var(--font-display);font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--c-ink-faint);margin-right:6px}
+    .ed-chip{font-family:var(--font-display);font-size:0.62rem;font-weight:500;letter-spacing:0.08em;padding:5px 11px;border-radius:9999px;border:1px solid var(--c-border-light);color:var(--c-ink-light);background:var(--c-surface);cursor:pointer;white-space:nowrap;transition:border-color 120ms,background 120ms,color 120ms}
+    .ed-chip:hover{border-color:var(--c-teal);color:var(--c-teal-bright);background:var(--c-surface-2)}
+    .ed-chip.active{border-color:var(--c-brass);background:rgba(184,138,90,0.18);color:var(--c-brass-bright);box-shadow:0 0 0 1px rgba(184,138,90,0.25)}
+    .ed-form{background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-sm);padding:0.9rem 1rem;max-height:78vh;overflow-y:auto}
     .ed-preview-wrap{position:sticky;top:0.5rem;max-height:88vh;overflow-y:auto}
-    .ed-sec{margin-bottom:1rem;padding-bottom:0.7rem;border-bottom:1px solid var(--border)}
+    .ed-sec{margin-bottom:1rem;padding-bottom:0.7rem;border-bottom:1px solid var(--c-border)}
     .ed-sec:last-child{border-bottom:none}
-    .ed-sec-h{display:flex;justify-content:space-between;align-items:center;font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass);margin-bottom:0.5rem}
+    .ed-sec-h{display:flex;justify-content:space-between;align-items:center;font-family:var(--font-display);font-size:0.66rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--c-brass);margin-bottom:0.5rem}
     .ed-grid{display:grid;gap:0.5rem 0.6rem}
     .ed-grid.c2{grid-template-columns:repeat(2,1fr)}
     .ed-grid.c3{grid-template-columns:repeat(3,1fr)}
     .ed-grid.c4{grid-template-columns:repeat(4,1fr)}
     .ed-grid.c5{grid-template-columns:repeat(5,1fr)}
     .ed-fg{display:flex;flex-direction:column;gap:3px;min-width:0}
-    .ed-fg label{font-family:'Cinzel',serif;font-size:0.54rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint)}
+    .ed-fg label{font-family:var(--font-display);font-size:0.54rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--c-ink-faint)}
     .ed-fg input,.ed-fg select,.ed-fg textarea{font-size:0.92rem;padding:5px 8px}
-    .ed-fg input[readonly]{color:var(--ink-faint);background:var(--panel)}
+    .ed-fg input[readonly]{color:var(--c-ink-faint);background:var(--c-surface)}
     .ed-fg textarea{min-height:60px;line-height:1.45}
     .ed-abil{display:grid;grid-template-columns:repeat(6,1fr);gap:0.5rem;text-align:center}
-    .ed-abil .ab-cell{background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius);padding:5px}
-    .ed-abil .ab-cell .lbl{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--brass);margin-bottom:2px}
-    .ed-abil .ab-cell input[type=number]{width:100%;text-align:center;font-family:'Cinzel',serif;font-size:0.95rem;padding:3px}
-    .ed-abil .ab-cell .mod{font-size:0.78rem;color:var(--ink-light);margin-top:2px}
-    .ed-abil .ab-cell .save-row{display:flex;justify-content:center;align-items:center;gap:3px;margin-top:3px;font-size:0.66rem;color:var(--teal-bright);font-family:'Cinzel',serif}
+    .ed-abil .ab-cell{background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:var(--radius-sm);padding:5px}
+    .ed-abil .ab-cell .lbl{font-family:var(--font-display);font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--c-brass);margin-bottom:2px}
+    .ed-abil .ab-cell input[type=number]{width:100%;text-align:center;font-family:var(--font-display);font-size:0.95rem;padding:3px}
+    .ed-abil .ab-cell .mod{font-size:0.78rem;color:var(--c-ink-light);margin-top:2px}
+    .ed-abil .ab-cell .save-row{display:flex;justify-content:center;align-items:center;gap:3px;margin-top:3px;font-size:0.66rem;color:var(--c-teal-bright);font-family:var(--font-display)}
     .ed-feat-list{display:flex;flex-direction:column;gap:0.5rem}
-    .ed-feat{background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius);padding:0.5rem 0.6rem}
+    .ed-feat{background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:var(--radius-sm);padding:0.5rem 0.6rem}
     .ed-feat-top{display:flex;gap:6px;align-items:center;margin-bottom:5px}
-    .ed-feat-tpl{font-size:0.8rem;color:var(--teal-bright);padding:0 4px;cursor:default;line-height:1}
+    .ed-feat-tpl{font-size:0.8rem;color:var(--c-teal-bright);padding:0 4px;cursor:default;line-height:1}
     .ed-feat-top input{flex:1;font-weight:600}
     .ed-feat textarea{font-size:0.88rem;min-height:50px}
     .ed-feat-actions{display:flex;gap:4px}
     .ed-feat-actions button{padding:3px 8px;font-size:0.55rem}
-    .ed-empty{padding:0.6rem;font-style:italic;color:var(--ink-faint);font-size:0.88rem;text-align:center}
-    .ed-toolbar{display:flex;flex-wrap:wrap;gap:6px;padding-bottom:0.6rem;margin-bottom:0.6rem;border-bottom:1px solid var(--border);align-items:center;justify-content:space-between}
+    .ed-empty{padding:0.6rem;font-style:italic;color:var(--c-ink-faint);font-size:0.88rem;text-align:center}
+    .ed-toolbar{display:flex;flex-wrap:wrap;gap:6px;padding-bottom:0.6rem;margin-bottom:0.6rem;border-bottom:1px solid var(--c-border);align-items:center;justify-content:space-between}
     .ed-toolbar .left{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
     .ed-toolbar .right{display:flex;gap:6px;flex-wrap:wrap}
-    .ed-toolbar .title{font-family:'Cinzel',serif;font-size:0.78rem;letter-spacing:0.06em;color:var(--brass-bright)}
-    .ed-derived{font-family:'Cinzel',serif;font-size:0.7rem;color:var(--ink-light);padding:4px 6px;background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius)}
-    .custom-chip{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--brass);color:var(--brass);background:rgba(184,138,90,0.10);margin-left:6px}
-    .fm-badge{font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;padding:2px 7px;border-radius:8px;margin-left:8px;vertical-align:middle}
-    .fm-badge.solo{border:1px solid var(--rust);color:#e3a08e;background:rgba(154,90,90,0.15)}
-    .fm-badge.minion{border:1px solid var(--ink-faint);color:var(--ink-faint);background:rgba(255,255,255,0.04)}
+    .ed-toolbar .title{font-family:var(--font-display);font-size:0.78rem;letter-spacing:0.06em;color:var(--c-brass-bright)}
+    .ed-derived{font-family:var(--font-display);font-size:0.7rem;color:var(--c-ink-light);padding:4px 6px;background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:var(--radius-sm)}
+    .custom-chip{font-family:var(--font-display);font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--c-brass);color:var(--c-brass);background:rgba(184,138,90,0.10);margin-left:6px}
+    .fm-badge{font-family:var(--font-display);font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;padding:2px 7px;border-radius:8px;margin-left:8px;vertical-align:middle}
+    .fm-badge.solo{border:1px solid var(--c-error);color:#e3a08e;background:rgba(154,90,90,0.15)}
+    .fm-badge.minion{border:1px solid var(--c-ink-faint);color:var(--c-ink-faint);background:rgba(255,255,255,0.04)}
     /* Smaller list-row variant of the same chips, sits next to the role chip. */
-    .cat-chip{font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;margin-left:6px;vertical-align:middle;white-space:nowrap}
-    .cat-chip.solo{border:1px solid var(--rust);color:#e3a08e;background:rgba(154,90,90,0.10)}
+    .cat-chip{font-family:var(--font-display);font-size:0.48rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;margin-left:6px;vertical-align:middle;white-space:nowrap}
+    .cat-chip.solo{border:1px solid var(--c-error);color:#e3a08e;background:rgba(154,90,90,0.10)}
     .cat-chip.minion{border:1px solid #8b9bb5;color:#a8b9d0;background:rgba(94,118,150,0.10)}
     .cat-chip.companion{border:1px solid #82a878;color:#a8c89b;background:rgba(102,140,90,0.10)}
-    .cat-chip.retainer{border:1px solid var(--brass);color:var(--brass-bright);background:rgba(184,138,90,0.10)}
+    .cat-chip.retainer{border:1px solid var(--c-brass);color:var(--c-brass-bright);background:rgba(184,138,90,0.10)}
     .cat-chip.villain-party{border:1px solid #b07ac8;color:#d4a3e8;background:rgba(140,90,180,0.10)}
-    .role-chip{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.08em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--teal);color:var(--teal-bright);background:rgba(60,153,150,0.08);margin-left:6px;white-space:nowrap}
-    .source-chip{font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--ink-faint);color:var(--ink-faint);background:transparent;margin-left:6px;vertical-align:middle;white-space:nowrap}
+    .role-chip{font-family:var(--font-display);font-size:0.5rem;letter-spacing:0.08em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--c-teal);color:var(--c-teal-bright);background:rgba(60,153,150,0.08);margin-left:6px;white-space:nowrap}
+    .source-chip{font-family:var(--font-display);font-size:0.48rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--c-ink-faint);color:var(--c-ink-faint);background:transparent;margin-left:6px;vertical-align:middle;white-space:nowrap}
     .source-chip.s-mm-2024{border-color:#6c8db5;color:#8eb5e8}
     .source-chip.s-tob-v1{border-color:#a89478;color:#d2bd96}
     .source-chip.s-fm-v1{border-color:#c29478;color:#e3a08e}
-    .source-chip.s-custom{border-color:var(--brass);color:var(--brass-bright)}
-    .terrain-chip{font-family:'Cinzel',serif;font-size:0.48rem;letter-spacing:0.08em;text-transform:uppercase;padding:1px 5px;border-radius:8px;border:1px solid var(--border-light);color:var(--ink-faint);background:rgba(255,255,255,0.02);margin-left:4px;white-space:nowrap}
+    .source-chip.s-custom{border-color:var(--c-brass);color:var(--c-brass-bright)}
+    .terrain-chip{font-family:var(--font-display);font-size:0.48rem;letter-spacing:0.08em;text-transform:uppercase;padding:1px 5px;border-radius:8px;border:1px solid var(--c-border-light);color:var(--c-ink-faint);background:rgba(255,255,255,0.02);margin-left:4px;white-space:nowrap}
     .terrain-strip{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
-    .terrain-pick{display:flex;flex-wrap:wrap;gap:6px;padding:6px;border:1px solid var(--border-light);border-radius:6px;background:rgba(0,0,0,0.15)}
-    .terrain-pick label{font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-light);padding:3px 7px;border-radius:8px;border:1px solid var(--border-light);background:rgba(255,255,255,0.02);cursor:pointer;display:flex;align-items:center;gap:4px}
-    .terrain-pick label:hover{border-color:var(--teal);color:var(--teal-bright)}
+    .terrain-pick{display:flex;flex-wrap:wrap;gap:6px;padding:6px;border:1px solid var(--c-border-light);border-radius:6px;background:rgba(0,0,0,0.15)}
+    .terrain-pick label{font-family:var(--font-display);font-size:0.55rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--c-ink-light);padding:3px 7px;border-radius:8px;border:1px solid var(--c-border-light);background:rgba(255,255,255,0.02);cursor:pointer;display:flex;align-items:center;gap:4px}
+    .terrain-pick label:hover{border-color:var(--c-teal);color:var(--c-teal-bright)}
     .terrain-pick input[type=checkbox]{display:none}
-    .terrain-pick input[type=checkbox]:checked + span{color:var(--teal-bright)}
-    .terrain-pick label:has(input:checked){border-color:var(--teal);background:rgba(60,153,150,0.12);color:var(--teal-bright)}
-    .tag-manual{font-size:0.5rem;color:var(--ink-faint);letter-spacing:0.05em;margin-left:6px}
+    .terrain-pick input[type=checkbox]:checked + span{color:var(--c-teal-bright)}
+    .terrain-pick label:has(input:checked){border-color:var(--c-teal);background:rgba(60,153,150,0.12);color:var(--c-teal-bright)}
+    .tag-manual{font-size:0.5rem;color:var(--c-ink-faint);letter-spacing:0.05em;margin-left:6px}
     /* Generate tab */
     .gen-layout{display:grid;grid-template-columns:minmax(280px, 360px) 1fr;gap:1.25rem;align-items:start}
     .gen-form{display:flex;flex-direction:column;gap:0.85rem}
-    .gen-sec{background:rgba(0,0,0,0.18);border:1px solid var(--border-light);border-radius:6px;padding:0.75rem}
-    .gen-sec h3{font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.14em;color:var(--brass-bright);margin:0 0 0.6rem 0;text-transform:uppercase}
+    .gen-sec{background:rgba(0,0,0,0.18);border:1px solid var(--c-border-light);border-radius:6px;padding:0.75rem}
+    .gen-sec h3{font-family:var(--font-display);font-size:0.7rem;letter-spacing:0.14em;color:var(--c-brass-bright);margin:0 0 0.6rem 0;text-transform:uppercase}
     .gen-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.6rem}
     .gen-fg{display:flex;flex-direction:column;gap:3px}
-    .gen-fg label{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;color:var(--ink-light);text-transform:uppercase}
-    .gen-fg select,.gen-fg input{background:rgba(0,0,0,0.25);border:1px solid var(--border-light);border-radius:4px;padding:5px 7px;color:var(--ink);font-family:inherit;font-size:0.85rem}
-    .gen-fg select:focus,.gen-fg input:focus{outline:none;border-color:var(--teal)}
+    .gen-fg label{font-family:var(--font-display);font-size:0.6rem;letter-spacing:0.1em;color:var(--c-ink-light);text-transform:uppercase}
+    .gen-fg select,.gen-fg input{background:rgba(0,0,0,0.25);border:1px solid var(--c-border-light);border-radius:4px;padding:5px 7px;color:var(--c-ink);font-family:inherit;font-size:0.85rem}
+    .gen-fg select:focus,.gen-fg input:focus{outline:none;border-color:var(--c-teal)}
     .gen-actions{display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center}
-    .gen-preview{background:rgba(0,0,0,0.18);border:1px solid var(--border-light);border-radius:6px;padding:0.8rem;min-height:300px}
+    .gen-preview{background:rgba(0,0,0,0.18);border:1px solid var(--c-border-light);border-radius:6px;padding:0.8rem;min-height:300px}
     .gen-candidates{display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto}
-    .gen-cand{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;background:rgba(255,255,255,0.02);border:1px solid var(--border-light);border-radius:4px;cursor:pointer;font-size:0.8rem}
-    .gen-cand:hover{border-color:var(--teal);background:rgba(60,153,150,0.08)}
-    .gen-cand.active{border-color:var(--brass);background:rgba(184,138,90,0.10)}
-    .gen-cand-nm{flex:1;color:var(--ink-light)}
-    .gen-cand-meta{font-size:0.65rem;color:var(--ink-faint);letter-spacing:0.05em}
+    .gen-cand{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;background:rgba(255,255,255,0.02);border:1px solid var(--c-border-light);border-radius:4px;cursor:pointer;font-size:0.8rem}
+    .gen-cand:hover{border-color:var(--c-teal);background:rgba(60,153,150,0.08)}
+    .gen-cand.active{border-color:var(--c-brass);background:rgba(184,138,90,0.10)}
+    .gen-cand-nm{flex:1;color:var(--c-ink-light)}
+    .gen-cand-meta{font-size:0.65rem;color:var(--c-ink-faint);letter-spacing:0.05em}
     .gen-deltas{display:flex;flex-wrap:wrap;gap:4px;margin:0.4rem 0 0.6rem 0;font-size:0.7rem}
-    .gen-delta{padding:2px 6px;border-radius:4px;border:1px solid var(--border-light);color:var(--ink-faint)}
+    .gen-delta{padding:2px 6px;border-radius:4px;border:1px solid var(--c-border-light);color:var(--c-ink-faint)}
     .gen-delta.up{color:#9ad8a6;border-color:#4a7050}
     .gen-delta.down{color:#e8a89a;border-color:#6e4848}
-    .gen-source-line{font-family:'Cinzel',serif;font-size:0.55rem;letter-spacing:0.12em;color:var(--ink-faint);margin-bottom:0.4rem}
+    .gen-source-line{font-family:var(--font-display);font-size:0.55rem;letter-spacing:0.12em;color:var(--c-ink-faint);margin-bottom:0.4rem}
     /* Library tab */
     .lib-edit{display:flex;flex-direction:column;gap:0.7rem}
-    .lib-edit-sec{background:rgba(0,0,0,0.18);border:1px solid var(--border-light);border-radius:6px;padding:0.65rem}
-    .lib-edit-sec h4{font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.14em;color:var(--brass-bright);margin:0 0 0.5rem 0;text-transform:uppercase}
+    .lib-edit-sec{background:rgba(0,0,0,0.18);border:1px solid var(--c-border-light);border-radius:6px;padding:0.65rem}
+    .lib-edit-sec h4{font-family:var(--font-display);font-size:0.65rem;letter-spacing:0.14em;color:var(--c-brass-bright);margin:0 0 0.5rem 0;text-transform:uppercase}
     .lib-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.5rem}
     .lib-fg{display:flex;flex-direction:column;gap:3px}
-    .lib-fg label{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;color:var(--ink-light);text-transform:uppercase}
-    .lib-fg input,.lib-fg select,.lib-fg textarea{background:rgba(0,0,0,0.25);border:1px solid var(--border-light);border-radius:4px;padding:5px 7px;color:var(--ink);font-family:inherit;font-size:0.85rem;width:100%;box-sizing:border-box}
-    .lib-fg textarea{font-family:'Crimson Text',Georgia,serif;font-size:0.9rem;min-height:80px;line-height:1.4}
-    .lib-fg input:focus,.lib-fg select:focus,.lib-fg textarea:focus{outline:none;border-color:var(--teal)}
-    .lib-actions{display:flex;flex-wrap:wrap;gap:0.4rem;align-items:center;padding-top:0.4rem;border-top:1px solid var(--border-light)}
-    .lib-row{display:flex;align-items:center;justify-content:space-between;padding:6px 9px;background:rgba(255,255,255,0.02);border:1px solid var(--border-light);border-radius:4px;cursor:pointer;font-size:0.82rem;margin-bottom:3px}
-    .lib-row:hover{border-color:var(--teal);background:rgba(60,153,150,0.08)}
-    .lib-row.active{border-color:var(--brass);background:rgba(184,138,90,0.10)}
-    .lib-row .nm{flex:1;color:var(--ink-light)}
-    .lib-row .meta{font-size:0.62rem;color:var(--ink-faint);letter-spacing:0.05em;text-transform:uppercase}
-    .lib-row .sig-chip{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 5px;border-radius:6px;border:1px solid var(--rust);color:#e3a08e;background:rgba(154,90,90,0.10);margin-left:5px}
-    .lib-tier-chip{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.08em;text-transform:uppercase;padding:1px 5px;border-radius:6px;border:1px solid var(--border-light);color:var(--ink-light);margin-left:5px}
-    .lib-tier-chip.t-low{color:var(--ink-light)}
-    .lib-tier-chip.t-mid{color:var(--teal-bright);border-color:var(--teal)}
-    .lib-tier-chip.t-high{color:var(--brass-bright);border-color:var(--brass)}
-    .lib-tier-chip.t-epic{color:#e3a08e;border-color:var(--rust)}
-    .lib-help{font-size:0.7rem;color:var(--ink-faint);line-height:1.4;margin-top:0.3rem;font-style:italic}
-    .lib-donors{font-size:0.7rem;color:var(--ink-faint);background:rgba(0,0,0,0.20);border:1px solid var(--border-light);border-radius:4px;padding:5px 7px;max-height:80px;overflow-y:auto}
+    .lib-fg label{font-family:var(--font-display);font-size:0.6rem;letter-spacing:0.1em;color:var(--c-ink-light);text-transform:uppercase}
+    .lib-fg input,.lib-fg select,.lib-fg textarea{background:rgba(0,0,0,0.25);border:1px solid var(--c-border-light);border-radius:4px;padding:5px 7px;color:var(--c-ink);font-family:inherit;font-size:0.85rem;width:100%;box-sizing:border-box}
+    .lib-fg textarea{font-family:var(--font-body);font-size:0.9rem;min-height:80px;line-height:1.4}
+    .lib-fg input:focus,.lib-fg select:focus,.lib-fg textarea:focus{outline:none;border-color:var(--c-teal)}
+    .lib-actions{display:flex;flex-wrap:wrap;gap:0.4rem;align-items:center;padding-top:0.4rem;border-top:1px solid var(--c-border-light)}
+    .lib-row{display:flex;align-items:center;justify-content:space-between;padding:6px 9px;background:rgba(255,255,255,0.02);border:1px solid var(--c-border-light);border-radius:4px;cursor:pointer;font-size:0.82rem;margin-bottom:3px}
+    .lib-row:hover{border-color:var(--c-teal);background:rgba(60,153,150,0.08)}
+    .lib-row.active{border-color:var(--c-brass);background:rgba(184,138,90,0.10)}
+    .lib-row .nm{flex:1;color:var(--c-ink-light)}
+    .lib-row .meta{font-size:0.62rem;color:var(--c-ink-faint);letter-spacing:0.05em;text-transform:uppercase}
+    .lib-row .sig-chip{font-family:var(--font-display);font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 5px;border-radius:6px;border:1px solid var(--c-error);color:#e3a08e;background:rgba(154,90,90,0.10);margin-left:5px}
+    .lib-tier-chip{font-family:var(--font-display);font-size:0.5rem;letter-spacing:0.08em;text-transform:uppercase;padding:1px 5px;border-radius:6px;border:1px solid var(--c-border-light);color:var(--c-ink-light);margin-left:5px}
+    .lib-tier-chip.t-low{color:var(--c-ink-light)}
+    .lib-tier-chip.t-mid{color:var(--c-teal-bright);border-color:var(--c-teal)}
+    .lib-tier-chip.t-high{color:var(--c-brass-bright);border-color:var(--c-brass)}
+    .lib-tier-chip.t-epic{color:#e3a08e;border-color:var(--c-error)}
+    .lib-help{font-size:0.7rem;color:var(--c-ink-faint);line-height:1.4;margin-top:0.3rem;font-style:italic}
+    .lib-donors{font-size:0.7rem;color:var(--c-ink-faint);background:rgba(0,0,0,0.20);border:1px solid var(--c-border-light);border-radius:4px;padding:5px 7px;max-height:80px;overflow-y:auto}
 
     /* Analysis tab */
     .ana-cards{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:1rem}
-    .ana-card{flex:1;min-width:140px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:0.7rem 0.9rem;text-align:center}
-    .ana-card .val{font-family:'Cinzel',serif;font-size:1.5rem;color:var(--teal-bright);line-height:1.1}
-    .ana-card .lbl{font-family:'Cinzel',serif;font-size:0.54rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-faint);margin-top:0.3rem}
+    .ana-card{flex:1;min-width:140px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-sm);padding:0.7rem 0.9rem;text-align:center}
+    .ana-card .val{font-family:var(--font-display);font-size:1.5rem;color:var(--c-teal-bright);line-height:1.1}
+    .ana-card .lbl{font-family:var(--font-display);font-size:0.54rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--c-ink-faint);margin-top:0.3rem}
     .ana-section{margin-bottom:1.4rem}
-    .ana-section-h{font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass);margin-bottom:0.5rem}
-    .ana-table{width:100%;border-collapse:collapse;font-size:0.92rem;background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius)}
-    .ana-table th,.ana-table td{padding:6px 10px;text-align:left;border-bottom:1px solid var(--border)}
-    .ana-table th{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;color:var(--ink-faint);text-transform:uppercase;background:var(--panel)}
-    .ana-table td.num{text-align:right;font-family:'Cinzel',serif;color:var(--teal-bright)}
-    .ana-table td.cr{font-family:'Cinzel',serif;color:var(--brass-bright)}
-    .ana-table td .rng{color:var(--ink-faint);font-size:0.82rem;margin-left:4px}
+    .ana-section-h{font-family:var(--font-display);font-size:0.72rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--c-brass);margin-bottom:0.5rem}
+    .ana-table{width:100%;border-collapse:collapse;font-size:0.92rem;background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:var(--radius-sm)}
+    .ana-table th,.ana-table td{padding:6px 10px;text-align:left;border-bottom:1px solid var(--c-border)}
+    .ana-table th{font-family:var(--font-display);font-size:0.6rem;letter-spacing:0.1em;color:var(--c-ink-faint);text-transform:uppercase;background:var(--c-surface)}
+    .ana-table td.num{text-align:right;font-family:var(--font-display);color:var(--c-teal-bright)}
+    .ana-table td.cr{font-family:var(--font-display);color:var(--c-brass-bright)}
+    .ana-table td .rng{color:var(--c-ink-faint);font-size:0.82rem;margin-left:4px}
     .ana-table tr:last-child td{border-bottom:none}
-    .ana-bars{font-family:'Cinzel',serif;font-size:0.85rem;background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius);padding:0.6rem 0.9rem}
+    .ana-bars{font-family:var(--font-display);font-size:0.85rem;background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:var(--radius-sm);padding:0.6rem 0.9rem}
     .ana-bars .bar-row{display:grid;grid-template-columns:60px 1fr 50px;gap:8px;align-items:center;padding:2px 0}
-    .ana-bars .bar-lbl{color:var(--brass);font-size:0.72rem;letter-spacing:0.08em}
-    .ana-bars .bar-fill{background:var(--teal-faint);height:14px;border-radius:2px;border:1px solid var(--teal-deep);position:relative}
-    .ana-bars .bar-fill > span{display:block;height:100%;background:linear-gradient(90deg,var(--teal-deep),var(--teal));border-radius:2px}
-    .ana-bars .bar-n{color:var(--teal-bright);font-size:0.78rem;text-align:right}
+    .ana-bars .bar-lbl{color:var(--c-brass);font-size:0.72rem;letter-spacing:0.08em}
+    .ana-bars .bar-fill{background:var(--c-teal-faint);height:14px;border-radius:2px;border:1px solid var(--c-teal-deep);position:relative}
+    .ana-bars .bar-fill > span{display:block;height:100%;background:linear-gradient(90deg,var(--c-teal-deep),var(--c-teal));border-radius:2px}
+    .ana-bars .bar-n{color:var(--c-teal-bright);font-size:0.78rem;text-align:right}
     .ana-dmg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
-    .ana-dmg .dt{background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;display:flex;justify-content:space-between;align-items:center;font-size:0.88rem}
-    .ana-dmg .dt-name{font-family:'Cinzel',serif;font-size:0.64rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-light)}
-    .ana-dmg .dt-n{font-family:'Cinzel',serif;color:var(--teal-bright);font-size:0.95rem}
-    .ana-dmg .dt.phys .dt-name{color:var(--ink-light)}
+    .ana-dmg .dt{background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:var(--radius-sm);padding:6px 10px;display:flex;justify-content:space-between;align-items:center;font-size:0.88rem}
+    .ana-dmg .dt-name{font-family:var(--font-display);font-size:0.64rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--c-ink-light)}
+    .ana-dmg .dt-n{font-family:var(--font-display);color:var(--c-teal-bright);font-size:0.95rem}
+    .ana-dmg .dt.phys .dt-name{color:var(--c-ink-light)}
     .ana-dmg .dt.fire .dt-name{color:#ff9a6e}
     .ana-dmg .dt.cold .dt-name{color:#88c0ff}
     .ana-dmg .dt.lightning .dt-name{color:#ffe060}
@@ -358,18 +275,18 @@
     /* Action breakdown subsection */
     .ana-grid-2col{display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start}
     @media (max-width:900px){.ana-grid-2col{grid-template-columns:1fr}}
-    .ana-kind-list{background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius);padding:0.5rem 0.7rem;font-size:0.9rem}
+    .ana-kind-list{background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:var(--radius-sm);padding:0.5rem 0.7rem;font-size:0.9rem}
     .ana-kind-row{display:grid;grid-template-columns:120px 1fr 60px;gap:8px;align-items:center;padding:3px 0}
-    .ana-kind-row .kind-name{font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.08em;color:var(--brass)}
-    .ana-kind-row .kind-fill{background:var(--teal-faint);height:12px;border-radius:2px;border:1px solid var(--teal-deep);position:relative}
-    .ana-kind-row .kind-fill > span{display:block;height:100%;background:linear-gradient(90deg,var(--teal-deep),var(--teal));border-radius:2px}
-    .ana-kind-row .kind-n{font-family:'Cinzel',serif;color:var(--teal-bright);font-size:0.75rem;text-align:right}
-    .ana-archetype-list{background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius);font-size:0.9rem}
-    .ana-archetype-row{display:flex;align-items:center;gap:10px;padding:5px 10px;border-bottom:1px solid var(--border)}
+    .ana-kind-row .kind-name{font-family:var(--font-display);font-size:0.66rem;letter-spacing:0.08em;color:var(--c-brass)}
+    .ana-kind-row .kind-fill{background:var(--c-teal-faint);height:12px;border-radius:2px;border:1px solid var(--c-teal-deep);position:relative}
+    .ana-kind-row .kind-fill > span{display:block;height:100%;background:linear-gradient(90deg,var(--c-teal-deep),var(--c-teal));border-radius:2px}
+    .ana-kind-row .kind-n{font-family:var(--font-display);color:var(--c-teal-bright);font-size:0.75rem;text-align:right}
+    .ana-archetype-list{background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:var(--radius-sm);font-size:0.9rem}
+    .ana-archetype-row{display:flex;align-items:center;gap:10px;padding:5px 10px;border-bottom:1px solid var(--c-border)}
     .ana-archetype-row:last-child{border-bottom:none}
-    .ana-archetype-row .desc{flex:1;color:var(--ink)}
-    .ana-archetype-row .n{font-family:'Cinzel',serif;color:var(--teal-bright);font-size:0.85rem;min-width:36px;text-align:right}
-    .ability-chip{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--border-light);color:var(--ink-light);margin-right:4px}
+    .ana-archetype-row .desc{flex:1;color:var(--c-ink)}
+    .ana-archetype-row .n{font-family:var(--font-display);color:var(--c-teal-bright);font-size:0.85rem;min-width:36px;text-align:right}
+    .ability-chip{font-family:var(--font-display);font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--c-border-light);color:var(--c-ink-light);margin-right:4px}
     .ability-chip.str{color:#e88;border-color:#844}
     .ability-chip.dex{color:#8e8;border-color:#484}
     .ability-chip.con{color:#fb8;border-color:#a64}
@@ -377,48 +294,46 @@
     .ability-chip.wis{color:#dac;border-color:#85a}
     .ability-chip.cha{color:#fac;border-color:#a48}
 
-    /* Template-picker modal */
-    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:200;padding:1rem}
-    .modal-backdrop.hidden{display:none}
-    .tpl-modal{background:var(--panel);border:1px solid var(--border-light);border-radius:var(--radius);max-width:640px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.8)}
-    .tpl-header{display:flex;align-items:center;justify-content:space-between;padding:0.9rem 1.1rem;border-bottom:1px solid var(--border)}
-    .tpl-header h2{font-family:'Cinzel',serif;font-size:0.85rem;letter-spacing:0.1em;color:var(--brass-bright);text-transform:uppercase;font-weight:700}
-    .tpl-close{background:none;border:none;color:var(--ink-faint);font-size:1.1rem;cursor:pointer;padding:2px 6px}
-    .tpl-close:hover{color:var(--ink)}
+    /* Template-picker modal — theme .modal-overlay handles the backdrop; inner shell is page-specific */
+    .tpl-modal{background:var(--c-surface);border:1px solid var(--c-border-light);border-radius:var(--radius-sm);max-width:640px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.8)}
+    .tpl-header{display:flex;align-items:center;justify-content:space-between;padding:0.9rem 1.1rem;border-bottom:1px solid var(--c-border)}
+    .tpl-header h2{font-family:var(--font-display);font-size:0.85rem;letter-spacing:0.1em;color:var(--c-brass-bright);text-transform:uppercase;font-weight:700}
+    .tpl-close{background:none;border:none;color:var(--c-ink-faint);font-size:1.1rem;cursor:pointer;padding:2px 6px}
+    .tpl-close:hover{color:var(--c-ink)}
     .tpl-body{padding:0.9rem 1.1rem;overflow-y:auto;flex:1}
-    .tpl-footer{padding:0.7rem 1.1rem;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
-    .tpl-kind-row{display:grid;grid-template-columns:120px 1fr;gap:8px;align-items:center;padding-bottom:0.7rem;margin-bottom:0.7rem;border-bottom:1px solid var(--border)}
-    .tpl-kind-row label{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint)}
+    .tpl-footer{padding:0.7rem 1.1rem;border-top:1px solid var(--c-border);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+    .tpl-kind-row{display:grid;grid-template-columns:120px 1fr;gap:8px;align-items:center;padding-bottom:0.7rem;margin-bottom:0.7rem;border-bottom:1px solid var(--c-border)}
+    .tpl-kind-row label{font-family:var(--font-display);font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--c-ink-faint)}
     .tpl-form{display:grid;gap:0.6rem}
     .tpl-form .row{display:grid;gap:0.5rem;align-items:end}
     .tpl-form .row.c2{grid-template-columns:1fr 1fr}
     .tpl-form .row.c3{grid-template-columns:repeat(3,1fr)}
     .tpl-form .row.c4{grid-template-columns:repeat(4,1fr)}
     .tpl-form .fg{display:flex;flex-direction:column;gap:3px;min-width:0}
-    .tpl-form .fg label{font-family:'Cinzel',serif;font-size:0.54rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint)}
-    .tpl-form .fg input,.tpl-form .fg select,.tpl-form .fg textarea{font-size:0.92rem;padding:5px 8px;background:var(--panel-deep);border:1px solid var(--border);border-radius:2px;color:var(--ink);outline:none}
-    .tpl-form .fg input:focus,.tpl-form .fg select:focus{border-color:var(--teal)}
+    .tpl-form .fg label{font-family:var(--font-display);font-size:0.54rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--c-ink-faint)}
+    .tpl-form .fg input,.tpl-form .fg select,.tpl-form .fg textarea{font-size:0.92rem;padding:5px 8px;background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:2px;color:var(--c-ink);outline:none}
+    .tpl-form .fg input:focus,.tpl-form .fg select:focus{border-color:var(--c-teal)}
     .tpl-form .fg textarea{min-height:60px;line-height:1.45;resize:vertical}
-    .tpl-help{font-size:0.84rem;color:var(--ink-faint);font-style:italic;margin-bottom:0.4rem}
-    .tpl-preview{background:var(--panel-deep);border:1px solid var(--border);border-top:2px solid var(--brass);border-radius:var(--radius);padding:0.7rem 0.8rem;margin-top:0.6rem;font-size:0.92rem;line-height:1.5}
-    .tpl-preview .name{font-family:'Cinzel',serif;color:var(--brass-bright);font-weight:600;margin-bottom:0.3rem}
-    .tpl-preview .body{color:var(--ink-light)}
-    .tpl-preview-h{font-family:'Cinzel',serif;font-size:0.58rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--brass);margin-bottom:0.3rem}
-    .tpl-derived{font-family:'Cinzel',serif;font-size:0.7rem;color:var(--teal-bright);padding:3px 8px;background:var(--panel-deep);border:1px solid var(--border);border-radius:var(--radius);display:inline-block}
+    .tpl-help{font-size:0.84rem;color:var(--c-ink-faint);font-style:italic;margin-bottom:0.4rem}
+    .tpl-preview{background:var(--c-bg-elevated);border:1px solid var(--c-border);border-top:2px solid var(--c-brass);border-radius:var(--radius-sm);padding:0.7rem 0.8rem;margin-top:0.6rem;font-size:0.92rem;line-height:1.5}
+    .tpl-preview .name{font-family:var(--font-display);color:var(--c-brass-bright);font-weight:600;margin-bottom:0.3rem}
+    .tpl-preview .body{color:var(--c-ink-light)}
+    .tpl-preview-h{font-family:var(--font-display);font-size:0.58rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--c-brass);margin-bottom:0.3rem}
+    .tpl-derived{font-family:var(--font-display);font-size:0.7rem;color:var(--c-teal-bright);padding:3px 8px;background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:var(--radius-sm);display:inline-block}
 
     /* Clone picker modal */
     .clone-modal{max-width:560px}
-    .clone-search{width:100%;margin-bottom:0.6rem;padding:7px 10px;background:var(--panel-deep);border:1px solid var(--border);border-radius:2px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.95rem;outline:none}
-    .clone-search:focus{border-color:var(--teal)}
-    .clone-list{max-height:50vh;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--panel-deep)}
-    .clone-row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--border);cursor:pointer}
+    .clone-search{width:100%;margin-bottom:0.6rem;padding:7px 10px;background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:2px;color:var(--c-ink);font-family:var(--font-body);font-size:0.95rem;outline:none}
+    .clone-search:focus{border-color:var(--c-teal)}
+    .clone-list{max-height:50vh;overflow-y:auto;border:1px solid var(--c-border);border-radius:var(--radius-sm);background:var(--c-bg-elevated)}
+    .clone-row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--c-border);cursor:pointer}
     .clone-row:last-child{border-bottom:none}
-    .clone-row:hover{background:var(--panel-light)}
-    .clone-nm{flex:1;font-size:0.92rem;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .clone-nm small{display:block;font-family:'Cinzel',serif;font-size:0.54rem;color:var(--ink-faint);letter-spacing:0.06em;text-transform:uppercase;margin-top:1px}
+    .clone-row:hover{background:var(--c-surface-2)}
+    .clone-nm{flex:1;font-size:0.92rem;color:var(--c-ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .clone-nm small{display:block;font-family:var(--font-display);font-size:0.54rem;color:var(--c-ink-faint);letter-spacing:0.06em;text-transform:uppercase;margin-top:1px}
 
-    .footer{margin-top:2rem;text-align:center;padding-top:1.5rem;border-top:1px solid var(--border)}
-    .footer-text{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--ink-faint)}
+    .footer{margin-top:2rem;text-align:center;padding-top:1.5rem;border-top:1px solid var(--c-border)}
+    .footer-text{font-family:var(--font-display);font-size:0.62rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--c-ink-faint)}
   </style>
 </head>
 <body>
@@ -427,15 +342,15 @@
       <h1>The <span class="accent">Menagerie</span></h1>
       <div class="topbar-meta">
         <span id="role-line">— loading —</span>
-        <a href="home.html" class="home-link">⌂ Home</a>
+        <a href="home.html" class="btn btn--sm">⌂ Home</a>
       </div>
     </div>
 
     <div id="state" class="state">Opening the bestiary…</div>
 
     <div id="tool" style="display:none">
-      <div class="tabs">
-        <button class="tab active" data-tab="browse" onclick="switchTab('browse')">Browse</button>
+      <div class="tab-list">
+        <button class="tab is-active" data-tab="browse" onclick="switchTab('browse')">Browse</button>
         <button class="tab" data-tab="analysis" onclick="switchTab('analysis')">Analysis</button>
         <button class="tab" data-tab="editor" onclick="switchTab('editor')">Editor</button>
         <button class="tab" data-tab="generate" onclick="switchTab('generate')">Generate</button>
@@ -449,7 +364,7 @@
           <div>
             <div class="col-head">
               <span>Monsters (<span id="m-count">0</span>)</span>
-              <span id="m-source" style="font-size:0.55rem;color:var(--ink-faint);letter-spacing:0.12em">—</span>
+              <span id="m-source" style="font-size:0.55rem;color:var(--c-ink-faint);letter-spacing:0.12em">—</span>
             </div>
             <div class="toolbar">
               <input type="text" id="m-search" placeholder="Search name…" oninput="renderList()">
@@ -483,12 +398,12 @@
                 <option value="retainer">Retainer</option>
                 <option value="villain-party">Villain Party</option>
               </select>
-              <button class="btn ghost sm" onclick="clearFilters()">Clear</button>
+              <button class="btn btn--ghost btn--sm" onclick="clearFilters()">Clear</button>
             </div>
             <div class="list" id="m-list"></div>
           </div>
           <div>
-            <div class="col-head"><span>Stat block</span><span id="sb-id" style="font-size:0.55rem;color:var(--ink-faint);letter-spacing:0.12em"></span></div>
+            <div class="col-head"><span>Stat block</span><span id="sb-id" style="font-size:0.55rem;color:var(--c-ink-faint);letter-spacing:0.12em"></span></div>
             <div id="m-statblock"><div class="empty-note">Select a monster to view its stat block.</div></div>
           </div>
         </div>
@@ -499,8 +414,8 @@
         <div class="ed-strip" id="ed-chips">
           <span class="lbl">Custom (<span id="ed-count">0</span>)</span>
           <span id="ed-chips-list"></span>
-          <button class="btn brass sm" onclick="newCustom()">+ New monster</button>
-          <button class="btn ghost sm" onclick="openClonePicker()" title="Load any existing monster (imported or custom) into the editor as a new copy you can edit and save">📋 From existing…</button>
+          <button class="btn btn--brass btn--sm" onclick="newCustom()">+ New monster</button>
+          <button class="btn btn--ghost btn--sm" onclick="openClonePicker()" title="Load any existing monster (imported or custom) into the editor as a new copy you can edit and save">📋 From existing…</button>
         </div>
         <div class="ed-layout">
           <!-- FORM -->
@@ -510,10 +425,10 @@
                 <span class="title" id="ed-title">New monster</span>
               </div>
               <div class="right">
-                <button class="btn ghost sm" onclick="fillFromCRMedian()" title="Use the Analysis-tab CR medians to populate empty defense/attack fields for the current CR">Fill from CR median</button>
-                <button class="btn ghost sm" onclick="duplicateCustom()" id="ed-dup-btn" style="display:none">⎘ Duplicate</button>
-                <button class="btn danger sm" onclick="deleteCustom()" id="ed-del-btn" style="display:none">Delete</button>
-                <button class="btn brass sm" onclick="saveCustom()" id="ed-save-btn">Save</button>
+                <button class="btn btn--ghost btn--sm" onclick="fillFromCRMedian()" title="Use the Analysis-tab CR medians to populate empty defense/attack fields for the current CR">Fill from CR median</button>
+                <button class="btn btn--ghost btn--sm" onclick="duplicateCustom()" id="ed-dup-btn" style="display:none">⎘ Duplicate</button>
+                <button class="btn btn--danger btn--sm" onclick="deleteCustom()" id="ed-del-btn" style="display:none">Delete</button>
+                <button class="btn btn--brass btn--sm" onclick="saveCustom()" id="ed-save-btn">Save</button>
               </div>
             </div>
 
@@ -540,7 +455,7 @@
               <div class="ed-sec-h"><span>Tags (Flee Mortals role + terrain)</span><span id="ed-tag-manual" class="tag-manual"></span></div>
               <div class="ed-grid c2">
                 <div class="ed-fg">
-                  <label>Role <span style="font-size:0.6rem;color:var(--ink-faint)">— defines combat function for the generator</span></label>
+                  <label>Role <span style="font-size:0.6rem;color:var(--c-ink-faint)">— defines combat function for the generator</span></label>
                   <select id="ed-role" onchange="syncEditor()">
                     <option value="">(auto)</option>
                     <option>Ambusher</option><option>Artillery</option><option>Brute</option>
@@ -549,7 +464,7 @@
                   </select>
                 </div>
                 <div class="ed-fg">
-                  <label>Terrain <span style="font-size:0.6rem;color:var(--ink-faint)">— check all that apply</span></label>
+                  <label>Terrain <span style="font-size:0.6rem;color:var(--c-ink-faint)">— check all that apply</span></label>
                   <div class="terrain-pick" id="ed-terrain-pick">
                     <label><input type="checkbox" value="arctic" onchange="syncEditor()"><span>Arctic</span></label>
                     <label><input type="checkbox" value="coastal" onchange="syncEditor()"><span>Coastal</span></label>
@@ -578,7 +493,7 @@
               </div>
               <div class="ed-grid c5" style="margin-top:0.5rem;align-items:end">
                 <div class="ed-fg" style="grid-column:1 / span 5;display:flex;flex-direction:row;align-items:center;gap:8px">
-                  <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;color:var(--ink-light);cursor:pointer">
+                  <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;color:var(--c-ink-light);cursor:pointer">
                     <input type="checkbox" id="ed-hpStructured" onchange="syncEditor()">
                     Use structured hit dice — HP auto-derives from <code>count·(size+1)/2 + count·CON_mod + magic</code> and tracks CON changes.
                   </label>
@@ -626,15 +541,15 @@
             </div>
 
             <div class="ed-sec" id="ed-feat-section-traits">
-              <div class="ed-sec-h"><span>Traits (<span id="ed-traits-n">0</span>)</span><button class="btn ghost sm" onclick="addFeature('traits')">+ Add trait</button></div>
+              <div class="ed-sec-h"><span>Traits (<span id="ed-traits-n">0</span>)</span><button class="btn btn--ghost btn--sm" onclick="addFeature('traits')">+ Add trait</button></div>
               <div class="ed-feat-list" id="ed-traits-list"></div>
             </div>
             <div class="ed-sec">
               <div class="ed-sec-h">
                 <span>Actions (<span id="ed-actions-n">0</span>)</span>
                 <span style="display:flex;gap:6px">
-                  <button class="btn ghost sm" onclick="openTemplateModal('actions')" title="Compose a 2024 MM-shaped action from a template (Melee/Ranged/Save/Multiattack/Spellcasting)">+ From template…</button>
-                  <button class="btn ghost sm" onclick="addFeature('actions')">+ Add blank</button>
+                  <button class="btn btn--ghost btn--sm" onclick="openTemplateModal('actions')" title="Compose a 2024 MM-shaped action from a template (Melee/Ranged/Save/Multiattack/Spellcasting)">+ From template…</button>
+                  <button class="btn btn--ghost btn--sm" onclick="addFeature('actions')">+ Add blank</button>
                 </span>
               </div>
               <div class="ed-feat-list" id="ed-actions-list"></div>
@@ -643,8 +558,8 @@
               <div class="ed-sec-h">
                 <span>Bonus Actions (<span id="ed-bonusActions-n">0</span>)</span>
                 <span style="display:flex;gap:6px">
-                  <button class="btn ghost sm" onclick="openTemplateModal('bonusActions')">+ From template…</button>
-                  <button class="btn ghost sm" onclick="addFeature('bonusActions')">+ Add blank</button>
+                  <button class="btn btn--ghost btn--sm" onclick="openTemplateModal('bonusActions')">+ From template…</button>
+                  <button class="btn btn--ghost btn--sm" onclick="addFeature('bonusActions')">+ Add blank</button>
                 </span>
               </div>
               <div class="ed-feat-list" id="ed-bonusActions-list"></div>
@@ -653,8 +568,8 @@
               <div class="ed-sec-h">
                 <span>Reactions (<span id="ed-reactions-n">0</span>)</span>
                 <span style="display:flex;gap:6px">
-                  <button class="btn ghost sm" onclick="openTemplateModal('reactions')">+ From template…</button>
-                  <button class="btn ghost sm" onclick="addFeature('reactions')">+ Add blank</button>
+                  <button class="btn btn--ghost btn--sm" onclick="openTemplateModal('reactions')">+ From template…</button>
+                  <button class="btn btn--ghost btn--sm" onclick="addFeature('reactions')">+ Add blank</button>
                 </span>
               </div>
               <div class="ed-feat-list" id="ed-reactions-list"></div>
@@ -663,14 +578,14 @@
               <div class="ed-sec-h">
                 <span>Legendary Actions (<span id="ed-legendaryActions-n">0</span>)</span>
                 <span style="display:flex;gap:6px">
-                  <button class="btn ghost sm" onclick="openTemplateModal('legendaryActions')">+ From template…</button>
-                  <button class="btn ghost sm" onclick="addFeature('legendaryActions')">+ Add blank</button>
+                  <button class="btn btn--ghost btn--sm" onclick="openTemplateModal('legendaryActions')">+ From template…</button>
+                  <button class="btn btn--ghost btn--sm" onclick="addFeature('legendaryActions')">+ Add blank</button>
                 </span>
               </div>
               <div class="ed-feat-list" id="ed-legendaryActions-list"></div>
             </div>
             <div class="ed-sec">
-              <div class="ed-sec-h"><span>Lair Effects (<span id="ed-lairEffects-n">0</span>)</span><button class="btn ghost sm" onclick="addFeature('lairEffects')">+ Add</button></div>
+              <div class="ed-sec-h"><span>Lair Effects (<span id="ed-lairEffects-n">0</span>)</span><button class="btn btn--ghost btn--sm" onclick="addFeature('lairEffects')">+ Add</button></div>
               <div class="ed-feat-list" id="ed-lairEffects-list"></div>
             </div>
 
@@ -692,7 +607,7 @@
       <div class="tab-panel" id="panel-analysis" style="display:none">
         <div class="hint">Aggregate stats across the imported bestiary — built to anchor the future stat-block editor and generator. Numbers come from the structured fields and (for attack bonus, damage, save DC) regex-parsed action prose. The Typical Stats table is the load-bearing piece: it answers "what should a CR X monster actually look like?".</div>
         <div class="toolbar" style="justify-content:space-between;align-items:center">
-          <button class="btn" onclick="runAnalysis()">Recompute</button>
+          <button class="btn btn--primary" onclick="runAnalysis()">Recompute</button>
           <span id="ana-status" class="hint" style="margin:0">Switch to this tab to run the analysis.</span>
         </div>
         <div class="ana-section"><div id="ana-summary"></div></div>
@@ -783,9 +698,9 @@
               </div>
             </div>
             <div class="gen-actions">
-              <button class="btn brass" onclick="generateMonster()">🎲 Generate</button>
-              <button class="btn ghost sm" onclick="generateMonster()" id="gen-reroll-btn" disabled title="Re-roll with the same criteria">↻ Generate another</button>
-              <button class="btn brass sm" onclick="openGeneratedInEditor()" id="gen-open-btn" disabled>📋 Open in Editor</button>
+              <button class="btn btn--brass" onclick="generateMonster()">🎲 Generate</button>
+              <button class="btn btn--ghost btn--sm" onclick="generateMonster()" id="gen-reroll-btn" disabled title="Re-roll with the same criteria">↻ Generate another</button>
+              <button class="btn btn--brass btn--sm" onclick="openGeneratedInEditor()" id="gen-open-btn" disabled>📋 Open in Editor</button>
             </div>
             <div class="gen-sec">
               <h3>Candidates considered (<span id="gen-cand-n">0</span>)</h3>
@@ -807,7 +722,7 @@
           <div>
             <div class="col-head">
               <span>Library features (<span id="lib-count">0</span>)</span>
-              <span id="lib-source" style="font-size:0.55rem;color:var(--ink-faint);letter-spacing:0.12em">—</span>
+              <span id="lib-source" style="font-size:0.55rem;color:var(--c-ink-faint);letter-spacing:0.12em">—</span>
             </div>
             <div class="toolbar">
               <input type="text" id="lib-search" placeholder="Search name…" oninput="renderLibraryList()">
@@ -845,15 +760,15 @@
                 <option value="signature">Signature only</option>
                 <option value="common">Common only</option>
               </select>
-              <button class="btn ghost sm" onclick="clearLibraryFilters()">Clear</button>
-              <button class="btn brass sm" onclick="newLibraryEntry()">+ New</button>
+              <button class="btn btn--ghost btn--sm" onclick="clearLibraryFilters()">Clear</button>
+              <button class="btn btn--brass btn--sm" onclick="newLibraryEntry()">+ New</button>
             </div>
             <div class="list" id="lib-list"></div>
           </div>
           <div>
             <div class="col-head">
               <span>Edit feature</span>
-              <span id="lib-edit-id" style="font-size:0.55rem;color:var(--ink-faint);letter-spacing:0.12em"></span>
+              <span id="lib-edit-id" style="font-size:0.55rem;color:var(--c-ink-faint);letter-spacing:0.12em"></span>
             </div>
             <div id="lib-edit-panel">
               <div class="empty-note">Pick a feature on the left, or click <b>+ New</b> to create one.</div>
@@ -868,10 +783,10 @@
           <h3>Import bestiary</h3>
           <div class="hint">Pick the <code>bestiary.json</code> file (output of <code>scripts/normalize_bestiary.py</code>). The file stays on your machine — only its parsed contents go up to your worker's KV. Bestiary entries are DM-only and never reach players directly.</div>
           <div class="fg"><label>Import mode</label>
-            <div style="display:flex;flex-direction:column;gap:5px;font-size:0.92rem;color:var(--ink-light)">
+            <div style="display:flex;flex-direction:column;gap:5px;font-size:0.92rem;color:var(--c-ink-light)">
               <label style="display:flex;align-items:center;gap:7px;cursor:pointer">
                 <input type="radio" name="import-mode" value="merge" checked onchange="onImportModeChange()">
-                <span><b>Merge new</b> — only add monsters whose <code>id</code> isn't already in KV. Existing entries are left alone. <span style="color:var(--teal-bright)">Default — safe for re-imports.</span></span>
+                <span><b>Merge new</b> — only add monsters whose <code>id</code> isn't already in KV. Existing entries are left alone. <span style="color:var(--c-teal-bright)">Default — safe for re-imports.</span></span>
               </label>
               <label style="display:flex;align-items:center;gap:7px;cursor:pointer">
                 <input type="radio" name="import-mode" value="replace" onchange="onImportModeChange()">
@@ -882,7 +797,7 @@
           <div class="fg"><label>Bestiary file</label><input type="file" id="import-file" accept="application/json,.json" onchange="loadSeed(event)"></div>
           <div id="import-preview" class="hint"></div>
           <div class="form-actions">
-            <button class="btn brass" id="import-btn" onclick="doImport()" disabled>Import to KV</button>
+            <button class="btn btn--brass" id="import-btn" onclick="doImport()" disabled>Import to KV</button>
           </div>
         </div>
       </div>
@@ -891,7 +806,7 @@
     <div class="footer"><p class="footer-text">The Spire · The Menagerie</p></div>
   </main>
   <!-- CLONE-TO-EDITOR PICKER MODAL -->
-  <div class="modal-backdrop hidden" id="clone-modal" onclick="if(event.target===this)closeClonePicker()">
+  <div class="modal-overlay" id="clone-modal" onclick="if(event.target===this)closeClonePicker()">
     <div class="tpl-modal clone-modal">
       <div class="tpl-header">
         <h2>Load from existing monster</h2>
@@ -903,13 +818,13 @@
         <div class="clone-list" id="clone-list"></div>
       </div>
       <div class="tpl-footer">
-        <button class="btn ghost" onclick="closeClonePicker()">Cancel</button>
+        <button class="btn btn--ghost" onclick="closeClonePicker()">Cancel</button>
       </div>
     </div>
   </div>
 
   <!-- TEMPLATE PICKER MODAL -->
-  <div class="modal-backdrop hidden" id="tpl-modal" onclick="if(event.target===this)closeTemplateModal()">
+  <div class="modal-overlay" id="tpl-modal" onclick="if(event.target===this)closeTemplateModal()">
     <div class="tpl-modal">
       <div class="tpl-header">
         <h2 id="tpl-title">Action template</h2>
@@ -936,19 +851,19 @@
         <div class="tpl-preview" id="tpl-preview"><div class="name">—</div><div class="body">Fill the fields above.</div></div>
       </div>
       <div class="tpl-footer">
-        <button class="btn ghost" onclick="closeTemplateModal()">Cancel</button>
-        <button class="btn brass" id="tpl-add-btn" onclick="composeFromTemplate()">Add</button>
+        <button class="btn btn--ghost" onclick="closeTemplateModal()">Cancel</button>
+        <button class="btn btn--brass" id="tpl-add-btn" onclick="composeFromTemplate()">Add</button>
       </div>
     </div>
   </div>
 
-  <div class="toast" id="toast"></div>
-
-  <script src="auth.js"></script>
+  <script src="auth.js?v=2"></script>
+  <script src="spire-api.js?v=2"></script>
+  <script src="spire-ui.js?v=1"></script>
   <script src="bestiary-merge.js"></script>
   <script>
-    const WORKER_URL = (window.Auth && window.Auth.WORKER_URL) || 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
-    function esc(s){return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+    const WORKER_URL = API.WORKER_URL;
+    const esc = UI.escapeHtml;
 
     // bestiary: { schemaVersion, source, scrapedAt, normalizedAt, count, monsters:[...] }
     // tolerate either an envelope or a bare array
@@ -976,11 +891,7 @@
       ['26','26'], ['27','27'], ['28','28'], ['29','29'], ['30','30']
     ];
 
-    function toast(msg, isErr){
-      const t = document.getElementById('toast');
-      t.textContent = msg; t.className = 'toast show' + (isErr?' err':'');
-      clearTimeout(t._t); t._t = setTimeout(()=>{ t.className='toast'; }, 2600);
-    }
+    const toast = (msg, isErr) => UI.toast(msg, isErr === true ? 'error' : (isErr || 'info'));
 
     function asMonsters(d){
       if (Array.isArray(d)) return d;
@@ -1020,7 +931,7 @@
 
     async function bootstrap(){
       const ident = Auth.identity();
-      document.getElementById('role-line').innerHTML = `${esc(ident.display||'DM')} <span class="role dm">DM</span>`;
+      document.getElementById('role-line').innerHTML = `${esc(ident.display||'DM')} <span class="chip chip--dm">DM</span>`;
       if (!Auth.requireRole('dm', { reason:'The Menagerie is for the DM only.' })) return;
       const stateEl = document.getElementById('state');
       try {
@@ -1073,7 +984,7 @@
     }
 
     function switchTab(name){
-      document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+      document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('is-active', t.dataset.tab===name));
       document.querySelectorAll('.tab-panel').forEach(p=>p.style.display='none');
       document.getElementById('panel-'+name).style.display='';
       if (name === 'analysis' && !window.__anaCache) runAnalysis();
@@ -1208,8 +1119,8 @@
       const isCustom = !!m._custom;
       document.getElementById('m-statblock').innerHTML =
         `<div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:0.4rem">
-           <button class="btn ghost sm" onclick="editMonsterInPlace('${esc(m.id)}')" title="Open this monster in the Editor and save changes back to ${isCustom ? 'bestiary_custom' : 'the imported bestiary'}">✏️ Edit ${isCustom ? 'this custom' : 'this monster'}</button>
-           <button class="btn ghost sm" onclick="cloneMonsterToEditor('${esc(m.id)}')" title="Open this monster in the Editor as a new custom copy">📋 Edit a copy</button>
+           <button class="btn btn--ghost btn--sm" onclick="editMonsterInPlace('${esc(m.id)}')" title="Open this monster in the Editor and save changes back to ${isCustom ? 'bestiary_custom' : 'the imported bestiary'}">✏️ Edit ${isCustom ? 'this custom' : 'this monster'}</button>
+           <button class="btn btn--ghost btn--sm" onclick="cloneMonsterToEditor('${esc(m.id)}')" title="Open this monster in the Editor as a new custom copy">📋 Edit a copy</button>
          </div>` +
         renderStatblock(m);
     }
@@ -1446,7 +1357,7 @@
         } catch(e){
           seedData = null;
           const prev = document.getElementById('import-preview');
-          prev.innerHTML = `<span style="color:var(--rust)">Couldn't read that file: ${esc(e.message)}</span>`;
+          prev.innerHTML = `<span style="color:var(--c-error)">Couldn't read that file: ${esc(e.message)}</span>`;
           document.getElementById('import-btn').disabled = true;
         }
       };
@@ -1465,7 +1376,7 @@
         if (ok){
           featureLibrary = seedData;
           document.getElementById('import-preview').innerHTML =
-            `<b style="color:var(--teal-bright)">Done.</b> Feature library is now ${(seedData.features||[]).length} entries.`;
+            `<b style="color:var(--c-teal-bright)">Done.</b> Feature library is now ${(seedData.features||[]).length} entries.`;
           toast('Feature library imported.');
           btn.textContent = originalLabel;
         } else {
@@ -1482,7 +1393,7 @@
       let summaryHTML;
       if (mode === 'replace'){
         payload = seedData;
-        summaryHTML = `<b style="color:var(--teal-bright)">Done.</b> The Menagerie now holds ${asMonsters(seedData).length} monsters.`;
+        summaryHTML = `<b style="color:var(--c-teal-bright)">Done.</b> The Menagerie now holds ${asMonsters(seedData).length} monsters.`;
       } else {
         const { toAdd, skipped } = computeMergeDelta(asMonsters(bestiary), asMonsters(seedData));
         if (!toAdd.length){
@@ -1490,7 +1401,7 @@
           btn.textContent = originalLabel;
           btn.disabled = true;
           document.getElementById('import-preview').innerHTML =
-            `<b style="color:var(--ink-faint)">Nothing to do.</b> All ${asMonsters(seedData).length} monsters in this file are already in KV.`;
+            `<b style="color:var(--c-ink-faint)">Nothing to do.</b> All ${asMonsters(seedData).length} monsters in this file are already in KV.`;
           toast('Nothing new to import.');
           return;
         }
@@ -1515,7 +1426,7 @@
           }
           payload._sources = merged;
         }
-        summaryHTML = `<b style="color:var(--teal-bright)">Done.</b> Added ${toAdd.length} new monsters` +
+        summaryHTML = `<b style="color:var(--c-teal-bright)">Done.</b> Added ${toAdd.length} new monsters` +
           (skipped.length ? ` (${skipped.length} already in KV were skipped)` : '') +
           `. Bestiary is now ${mergedMonsters.length} entries.`;
       }
@@ -1547,13 +1458,13 @@
             featureLibrary = rebuilt;
             const after = rebuilt.features.length;
             const delta = after - before;
-            libSummary = `<br><span style="color:var(--ink-faint);font-size:0.85em">Feature library auto-rebuilt: ${after} entries (${delta >= 0 ? '+' : ''}${delta} from previous).</span>`;
+            libSummary = `<br><span style="color:var(--c-ink-faint);font-size:0.85em">Feature library auto-rebuilt: ${after} entries (${delta >= 0 ? '+' : ''}${delta} from previous).</span>`;
           } else {
-            libSummary = `<br><span style="color:var(--rust);font-size:0.85em">Feature library rebuild failed — re-run scripts/extract_features.py and re-import via the library path.</span>`;
+            libSummary = `<br><span style="color:var(--c-error);font-size:0.85em">Feature library rebuild failed — re-run scripts/extract_features.py and re-import via the library path.</span>`;
           }
         } catch(e){
           console.error('Library rebuild failed:', e);
-          libSummary = `<br><span style="color:var(--rust);font-size:0.85em">Feature library rebuild errored: ${esc(e.message)}. Bestiary save succeeded; rebuild manually with scripts/extract_features.py.</span>`;
+          libSummary = `<br><span style="color:var(--c-error);font-size:0.85em">Feature library rebuild errored: ${esc(e.message)}. Bestiary save succeeded; rebuild manually with scripts/extract_features.py.</span>`;
         }
 
         document.getElementById('import-preview').innerHTML = summaryHTML + libSummary;
@@ -2533,9 +2444,9 @@
             <input value="${esc(f.name||'')}" placeholder="Feature name" oninput="updateFeature('${section}',${i},'name',this.value)">
             ${f._template ? `<span class="ed-feat-tpl" title="Linked to ${esc(TEMPLATES[f._template.kind]?.label || f._template.kind)} template — name and body recompute when stats change. Editing the name or body breaks the link.">🔗</span>` : ''}
             <div class="ed-feat-actions">
-              <button class="btn ghost sm" onclick="moveFeature('${section}',${i},-1)" ${i===0?'disabled':''}>↑</button>
-              <button class="btn ghost sm" onclick="moveFeature('${section}',${i},1)" ${i===items.length-1?'disabled':''}>↓</button>
-              <button class="btn danger sm" onclick="removeFeature('${section}',${i})">×</button>
+              <button class="btn btn--ghost btn--sm" onclick="moveFeature('${section}',${i},-1)" ${i===0?'disabled':''}>↑</button>
+              <button class="btn btn--ghost btn--sm" onclick="moveFeature('${section}',${i},1)" ${i===items.length-1?'disabled':''}>↓</button>
+              <button class="btn btn--danger btn--sm" onclick="removeFeature('${section}',${i})">×</button>
             </div>
           </div>
           <textarea oninput="updateFeature('${section}',${i},'body',this.value)" placeholder="Body text — describe the trait or action.">${esc(f.body||'')}</textarea>
@@ -2743,13 +2654,13 @@
      * starting point for a new homebrew. Wraps cloneMonsterToEditor().
      */
     function openClonePicker(){
-      document.getElementById('clone-modal').classList.remove('hidden');
+      document.getElementById('clone-modal').classList.add('is-visible');
       document.getElementById('clone-search').value = '';
       renderCloneList();
       setTimeout(() => document.getElementById('clone-search')?.focus(), 50);
     }
     function closeClonePicker(){
-      document.getElementById('clone-modal').classList.add('hidden');
+      document.getElementById('clone-modal').classList.remove('is-visible');
     }
     function renderCloneList(){
       const q = (document.getElementById('clone-search').value || '').trim().toLowerCase();
@@ -2894,7 +2805,7 @@
             <div class="fg"><label>Magic bonus</label><input id="tplf-damageBonus" type="number" value="${f.damageBonus ?? 0}"></div>
             <div class="fg"><label>Damage type</label><select id="tplf-damageType">${DMG_TYPES.map(d => `<option ${d===f.damageType?'selected':''}>${d}</option>`).join('')}</select></div>
           </div>
-          <label class="toggle" style="display:flex;align-items:center;gap:6px;font-size:0.84rem;color:var(--ink-light);margin-top:0.2rem"><input type="checkbox" id="tplf-useAbilityMod" ${f.useAbilityMod?'checked':''}> Add ability mod to damage (auto-updates if the stat changes)</label>
+          <label class="toggle" style="display:flex;align-items:center;gap:6px;font-size:0.84rem;color:var(--c-ink-light);margin-top:0.2rem"><input type="checkbox" id="tplf-useAbilityMod" ${f.useAbilityMod?'checked':''}> Add ability mod to damage (auto-updates if the stat changes)</label>
           <div class="row c3">
             <div class="fg"><label>Rider damage (optional)</label><input id="tplf-riderDice" placeholder="e.g. 2d10" value="${esc(f.riderDice||'')}"></div>
             <div class="fg"><label>Rider type</label><select id="tplf-riderType"><option value="">—</option>${DMG_TYPES.map(d => `<option ${d===f.riderType?'selected':''}>${d}</option>`).join('')}</select></div>
@@ -2953,7 +2864,7 @@
           </div>
           <div class="row c3">
             <div class="fg"><label>Magic bonus</label><input id="tplf-damageBonus" type="number" value="${f.damageBonus ?? 0}"></div>
-            <label class="toggle" style="display:flex;align-items:center;gap:6px;font-size:0.84rem;color:var(--ink-light);margin-top:1.2rem"><input type="checkbox" id="tplf-useAbilityMod" ${f.useAbilityMod?'checked':''}> Add ability mod</label>
+            <label class="toggle" style="display:flex;align-items:center;gap:6px;font-size:0.84rem;color:var(--c-ink-light);margin-top:1.2rem"><input type="checkbox" id="tplf-useAbilityMod" ${f.useAbilityMod?'checked':''}> Add ability mod</label>
             <div class="fg"><label>Recharge / limit</label><select id="tplf-recharge">${RECHARGE_OPTIONS.map(o => `<option value="${o.value}" ${o.value===f.recharge?'selected':''}>${o.label}</option>`).join('')}</select></div>
           </div>
           <div class="row c2">
@@ -3016,7 +2927,7 @@
             <div class="fg"><label>Damage type</label><select id="tplf-damageType">${DMG_TYPES.map(d => `<option ${d===f.damageType?'selected':''}>${d}</option>`).join('')}</select></div>
             <div class="fg"><label>Recharge / limit</label><select id="tplf-recharge">${RECHARGE_OPTIONS.map(o => `<option value="${o.value}" ${o.value===f.recharge?'selected':''}>${o.label}</option>`).join('')}</select></div>
           </div>
-          <label class="toggle" style="display:flex;align-items:center;gap:6px;font-size:0.84rem;color:var(--ink-light);margin-top:0.2rem"><input type="checkbox" id="tplf-useAbilityMod" ${f.useAbilityMod?'checked':''}> Add ability mod to damage (auto-updates if the stat changes)</label>
+          <label class="toggle" style="display:flex;align-items:center;gap:6px;font-size:0.84rem;color:var(--c-ink-light);margin-top:0.2rem"><input type="checkbox" id="tplf-useAbilityMod" ${f.useAbilityMod?'checked':''}> Add ability mod to damage (auto-updates if the stat changes)</label>
           <div class="row c2">
             <div class="fg"><label>Rider damage (optional)</label><input id="tplf-riderDice" placeholder="e.g. 1d4" value="${esc(f.riderDice||'')}"></div>
             <div class="fg"><label>Rider type</label><select id="tplf-riderType"><option value="">—</option>${DMG_TYPES.map(d => `<option ${d===f.riderType?'selected':''}>${d}</option>`).join('')}</select></div>
@@ -3070,7 +2981,7 @@
             <div class="fg"><label>Damage type</label><select id="tplf-damageType">${DMG_TYPES.map(d => `<option ${d===f.damageType?'selected':''}>${d}</option>`).join('')}</select></div>
           </div>
           <div class="fg"><label>Extra failure clause (optional)</label><textarea id="tplf-failureSuffix" placeholder="e.g. The target has the Frightened condition until the end of its next turn.">${esc(f.failureSuffix||'')}</textarea></div>
-          <label style="display:flex;align-items:center;gap:6px;font-size:0.88rem;color:var(--ink-light)"><input type="checkbox" id="tplf-successHalf" ${f.successHalf?'checked':''}> Success: half damage</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.88rem;color:var(--c-ink-light)"><input type="checkbox" id="tplf-successHalf" ${f.successHalf?'checked':''}> Success: half damage</label>
           <div class="fg"><label>Extra success clause (optional)</label><textarea id="tplf-successSuffix" placeholder="e.g. No damage and no effect.">${esc(f.successSuffix||'')}</textarea></div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:0.3rem">
             <span class="tpl-derived">DC: ${saveDCFor(f.dcAbility, m)}</span>
@@ -3234,12 +3145,12 @@
       document.getElementById('tpl-kind').value = _tpl.kind;
       document.getElementById('tpl-title').textContent = 'Add to ' + (SECTION_LABELS[_tpl.targetSection] || 'Actions');
       document.getElementById('tpl-add-btn').textContent = 'Add to ' + (SECTION_LABELS[_tpl.targetSection] || 'Actions');
-      document.getElementById('tpl-modal').classList.remove('hidden');
+      document.getElementById('tpl-modal').classList.add('is-visible');
       renderSectionWrapper();
       renderTemplateForm();
     }
     function closeTemplateModal(){
-      document.getElementById('tpl-modal').classList.add('hidden');
+      document.getElementById('tpl-modal').classList.remove('is-visible');
     }
     function onTemplateKindChange(){
       _tpl.kind = document.getElementById('tpl-kind').value;
@@ -3252,7 +3163,7 @@
       const wrap = document.getElementById('tpl-section-wrap');
       if (_tpl.targetSection === 'reactions'){
         wrap.innerHTML = `
-          <div class="tpl-form" style="margin-bottom:0.7rem;padding-bottom:0.7rem;border-bottom:1px solid var(--border)">
+          <div class="tpl-form" style="margin-bottom:0.7rem;padding-bottom:0.7rem;border-bottom:1px solid var(--c-border)">
             <div class="fg">
               <label>Trigger (Reaction)</label>
               <textarea id="tpl-trigger" placeholder='e.g. "A creature the X can see within 5 ft. hits the X with an attack roll."' oninput="onSectionWrapperChange()">${esc(_tpl.trigger || '')}</textarea>
@@ -3260,7 +3171,7 @@
           </div>`;
       } else if (_tpl.targetSection === 'legendaryActions'){
         wrap.innerHTML = `
-          <div class="tpl-form" style="margin-bottom:0.7rem;padding-bottom:0.7rem;border-bottom:1px solid var(--border)">
+          <div class="tpl-form" style="margin-bottom:0.7rem;padding-bottom:0.7rem;border-bottom:1px solid var(--c-border)">
             <div class="fg" style="max-width:160px">
               <label>Cost (legendary actions)</label>
               <input id="tpl-legendaryCost" type="number" min="1" max="3" value="${_tpl.legendaryCost}" oninput="onSectionWrapperChange()">
@@ -4841,7 +4752,7 @@
               </div>
               <div class="lib-fg">
                 <label>Signature</label>
-                <label style="display:flex;align-items:center;gap:6px;font-size:0.84rem;color:var(--ink-light);padding-top:4px">
+                <label style="display:flex;align-items:center;gap:6px;font-size:0.84rem;color:var(--c-ink-light);padding-top:4px">
                   <input type="checkbox" id="lef-isSignature" ${f.isSignature ? 'checked' : ''}>
                   Restrict to high-budget chimeras (rerolled 70% otherwise)
                 </label>
@@ -4865,7 +4776,7 @@
             <h4>Template fields (compose-time inputs)</h4>
             <div class="lib-fg">
               <label>JSON</label>
-              <textarea id="lef-templateFields" style="min-height:130px;font-family:'Menlo','Monaco',monospace;font-size:0.78rem">${esc(JSON.stringify(f.templateFields || {}, null, 2))}</textarea>
+              <textarea id="lef-templateFields" style="min-height:130px;font-family:var(--font-mono);font-size:0.78rem">${esc(JSON.stringify(f.templateFields || {}, null, 2))}</textarea>
             </div>
             <div class="lib-help">For attack/save kinds the chimera composes the body from these against its own stats. Edit as raw JSON; saved value must parse. Empty object <code>{}</code> means the bodyTemplate below is used verbatim.</div>
           </div>
@@ -4886,10 +4797,10 @@
           </div>
 
           <div class="lib-actions">
-            <button class="btn brass" onclick="saveLibraryEntry()">Save changes</button>
-            <button class="btn ghost sm" onclick="selectLibraryEntry('${esc(f.id)}')">Discard edits</button>
+            <button class="btn btn--brass" onclick="saveLibraryEntry()">Save changes</button>
+            <button class="btn btn--ghost btn--sm" onclick="selectLibraryEntry('${esc(f.id)}')">Discard edits</button>
             ${isNew || (f._custom || (f.donorCount || 0) === 0)
-              ? `<button class="btn danger sm" onclick="deleteLibraryEntry('${esc(f.id)}')">Delete</button>`
+              ? `<button class="btn btn--danger btn--sm" onclick="deleteLibraryEntry('${esc(f.id)}')">Delete</button>`
               : `<span class="lib-help" style="margin:0">Imported entries can't be deleted — re-run extract_features.py and re-import to refresh.</span>`}
           </div>
         </div>
@@ -4990,10 +4901,9 @@
     }
 
     async function saveKey(type, payload){
-      const r = await fetch(WORKER_URL, { method:'POST', headers: Auth.dmHeaders(), body: JSON.stringify({ type, payload }) });
-      if (r.status === 401){ toast('DM session expired — sign in again.', true); return false; }
-      let b={}; try{ b=await r.json(); }catch{}
-      if (!r.ok || b.error){ toast(b.error || ('Save failed (HTTP '+r.status+')'), true); return false; }
+      const { ok, status, body } = await API.dmPost(type, payload);
+      if (status === 401){ toast('DM session expired — sign in again.', true); return false; }
+      if (!ok || (body && body.error)){ toast((body && body.error) || ('Save failed (HTTP '+status+')'), true); return false; }
       return true;
     }
 

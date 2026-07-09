@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>spire-api helpers</title></head>
+<body>
+<pre id="out"></pre>
+<script>window.Auth = { WORKER_URL: 'https://example.invalid/' };</script>
+<script src="../spire-api.js?v=2"></script>
+<script>
+const log = (msg) => document.getElementById('out').textContent += msg + '\n';
+let failed = 0;
+function check(cond, label) {
+  if (cond) log('✓ ' + label);
+  else { log('✗ ' + label); failed++; }
+}
+
+// ── mergeById ──
+const remote = [
+  { id: 'a', v: 'remote-a' },
+  { id: 'b', v: 'remote-b' },
+  { id: 'c', v: 'remote-c' },   // added in another tab, not in local
+];
+const local = [
+  { id: 'a', v: 'local-a' },    // edited locally → local wins
+  { id: 'b', v: 'remote-b' },
+  { id: 'd', v: 'local-d' },    // added locally
+];
+
+let m = API.mergeById(remote, local, []);
+check(m.length === 4, 'merge: union of remote + local');
+check(m.find(x => x.id === 'a').v === 'local-a', 'merge: local wins for shared id');
+check(!!m.find(x => x.id === 'c'), 'merge: remote-only record kept');
+check(!!m.find(x => x.id === 'd'), 'merge: local-only record appended');
+check(m.findIndex(x => x.id === 'a') === 0, 'merge: remote ordering preserved for shared ids');
+
+m = API.mergeById(remote, local.filter(x => x.id !== 'b'), ['b']);
+check(!m.find(x => x.id === 'b'), 'merge: explicit deletion not resurrected');
+check(m.length === 3, 'merge: deletion leaves union of the rest');
+
+// numeric vs string ids (the boundary-coercion rule)
+m = API.mergeById([{ id: 7, v: 'remote' }], [{ id: '7', v: 'local' }], []);
+check(m.length === 1 && m[0].v === 'local', 'merge: numeric remote id matches string local id');
+
+m = API.mergeById([{ id: 9, v: 'x' }], [], ['9']);
+check(m.length === 0, 'merge: deletion works across numeric/string ids');
+
+// empty remote
+m = API.mergeById([], local, []);
+check(m.length === 3, 'merge: empty remote yields local as-is');
+
+log(failed ? `\n${failed} FAILED` : '\nALL PASS');
+</script>
+</body></html>

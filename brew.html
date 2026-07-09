@@ -5,81 +5,58 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>The Spire — The Cauldron</title>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="theme.css?v=2">
   <style>
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    /* Alias theme.css token names to this page's existing palette so any theme component classes inherit the local look. */
+    /* Page-specific tokens (potion category colors) on top of theme.css tokens. */
     :root{
-      --c-bg:var(--bg);--c-bg-elevated:var(--panel-deep);--c-surface:var(--panel);
-      --c-surface-2:var(--panel-light);--c-surface-3:var(--panel-light);
-      --c-border:var(--border);--c-border-light:var(--border-light);
-      --c-brass:var(--brass);--c-brass-bright:#d8b888;--c-brass-deep:rgba(184,138,90,0.55);
-      --c-teal:var(--teal);--c-teal-bright:var(--teal-bright);--c-teal-deep:var(--teal-deep);
-      --c-ink:var(--ink);--c-ink-light:var(--ink-light);--c-ink-faint:var(--ink-faint);--c-ink-dim:var(--ink-faint);
-      --c-error:var(--rust);
-    }
-    :root{
-      --bg:#080c10;--panel:#131c22;--panel-deep:#0d141a;--panel-light:#1c2730;
-      --border:#2c4048;--border-light:#3e5862;
-      --teal:#4a9595;--teal-bright:#7ec5c5;--teal-deep:#2a5454;--teal-faint:#1b3838;
-      --ink:#dde3e5;--ink-light:#a3adb3;--ink-faint:#6c787f;
-      --brass:#b88a5a;--rust:#a85d4a;
       --combat:#c43838;--utility:#3a6fd0;--whimsy:#b060d0;
-      --radius:4px;
     }
     body{
-      background:var(--bg);
+      background:var(--c-bg);
       background-image:
         radial-gradient(ellipse at 20% 10%, rgba(74,149,149,0.10) 0%, transparent 55%),
         radial-gradient(ellipse at 80% 90%, rgba(184,138,90,0.06) 0%, transparent 55%);
-      min-height:100vh; color:var(--ink);
-      font-family:'Crimson Text',Georgia,serif;
       padding:1.5rem 1rem 4rem;
     }
     .wrap{max-width:1000px;margin:0 auto}
 
-    /* Topbar */
-    .topbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding-bottom:1rem;margin-bottom:1.25rem;border-bottom:1px solid var(--border);flex-wrap:wrap}
-    .topbar h1{font-family:'Cinzel',serif;font-size:clamp(1.2rem,1rem + 1vw,1.55rem);font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--ink);text-shadow:0 1px 24px rgba(74,149,149,0.10)}
-    .topbar h1 .accent{color:var(--teal-bright);font-weight:400}
-    .topbar-meta{display:flex;align-items:center;gap:8px;font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-faint);flex-wrap:wrap}
-    .topbar-meta .role{padding:3px 10px;border-radius:9999px;border:1px solid;font-size:0.58rem;letter-spacing:0.14em}
-    .role.dm{color:#d8b888;border-color:rgba(184,138,90,0.45);background:rgba(184,138,90,0.12)}
-    .role.player{color:var(--teal-bright);border-color:rgba(74,149,149,0.45);background:rgba(74,149,149,0.12)}
-    .home-link{font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-light);text-decoration:none;padding:7px 14px;border:1px solid var(--border-light);background:var(--panel-light);border-radius:3px;transition:background 120ms,border-color 120ms,color 120ms}
-    .home-link:hover{background:var(--panel);border-color:var(--teal);color:var(--teal-bright)}
+    /* Topbar (page variant: title + meta on one row, transparent over theme .topbar base) */
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding-bottom:1rem;margin-bottom:1.25rem;border-bottom:1px solid var(--c-border);flex-wrap:wrap}
+    .topbar h1{font-family:var(--font-display);font-size:clamp(1.2rem,1rem + 1vw,1.55rem);font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--c-ink);text-shadow:0 1px 24px rgba(74,149,149,0.10)}
+    .topbar h1 .accent{color:var(--c-teal-bright);font-weight:400}
+    .topbar-meta{display:flex;align-items:center;gap:8px;font-family:var(--font-display);font-size:0.66rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--c-ink-faint);flex-wrap:wrap}
 
-    /* Mode tabs */
+    /* Mode tabs — boxed segmented toggles (kept page-local: theme .tab is the underline style) */
     .modes{display:flex;gap:6px;margin-bottom:1.25rem;flex-wrap:wrap}
-    .mode-tab{font-family:'Cinzel',serif;font-size:0.72rem;font-weight:500;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-light);background:var(--panel-deep);border:1px solid var(--border);border-radius:3px;padding:9px 18px;cursor:pointer;transition:background 120ms cubic-bezier(0.16,1,0.3,1),border-color 120ms cubic-bezier(0.16,1,0.3,1),color 120ms cubic-bezier(0.16,1,0.3,1),transform 120ms cubic-bezier(0.16,1,0.3,1),box-shadow 120ms cubic-bezier(0.16,1,0.3,1)}
-    .mode-tab:hover{border-color:var(--teal);color:var(--teal-bright);background:var(--panel)}
+    .mode-tab{font-family:var(--font-display);font-size:0.72rem;font-weight:500;letter-spacing:0.14em;text-transform:uppercase;color:var(--c-ink-light);background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:var(--radius-sm);padding:9px 18px;cursor:pointer;transition:background var(--motion-fast) var(--ease-out),border-color var(--motion-fast) var(--ease-out),color var(--motion-fast) var(--ease-out),transform var(--motion-fast) var(--ease-out),box-shadow var(--motion-fast) var(--ease-out)}
+    .mode-tab:hover{border-color:var(--c-teal);color:var(--c-teal-bright);background:var(--c-surface)}
     .mode-tab:active{transform:translateY(1px)}
-    .mode-tab.active{background:var(--teal-faint);border-color:var(--teal);color:var(--teal-bright);box-shadow:0 0 0 1px rgba(74,149,149,0.25)}
-    .mode-hint{font-size:0.92rem;color:var(--ink-faint);font-style:italic;margin:-0.5rem 0 1.25rem}
+    .mode-tab.active{background:var(--c-teal-faint);border-color:var(--c-teal);color:var(--c-teal-bright);box-shadow:0 0 0 1px rgba(74,149,149,0.25)}
+    .mode-hint{font-size:0.92rem;color:var(--c-ink-faint);font-style:italic;margin:-0.5rem 0 1.25rem}
 
     /* Two-column layout */
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;align-items:start}
     @media (max-width:760px){.grid{grid-template-columns:1fr}}
-    .col-head{font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--brass);margin-bottom:0.6rem}
+    .col-head{font-family:var(--font-display);font-size:0.72rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--c-brass);margin-bottom:0.6rem}
 
     /* Ingredient picker */
-    .search{width:100%;background:var(--panel-deep);border:1px solid var(--border);border-radius:3px;color:var(--ink);font-family:'Crimson Text',serif;font-size:0.95rem;padding:8px 12px;outline:none;margin-bottom:0.6rem;transition:border-color 120ms,box-shadow 120ms}
-    .search:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(74,149,149,0.16)}
-    .search::placeholder{color:var(--ink-faint);opacity:0.6;font-style:italic}
-    .ing-list{max-height:460px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;background:var(--panel-deep);box-shadow:inset 0 0 0 1px rgba(255,255,255,0.02)}
-    .ing-row{display:flex;align-items:center;gap:8px;padding:8px 11px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 120ms,padding 120ms}
+    .search{width:100%;background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:var(--radius-sm);color:var(--c-ink);font-family:var(--font-body);font-size:0.95rem;padding:8px 12px;outline:none;margin-bottom:0.6rem;transition:border-color var(--motion-fast),box-shadow var(--motion-fast)}
+    .search:focus{border-color:var(--c-teal);box-shadow:0 0 0 3px rgba(74,149,149,0.16)}
+    .search::placeholder{color:var(--c-ink-faint);opacity:0.6;font-style:italic}
+    .ing-list{max-height:460px;overflow-y:auto;border:1px solid var(--c-border);border-radius:var(--radius-md);background:var(--c-bg-elevated);box-shadow:inset 0 0 0 1px rgba(255,255,255,0.02)}
+    .ing-row{display:flex;align-items:center;gap:8px;padding:8px 11px;border-bottom:1px solid var(--c-border);cursor:pointer;transition:background var(--motion-fast),padding var(--motion-fast)}
     .ing-row:last-child{border-bottom:none}
-    .ing-row:hover{background:var(--panel-light);padding-left:13px}
+    .ing-row:hover{background:var(--c-surface-2);padding-left:13px}
     .ing-row.disabled{opacity:0.4;cursor:not-allowed}
-    .ing-name{flex:1;font-size:0.95rem;color:var(--ink)}
-    .ing-rarity{font-family:'Cinzel',serif;font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid}
-    .ing-rarity.common{color:var(--ink-light);border-color:var(--border-light)}
-    .ing-rarity.uncommon{color:var(--teal-bright);border-color:var(--teal)}
-    .ing-rarity.rare{color:var(--brass);border-color:rgba(184,138,90,0.6)}
-    .ing-qty{font-family:'Cinzel',serif;font-size:0.62rem;color:var(--teal-bright);min-width:24px;text-align:right}
-    .ing-vals{display:flex;gap:5px;font-family:'Cinzel',serif;font-size:0.62rem}
+    .ing-name{flex:1;font-size:0.95rem;color:var(--c-ink)}
+    .ing-rarity{font-family:var(--font-display);font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid}
+    .ing-rarity.common{color:var(--c-ink-light);border-color:var(--c-border-light)}
+    .ing-rarity.uncommon{color:var(--c-teal-bright);border-color:var(--c-teal)}
+    .ing-rarity.rare{color:var(--c-brass);border-color:rgba(184,138,90,0.6)}
+    .ing-qty{font-family:var(--font-display);font-size:0.62rem;color:var(--c-teal-bright);min-width:24px;text-align:right}
+    .ing-vals{display:flex;gap:5px;font-family:var(--font-display);font-size:0.62rem}
     .v-c{color:var(--combat)}.v-u{color:var(--utility)}.v-w{color:var(--whimsy)}
-    .aff-chip{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--border-light);color:var(--ink-light);white-space:nowrap}
+    .aff-chip{font-family:var(--font-display);font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--c-border-light);color:var(--c-ink-light);white-space:nowrap}
     .aff-chip.fire{color:#ff9a6e;border-color:#c43838}
     .aff-chip.cold,.aff-chip.ice{color:#88c0ff;border-color:#3a6fd0}
     .aff-chip.lightning{color:#ffe060;border-color:#c4a838}
@@ -90,102 +67,92 @@
     .aff-chip.psychic{color:#e090c0;border-color:#a040a0}
     .aff-chip.force,.aff-chip.arcane{color:#c8a0ff;border-color:#7c5fc4}
     .affinity-tally{display:flex;flex-wrap:wrap;gap:5px;margin-top:0.6rem}
-    .affinity-tally .tally-label{font-family:'Cinzel',serif;font-size:0.56rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint);align-self:center;margin-right:4px}
-    .empty-note{padding:1.5rem 1rem;text-align:center;color:var(--ink-faint);font-style:italic;font-size:0.92rem}
+    .affinity-tally .tally-label{font-family:var(--font-display);font-size:0.56rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--c-ink-faint);align-self:center;margin-right:4px}
+    .empty-note{padding:1.5rem 1rem;text-align:center;color:var(--c-ink-faint);font-style:italic;font-size:0.92rem}
 
     /* Recipe slots */
     .slots{display:flex;gap:8px;margin-bottom:1rem}
-    .slot{flex:1;min-height:64px;border:1px dashed var(--border-light);border-radius:var(--radius);background:var(--panel-deep);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px;text-align:center;position:relative}
-    .slot.filled{border-style:solid;border-color:var(--teal-deep);background:var(--panel-light);cursor:pointer}
-    .slot.filled:hover{border-color:var(--rust)}
-    .slot-name{font-size:0.85rem;color:var(--ink);line-height:1.2}
-    .slot-vals{display:flex;gap:6px;font-family:'Cinzel',serif;font-size:0.6rem;margin-top:4px}
-    .slot-empty{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint)}
-    .slot .x{position:absolute;top:3px;right:6px;color:var(--ink-faint);font-size:0.8rem}
-    .slot.filled:hover .x{color:var(--rust)}
+    .slot{flex:1;min-height:64px;border:1px dashed var(--c-border-light);border-radius:var(--radius-sm);background:var(--c-bg-elevated);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px;text-align:center;position:relative}
+    .slot.filled{border-style:solid;border-color:var(--c-teal-deep);background:var(--c-surface-2);cursor:pointer}
+    .slot.filled:hover{border-color:var(--c-error)}
+    .slot-name{font-size:0.85rem;color:var(--c-ink);line-height:1.2}
+    .slot-vals{display:flex;gap:6px;font-family:var(--font-display);font-size:0.6rem;margin-top:4px}
+    .slot-empty{font-family:var(--font-display);font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--c-ink-faint)}
+    .slot .x{position:absolute;top:3px;right:6px;color:var(--c-ink-faint);font-size:0.8rem}
+    .slot.filled:hover .x{color:var(--c-error)}
 
-    .panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;margin-bottom:1rem}
+    .panel{background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-sm);padding:1rem 1.1rem;margin-bottom:1rem}
 
     /* Sums */
     .sum-row{display:flex;align-items:center;gap:10px;margin-bottom:7px}
-    .sum-label{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;width:62px;color:var(--ink-light)}
-    .sum-bar{flex:1;height:14px;background:var(--panel-deep);border:1px solid var(--border);border-radius:7px;overflow:hidden}
+    .sum-label{font-family:var(--font-display);font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;width:62px;color:var(--c-ink-light)}
+    .sum-bar{flex:1;height:14px;background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:7px;overflow:hidden}
     .sum-fill{height:100%;border-radius:7px;transition:width 0.25s}
     .sum-fill.combat{background:var(--combat)}.sum-fill.utility{background:var(--utility)}.sum-fill.whimsy{background:var(--whimsy)}
-    .sum-val{font-family:'Cinzel',serif;font-size:0.85rem;width:26px;text-align:right}
-    .sum-row.win .sum-label{color:var(--teal-bright)}
-    .sum-row.win .sum-val{color:var(--teal-bright);font-weight:700}
+    .sum-val{font-family:var(--font-display);font-size:0.85rem;width:26px;text-align:right}
+    .sum-row.win .sum-label{color:var(--c-teal-bright)}
+    .sum-row.win .sum-val{color:var(--c-teal-bright);font-weight:700}
 
     /* Slot result */
-    .result-line{font-family:'Cinzel',serif;font-size:0.9rem;letter-spacing:0.04em;color:var(--ink);margin-top:0.6rem;line-height:1.5}
-    .result-line .big{font-size:1.15rem;color:var(--teal-bright)}
+    .result-line{font-family:var(--font-display);font-size:0.9rem;letter-spacing:0.04em;color:var(--c-ink);margin-top:0.6rem;line-height:1.5}
+    .result-line .big{font-size:1.15rem;color:var(--c-teal-bright)}
     .meta-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:0.6rem}
-    .meta-chip{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.06em;padding:3px 9px;border-radius:10px;border:1px solid var(--border-light);color:var(--ink-light)}
-    .meta-chip b{color:var(--ink)}
+    .meta-chip{font-family:var(--font-display);font-size:0.62rem;letter-spacing:0.06em;padding:3px 9px;border-radius:10px;border:1px solid var(--c-border-light);color:var(--c-ink-light)}
+    .meta-chip b{color:var(--c-ink)}
 
     /* Tie chooser */
-    .tie{margin-top:0.7rem;padding:0.6rem 0.7rem;border:1px solid rgba(184,138,90,0.4);border-radius:var(--radius);background:rgba(184,138,90,0.07)}
-    .tie-label{font-family:'Cinzel',serif;font-size:0.58rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--brass);margin-bottom:0.4rem}
+    .tie{margin-top:0.7rem;padding:0.6rem 0.7rem;border:1px solid rgba(184,138,90,0.4);border-radius:var(--radius-sm);background:rgba(184,138,90,0.07)}
+    .tie-label{font-family:var(--font-display);font-size:0.58rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--c-brass);margin-bottom:0.4rem}
     .tie-opts{display:flex;gap:6px;flex-wrap:wrap}
-    .tie-opt{font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.08em;text-transform:uppercase;padding:4px 11px;border-radius:var(--radius);border:1px solid var(--border-light);background:var(--panel-deep);color:var(--ink-light);cursor:pointer}
-    .tie-opt.active{border-color:var(--teal);color:var(--teal-bright);background:var(--teal-faint)}
+    .tie-opt{font-family:var(--font-display);font-size:0.66rem;letter-spacing:0.08em;text-transform:uppercase;padding:4px 11px;border-radius:var(--radius-sm);border:1px solid var(--c-border-light);background:var(--c-bg-elevated);color:var(--c-ink-light);cursor:pointer}
+    .tie-opt.active{border-color:var(--c-teal);color:var(--c-teal-bright);background:var(--c-teal-faint)}
 
-    /* Brew controls */
+    /* Brew controls — theme .field with page-local sizing for the compact number inputs */
     .brew-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-top:0.4rem}
-    .field{display:flex;flex-direction:column;gap:3px}
-    .field label{font-family:'Cinzel',serif;font-size:0.56rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint)}
-    .field input{width:90px;background:var(--panel-deep);border:1px solid var(--border);border-radius:2px;color:var(--ink);font-family:'Cinzel',serif;font-size:1rem;padding:7px 9px;outline:none;text-align:center}
-    .field input:focus{border-color:var(--teal)}
-    .btn{font-family:'Cinzel',serif;font-size:0.74rem;letter-spacing:0.12em;text-transform:uppercase;padding:10px 20px;border-radius:var(--radius);border:1px solid var(--teal);background:var(--teal-deep);color:#eafafa;cursor:pointer;transition:all 0.15s}
-    .btn:hover{background:var(--teal);box-shadow:0 0 14px rgba(74,149,149,0.3)}
-    .btn:disabled{opacity:0.4;cursor:not-allowed;box-shadow:none}
-    .btn.secondary{background:var(--panel-deep);border-color:var(--border-light);color:var(--ink-light)}
-    .btn.secondary:hover{border-color:var(--teal);color:var(--teal-bright);box-shadow:none}
+    .brew-controls .field{margin-bottom:0}
+    .brew-controls .field input{width:90px;font-family:var(--font-display);text-align:center}
 
-    /* Brew result */
-    .brew-result{border-radius:var(--radius);padding:1rem 1.1rem;margin-top:0.4rem;border:1px solid var(--border);background:var(--panel-deep)}
-    .brew-result.success{border-color:var(--teal);background:linear-gradient(160deg,rgba(74,149,149,0.12),var(--panel-deep))}
-    .brew-result.choose{border-color:var(--brass);background:linear-gradient(160deg,rgba(184,138,90,0.12),var(--panel-deep))}
-    .brew-result.wrong{border-color:#c87800;background:linear-gradient(160deg,rgba(200,120,0,0.10),var(--panel-deep))}
-    .brew-result.sludge{border-color:var(--ink-faint)}
-    .brew-result.negative{border-color:var(--rust);background:linear-gradient(160deg,rgba(168,93,74,0.14),var(--panel-deep))}
-    .brew-outcome{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.16em;text-transform:uppercase;margin-bottom:0.5rem}
-    .brew-result.success .brew-outcome{color:var(--teal-bright)}
-    .brew-result.choose .brew-outcome{color:var(--brass)}
+    /* Brew result (page-specific outcome card — retinted with theme tokens) */
+    .brew-result{border-radius:var(--radius-sm);padding:1rem 1.1rem;margin-top:0.4rem;border:1px solid var(--c-border);background:var(--c-bg-elevated)}
+    .brew-result.success{border-color:var(--c-teal);background:linear-gradient(160deg,rgba(74,149,149,0.12),var(--c-bg-elevated))}
+    .brew-result.choose{border-color:var(--c-brass);background:linear-gradient(160deg,rgba(184,138,90,0.12),var(--c-bg-elevated))}
+    .brew-result.wrong{border-color:#c87800;background:linear-gradient(160deg,rgba(200,120,0,0.10),var(--c-bg-elevated))}
+    .brew-result.sludge{border-color:var(--c-ink-faint)}
+    .brew-result.negative{border-color:var(--c-error);background:linear-gradient(160deg,rgba(168,93,74,0.14),var(--c-bg-elevated))}
+    .brew-outcome{font-family:var(--font-display);font-size:0.62rem;letter-spacing:0.16em;text-transform:uppercase;margin-bottom:0.5rem}
+    .brew-result.success .brew-outcome{color:var(--c-teal-bright)}
+    .brew-result.choose .brew-outcome{color:var(--c-brass)}
     .brew-result.wrong .brew-outcome{color:#f0b076}
-    .brew-result.sludge .brew-outcome{color:var(--ink-faint)}
-    .brew-result.negative .brew-outcome{color:var(--rust)}
-    .potion-name{font-family:'Cinzel',serif;font-size:1.15rem;letter-spacing:0.04em;color:var(--ink);margin-bottom:0.3rem}
-    .potion-effect{font-size:0.98rem;line-height:1.6;color:var(--ink-light);white-space:pre-wrap}
-    .roll-readout{font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.06em;color:var(--ink-faint);margin-top:0.6rem}
-    .roll-readout b{color:var(--ink-light)}
+    .brew-result.sludge .brew-outcome{color:var(--c-ink-faint)}
+    .brew-result.negative .brew-outcome{color:var(--c-error)}
+    .potion-name{font-family:var(--font-display);font-size:1.15rem;letter-spacing:0.04em;color:var(--c-ink);margin-bottom:0.3rem}
+    .potion-effect{font-size:0.98rem;line-height:1.6;color:var(--c-ink-light);white-space:pre-wrap}
+    .roll-readout{font-family:var(--font-display);font-size:0.72rem;letter-spacing:0.06em;color:var(--c-ink-faint);margin-top:0.6rem}
+    .roll-readout b{color:var(--c-ink-light)}
     .choose-opts{display:grid;gap:8px;margin-top:0.6rem}
-    .choose-opt{text-align:left;border:1px solid var(--border-light);border-radius:var(--radius);background:var(--panel);padding:0.6rem 0.8rem;cursor:pointer;transition:all 0.15s;color:var(--ink)}
-    .choose-opt:hover{border-color:var(--teal);background:var(--panel-light)}
-    .choose-opt .nm{font-family:'Cinzel',serif;font-size:0.92rem;color:var(--teal-bright);margin-bottom:0.2rem}
-    .choose-opt .ef{font-size:0.88rem;line-height:1.5;color:var(--ink-light)}
+    .choose-opt{text-align:left;border:1px solid var(--c-border-light);border-radius:var(--radius-sm);background:var(--c-surface);padding:0.6rem 0.8rem;cursor:pointer;transition:all 0.15s;color:var(--c-ink)}
+    .choose-opt:hover{border-color:var(--c-teal);background:var(--c-surface-2)}
+    .choose-opt .nm{font-family:var(--font-display);font-size:0.92rem;color:var(--c-teal-bright);margin-bottom:0.2rem}
+    .choose-opt .ef{font-size:0.88rem;line-height:1.5;color:var(--c-ink-light)}
 
-    .state{text-align:center;padding:3rem 1rem;color:var(--ink-faint);font-style:italic}
-    .state.error{color:var(--rust)}
-    .footer{margin-top:2rem;text-align:center;padding-top:1.5rem;border-top:1px solid var(--border)}
-    .footer-text{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--ink-faint)}
+    .state{text-align:center;padding:3rem 1rem;color:var(--c-ink-faint);font-style:italic}
+    .state.error{color:var(--c-error)}
+    .footer{margin-top:2rem;text-align:center;padding-top:1.5rem;border-top:1px solid var(--c-border)}
+    .footer-text{font-family:var(--font-display);font-size:0.62rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--c-ink-faint)}
 
     /* Known recipes */
     .recipes-panel{margin-bottom:1rem}
-    .rec-list{max-height:210px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--panel-deep)}
-    .rec-row{display:flex;flex-direction:column;gap:2px;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.12s}
+    .rec-list{max-height:210px;overflow-y:auto;border:1px solid var(--c-border);border-radius:var(--radius-sm);background:var(--c-bg-elevated)}
+    .rec-row{display:flex;flex-direction:column;gap:2px;padding:7px 10px;border-bottom:1px solid var(--c-border);cursor:pointer;transition:background 0.12s}
     .rec-row:last-child{border-bottom:none}
-    .rec-row:hover{background:var(--panel-light)}
+    .rec-row:hover{background:var(--c-surface-2)}
     .rec-row.missing{opacity:0.5}
     .rec-top{display:flex;align-items:baseline;gap:8px}
-    .rec-name{font-family:'Cinzel',serif;font-size:0.82rem;color:var(--teal-bright);letter-spacing:0.03em;flex:1}
-    .rec-slot{font-family:'Cinzel',serif;font-size:0.56rem;letter-spacing:0.06em;color:var(--ink-faint);text-transform:uppercase}
-    .rec-ings{font-size:0.84rem;color:var(--ink-light)}
-    .rec-missing{font-family:'Cinzel',serif;font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--rust)}
-    .empty-rec{padding:0.9rem 1rem;text-align:center;color:var(--ink-faint);font-style:italic;font-size:0.86rem}
-
-    .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel-light);border:1px solid var(--teal);border-radius:var(--radius);padding:10px 18px;color:var(--ink);font-size:0.9rem;box-shadow:0 4px 16px rgba(0,0,0,0.5);opacity:0;transition:opacity 0.2s;pointer-events:none;z-index:50}
-    .toast.show{opacity:1}
+    .rec-name{font-family:var(--font-display);font-size:0.82rem;color:var(--c-teal-bright);letter-spacing:0.03em;flex:1}
+    .rec-slot{font-family:var(--font-display);font-size:0.56rem;letter-spacing:0.06em;color:var(--c-ink-faint);text-transform:uppercase}
+    .rec-ings{font-size:0.84rem;color:var(--c-ink-light)}
+    .rec-missing{font-family:var(--font-display);font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--c-error)}
+    .empty-rec{padding:0.9rem 1rem;text-align:center;color:var(--c-ink-faint);font-style:italic;font-size:0.86rem}
   </style>
 </head>
 <body>
@@ -194,7 +161,7 @@
       <h1>The <span class="accent">Cauldron</span></h1>
       <div class="topbar-meta">
         <span id="role-line">— loading —</span>
-        <a href="home.html" class="home-link">⌂ Home</a>
+        <a href="home.html" class="btn btn--sm">⌂ Home</a>
       </div>
     </div>
 
@@ -234,12 +201,13 @@
 
     <div class="footer"><p class="footer-text">The Spire · The Cauldron</p></div>
   </main>
-  <div class="toast" id="toast"></div>
 
-  <script src="auth.js"></script>
+  <script src="auth.js?v=2"></script>
+  <script src="spire-ui.js?v=1"></script>
+  <script src="spire-api.js?v=2"></script>
   <script>
-    const WORKER_URL = (window.Auth && window.Auth.WORKER_URL) || 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
-    function esc(s){return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+    const WORKER_URL = API.WORKER_URL;
+    const esc = UI.escapeHtml;
     function affClass(a){return (a||'').toString().trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');}
 
     let isDM = false;
@@ -252,18 +220,15 @@
     let chosenCategory = null;  // tie-break choice
     let lastRoll = null;        // {d20, bonus, total}
 
-    function toast(msg){
-      const t = document.getElementById('toast');
-      t.textContent = msg; t.className = 'toast show';
-      clearTimeout(t._t); t._t = setTimeout(()=>{ t.className='toast'; }, 3000);
-    }
+    const toast = (msg, kind) => UI.toast(msg, kind);
 
     async function bootstrap(){
       const ident = Auth.identity();
       isDM = ident.role === 'dm';
       const roleEl = document.getElementById('role-line');
       const stateEl = document.getElementById('state');
-      roleEl.innerHTML = `Brewing as <strong style="color:var(--ink)">${esc(ident.display||'Visitor')}</strong> <span class="role ${esc(ident.role)}">${isDM?'DM':'Player'}</span>`;
+      const roleChip = isDM ? 'chip--dm' : ident.role === 'player' ? 'chip--player' : 'chip--anon';
+      roleEl.innerHTML = `Brewing as <strong style="color:var(--c-ink)">${esc(ident.display||'Visitor')}</strong> <span class="chip ${roleChip}">${isDM?'DM':'Player'}</span>`;
 
       if (!Auth.requireRole('any-login', { reason:'Log in to use the Cauldron.' })) return;
 
@@ -293,7 +258,7 @@
       byId = Object.fromEntries(catalog.map(i => [i.id, i]));
       if (catalog.length === 0){
         stateEl.innerHTML = isDM
-          ? 'No ingredients yet. Open the <a class="home-link" href="brew-dm.html">Apothecary</a> and run the import.'
+          ? 'No ingredients yet. Open the <a class="btn btn--sm" href="brew-dm.html">Apothecary</a> and run the import.'
           : 'The brewing stores are empty — your DM hasn\'t stocked ingredients yet.';
         return;
       }
@@ -443,7 +408,7 @@
       const brewZone = document.getElementById('brew-zone');
 
       if (selected.length < 3){
-        slotResEl.innerHTML = `<div class="result-line" style="color:var(--ink-faint)">Add ${3-selected.length} more ingredient${3-selected.length===1?'':'s'} to see the recipe.</div>`;
+        slotResEl.innerHTML = `<div class="result-line" style="color:var(--c-ink-faint)">Add ${3-selected.length} more ingredient${3-selected.length===1?'':'s'} to see the recipe.</div>`;
         tieEl.innerHTML = ''; brewZone.innerHTML = '';
         return;
       }
@@ -480,7 +445,7 @@
     function renderBrewZone(category, number, rarity, dc){
       const zone = document.getElementById('brew-zone');
       if (mode==='experiment'){
-        zone.innerHTML = `<div class="panel"><div class="result-line" style="color:var(--ink-faint);font-family:'Crimson Text',serif;font-style:italic">
+        zone.innerHTML = `<div class="panel"><div class="result-line" style="color:var(--c-ink-faint);font-family:var(--font-body);font-style:italic">
           The potion at this slot stays hidden. Brew it for real ${isDM?'(switch to Craft to test)':'from your inventory'} to discover what it makes.</div></div>`;
         return;
       }
@@ -488,7 +453,7 @@
         <div class="brew-controls">
           <div class="field"><label>Alchemy bonus</label><input type="number" id="bonus" value="0"></div>
           <div class="field"><label>d20 (blank = roll)</label><input type="number" id="d20" placeholder="roll" min="1" max="20"></div>
-          <button class="btn" id="brew-btn" onclick="brew('${category}')">${isDM?'Test Brew':'Brew Potion'}</button>
+          <button class="btn btn--primary" id="brew-btn" onclick="brew('${category}')">${isDM?'Test Brew':'Brew Potion'}</button>
         </div>
         <div class="roll-readout" style="margin-top:0.7rem">Need a total of <b>${dc}</b> or higher. Beat it by 10+ to choose your potion; miss by 6–9 and you get sludge; miss by 10+ for a nasty surprise.</div>
       </div>`;
