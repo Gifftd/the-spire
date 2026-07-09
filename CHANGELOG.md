@@ -9,6 +9,32 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-07-09
 
+### Data hygiene — characterIds canonical + merge-before-write saves
+
+Step B4, closing out the DM-workflow phase:
+
+- **`attendance` → `characterIds`.** sessions-dm used a parallel `attendance`
+  field for session attendance while every other writer (Atlas timeline
+  editor, initiative export) wrote the canonical `characterIds` — so
+  attendance silently went stale. sessions-dm now normalizes on load
+  (`characterIds ??= attendance`, then drops `attendance`) and reads/writes
+  `characterIds` everywhere; the first whole-blob save migrates stored data
+  for free. Markdown vault round-trip is unchanged (frontmatter key is still
+  `characters:`; a legacy `attendance:` key is still consumed, not echoed).
+- **Merge-before-write for `npcs` and `timeline`.** These KV keys are
+  whole-array last-write-wins — two DM tabs (or the Chronicle + the
+  initiative export modal left open) could silently clobber each other.
+  New `API.dmPostMerged(postType, getType, localArray, {deletedIds})`
+  re-fetches the remote array right before POSTing and merges by id: local
+  wins for ids it holds, remote-only records are kept, explicit deletions
+  are dropped (ids compared as strings, per the numeric-id boundary rule).
+  Adopted by sessions-dm (timeline + npcs), map-dm (npcs), and
+  initiative-dm's exportToChronicle (which previously re-posted a
+  potentially minutes-old copy of the whole chronicle). The NPC editor now
+  reports `persist({deletedId})` so merges can't resurrect deleted NPCs.
+- New `tests/spire-api.test.html` (10 assertions on `API.mergeById`) — all
+  pass. spire-api.js bumped to `?v=2`.
+
 ### Timeline consolidation — the Chronicle Workshop is the ONE timeline editor
 
 Step B3. The chronicle previously had three competing interactive editors

@@ -779,10 +779,10 @@ body{overflow:hidden}
 </div>
 
 <script src="auth.js?v=2"></script>
-<script src="spire-api.js?v=1"></script>
+<script src="spire-api.js?v=2"></script>
 <script src="spire-ui.js?v=1"></script>
 <script src="map-render.js?v=1"></script>
-<script src="npc-editor.js?v=1"></script>
+<script src="npc-editor.js?v=2"></script>
 <script src="encounter-schema.js"></script>
 <script>//<![CDATA[
 // ══════════════════════════════════════════════════════════════
@@ -1009,10 +1009,26 @@ function loadTimelineLocal() {
 }
 
 // ── NPCs: load + save ────────────────────────────────────────
-async function saveNPCsKV() {
-  const res = await dmPost({ type: 'npcs', payload: npcs }, saveNPCsKV);
+const _deletedNpcIds = new Set();
+async function saveNPCsKV(meta) {
+  if (meta && meta.deletedId) _deletedNpcIds.add(meta.deletedId);
+  // Merge-before-write: local wins by id, remote-only NPCs (added in the
+  // Chronicle Workshop or another tab) are kept, deletions applied.
+  const { ok, status, merged } = await API.dmPostMerged('npcs', 'npcs', npcs, {
+    deletedIds: [..._deletedNpcIds],
+  });
+  if (status === 401) {
+    Auth.logout();
+    window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.'));
+    return false;
+  }
+  if (ok) {
+    npcs.length = 0;           // adopt the merge in place — the shared NPC
+    npcs.push(...merged);      // editor holds a reference to this array
+    _deletedNpcIds.clear();
+  }
   saveNPCsLocal();
-  return !!(res && res.ok);
+  return ok;
 }
 function saveNPCsLocal() { localStorage.setItem('dm_npcs', JSON.stringify(npcs)); }
 async function loadNPCsKV() {

@@ -817,6 +817,7 @@ body {
 </div>
 
 <script src="auth.js?v=2"></script>
+<script src="spire-api.js?v=2"></script>
 <script src="initiative-notes.js"></script>
 <script src="bestiary-merge.js"></script>
 <script src="encounter-schema.js"></script>
@@ -2735,13 +2736,17 @@ async function exportToChronicle() {
   const btn = document.getElementById('exp-chronicle-btn');
   btn.disabled = true; btn.textContent = '…';
   try {
-    const r = await fetch(WORKER_URL, { method:'POST', headers: Auth.dmHeaders(), body: JSON.stringify({ type:'timeline', payload: chronicleAll }) });
-    if (r.status === 401) {
+    // Merge-before-write: chronicleAll may be minutes old — re-fetch and
+    // merge by id so this export can't clobber Chronicle Workshop edits
+    // made since the export modal opened.
+    const { ok, status, merged } = await API.dmPostMerged('timeline', 'timeline_dm', chronicleAll);
+    if (status === 401) {
       Auth.logout();
       window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.'));
       return;
     }
-    if (!r.ok) throw new Error('HTTP ' + r.status);
+    if (!ok) throw new Error('HTTP ' + status);
+    chronicleAll = merged;
     // Chronicle write succeeded — drop the bound draft (best-effort).
     if (exportingDraftId) {
       removeDraft(exportingDraftId);

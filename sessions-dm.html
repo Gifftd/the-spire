@@ -938,9 +938,9 @@ body { display: flex; flex-direction: column; }
 </div>
 
 <script src="auth.js?v=2"></script>
-<script src="spire-api.js?v=1"></script>
+<script src="spire-api.js?v=2"></script>
 <script src="spire-ui.js?v=1"></script>
-<script src="npc-editor.js?v=1"></script>
+<script src="npc-editor.js?v=2"></script>
 <script src="encounter-schema.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════════
@@ -973,7 +973,7 @@ function blankWork() {
     kind: 'session',
     title:'', body:'', prep:'', dmNotes:'',
     dateReal:'', dateInGame:'', dateSort:'',
-    attendance:[], locationIds:[], npcIds:[], visibleTo:[],
+    characterIds:[], locationIds:[], npcIds:[], visibleTo:[],
     tags:[], loot:[], combats:[], frontmatterExtras:{},
     prepSections:[],
     prepCollapsed: new Set(),
@@ -1033,10 +1033,22 @@ async function dmPost(type, payload) {
   } catch { return false; }
 }
 
+// Migration: `attendance` was a sessions-dm-only duplicate of the canonical
+// `characterIds` (other writers — the Atlas, the initiative export — only
+// ever wrote characterIds, so attendance went stale). Normalize on load;
+// the next whole-blob save persists the migration for free.
+function normalizeTimelineEntries(list) {
+  (list || []).forEach(e => {
+    if (!Array.isArray(e.characterIds)) e.characterIds = Array.isArray(e.attendance) ? e.attendance.slice() : [];
+    delete e.attendance;
+  });
+  return list;
+}
+
 async function loadAll() {
   setStatus('Loading…', 'ing');
   try {
-    const tl = JSON.parse(localStorage.getItem('dm_timeline') || 'null'); if (Array.isArray(tl)) timeline = tl;
+    const tl = JSON.parse(localStorage.getItem('dm_timeline') || 'null'); if (Array.isArray(tl)) timeline = normalizeTimelineEntries(tl);
     const ch = JSON.parse(localStorage.getItem('dm_characters') || 'null'); if (Array.isArray(ch)) characters = ch;
     const np = JSON.parse(localStorage.getItem('dm_npcs') || 'null'); if (Array.isArray(np)) npcs = np;
     const md = JSON.parse(localStorage.getItem('dm_map_data') || 'null'); if (md && md.locations) worldData = md;
@@ -1044,7 +1056,7 @@ async function loadAll() {
   renderList(); renderEditor(); renderSidebar();
 
   const [tl, ch, np, md] = await Promise.all([dmGet('timeline_dm'), dmGet('characters'), dmGet('npcs'), dmGet('map_data_dm')]);
-  if (Array.isArray(tl)) { timeline = tl; localStorage.setItem('dm_timeline', JSON.stringify(tl)); }
+  if (Array.isArray(tl)) { timeline = normalizeTimelineEntries(tl); localStorage.setItem('dm_timeline', JSON.stringify(timeline)); }
   if (Array.isArray(ch)) { characters = ch; localStorage.setItem('dm_characters', JSON.stringify(ch)); }
   if (Array.isArray(np)) { npcs = np; localStorage.setItem('dm_npcs', JSON.stringify(np)); }
   if (md && md.locations) { worldData = md; localStorage.setItem('dm_map_data', JSON.stringify(md)); }
@@ -1054,11 +1066,24 @@ async function loadAll() {
   setStatus('Saved', 'ok');
 }
 
+// Deleted-entry ids since the last successful save — passed to the
+// merge-write so another tab's copy can't resurrect them.
+const _deletedTimelineIds = new Set();
+const _deletedNpcIds = new Set();
+
 async function persistTimeline() {
-  localStorage.setItem('dm_timeline', JSON.stringify(timeline));
   setStatus('Saving…', 'ing');
-  const ok = await dmPost('timeline', timeline);
+  const { ok, status, merged } = await API.dmPostMerged('timeline', 'timeline_dm', timeline, {
+    deletedIds: [..._deletedTimelineIds],
+  });
+  if (status === 401) { Auth.logout(); window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.')); return false; }
+  if (ok) {
+    timeline = normalizeTimelineEntries(merged);
+    _deletedTimelineIds.clear();
+  }
+  localStorage.setItem('dm_timeline', JSON.stringify(timeline));
   setStatus(ok ? 'Saved' : 'Save failed', ok ? 'ok' : 'fail');
+  return ok;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1286,11 +1311,11 @@ function parseEntryMarkdown(text, fileName) {
     charNames = extractWikilinkTargets(charsField);
     if (!charNames.length) charNames = charsField.split(',').map(s => stripWikilink(s.trim())).filter(Boolean);
   }
-  const attendance = [];
+  const characterIds = [];
   const unresolvedChars = [];
   charNames.forEach(n => {
     const id = nameToCharacterId(n);
-    if (id) { if (!attendance.includes(id)) attendance.push(id); }
+    if (id) { if (!characterIds.includes(id)) characterIds.push(id); }
     else unresolvedChars.push(n);
   });
 
@@ -1319,7 +1344,7 @@ function parseEntryMarkdown(text, fileName) {
   return {
     id, kind, title, body, prep, dmNotes,
     dateReal, dateInGame, dateSort,
-    tags, attendance, locationIds, npcIds: [], visibleTo: [],
+    tags, characterIds, locationIds, npcIds: [], visibleTo: [],
     loot: [], combats: [],
     frontmatterExtras,
     unresolvedChars, unresolvedLocs,
@@ -1344,7 +1369,7 @@ function emitFrontmatter(s) {
   else if (locs.length > 1) lines.push('location: ' + yamlQuote(locs.map(n => `[[${n}]]`).join(', ')));
   else lines.push('location: ');
 
-  const chars = (s.attendance || []).map(id => characterName(id)).filter(Boolean);
+  const chars = (s.characterIds || []).map(id => characterName(id)).filter(Boolean);
   if (chars.length) lines.push('characters: ' + yamlQuote(chars.map(n => `[[${n}]]`).join(', ')));
   else lines.push('characters: ');
 
@@ -1505,7 +1530,7 @@ function renderList() {
     const k = normalizeKind(s.kind);
     const sel = s.id === editingId ? 'selected' : '';
     const num = (k === 'session') ? sessionNumber(s) : '';
-    const attN = (s.attendance || []).length;
+    const attN = (s.characterIds || []).length;
     const date = (s.dateReal || s.dateSort || '').slice(0, 10);
     const planned = (window.allEncounters || []).filter(e => e.sessionId === s.id);
     const encTally = planned.length ? (() => {
@@ -1579,7 +1604,7 @@ function loadIntoWork(s) {
     dateReal: s.dateReal || '',
     dateInGame: s.dateInGame || '',
     dateSort: s.dateSort || '',
-    attendance: (s.attendance || []).slice(),
+    characterIds: (s.characterIds || []).slice(),
     locationIds: (s.locationIds || []).slice(),
     npcIds: (s.npcIds || []).slice(),
     visibleTo: (s.visibleTo || []).slice(),
@@ -1689,7 +1714,7 @@ function renderChips() {
   } else {
     const sortChars = characters.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     attEl.innerHTML = sortChars.map(c =>
-      `<span class="pick-chip attend ${work.attendance.includes(c.id) ? 'on' : ''}" onclick="toggleChip('attendance','${c.id}')">${escapeHtml(c.name || '')}${c.player ? ` <span style="opacity:0.6">· ${escapeHtml(c.player)}</span>` : ''}</span>`
+      `<span class="pick-chip attend ${work.characterIds.includes(c.id) ? 'on' : ''}" onclick="toggleChip('characterIds','${c.id}')">${escapeHtml(c.name || '')}${c.player ? ` <span style="opacity:0.6">· ${escapeHtml(c.player)}</span>` : ''}</span>`
     ).join('');
     visEl.innerHTML = sortChars.map(c =>
       `<span class="pick-chip ${work.visibleTo.includes(c.id) ? 'on' : ''}" onclick="toggleChip('visibleTo','${c.id}')">${escapeHtml(c.name || '')}</span>`
@@ -1886,9 +1911,8 @@ async function saveSession() {
     dateReal: work.dateReal || new Date().toISOString().slice(0, 10),
     dateInGame: work.dateInGame,
     dateSort: work.dateSort || work.dateReal || '',
-    attendance: work.attendance.slice(),
     locationIds: work.locationIds.slice(),
-    characterIds: work.attendance.slice(),
+    characterIds: work.characterIds.slice(),
     npcIds: work.npcIds.slice(),
     visibleTo: work.visibleTo.slice(),
     tags: work.tags.slice(),
@@ -1915,6 +1939,7 @@ async function deleteSession() {
   const s = timeline.find(t => t.id === editingId);
   if (!s) return;
   if (!confirm(`Delete "${s.title || 'this entry'}"? This cannot be undone.`)) return;
+  _deletedTimelineIds.add(editingId);
   timeline = timeline.filter(t => t.id !== editingId);
   editingId = null;
   await persistTimeline();
@@ -1930,7 +1955,7 @@ function renderSidebar() {
 
   document.getElementById('g-which').textContent = editingId ? (work.title || 'Untitled') : '—';
   document.getElementById('g-kind').textContent = editingId ? (KIND_LABELS[work.kind] || '—') : '—';
-  document.getElementById('g-att').textContent = editingId ? (work.attendance.length || 0) : '—';
+  document.getElementById('g-att').textContent = editingId ? (work.characterIds.length || 0) : '—';
   document.getElementById('g-loot').textContent = editingId ? (work.loot.length || 0) : '—';
   document.getElementById('g-combats').textContent = editingId ? (work.combats.length || 0) : '—';
 
@@ -1938,7 +1963,7 @@ function renderSidebar() {
   if (editingId && characters.length) {
     badges.innerHTML = characters
       .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-      .map(c => `<span class="badge ${work.attendance.includes(c.id) ? '' : 'absent'}">${escapeHtml(c.name || '')}</span>`)
+      .map(c => `<span class="badge ${work.characterIds.includes(c.id) ? '' : 'absent'}">${escapeHtml(c.name || '')}</span>`)
       .join('');
   } else badges.innerHTML = '';
 
@@ -2027,9 +2052,8 @@ function applyImport(parsed, fileLabel) {
     dateInGame: parsed.dateInGame,
     dateSort: parsed.dateSort,
     tags: parsed.tags,
-    attendance: parsed.attendance,
     locationIds: parsed.locationIds,
-    characterIds: parsed.attendance.slice(),
+    characterIds: parsed.characterIds.slice(),
     npcIds: existing?.npcIds || [],
     visibleTo: existing?.visibleTo || [],
     loot: existing?.loot || [],
@@ -2108,10 +2132,21 @@ async function exportAll() {
 // ═══════════════════════════════════════════════════════════════
 //  NPC QUICK-ADD + PREP SCAN
 // ═══════════════════════════════════════════════════════════════
-async function saveNPCsKV() {
-  localStorage.setItem('dm_npcs', JSON.stringify(npcs));
+async function saveNPCsKV(meta) {
+  if (meta && meta.deletedId) _deletedNpcIds.add(meta.deletedId);
   setStatus('Saving NPCs…', 'ing');
-  const ok = await dmPost('npcs', npcs);
+  const { ok, status, merged } = await API.dmPostMerged('npcs', 'npcs', npcs, {
+    deletedIds: [..._deletedNpcIds],
+  });
+  if (status === 401) { Auth.logout(); window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.')); return false; }
+  if (ok) {
+    // Adopt the merge IN PLACE — the NPC editor and pickers hold a
+    // reference to this array.
+    npcs.length = 0;
+    npcs.push(...merged);
+    _deletedNpcIds.clear();
+  }
+  localStorage.setItem('dm_npcs', JSON.stringify(npcs));
   setStatus(ok ? 'Saved' : 'Save failed', ok ? 'ok' : 'fail');
   return ok;
 }

@@ -340,7 +340,9 @@
       if (!(await confirmBox(`Delete ${rec.name}? Their history will be lost and players who knew them will no longer see them.`))) return;
       const idx = npcs.findIndex(n => n.id === rec.id);
       if (idx >= 0) npcs.splice(idx, 1);
-      const ok = await persist();
+      // Tell the host WHICH record was deleted so merge-before-write saves
+      // don't resurrect it from the remote copy.
+      const ok = await persist({ deletedId: rec.id });
       if (!ok) {
         if (idx >= 0) npcs.splice(idx, 0, rec);
         notify('Failed to delete NPC — try again.', 'error');
