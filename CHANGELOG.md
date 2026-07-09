@@ -9,6 +9,34 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-07-09
 
+### Full restyle, batch 1 — brew, index, initiative-player, brew-dm, encounter-dm consume theme.css
+
+Steps C1–C3 of the unification plan. Each page loses its alias `:root` block
+(the shim that remapped theme token names onto a local palette), its local
+palette, and its inline re-implementations of shared components — and now
+genuinely consumes theme.css tokens/components plus the shared JS modules
+(UI.escapeHtml / UI.toast / API.WORKER_URL / API.dmPost where contracts
+matched). Page-specific tokens survive in minimal `:root` blocks defined on
+top of theme tokens (brew's potion-category colors, index's perk-tier
+colors, initiative-player's --pc-accent/--enemy-accent/--active-glow).
+
+- **brew.html** (−35 lines): local field/btn/toast CSS+JS deleted; buttons →
+  `.btn--primary`; role pill → `.chip--player` etc.
+- **index.html** (−50 lines): send CTA → `.btn--brass .btn--lg`, reset →
+  `.btn--ghost .btn--sm` (keeps its red danger hover).
+- **initiative-player.html**: gold palette → brass/teal theme tokens;
+  undefined `--amber` bug → `--c-warn`. The surgical diff-by-id render
+  pipeline (`showCombat`/`buildEmptyRow`/`updateRowContent`/`poll`) is
+  byte-for-byte untouched — verified via diff-hunk audit.
+- **brew-dm.html** (−86 lines): tabs → theme `.tab-list/.tab` (+`is-active`),
+  role pill → `.chip--dm`, buttons → `.btn--brass/--ghost/--danger`;
+  `saveKey()` rides `API.dmPost` with its boolean contract + 401 toast
+  branches preserved; toast → `UI.toast` (36 call sites audited).
+- **encounter-dm.html** (−30 lines): topbar → theme `.topbar` with brass
+  title; banner → `.banner--warn/--info`; save POST → `API.dmPost` with
+  distinct network-vs-HTTP error messages preserved; raw-fetch GETs kept
+  (their 401/fallback contracts don't match `API.dmGet`).
+
 ### Data hygiene — characterIds canonical + merge-before-write saves
 
 Step B4, closing out the DM-workflow phase:

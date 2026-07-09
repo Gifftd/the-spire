@@ -7,130 +7,84 @@
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="theme.css?v=2">
   <style>
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    /* Alias theme.css token names to this page's existing palette so any theme component classes inherit the local look. */
+    /* Page-specific tokens (potion category colors) on top of theme.css tokens. */
     :root{
-      --c-bg:var(--bg);
-      --c-bg-elevated:var(--panel-deep,var(--surface,var(--bg)));
-      --c-surface:var(--panel,var(--surface));
-      --c-surface-2:var(--panel-light,var(--surface2));
-      --c-surface-3:var(--panel-light,var(--surface3,var(--surface2)));
-      --c-border:var(--border);
-      --c-border-light:var(--border-light);
-      --c-brass:var(--brass,var(--gold));
-      --c-brass-bright:var(--brass-bright,var(--gold-light));
-      --c-brass-deep:var(--gold-faint,rgba(184,138,90,0.55));
-      --c-teal:var(--teal,#4a9595);
-      --c-teal-bright:var(--teal-bright,#7ec5c5);
-      --c-teal-deep:var(--teal-deep,#2a5454);
-      --c-ink:var(--ink);
-      --c-ink-light:var(--ink-light,var(--ink-dim));
-      --c-ink-faint:var(--ink-faint);
-      --c-ink-dim:var(--ink-faint);
-      --c-error:var(--rust,var(--red,#c4604c));
-      --c-success:var(--green-light,#5fb381);
-      --c-warn:var(--amber,#c89a4a);
-    }
-    :root{
-      --bg:#080c10;--panel:#131c22;--panel-deep:#0d141a;--panel-light:#1c2730;
-      --border:#2c4048;--border-light:#3e5862;
-      --teal:#4a9595;--teal-bright:#7ec5c5;--teal-deep:#2a5454;--teal-faint:#1b3838;
-      --ink:#dde3e5;--ink-light:#a3adb3;--ink-faint:#6c787f;
-      --brass:#b88a5a;--brass-bright:#d8b888;--rust:#a85d4a;
       --combat:#c43838;--utility:#3a6fd0;--whimsy:#b060d0;
-      --radius:4px;
     }
     body{
-      background:var(--bg);
+      background:var(--c-bg);
       background-image:radial-gradient(ellipse at 20% 10%, rgba(184,138,90,0.10) 0%, transparent 55%),radial-gradient(ellipse at 80% 90%, rgba(74,149,149,0.08) 0%, transparent 55%);
-      min-height:100vh;color:var(--ink);
-      font-family:'Crimson Text',Georgia,serif;
       padding:clamp(1rem,2vw + 0.5rem,2rem) 1rem 4rem;
     }
     .wrap{max-width:1040px;margin:0 auto}
+
+    /* Topbar (page variant: title + meta on one row, transparent over theme .topbar base) */
     .topbar{
       display:flex;align-items:center;justify-content:space-between;gap:1rem;
-      padding-bottom:1rem;margin-bottom:1.25rem;
-      border-bottom:1px solid var(--border);flex-wrap:wrap;
+      min-height:0;background:transparent;padding:0 0 1rem;margin-bottom:1.25rem;
+      border-bottom:1px solid var(--c-border);flex-wrap:wrap;
     }
     .topbar h1{
-      font-family:'Cinzel',serif;
+      font-family:var(--font-display);
       font-size:clamp(1.2rem,1rem + 1vw,1.55rem);font-weight:700;letter-spacing:0.18em;
-      text-transform:uppercase;color:var(--ink);
+      text-transform:uppercase;color:var(--c-ink);
       text-shadow:0 1px 24px rgba(184,138,90,0.10);
     }
-    .topbar h1 .accent{color:var(--brass-bright);font-weight:400}
-    .topbar-meta{display:flex;align-items:center;gap:8px;font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-faint);flex-wrap:wrap}
-    .role.dm{
-      padding:3px 10px;border-radius:9999px;
-      border:1px solid rgba(184,138,90,0.45);background:rgba(184,138,90,0.12);
-      color:var(--brass-bright);font-size:0.58rem;letter-spacing:0.14em;
-    }
-    .home-link{
-      font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.14em;text-transform:uppercase;
-      color:var(--ink-light);text-decoration:none;padding:7px 14px;
-      border:1px solid var(--border-light);background:var(--panel-light);border-radius:3px;
-      transition:background 120ms,border-color 120ms,color 120ms;
-    }
-    .home-link:hover{background:var(--panel);border-color:var(--brass);color:var(--brass-bright)}
+    .topbar h1 .accent{color:var(--c-brass-bright);font-weight:400}
+    .topbar-meta{display:flex;align-items:center;gap:8px;font-family:var(--font-display);font-size:0.66rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--c-ink-faint);flex-wrap:wrap}
 
-    .tabs{display:flex;gap:2px;flex-wrap:wrap;margin-bottom:1.25rem;border-bottom:1px solid var(--border)}
-    .tab{
-      font-family:'Cinzel',serif;font-size:0.7rem;font-weight:500;letter-spacing:0.12em;
-      text-transform:uppercase;color:var(--ink-light);
-      background:none;border:none;border-bottom:2px solid transparent;padding:11px 18px 10px;
-      cursor:pointer;margin-bottom:-1px;
-      transition:color 120ms,border-color 120ms,background 120ms;
-    }
-    .tab:hover:not(.active){color:var(--brass-bright);background:rgba(184,138,90,0.04)}
-    .tab.active{color:var(--brass-bright);border-bottom-color:var(--brass);background:rgba(184,138,90,0.06)}
+    /* Tabs — theme .tab-list/.tab retinted brass (DM identity), natural widths */
+    .tab-list{flex-wrap:wrap;margin-bottom:1.25rem}
+    .tab-list .tab{flex:0 0 auto;padding:11px 18px 10px}
+    .tab:hover:not(.is-active){color:var(--c-brass-bright);background:rgba(184,138,90,0.04)}
+    .tab.is-active{color:var(--c-brass-bright);border-bottom-color:var(--c-brass);background:rgba(184,138,90,0.06)}
 
     .layout{display:grid;grid-template-columns:1fr 1.1fr;gap:1.25rem;align-items:start}
     @media (max-width:820px){.layout{grid-template-columns:1fr}}
     .col-head{
-      font-family:'Cinzel',serif;font-size:0.68rem;font-weight:500;letter-spacing:0.20em;
-      text-transform:uppercase;color:var(--brass-bright);margin-bottom:0.7rem;
+      font-family:var(--font-display);font-size:0.68rem;font-weight:500;letter-spacing:0.20em;
+      text-transform:uppercase;color:var(--c-brass-bright);margin-bottom:0.7rem;
       display:flex;justify-content:space-between;align-items:center;
-      padding-bottom:5px;border-bottom:1px solid var(--border);
+      padding-bottom:5px;border-bottom:1px solid var(--c-border);
     }
 
     .toolbar{display:flex;gap:6px;margin-bottom:0.7rem;flex-wrap:wrap}
     input,select,textarea{
-      background:var(--panel-deep);border:1px solid var(--border);border-radius:3px;
-      color:var(--ink);font-family:'Crimson Text',serif;font-size:0.95rem;padding:7px 11px;outline:none;
-      transition:border-color 120ms,box-shadow 120ms;
+      background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:var(--radius-sm);
+      color:var(--c-ink);font-family:var(--font-body);font-size:0.95rem;padding:7px 11px;outline:none;
+      transition:border-color var(--motion-fast),box-shadow var(--motion-fast);
     }
     input:focus,select:focus,textarea:focus{
-      border-color:var(--teal);
+      border-color:var(--c-teal);
       box-shadow:0 0 0 3px rgba(74,149,149,0.16);
     }
-    input::placeholder,textarea::placeholder{color:var(--ink-faint);opacity:0.6;font-style:italic}
+    input::placeholder,textarea::placeholder{color:var(--c-ink-faint);opacity:0.6;font-style:italic}
     textarea{width:100%;resize:vertical;min-height:80px;line-height:1.5}
     .toolbar input{flex:1;min-width:140px}
 
     .list{
       max-height:520px;overflow-y:auto;
-      border:1px solid var(--border);border-radius:6px;background:var(--panel-deep);
+      border:1px solid var(--c-border);border-radius:var(--radius-md);background:var(--c-bg-elevated);
       box-shadow:inset 0 0 0 1px rgba(255,255,255,0.02);
     }
     .row{
       display:flex;align-items:center;gap:8px;padding:8px 11px;
-      border-bottom:1px solid var(--border);cursor:pointer;
-      transition:background 120ms,padding 120ms;
+      border-bottom:1px solid var(--c-border);cursor:pointer;
+      transition:background var(--motion-fast),padding var(--motion-fast);
     }
     .row:last-child{border-bottom:none}
-    .row:hover{background:var(--panel-light);padding-left:13px}
-    .row.active{background:var(--teal-faint);border-left:3px solid var(--teal);padding-left:8px}
-    .row .nm{flex:1;font-size:0.95rem;color:var(--ink)}
-    .row .sub{font-family:'Cinzel',serif;font-size:0.62rem;color:var(--ink-faint);letter-spacing:0.06em;text-transform:uppercase}
+    .row:hover{background:var(--c-surface-2);padding-left:13px}
+    .row.active{background:var(--c-teal-faint);border-left:3px solid var(--c-teal);padding-left:8px}
+    .row .nm{flex:1;font-size:0.95rem;color:var(--c-ink)}
+    .row .sub{font-family:var(--font-display);font-size:0.62rem;color:var(--c-ink-faint);letter-spacing:0.06em;text-transform:uppercase}
     .rarity{
-      font-family:'Cinzel',serif;font-size:0.52rem;font-weight:500;letter-spacing:0.12em;text-transform:uppercase;
-      padding:3px 9px;border-radius:9999px;border:1px solid;
+      font-family:var(--font-display);font-size:0.52rem;font-weight:500;letter-spacing:0.12em;text-transform:uppercase;
+      padding:3px 9px;border-radius:var(--radius-pill);border:1px solid;
     }
-    .rarity.common{color:var(--ink-light);border-color:var(--border-light)}
-    .rarity.uncommon{color:var(--teal-bright);border-color:var(--teal);background:rgba(74,149,149,0.10)}
-    .rarity.rare{color:var(--brass-bright);border-color:var(--brass);background:rgba(184,138,90,0.10)}
-    .aff-chip{font-family:'Cinzel',serif;font-size:0.52rem;font-weight:500;letter-spacing:0.12em;text-transform:uppercase;padding:2px 8px;border-radius:9999px;border:1px solid var(--border-light);color:var(--ink-light);white-space:nowrap;background:rgba(255,255,255,0.02)}
+    .rarity.common{color:var(--c-ink-light);border-color:var(--c-border-light)}
+    .rarity.uncommon{color:var(--c-teal-bright);border-color:var(--c-teal);background:rgba(74,149,149,0.10)}
+    .rarity.rare{color:var(--c-brass-bright);border-color:var(--c-brass);background:rgba(184,138,90,0.10)}
+    .aff-chip{font-family:var(--font-display);font-size:0.52rem;font-weight:500;letter-spacing:0.12em;text-transform:uppercase;padding:2px 8px;border-radius:var(--radius-pill);border:1px solid var(--c-border-light);color:var(--c-ink-light);white-space:nowrap;background:rgba(255,255,255,0.02)}
     .aff-chip.fire{color:#ff9a6e;border-color:#c43838}
     .aff-chip.cold,.aff-chip.ice{color:#88c0ff;border-color:#3a6fd0}
     .aff-chip.lightning{color:#ffe060;border-color:#c4a838}
@@ -140,110 +94,76 @@
     .aff-chip.necrotic{color:#b890c8;border-color:#7a5290}
     .aff-chip.psychic{color:#e090c0;border-color:#a040a0}
     .aff-chip.force,.aff-chip.arcane{color:#c8a0ff;border-color:#7c5fc4}
-    .vals{display:flex;gap:5px;font-family:'Cinzel',serif;font-size:0.62rem}
+    .vals{display:flex;gap:5px;font-family:var(--font-display);font-size:0.62rem}
     .v-c{color:var(--combat)}.v-u{color:var(--utility)}.v-w{color:var(--whimsy)}
-    .badge-official{font-family:'Cinzel',serif;font-size:0.5rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--teal-bright)}
+    .badge-official{font-family:var(--font-display);font-size:0.5rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--c-teal-bright)}
 
-    .form{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem}
-    .form h3{font-family:'Cinzel',serif;font-size:0.78rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--brass-bright);margin-bottom:0.8rem}
+    .form{background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-sm);padding:1rem 1.1rem}
+    .form h3{font-family:var(--font-display);font-size:0.78rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--c-brass-bright);margin-bottom:0.8rem}
+    .form .banner{margin-bottom:0.9rem}
     .fg{margin-bottom:0.7rem;display:flex;flex-direction:column;gap:4px}
-    .fg label{font-family:'Cinzel',serif;font-size:0.56rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint)}
+    .fg label{font-family:var(--font-display);font-size:0.56rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--c-ink-faint)}
     .frow{display:flex;gap:8px}
     .frow .fg{flex:1}
     .form-actions{display:flex;gap:8px;margin-top:0.8rem;flex-wrap:wrap}
-    .btn{
-      font-family:'Cinzel',serif;font-size:0.7rem;font-weight:500;letter-spacing:0.14em;
-      text-transform:uppercase;padding:9px 18px;border-radius:3px;
-      border:1px solid var(--teal);background:var(--teal-deep);color:#eafafa;
-      cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;
-      transition:
-        background 120ms cubic-bezier(0.16,1,0.3,1),
-        border-color 120ms cubic-bezier(0.16,1,0.3,1),
-        color 120ms cubic-bezier(0.16,1,0.3,1),
-        transform 120ms cubic-bezier(0.16,1,0.3,1),
-        box-shadow 120ms cubic-bezier(0.16,1,0.3,1);
-    }
-    .btn:hover{background:var(--teal);color:var(--bg);border-color:var(--teal-bright);box-shadow:0 0 14px rgba(74,149,149,0.30)}
-    .btn:active{transform:translateY(1px)}
-    .btn:disabled{opacity:0.4;cursor:not-allowed;pointer-events:none}
-    .btn.brass{border-color:var(--brass);background:rgba(184,138,90,0.18);color:var(--brass-bright)}
-    .btn.brass:hover{background:var(--brass);color:var(--bg);border-color:var(--brass-bright);box-shadow:0 0 14px rgba(184,138,90,0.30)}
-    .btn.ghost{background:transparent;border-color:var(--border-light);color:var(--ink-light)}
-    .btn.ghost:hover{background:var(--panel-light);border-color:var(--teal);color:var(--teal-bright);box-shadow:none}
-    .btn.danger{border-color:var(--rust);background:rgba(168,93,74,0.15);color:#e3a08e}
-    .btn.danger:hover{background:var(--rust);color:#fff;border-color:#e3a08e;box-shadow:0 0 14px rgba(168,93,74,0.30)}
-    .btn.sm{padding:5px 11px;font-size:0.60rem;letter-spacing:0.10em}
 
-    .empty-note{padding:1.5rem 1rem;text-align:center;color:var(--ink-faint);font-style:italic;font-size:0.92rem}
-    .hint{font-size:0.9rem;color:var(--ink-faint);font-style:italic;line-height:1.5;margin-bottom:0.8rem}
-    .warn{border:1px solid rgba(168,93,74,0.5);background:rgba(168,93,74,0.08);border-radius:var(--radius);padding:0.8rem 0.9rem;color:#e3a08e;font-size:0.92rem;line-height:1.5;margin-bottom:0.9rem}
+    .empty-note{padding:1.5rem 1rem;text-align:center;color:var(--c-ink-faint);font-style:italic;font-size:0.92rem}
+    .hint{font-size:0.9rem;color:var(--c-ink-faint);font-style:italic;line-height:1.5;margin-bottom:0.8rem}
 
     /* inventory rows */
-    .inv-row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border)}
+    .inv-row{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--c-border)}
     .inv-row:last-child{border-bottom:none}
     .inv-row .nm{flex:1}
     .qstep{display:flex;align-items:center;gap:6px}
     .qstep button{
-      width:28px;height:28px;border-radius:4px;border:1px solid var(--border-light);
-      background:var(--panel-deep);color:var(--ink);cursor:pointer;font-size:1rem;line-height:1;
-      transition:border-color 120ms,background 120ms,color 120ms,transform 120ms;
+      width:28px;height:28px;border-radius:var(--radius-sm);border:1px solid var(--c-border-light);
+      background:var(--c-bg-elevated);color:var(--c-ink);cursor:pointer;font-size:1rem;line-height:1;
+      transition:border-color var(--motion-fast),background var(--motion-fast),color var(--motion-fast),transform var(--motion-fast);
     }
-    .qstep button:hover{border-color:var(--teal);color:var(--teal-bright);background:var(--panel)}
+    .qstep button:hover{border-color:var(--c-teal);color:var(--c-teal-bright);background:var(--c-surface)}
     .qstep button:active{transform:translateY(1px)}
-    .qstep .q{font-family:'Cinzel',serif;font-size:0.95rem;min-width:28px;text-align:center;color:var(--teal-bright)}
+    .qstep .q{font-family:var(--font-display);font-size:0.95rem;min-width:28px;text-align:center;color:var(--c-teal-bright)}
 
-    .state{text-align:center;padding:3rem 1rem;color:var(--ink-faint);font-style:italic}
-    .state.error{color:var(--rust)}
-    .toast{
-      position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(8px);
-      background:var(--panel-light);border:1px solid var(--teal);
-      border-radius:6px;padding:11px 20px;
-      color:var(--ink);font-size:0.92rem;font-family:'Cinzel',serif;letter-spacing:0.04em;
-      box-shadow:0 8px 24px rgba(0,0,0,0.55), 0 0 0 1px rgba(74,149,149,0.18), 0 0 24px rgba(74,149,149,0.10);
-      opacity:0;
-      transition:opacity 220ms cubic-bezier(0.16,1,0.3,1),transform 220ms cubic-bezier(0.16,1,0.3,1);
-      pointer-events:none;z-index:50;
-    }
-    .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-    .toast.err{border-color:var(--rust);color:#e3a08e;box-shadow:0 8px 24px rgba(0,0,0,0.55), 0 0 0 1px rgba(168,93,74,0.25), 0 0 24px rgba(168,93,74,0.10)}
+    .state{text-align:center;padding:3rem 1rem;color:var(--c-ink-faint);font-style:italic}
+    .state.error{color:var(--c-error)}
 
     /* Analysis tab */
     .ana-cards{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:1rem}
     .ana-card{
       flex:1;min-width:140px;
-      background:var(--panel);
-      border:1px solid var(--border);border-radius:6px;
+      background:var(--c-surface);
+      border:1px solid var(--c-border);border-radius:var(--radius-md);
       padding:0.85rem 1rem;text-align:center;
       box-shadow:0 2px 8px rgba(0,0,0,0.20);
-      transition:border-color 120ms,box-shadow 120ms;
+      transition:border-color var(--motion-fast),box-shadow var(--motion-fast);
     }
-    .ana-card:hover{border-color:var(--border-light);box-shadow:0 4px 14px rgba(0,0,0,0.30)}
-    .ana-card .val{font-family:'Cinzel',serif;font-size:1.55rem;font-weight:600;color:var(--teal-bright);line-height:1.1;text-shadow:0 1px 8px rgba(74,149,149,0.18)}
-    .ana-card .lbl{font-family:'Cinzel',serif;font-size:0.56rem;font-weight:500;letter-spacing:0.16em;text-transform:uppercase;color:var(--ink-faint);margin-top:0.35rem}
+    .ana-card:hover{border-color:var(--c-border-light);box-shadow:0 4px 14px rgba(0,0,0,0.30)}
+    .ana-card .val{font-family:var(--font-display);font-size:1.55rem;font-weight:600;color:var(--c-teal-bright);line-height:1.1;text-shadow:0 1px 8px rgba(74,149,149,0.18)}
+    .ana-card .lbl{font-family:var(--font-display);font-size:0.56rem;font-weight:500;letter-spacing:0.16em;text-transform:uppercase;color:var(--c-ink-faint);margin-top:0.35rem}
     .ana-section{margin-bottom:1.4rem}
-    .ana-section-h{font-family:'Cinzel',serif;font-size:0.68rem;font-weight:500;letter-spacing:0.20em;text-transform:uppercase;color:var(--brass-bright);margin-bottom:0.5rem;padding-bottom:5px;border-bottom:1px solid var(--border)}
-    .ana-warn-list{border:1px solid rgba(168,93,74,0.5);background:rgba(168,93,74,0.07);border-radius:var(--radius);padding:0.4rem 0.6rem}
+    .ana-section-h{font-family:var(--font-display);font-size:0.68rem;font-weight:500;letter-spacing:0.20em;text-transform:uppercase;color:var(--c-brass-bright);margin-bottom:0.5rem;padding-bottom:5px;border-bottom:1px solid var(--c-border)}
+    .ana-warn-list{border:1px solid rgba(168,93,74,0.5);background:rgba(168,93,74,0.07);border-radius:var(--radius-sm);padding:0.4rem 0.6rem}
     .ana-warn-row{display:flex;gap:10px;align-items:center;padding:6px 4px;font-size:0.92rem;border-bottom:1px solid rgba(168,93,74,0.2)}
     .ana-warn-row:last-child{border-bottom:none}
-    .ana-warn-row .pname{flex:1;color:var(--ink)}
+    .ana-warn-row .pname{flex:1;color:var(--c-ink)}
     .ana-warn-row .reason{color:#e3a08e;font-size:0.84rem}
     .ana-cov-table{width:100%;border-collapse:collapse;font-size:0.9rem}
-    .ana-cov-table th,.ana-cov-table td{padding:5px 8px;text-align:left;border-bottom:1px solid var(--border)}
-    .ana-cov-table th{font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.1em;color:var(--ink-faint);text-transform:uppercase}
-    .ana-cov-table td.num{text-align:right;font-family:'Cinzel',serif;color:var(--teal-bright)}
-    .ana-cov-table tr.danger td.num{color:var(--rust);font-weight:700}
+    .ana-cov-table th,.ana-cov-table td{padding:5px 8px;text-align:left;border-bottom:1px solid var(--c-border)}
+    .ana-cov-table th{font-family:var(--font-display);font-size:0.6rem;letter-spacing:0.1em;color:var(--c-ink-faint);text-transform:uppercase}
+    .ana-cov-table td.num{text-align:right;font-family:var(--font-display);color:var(--c-teal-bright)}
+    .ana-cov-table tr.danger td.num{color:var(--c-error);font-weight:700}
     .ana-cov-table tr.warn td.num{color:#f0b076}
-    .ana-slot-matrix{width:100%;border-collapse:collapse;font-size:0.84rem;font-family:'Cinzel',serif}
-    .ana-slot-matrix th,.ana-slot-matrix td{padding:3px 8px;text-align:center;border:1px solid var(--border)}
-    .ana-slot-matrix th{color:var(--ink-faint);font-size:0.58rem;letter-spacing:0.08em}
-    .ana-slot-matrix td.thin{color:var(--rust);font-weight:700}
+    .ana-slot-matrix{width:100%;border-collapse:collapse;font-size:0.84rem;font-family:var(--font-display)}
+    .ana-slot-matrix th,.ana-slot-matrix td{padding:3px 8px;text-align:center;border:1px solid var(--c-border)}
+    .ana-slot-matrix th{color:var(--c-ink-faint);font-size:0.58rem;letter-spacing:0.08em}
+    .ana-slot-matrix td.thin{color:var(--c-error);font-weight:700}
     .ana-slot-matrix td.thinish{color:#f0b076}
-    .ana-slot-matrix td.row-h{color:var(--ink-faint);background:var(--panel-deep)}
-    .ana-slot-matrix tr.band-uncommon td.row-h{color:var(--teal-bright)}
-    .ana-slot-matrix tr.band-rare td.row-h{color:var(--brass)}
-    .ana-ok{color:var(--teal-bright);font-style:italic;font-size:0.9rem}
-    .footer{margin-top:2rem;text-align:center;padding-top:1.5rem;border-top:1px solid var(--border)}
-    .footer-text{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--ink-faint)}
+    .ana-slot-matrix td.row-h{color:var(--c-ink-faint);background:var(--c-bg-elevated)}
+    .ana-slot-matrix tr.band-uncommon td.row-h{color:var(--c-teal-bright)}
+    .ana-slot-matrix tr.band-rare td.row-h{color:var(--c-brass)}
+    .ana-ok{color:var(--c-teal-bright);font-style:italic;font-size:0.9rem}
+    .footer{margin-top:2rem;text-align:center;padding-top:1.5rem;border-top:1px solid var(--c-border)}
+    .footer-text{font-family:var(--font-display);font-size:0.62rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--c-ink-faint)}
   </style>
 </head>
 <body>
@@ -252,15 +172,15 @@
       <h1>The <span class="accent">Apothecary</span></h1>
       <div class="topbar-meta">
         <span id="role-line">— loading —</span>
-        <a href="home.html" class="home-link">⌂ Home</a>
+        <a href="home.html" class="btn btn--sm">⌂ Home</a>
       </div>
     </div>
 
     <div id="state" class="state">Unlocking the stores…</div>
 
     <div id="tool" style="display:none">
-      <div class="tabs">
-        <button class="tab active" data-tab="ingredients" onclick="switchTab('ingredients')">Ingredients</button>
+      <div class="tab-list">
+        <button class="tab is-active" data-tab="ingredients" onclick="switchTab('ingredients')">Ingredients</button>
         <button class="tab" data-tab="potions" onclick="switchTab('potions')">Potions</button>
         <button class="tab" data-tab="negatives" onclick="switchTab('negatives')">Negatives</button>
         <button class="tab" data-tab="library" onclick="switchTab('library')">Library</button>
@@ -274,7 +194,7 @@
       <div class="tab-panel" id="panel-ingredients">
         <div class="layout">
           <div>
-            <div class="col-head"><span>Ingredients (<span id="ing-count">0</span>)</span><button class="btn ghost sm" onclick="newIng()">+ New</button></div>
+            <div class="col-head"><span>Ingredients (<span id="ing-count">0</span>)</span><button class="btn btn--ghost btn--sm" onclick="newIng()">+ New</button></div>
             <div class="toolbar">
               <input type="text" id="ing-search" placeholder="Search…" oninput="renderIngList()">
               <select id="ing-rarity-filter" onchange="renderIngList()">
@@ -297,10 +217,10 @@
             <div class="fg"><label>Description (player-visible)</label><textarea id="ing-desc"></textarea></div>
             <div class="fg"><label>DM notes (private)</label><textarea id="ing-dmnotes" style="min-height:50px"></textarea></div>
             <div class="form-actions">
-              <button class="btn" onclick="saveIng()">Save ingredient</button>
-              <button class="btn ghost" id="ing-dup" onclick="duplicateIng()" style="display:none" title="Create a copy of this ingredient">⎘ Duplicate</button>
-              <button class="btn danger" id="ing-del" onclick="deleteIng()" style="display:none">Delete</button>
-              <button class="btn ghost" onclick="newIng()">Clear</button>
+              <button class="btn btn--primary" onclick="saveIng()">Save ingredient</button>
+              <button class="btn btn--ghost" id="ing-dup" onclick="duplicateIng()" style="display:none" title="Create a copy of this ingredient">⎘ Duplicate</button>
+              <button class="btn btn--danger" id="ing-del" onclick="deleteIng()" style="display:none">Delete</button>
+              <button class="btn btn--ghost" onclick="newIng()">Clear</button>
             </div>
           </div>
         </div>
@@ -310,7 +230,7 @@
       <div class="tab-panel" id="panel-potions" style="display:none">
         <div class="layout">
           <div>
-            <div class="col-head"><span>Potions (<span id="pot-count">0</span>)</span><button class="btn ghost sm" onclick="newPot()">+ New</button></div>
+            <div class="col-head"><span>Potions (<span id="pot-count">0</span>)</span><button class="btn btn--ghost btn--sm" onclick="newPot()">+ New</button></div>
             <div class="toolbar">
               <input type="text" id="pot-search" placeholder="Search name/effect…" oninput="renderPotList()">
               <select id="pot-cat-filter" onchange="renderPotList()">
@@ -334,10 +254,10 @@
             <div class="fg"><label>Effect</label><textarea id="pot-effect"></textarea></div>
             <div class="fg"><label>DM notes (private)</label><textarea id="pot-dmnotes" style="min-height:50px"></textarea></div>
             <div class="form-actions">
-              <button class="btn" onclick="savePot()">Save potion</button>
-              <button class="btn ghost" id="pot-dup" onclick="duplicatePot()" style="display:none" title="Create a copy of this potion">⎘ Duplicate</button>
-              <button class="btn danger" id="pot-del" onclick="deletePot()" style="display:none">Delete</button>
-              <button class="btn ghost" onclick="newPot()">Clear</button>
+              <button class="btn btn--primary" onclick="savePot()">Save potion</button>
+              <button class="btn btn--ghost" id="pot-dup" onclick="duplicatePot()" style="display:none" title="Create a copy of this potion">⎘ Duplicate</button>
+              <button class="btn btn--danger" id="pot-del" onclick="deletePot()" style="display:none">Delete</button>
+              <button class="btn btn--ghost" onclick="newPot()">Clear</button>
             </div>
           </div>
         </div>
@@ -347,7 +267,7 @@
       <div class="tab-panel" id="panel-negatives" style="display:none">
         <div class="layout">
           <div>
-            <div class="col-head"><span>Negative potions (<span id="neg-count">0</span>)</span><button class="btn ghost sm" onclick="newNeg()">+ New</button></div>
+            <div class="col-head"><span>Negative potions (<span id="neg-count">0</span>)</span><button class="btn btn--ghost btn--sm" onclick="newNeg()">+ New</button></div>
             <div class="hint">Drawn at random when a brew fails by 10 or more.</div>
             <div class="list" id="neg-list"></div>
           </div>
@@ -357,9 +277,9 @@
             <div class="fg"><label>Name</label><input type="text" id="neg-name"></div>
             <div class="fg"><label>Effect</label><textarea id="neg-effect"></textarea></div>
             <div class="form-actions">
-              <button class="btn" onclick="saveNeg()">Save</button>
-              <button class="btn danger" id="neg-del" onclick="deleteNeg()" style="display:none">Delete</button>
-              <button class="btn ghost" onclick="newNeg()">Clear</button>
+              <button class="btn btn--primary" onclick="saveNeg()">Save</button>
+              <button class="btn btn--danger" id="neg-del" onclick="deleteNeg()" style="display:none">Delete</button>
+              <button class="btn btn--ghost" onclick="newNeg()">Clear</button>
             </div>
           </div>
         </div>
@@ -381,10 +301,10 @@
             <div class="fg"><label>Ingredient</label><select id="inv-add-ing"></select></div>
             <div class="frow">
               <div class="fg" style="flex:0 0 90px"><label>Quantity</label><input type="number" id="inv-add-qty" value="1" min="1"></div>
-              <div class="fg" style="justify-content:flex-end"><button class="btn" onclick="grantIng()">Grant</button></div>
+              <div class="fg" style="justify-content:flex-end"><button class="btn btn--primary" onclick="grantIng()">Grant</button></div>
             </div>
-            <div class="form-actions" style="border-top:1px solid var(--border);padding-top:0.8rem">
-              <button class="btn ghost" onclick="grantAllIng()">Grant ALL ingredients ×qty</button>
+            <div class="form-actions" style="border-top:1px solid var(--c-border);padding-top:0.8rem">
+              <button class="btn btn--ghost" onclick="grantAllIng()">Grant ALL ingredients ×qty</button>
             </div>
             <div class="hint" style="margin:0.4rem 0 0">Stocks this character with every ingredient at the quantity above — handy for testing. Replaces their current inventory.</div>
           </div>
@@ -396,11 +316,11 @@
         <div class="hint">Standard 5e potions imported from D&D Beyond — a reference shelf. Use <b>Slot it</b> to drop one onto a Combat/Utility/Whimsy slot in the Potions tab; from there it brews and can be granted as a recipe like any other potion.</div>
         <div class="layout">
           <div>
-            <div class="col-head"><span>Library (<span id="lib-count">0</span>)</span><button class="btn ghost sm" onclick="newLib()">+ New</button></div>
+            <div class="col-head"><span>Library (<span id="lib-count">0</span>)</span><button class="btn btn--ghost btn--sm" onclick="newLib()">+ New</button></div>
             <div class="toolbar">
               <input type="text" id="lib-search" placeholder="Search…" oninput="renderLibList()">
               <input type="file" id="lib-import-file" accept="application/json,.json" onchange="importLibrary(event)" style="display:none">
-              <button class="btn brass sm" onclick="document.getElementById('lib-import-file').click()">Import seed</button>
+              <button class="btn btn--brass btn--sm" onclick="document.getElementById('lib-import-file').click()">Import seed</button>
             </div>
             <div class="list" id="lib-list"></div>
           </div>
@@ -416,10 +336,10 @@
             <div class="fg"><label>Effect</label><textarea id="lib-effect"></textarea></div>
             <div class="fg"><label>Source</label><input type="text" id="lib-source" placeholder="e.g. dmg-2024"></div>
             <div class="form-actions">
-              <button class="btn" onclick="saveLib()">Save</button>
-              <button class="btn" id="lib-slot" onclick="slotFromLibrary()" style="display:none">→ Slot it</button>
-              <button class="btn danger" id="lib-del" onclick="deleteLib()" style="display:none">Delete</button>
-              <button class="btn ghost" onclick="newLib()">Clear</button>
+              <button class="btn btn--primary" onclick="saveLib()">Save</button>
+              <button class="btn btn--primary" id="lib-slot" onclick="slotFromLibrary()" style="display:none">→ Slot it</button>
+              <button class="btn btn--danger" id="lib-del" onclick="deleteLib()" style="display:none">Delete</button>
+              <button class="btn btn--ghost" onclick="newLib()">Clear</button>
             </div>
           </div>
         </div>
@@ -443,7 +363,7 @@
             <div class="fg"><label>Ingredient 3</label><select id="rec-i2" onchange="recCompute()"></select></div>
             <div id="rec-slot-readout" class="hint" style="margin:0.2rem 0">Pick three different ingredients.</div>
             <div class="fg"><label>Resulting potion</label><select id="rec-potion"></select></div>
-            <div class="form-actions"><button class="btn" onclick="grantRecipe()">Grant recipe</button></div>
+            <div class="form-actions"><button class="btn btn--primary" onclick="grantRecipe()">Grant recipe</button></div>
           </div>
         </div>
       </div>
@@ -452,7 +372,7 @@
       <div class="tab-panel" id="panel-analysis" style="display:none">
         <div class="hint">Counts how many 3-ingredient combinations land on every potion slot, and which ingredient affinities can reach each slot. Use it to spot variants you've authored that no combo can actually brew, and to gauge whether you have enough affinity-tagged ingredients to cover every slot.</div>
         <div class="toolbar" style="justify-content:space-between;align-items:center">
-          <button class="btn" onclick="runAnalysis()">Recompute</button>
+          <button class="btn btn--primary" onclick="runAnalysis()">Recompute</button>
           <span id="ana-status" class="hint" style="margin:0">Switch to this tab to run the analysis.</span>
         </div>
         <div class="ana-section"><div id="ana-summary"></div></div>
@@ -465,12 +385,12 @@
       <div class="tab-panel" id="panel-import" style="display:none">
         <div class="form" style="max-width:640px">
           <h3>Import Obojima seed</h3>
-          <div class="warn"><b>Overwrites</b> the ingredient, potion, and negative lists with the contents of the seed file. Inventories are left untouched. Use once to stock the tool, then manage everything in the tabs.</div>
+          <div class="banner banner--error"><span><b>Overwrites</b> the ingredient, potion, and negative lists with the contents of the seed file. Inventories are left untouched. Use once to stock the tool, then manage everything in the tabs.</span></div>
           <div class="hint">Pick the <code>obojima-seed.json</code> file (it sits in your project folder). Nothing uploads anywhere except your own worker's KV store.</div>
           <div class="fg"><label>Seed file</label><input type="file" id="import-file" accept="application/json,.json" onchange="loadSeed(event)"></div>
           <div id="import-preview" class="hint"></div>
           <div class="form-actions">
-            <button class="btn brass" id="import-btn" onclick="doImport()" disabled>Import to KV</button>
+            <button class="btn btn--brass" id="import-btn" onclick="doImport()" disabled>Import to KV</button>
           </div>
         </div>
 
@@ -485,12 +405,13 @@
 
     <div class="footer"><p class="footer-text">The Spire · The Apothecary</p></div>
   </main>
-  <div class="toast" id="toast"></div>
 
   <script src="auth.js?v=2"></script>
+  <script src="spire-ui.js?v=1"></script>
+  <script src="spire-api.js?v=2"></script>
   <script>
-    const WORKER_URL = (window.Auth && window.Auth.WORKER_URL) || 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
-    function esc(s){return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+    const WORKER_URL = API.WORKER_URL;
+    const esc = UI.escapeHtml;
     function slug(s){return (s||'').toLowerCase().replace(/['’]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');}
     function genId(prefix){return prefix+'-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
     function bandOf(n){return n<=30?'common':n<=50?'uncommon':'rare';}
@@ -500,22 +421,15 @@
     let seedData = null;
     let recChosenCat = null;
 
-    function toast(msg, isErr){
-      const t = document.getElementById('toast');
-      t.textContent = msg; t.className = 'toast show' + (isErr?' err':'');
-      clearTimeout(t._t); t._t = setTimeout(()=>{ t.className='toast'; }, 2600);
-    }
+    const toast = (msg, isErr) => UI.toast(msg, isErr === true ? 'error' : (isErr || 'info'));
 
     async function bootstrap(){
       const ident = Auth.identity();
-      document.getElementById('role-line').innerHTML = `${esc(ident.display||'DM')} <span class="role dm">DM</span>`;
+      document.getElementById('role-line').innerHTML = `${esc(ident.display||'DM')} <span class="chip chip--dm">DM</span>`;
       if (!Auth.requireRole('dm', { reason:'The Apothecary is for the DM only.' })) return;
       const stateEl = document.getElementById('state');
       try {
-        const r = await fetch(WORKER_URL + '?type=potion_data_dm', { cache:'no-store', headers: Auth.dmHeaders() });
-        if (r.status === 401){ stateEl.textContent='Your DM session expired — sign in again on the home page.'; stateEl.classList.add('error'); return; }
-        if (!r.ok) throw new Error('HTTP '+r.status);
-        const d = await r.json();
+        const d = await API.dmGet('potion_data_dm');
         data.ingredients = Array.isArray(d.ingredients)?d.ingredients:[];
         data.potions     = Array.isArray(d.potions)?d.potions:[];
         data.negatives   = Array.isArray(d.negatives)?d.negatives:[];
@@ -524,6 +438,7 @@
         data.library     = Array.isArray(d.library)?d.library:[];
         data.characters  = Array.isArray(d.characters)?d.characters:[];
       } catch(e){
+        if (e && e.status === 401){ stateEl.textContent='Your DM session expired — sign in again on the home page.'; stateEl.classList.add('error'); return; }
         stateEl.textContent = 'Could not reach the worker. (If you just added the brew endpoints, redeploy the worker first.)';
         stateEl.classList.add('error');
         return;
@@ -540,17 +455,16 @@
     }
 
     function switchTab(name){
-      document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+      document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('is-active', t.dataset.tab===name));
       document.querySelectorAll('.tab-panel').forEach(p=>p.style.display='none');
       document.getElementById('panel-'+name).style.display='';
       if (name === 'analysis' && !window.__anaCache) runAnalysis();
     }
 
     async function saveKey(type, payload){
-      const r = await fetch(WORKER_URL, { method:'POST', headers: Auth.dmHeaders(), body: JSON.stringify({ type, payload }) });
-      if (r.status === 401){ toast('DM session expired — sign in again.', true); return false; }
-      let b={}; try{ b=await r.json(); }catch{}
-      if (!r.ok || b.error){ toast(b.error||('Save failed (HTTP '+r.status+')'), true); return false; }
+      const { ok, status, body } = await API.dmPost(type, payload);
+      if (status === 401){ toast('DM session expired — sign in again.', true); return false; }
+      if (!ok || (body && body.error)){ toast((body && body.error)||('Save failed (HTTP '+status+')'), true); return false; }
       return true;
     }
 
@@ -788,7 +702,7 @@
           <span class="nm" onclick="editLib('${esc(p.id)}')">${esc(p.name)}${p.attunement?' <span class="sub">attune</span>':''}</span>
           ${p.affinity?`<span class="aff-chip ${esc(affClass(p.affinity))}">${esc(p.affinity)}</span>`:''}
           <span class="rarity ${rarityClass(p.rarity)}">${esc(p.rarity||'—')}</span>
-          <button class="btn ghost sm" onclick="slotFromLibrary('${esc(p.id)}')">Slot it</button>
+          <button class="btn btn--ghost btn--sm" onclick="slotFromLibrary('${esc(p.id)}')">Slot it</button>
         </div>`).join('') : '<div class="empty-note">No library potions yet — use “Import seed”.</div>';
     }
     function newLib(){
@@ -891,7 +805,7 @@
             <span class="q">${e.qty||0}</span>
             <button onclick="bumpQty('${esc(e.ingredientId)}',1)">+</button>
           </span>
-          <button class="btn danger sm" onclick="removeInv('${esc(e.ingredientId)}')">Remove</button>
+          <button class="btn btn--danger btn--sm" onclick="removeInv('${esc(e.ingredientId)}')">Remove</button>
         </div>`).join('') : '<div class="empty-note">Nothing granted yet.</div>';
     }
     async function persistInv(){ return saveKey('potion_inventories', data.inventories); }
@@ -954,8 +868,8 @@
       if(!recChosenCat || !winners.includes(recChosenCat)) recChosenCat=winners[0];
       const cat=recChosenCat, num=sums[cat], rar=bandOf(num);
       let tie='';
-      if(winners.length>1){ tie=' &nbsp;·&nbsp; tie: '+winners.map(c=>`<a href="#" onclick="recCategory('${c}');return false" style="color:${c===cat?'var(--teal-bright)':'var(--ink-light)'}">${c}</a>`).join(' / '); }
-      readout.innerHTML=`Brews <b style="color:var(--teal-bright)">${cat.charAt(0).toUpperCase()+cat.slice(1)} #${num}</b> (${rar})${tie}`;
+      if(winners.length>1){ tie=' &nbsp;·&nbsp; tie: '+winners.map(c=>`<a href="#" onclick="recCategory('${c}');return false" style="color:${c===cat?'var(--c-teal-bright)':'var(--c-ink-light)'}">${c}</a>`).join(' / '); }
+      readout.innerHTML=`Brews <b style="color:var(--c-teal-bright)">${cat.charAt(0).toUpperCase()+cat.slice(1)} #${num}</b> (${rar})${tie}`;
       const slot=data.potions.filter(p=>p.category===cat && p.number===num);
       if(!slot.length){ potSel.innerHTML='<option value="">(no potion authored at this slot)</option>'; }
       else { const off=slot.find(p=>p.official)||slot[0]; potSel.innerHTML=slot.map(p=>`<option value="${esc(p.id)}" ${p.id===off.id?'selected':''}>${esc(p.name)}${p.official?' (official)':''}</option>`).join(''); }
@@ -984,9 +898,9 @@
       const nm=id=>{const i=data.ingredients.find(x=>x.id===id); return i?i.name:id;};
       list.innerHTML = recs.length ? recs.slice().sort((a,b)=>(a.potionName||'').localeCompare(b.potionName||'')).map(r=>`
         <div class="inv-row">
-          <span class="nm"><b style="color:var(--teal-bright)">${esc(r.potionName||'(unknown)')}</b><br><span style="font-size:0.84rem;color:var(--ink-faint)">${esc((r.ingredientIds||[]).map(nm).join(' + '))}</span></span>
+          <span class="nm"><b style="color:var(--c-teal-bright)">${esc(r.potionName||'(unknown)')}</b><br><span style="font-size:0.84rem;color:var(--c-ink-faint)">${esc((r.ingredientIds||[]).map(nm).join(' + '))}</span></span>
           <span class="sub">${esc((r.category||'').slice(0,3).toUpperCase())} #${r.number}</span>
-          <button class="btn danger sm" onclick="removeRecipe('${esc(r.id)}')">Remove</button>
+          <button class="btn btn--danger btn--sm" onclick="removeRecipe('${esc(r.id)}')">Remove</button>
         </div>`).join('') : '<div class="empty-note">No recipes known yet.</div>';
     }
     async function removeRecipe(id){
@@ -1079,7 +993,7 @@
               <td><span class="sub">${esc(r.p.category.toUpperCase().slice(0,3))} #${r.p.number}</span></td>
               <td><span class="aff-chip ${esc(affClass(r.p.affinity))}">${esc(r.p.affinity)}</span></td>
               <td class="num">${r.reach}</td>
-              <td class="num" style="color:var(--ink-light)">${r.total}</td>
+              <td class="num" style="color:var(--c-ink-light)">${r.total}</td>
             </tr>`;
           }).join('')}</tbody></table>`;
       }
@@ -1127,7 +1041,7 @@
           seedData={ ingredients:ing, potions:pot, negatives:neg };
           prev.innerHTML=`Ready to import: <b>${ing.length}</b> ingredients, <b>${pot.length}</b> potions, <b>${neg.length}</b> negatives.`;
           btn.disabled=false;
-        }catch(e){ seedData=null; btn.disabled=true; prev.innerHTML=`<span style="color:var(--rust)">Couldn't read that file: ${esc(e.message)}</span>`; }
+        }catch(e){ seedData=null; btn.disabled=true; prev.innerHTML=`<span style="color:var(--c-error)">Couldn't read that file: ${esc(e.message)}</span>`; }
       };
       reader.readAsText(file);
     }
@@ -1142,7 +1056,7 @@
         data.ingredients=seedData.ingredients; data.potions=seedData.potions; data.negatives=seedData.negatives;
         renderIngList(); renderPotList(); renderNegList(); populateInvIngSelect(); populateRecIngSelects();
         toast('Imported into KV.');
-        document.getElementById('import-preview').innerHTML='<b style="color:var(--teal-bright)">Done.</b> The Cauldron is stocked.';
+        document.getElementById('import-preview').innerHTML='<b style="color:var(--c-teal-bright)">Done.</b> The Cauldron is stocked.';
       } else { btn.disabled=false; }
     }
 
@@ -1173,11 +1087,11 @@
           }
           if(updated>0 && !(await saveKey('potion_ingredients', data.ingredients))) return;
           if(updated>0){ renderIngList(); window.__anaCache=null; }
-          out.innerHTML=`Applied <b style="color:var(--teal-bright)">${updated}</b> tag${updated===1?'':'s'}`
+          out.innerHTML=`Applied <b style="color:var(--c-teal-bright)">${updated}</b> tag${updated===1?'':'s'}`
             +(unchanged?`, ${unchanged} unchanged`:'')
-            +(missing.length?`, <span style="color:var(--rust)">${missing.length} unknown id${missing.length===1?'':'s'} skipped (${esc(missing.slice(0,4).join(', '))}${missing.length>4?'…':''})</span>`:'')+'.';
+            +(missing.length?`, <span style="color:var(--c-error)">${missing.length} unknown id${missing.length===1?'':'s'} skipped (${esc(missing.slice(0,4).join(', '))}${missing.length>4?'…':''})</span>`:'')+'.';
           if(updated>0) toast('Applied '+updated+' affinity tag'+(updated===1?'':'s')+'.');
-        }catch(e){ out.innerHTML=`<span style="color:var(--rust)">Couldn't read that file: ${esc(e.message)}</span>`; }
+        }catch(e){ out.innerHTML=`<span style="color:var(--c-error)">Couldn't read that file: ${esc(e.message)}</span>`; }
       };
       reader.readAsText(file);
       ev.target.value='';

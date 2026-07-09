@@ -7,29 +7,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="theme.css?v=2">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    /* ── Local palette (dark slate + brass + teal, matches the rest of the site) ── */
+    /* ── Page-specific tokens (perk tiers + class-group accents), built
+       on top of the shared theme.css palette ── */
     :root {
-      --bg:           #080c10;
-      --panel:        #131c22;
-      --panel-deep:   #0d141a;
-      --panel-light:  #1c2730;
-      --border:       #2c4048;
-      --border-light: #3e5862;
-      --ink:          #e5e9eb;
-      --ink-light:    #a8b2b8;
-      --ink-faint:    #6c787f;
-      --brass:        #b88a5a;
-      --brass-bright: #d4a87a;
-      --brass-deep:   #6b4d2e;
-      --teal:         #4a9595;
-      --teal-bright:  #7ec5c5;
-      --teal-deep:    #2a5454;
-      --rust:         #a85d4a;
-
       /* Semantic tier colors — picked to read well on dark surfaces */
-      --green:        #5fb381;
+      --green:        var(--c-success);
       --green-deep:   #1d4a30;
       --green-bg:     rgba(95,179,129,0.10);
       --purple:       #a890e8;
@@ -46,31 +28,18 @@
       --martial-color: #e3a08e;
       --martial-bg:    rgba(168,93,74,0.12);
       --martial-deep:  rgba(168,93,74,0.45);
-      --hybrid-color:  var(--brass-bright);
+      --hybrid-color:  var(--c-brass-bright);
       --hybrid-bg:     rgba(184,138,90,0.10);
       --hybrid-deep:   rgba(184,138,90,0.45);
       --caster-color:  var(--purple);
       --caster-bg:     var(--purple-bg);
       --caster-deep:   rgba(168,144,232,0.45);
-
-      /* Alias theme.css token names so any shared components use this page's palette */
-      --c-bg: var(--bg); --c-bg-elevated: var(--panel-deep);
-      --c-surface: var(--panel); --c-surface-2: var(--panel-light); --c-surface-3: var(--panel-light);
-      --c-border: var(--border); --c-border-light: var(--border-light);
-      --c-brass: var(--brass); --c-brass-bright: var(--brass-bright); --c-brass-deep: var(--brass-deep);
-      --c-teal: var(--teal); --c-teal-bright: var(--teal-bright); --c-teal-deep: var(--teal-deep);
-      --c-ink: var(--ink); --c-ink-light: var(--ink-light); --c-ink-faint: var(--ink-faint); --c-ink-dim: var(--ink-faint);
-      --c-error: var(--rust); --c-success: var(--green); --c-warn: var(--amber);
     }
 
     body {
-      background: var(--bg);
       background-image:
         radial-gradient(ellipse at 20% 10%, rgba(184,138,90,0.10) 0%, transparent 55%),
         radial-gradient(ellipse at 80% 90%, rgba(74,149,149,0.07) 0%, transparent 55%);
-      min-height: 100vh;
-      font-family: 'Crimson Text', Georgia, serif;
-      color: var(--ink);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -79,57 +48,57 @@
 
     /* The "scroll" container is now a dark panel matching home.html / sessions-dm */
     .scroll {
-      background: var(--panel);
+      background: var(--c-surface);
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
       max-width: 880px;
       width: 100%;
-      border-radius: 6px;
-      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--c-border);
       box-shadow:
         0 0 0 1px rgba(184,138,90,0.14),
         0 0 30px rgba(184,138,90,0.05),
-        0 16px 48px rgba(0,0,0,0.65),
+        var(--shadow-4),
         inset 0 1px 0 rgba(184,138,90,0.08);
       padding: clamp(1.5rem, 2.4vw + 0.5rem, 3rem);
     }
 
-    .ornament { text-align: center; color: var(--brass-bright); font-size: 1.3rem; letter-spacing: 0.5em; opacity: 0.55; }
+    .ornament { text-align: center; color: var(--c-brass-bright); font-size: 1.3rem; letter-spacing: 0.5em; opacity: 0.55; }
     .ornament.bottom { font-size: 1rem; letter-spacing: 0.4em; opacity: 0.35; margin-top: 2rem; }
 
     h1 {
-      font-family: 'Cinzel', serif;
+      font-family: var(--font-display);
       font-weight: 700;
       font-size: clamp(1.5rem, 1.2rem + 1.5vw, 2.1rem);
       text-align: center;
-      color: var(--ink);
+      color: var(--c-ink);
       letter-spacing: 0.10em;
       line-height: 1.15;
       margin: 1rem 0 0.4rem;
       text-transform: uppercase;
       text-shadow: 0 1px 24px rgba(184,138,90,0.10);
     }
-    .subtitle { text-align: center; font-size: 1.05rem; color: var(--ink-light); font-style: italic; margin-bottom: 0.5rem; }
+    .subtitle { text-align: center; font-size: 1.05rem; color: var(--c-ink-light); font-style: italic; margin-bottom: 0.5rem; }
 
-    .divider { border: none; border-top: 1px solid var(--border); margin: 1.2rem 0; position: relative; }
+    .divider { border: none; border-top: 1px solid var(--c-border); margin: 1.2rem 0; position: relative; }
     .divider::before {
       content: '✦'; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
-      background: var(--panel); padding: 0 0.7rem;
-      color: var(--brass-bright); font-size: 0.85rem;
+      background: var(--c-surface); padding: 0 0.7rem;
+      color: var(--c-brass-bright); font-size: 0.85rem;
     }
 
     /* Class picker */
     .class-picker { margin-bottom: 1.8rem; }
     .class-picker-label {
-      font-family: 'Cinzel', serif; font-size: 0.72rem; font-weight: 500; letter-spacing: 0.16em;
-      color: var(--brass-bright); text-transform: uppercase;
+      font-family: var(--font-display); font-size: 0.72rem; font-weight: 500; letter-spacing: 0.16em;
+      color: var(--c-brass-bright); text-transform: uppercase;
       margin-bottom: 0.7rem; display: block;
-      padding-bottom: 5px; border-bottom: 1px solid var(--border);
+      padding-bottom: 5px; border-bottom: 1px solid var(--c-border);
     }
     .class-groups { display: flex; gap: 1rem; flex-wrap: wrap; }
     .class-group { flex: 1; min-width: 180px; }
     .class-group-label {
-      font-family: 'Cinzel', serif; font-size: 0.62rem; letter-spacing: 0.14em; font-weight: 600;
-      padding: 3px 10px; border-radius: 9999px; display: inline-block; margin-bottom: 8px;
+      font-family: var(--font-display); font-size: 0.62rem; letter-spacing: 0.14em; font-weight: 600;
+      padding: 3px 10px; border-radius: var(--radius-pill); display: inline-block; margin-bottom: 8px;
       text-transform: uppercase; border: 1px solid;
     }
     .class-group-label.martial { background: var(--martial-bg); color: var(--martial-color); border-color: var(--martial-deep); }
@@ -137,18 +106,18 @@
     .class-group-label.caster  { background: var(--caster-bg);  color: var(--caster-color);  border-color: var(--caster-deep);  }
     .class-btn-grid { display: flex; flex-wrap: wrap; gap: 5px; }
     .class-btn {
-      font-family: 'Crimson Text', serif; font-size: 0.92rem;
-      background: var(--panel-deep); border: 1px solid var(--border-light); border-radius: 3px;
-      padding: 5px 12px; cursor: pointer; color: var(--ink-light);
-      transition: border-color 120ms, background 120ms, color 120ms;
+      font-family: var(--font-body); font-size: 0.92rem;
+      background: var(--c-bg-elevated); border: 1px solid var(--c-border-light); border-radius: var(--radius-sm);
+      padding: 5px 12px; cursor: pointer; color: var(--c-ink-light);
+      transition: border-color var(--motion-fast), background var(--motion-fast), color var(--motion-fast);
     }
-    .class-btn:hover { border-color: var(--brass); color: var(--ink); background: var(--panel-light); }
+    .class-btn:hover { border-color: var(--c-brass); color: var(--c-ink); background: var(--c-surface-2); }
     .class-btn.selected-martial { background: var(--martial-bg); border-color: var(--martial-color); color: var(--martial-color); font-weight: 600; box-shadow: 0 0 0 1px var(--martial-deep); }
     .class-btn.selected-hybrid  { background: var(--hybrid-bg);  border-color: var(--hybrid-color);  color: var(--hybrid-color);  font-weight: 600; box-shadow: 0 0 0 1px var(--hybrid-deep); }
     .class-btn.selected-caster  { background: var(--caster-bg);  border-color: var(--caster-color);  color: var(--caster-color);  font-weight: 600; box-shadow: 0 0 0 1px var(--caster-deep); }
     .points-callout {
       margin-top: 1rem; padding: 0.8rem 1rem; border-radius: 4px; border: 1px solid;
-      font-family: 'Cinzel', serif; font-size: 0.8rem; letter-spacing: 0.06em;
+      font-family: var(--font-display); font-size: 0.8rem; letter-spacing: 0.06em;
       display: none; align-items: center; gap: 0.6rem; text-transform: uppercase;
     }
     .points-callout.martial { background: var(--martial-bg); border-color: var(--martial-deep); color: var(--martial-color); }
@@ -157,63 +126,56 @@
 
     /* Name row */
     .name-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
-    .name-row label { font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.12em; color: var(--ink-light); white-space: nowrap; text-transform: uppercase; }
+    .name-row label { font-family: var(--font-display); font-size: 0.72rem; letter-spacing: 0.12em; color: var(--c-ink-light); white-space: nowrap; text-transform: uppercase; }
     .name-row input {
       flex: 1; min-width: 140px;
-      background: transparent; border: none; border-bottom: 1px solid var(--border);
+      background: transparent; border: none; border-bottom: 1px solid var(--c-border);
       padding: 6px 8px;
-      font-family: 'Crimson Text', serif; font-size: 1.1rem; color: var(--ink);
+      font-family: var(--font-body); font-size: 1.1rem; color: var(--c-ink);
       outline: none; transition: border-color 0.2s;
     }
-    .name-row input:focus { border-bottom-color: var(--brass-bright); }
-    .name-row input::placeholder { color: var(--ink-faint); font-style: italic; opacity: 0.7; }
+    .name-row input:focus { border-bottom-color: var(--c-brass-bright); }
+    .name-row input::placeholder { color: var(--c-ink-faint); font-style: italic; opacity: 0.7; }
 
     /* Tracker */
     .tracker {
       display: flex; align-items: center; justify-content: space-between;
-      background: var(--panel-deep);
-      border: 1px solid var(--border-light); border-radius: 6px;
+      background: var(--c-bg-elevated);
+      border: 1px solid var(--c-border-light); border-radius: var(--radius-md);
       padding: 1rem 1.2rem; margin-bottom: 1.8rem;
       box-shadow: inset 0 1px 0 rgba(184,138,90,0.05);
     }
     .tracker-left { display: flex; align-items: center; gap: 1rem; }
-    .tracker-label { font-family: 'Cinzel', serif; font-size: 0.66rem; letter-spacing: 0.16em; color: var(--ink-faint); display: block; margin-bottom: 3px; text-transform: uppercase; }
-    .tracker-count { font-family: 'Cinzel', serif; font-size: 1.55rem; font-weight: 700; color: var(--brass-bright); }
+    .tracker-label { font-family: var(--font-display); font-size: 0.66rem; letter-spacing: 0.16em; color: var(--c-ink-faint); display: block; margin-bottom: 3px; text-transform: uppercase; }
+    .tracker-count { font-family: var(--font-display); font-size: 1.55rem; font-weight: 700; color: var(--c-brass-bright); }
     .pip-row { display: flex; gap: 5px; }
     .pip {
       width: 18px; height: 18px; border-radius: 50%;
-      border: 1.5px solid var(--border-light); background: var(--bg);
+      border: 1.5px solid var(--c-border-light); background: var(--c-bg);
       transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
     }
-    .pip.filled { background: var(--brass); border-color: var(--brass-bright); box-shadow: 0 0 6px rgba(184,138,90,0.30); }
-    .reset-btn {
-      font-family: 'Cinzel', serif; font-size: 0.66rem; font-weight: 500; letter-spacing: 0.12em;
-      color: var(--ink-faint); background: transparent;
-      border: 1px solid var(--border-light); border-radius: 3px;
-      padding: 6px 14px; cursor: pointer;
-      text-transform: uppercase;
-      transition: color 120ms, border-color 120ms, background 120ms;
-    }
+    .pip.filled { background: var(--c-brass); border-color: var(--c-brass-bright); box-shadow: 0 0 6px rgba(184,138,90,0.30); }
+    /* Reset is a theme .btn; keep the danger-tinted hover it always had */
     .reset-btn:hover { color: var(--red); border-color: var(--red-deep); background: var(--red-bg); }
 
     /* Perk grid */
     #perk-sections { display: none; }
-    .pick-prompt { text-align: center; padding: 2rem 0; color: var(--ink-faint); font-style: italic; font-size: 1rem; }
+    .pick-prompt { text-align: center; padding: 2rem 0; color: var(--c-ink-faint); font-style: italic; font-size: 1rem; }
     .tier-section { margin-bottom: 2rem; }
     .tier-header { display: flex; align-items: center; gap: 10px; margin-bottom: 0.8rem; }
     .tier-badge {
-      font-family: 'Cinzel', serif; font-size: 0.66rem; font-weight: 600; letter-spacing: 0.16em;
-      padding: 4px 12px; border-radius: 9999px; white-space: nowrap;
+      font-family: var(--font-display); font-size: 0.66rem; font-weight: 600; letter-spacing: 0.16em;
+      padding: 4px 12px; border-radius: var(--radius-pill); white-space: nowrap;
       text-transform: uppercase; border: 1px solid;
     }
-    .tier-rule { flex: 1; height: 1px; background: var(--border); }
+    .tier-rule { flex: 1; height: 1px; background: var(--c-border); }
     .perk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(195px, 1fr)); gap: 8px; }
     .perk-card {
-      background: var(--panel-light); border: 1px solid var(--border); border-radius: 4px;
+      background: var(--c-surface-2); border: 1px solid var(--c-border); border-radius: 4px;
       padding: 11px 13px; cursor: pointer; user-select: none; position: relative;
-      transition: border-color 120ms, background 120ms, transform 120ms, box-shadow 120ms;
+      transition: border-color var(--motion-fast), background var(--motion-fast), transform var(--motion-fast), box-shadow var(--motion-fast);
     }
-    .perk-card:hover:not(.disabled) { border-color: var(--border-light); background: var(--panel); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.30); }
+    .perk-card:hover:not(.disabled) { border-color: var(--c-border-light); background: var(--c-surface); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.30); }
     .perk-card.selected { border-width: 1.5px; }
     .perk-card.disabled { opacity: 0.32; cursor: not-allowed; }
     .perk-card.selected.disabled { opacity: 1; }
@@ -223,38 +185,38 @@
       font-size: 9px; color: #0a0a0a; opacity: 0; transition: opacity 0.15s;
     }
     .perk-card.selected .check { opacity: 1; }
-    .perk-name { font-family: 'Cinzel', serif; font-size: 0.80rem; font-weight: 600; letter-spacing: 0.04em; margin-bottom: 5px; padding-right: 22px; color: var(--ink); }
-    .perk-desc { font-size: 0.88rem; line-height: 1.5; color: var(--ink-light); }
-    .perk-cost { font-family: 'Cinzel', serif; font-size: 0.64rem; letter-spacing: 0.10em; margin-top: 7px; font-weight: 600; text-transform: uppercase; }
+    .perk-name { font-family: var(--font-display); font-size: 0.80rem; font-weight: 600; letter-spacing: 0.04em; margin-bottom: 5px; padding-right: 22px; color: var(--c-ink); }
+    .perk-desc { font-size: 0.88rem; line-height: 1.5; color: var(--c-ink-light); }
+    .perk-cost { font-family: var(--font-display); font-size: 0.64rem; letter-spacing: 0.10em; margin-top: 7px; font-weight: 600; text-transform: uppercase; }
 
     /* ── Inline choice controls ─────────────────────────────────── */
     .perk-choice {
       display: none;
       margin-top: 9px;
       padding-top: 8px;
-      border-top: 1px dashed var(--border-light);
+      border-top: 1px dashed var(--c-border-light);
     }
     .perk-card.selected .perk-choice { display: block; }
 
     .choice-label {
-      font-family: 'Cinzel', serif; font-size: 0.58rem; letter-spacing: 0.14em;
-      color: var(--ink-faint); display: block; margin-bottom: 5px; text-transform: uppercase;
+      font-family: var(--font-display); font-size: 0.58rem; letter-spacing: 0.14em;
+      color: var(--c-ink-faint); display: block; margin-bottom: 5px; text-transform: uppercase;
     }
 
     .perk-choice select,
     .perk-choice input[type="text"] {
       width: 100%;
-      font-family: 'Crimson Text', serif; font-size: 0.88rem;
-      color: var(--ink); background: var(--bg);
-      border: 1px solid var(--border-light); border-radius: 3px;
+      font-family: var(--font-body); font-size: 0.88rem;
+      color: var(--c-ink); background: var(--c-bg);
+      border: 1px solid var(--c-border-light); border-radius: var(--radius-sm);
       padding: 5px 8px; outline: none; cursor: auto;
-      transition: border-color 120ms, box-shadow 120ms;
+      transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
     }
     .perk-choice select:focus,
-    .perk-choice input[type="text"]:focus { border-color: var(--brass); box-shadow: 0 0 0 3px rgba(184,138,90,0.16); }
+    .perk-choice input[type="text"]:focus { border-color: var(--c-brass); box-shadow: 0 0 0 3px rgba(184,138,90,0.16); }
 
     .choice-warning {
-      font-family: 'Cinzel', serif; font-size: 0.62rem; letter-spacing: 0.10em;
+      font-family: var(--font-display); font-size: 0.62rem; letter-spacing: 0.10em;
       color: var(--red); margin-top: 4px; display: none; text-transform: uppercase;
     }
     /* ─────────────────────────────────────────────────────────────── */
@@ -279,38 +241,25 @@
 
     /* Selected list */
     .selected-section {
-      background: var(--panel-deep); border: 1px solid var(--border-light); border-radius: 6px;
+      background: var(--c-bg-elevated); border: 1px solid var(--c-border-light); border-radius: var(--radius-md);
       padding: 1.1rem 1.3rem; margin-top: 1.5rem;
     }
-    .selected-section h3 { font-family: 'Cinzel', serif; font-size: 0.66rem; letter-spacing: 0.18em; color: var(--brass-bright); margin-bottom: 0.8rem; text-transform: uppercase; padding-bottom: 5px; border-bottom: 1px solid var(--border); }
-    .selected-item { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.95rem; color: var(--ink-light); padding: 5px 0; border-bottom: 1px dashed var(--border); }
+    .selected-section h3 { font-family: var(--font-display); font-size: 0.66rem; letter-spacing: 0.18em; color: var(--c-brass-bright); margin-bottom: 0.8rem; text-transform: uppercase; padding-bottom: 5px; border-bottom: 1px solid var(--c-border); }
+    .selected-item { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.95rem; color: var(--c-ink-light); padding: 5px 0; border-bottom: 1px dashed var(--c-border); }
     .selected-item:last-of-type { border-bottom: none; }
-    .selected-item .item-name { color: var(--ink); }
-    .selected-item .item-choice { font-style: italic; color: var(--ink-faint); font-size: 0.85rem; margin-left: 4px; }
-    .selected-item .item-pts { font-family: 'Cinzel', serif; font-size: 0.7rem; color: var(--brass-bright); white-space: nowrap; letter-spacing: 0.06em; }
-    .empty-msg { font-style: italic; color: var(--ink-faint); font-size: 0.95rem; }
+    .selected-item .item-name { color: var(--c-ink); }
+    .selected-item .item-choice { font-style: italic; color: var(--c-ink-faint); font-size: 0.85rem; margin-left: 4px; }
+    .selected-item .item-pts { font-family: var(--font-display); font-size: 0.7rem; color: var(--c-brass-bright); white-space: nowrap; letter-spacing: 0.06em; }
+    .empty-msg { font-style: italic; color: var(--c-ink-faint); font-size: 0.95rem; }
 
-    /* Send */
+    /* Send — button itself is a theme .btn (btn--brass btn--lg) */
     .send-section { margin-top: 1.5rem; text-align: center; }
-    .send-btn {
-      font-family: 'Cinzel', serif; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.14em;
-      color: var(--bg);
-      background: linear-gradient(180deg, var(--brass-bright), var(--brass));
-      border: 1px solid var(--brass-bright); border-radius: 4px;
-      padding: 13px 36px; cursor: pointer;
-      text-transform: uppercase; display: inline-flex; align-items: center; gap: 8px;
-      box-shadow: 0 4px 14px rgba(184,138,90,0.25);
-      transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
-    }
-    .send-btn:hover:not(:disabled) { background: linear-gradient(180deg, var(--brass-bright), var(--brass-bright)); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(184,138,90,0.35); }
-    .send-btn:active:not(:disabled) { transform: translateY(1px); box-shadow: 0 2px 8px rgba(184,138,90,0.20); }
-    .send-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
-    .send-hint { font-size: 0.85rem; font-style: italic; color: var(--ink-faint); margin-top: 0.6rem; }
-    .feedback { font-family: 'Cinzel', serif; font-size: 0.78rem; letter-spacing: 0.08em; margin-top: 0.9rem; padding: 9px 18px; border-radius: 3px; display: none; text-transform: uppercase; border: 1px solid; }
+    .send-hint { font-size: 0.85rem; font-style: italic; color: var(--c-ink-faint); margin-top: 0.6rem; }
+    .feedback { font-family: var(--font-display); font-size: 0.78rem; letter-spacing: 0.08em; margin-top: 0.9rem; padding: 9px 18px; border-radius: var(--radius-sm); display: none; text-transform: uppercase; border: 1px solid; }
     .feedback.sending  { background: var(--amber-bg);  color: var(--amber);  border-color: var(--amber-deep); display: block; }
     .feedback.success  { background: var(--green-bg);  color: var(--green);  border-color: var(--green-deep); display: block; }
     .feedback.error    { background: var(--red-bg);    color: var(--red);    border-color: var(--red-deep);   display: block; }
-    .validation-msg { font-family: 'Cinzel', serif; font-size: 0.70rem; letter-spacing: 0.10em; color: var(--red); margin-top: 0.6rem; display: none; text-transform: uppercase; }
+    .validation-msg { font-family: var(--font-display); font-size: 0.70rem; letter-spacing: 0.10em; color: var(--red); margin-top: 0.6rem; display: none; text-transform: uppercase; }
 
     @media (max-width: 620px) {
       h1 { font-size: 1.5rem; }
@@ -327,7 +276,7 @@
   <main class="scroll" id="main">
 
     <div style="display:flex;justify-content:flex-end;margin-bottom:-0.5rem">
-      <a href="home.html" style="font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.14em;color:#8a7355;text-decoration:none;text-transform:uppercase">⌂ Home</a>
+      <a href="home.html" style="font-family:var(--font-display);font-size:0.65rem;letter-spacing:0.14em;color:var(--c-brass);text-decoration:none;text-transform:uppercase">⌂ Home</a>
     </div>
     <div class="ornament">— ✦ —</div>
     <h1>Campaign Creation Bonus</h1>
@@ -376,7 +325,7 @@
         </div>
         <div class="pip-row" id="pip-row"></div>
       </div>
-      <button class="reset-btn" onclick="resetPerks()">↺ Reset perks</button>
+      <button class="btn btn--ghost btn--sm reset-btn" onclick="resetPerks()">↺ Reset perks</button>
     </div>
 
     <!-- PERK SECTIONS -->
@@ -395,7 +344,7 @@
 
     <!-- SEND TO DM -->
     <div class="send-section">
-      <button class="send-btn" id="send-btn" onclick="sendToDiscord()">
+      <button class="btn btn--brass btn--lg" id="send-btn" onclick="sendToDiscord()">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
           <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/>
         </svg>
@@ -410,11 +359,13 @@
   </main>
 
   <script src="auth.js?v=2"></script>
+  <script src="spire-ui.js?v=1"></script>
+  <script src="spire-api.js?v=2"></script>
   <script>
     // ═══════════════════════════════════════════════════════════════════
     //  Cloudflare Worker proxy URL
     // ═══════════════════════════════════════════════════════════════════
-    const WORKER_URL = (window.Auth && window.Auth.WORKER_URL) || 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+    const WORKER_URL = API.WORKER_URL;
 
     // Campaign Perks requires being signed in (player or DM).
     if (!window.Auth || !Auth.requireRole('any-login', { reason: 'Sign in to access Campaign Perks.' })) {
