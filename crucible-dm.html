@@ -8,36 +8,26 @@
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="theme.css?v=2">
   <style>
-    body { background: var(--c-bg, #0e1418); color: var(--c-ink, #dde7e9);
-           font-family: 'Crimson Text', serif; margin:0; min-height:100vh; }
-    .topbar { display:flex; gap:0.5rem; align-items:center;
-              padding:0.6rem 1rem; border-bottom:1px solid var(--c-border, #1c2429);
-              background:var(--c-surface, #152028); }
-    .topbar h1 { font-family:'Cinzel', serif; font-size:1.1rem; margin:0 1rem 0 0;
-                 color:var(--c-accent, #7ec5c5); letter-spacing:0.05em; }
-    .topbar .spacer { flex:1; }
-    .btn { padding:0.4rem 0.8rem; background:var(--c-surface-2, #1d3a4a);
-           color:var(--c-ink); border:1px solid var(--c-border); cursor:pointer;
-           border-radius:4px; font-family:'Crimson Text', serif; }
-    .btn:hover { background:var(--c-surface-3, #224a5f); }
-    .btn-teal { background:var(--c-accent, #4a9595); color:#0e1418; border-color:#4a9595; }
-    .btn-teal:disabled { opacity:0.4; cursor:not-allowed; }
+    /* Page layout — theme.css owns reset/body/topbar/buttons/modals.
+       Sim outcome colors, battlefield terrain colors, and team colors below
+       are page-specific by design (not theme tokens). */
+    #trials-select { padding:0.35rem 0.6rem; background:var(--c-surface-2);
+                     color:var(--c-ink); border:1px solid var(--c-border-light);
+                     border-radius:var(--radius-sm); font-family:var(--font-body); }
     .layout { display:grid; grid-template-columns: 320px 400px 1fr;
               gap:0; min-height: calc(100vh - 56px); }
-    .pane { padding:1rem; border-right:1px solid var(--c-border, #1c2429);
+    .pane { padding:1rem; border-right:1px solid var(--c-border);
             overflow-y:auto; max-height: calc(100vh - 56px); }
     .pane:last-child { border-right:none; }
-    .pane h2 { font-family:'Cinzel', serif; font-size:0.95rem; margin:0 0 0.75rem;
-               color:var(--c-accent, #7ec5c5); letter-spacing:0.06em; }
     @media (max-width: 1100px) {
       .layout { grid-template-columns: 1fr; }
       .pane { border-right:none; border-bottom:1px solid var(--c-border); max-height:none; }
     }
-    .empty-state { color:var(--c-ink-faint, #8b9da3); font-style:italic;
+    .empty-state { color:var(--c-ink-faint); font-style:italic;
                    padding:1rem; text-align:center; }
     .pc-features-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
     .feature-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 3px; }
-    .feature-row-name { font-family: 'Cinzel', serif; font-size: 0.85rem; flex: 0 0 auto; }
+    .feature-row-name { font-family: var(--font-display); font-size: 0.85rem; flex: 0 0 auto; }
     .feature-row-summary { font-size: 0.78rem; color: var(--c-ink-faint); flex: 1; }
     .feature-row-remove { background: none; border: none; color: var(--c-error); font-size: 1.2rem; cursor: pointer; padding: 0 6px; }
     .feature-row-edit { background: none; border: 1px solid var(--c-border); color: var(--c-ink-faint); font-size: 0.7rem; padding: 1px 6px; border-radius: 3px; cursor: pointer; margin-right: 4px; }
@@ -47,13 +37,13 @@
     .feature-tag.builtin { color: var(--c-brass); }
     .feature-tag.homebrew { color: var(--c-teal-bright); }
     .pc-features-actions { display: flex; gap: 8px; margin-top: 8px; }
-    .dsl-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-    .dsl-modal-card { background: var(--c-bg); border: 1px solid var(--c-brass); border-radius: 4px; padding: 1.5rem; min-width: 480px; max-width: 720px; max-height: 80vh; overflow-y: auto; }
-    .dsl-modal-card h3 { font-family: Cinzel, serif; margin: 0 0 1rem; color: var(--c-brass); }
+    /* DSL editor modal — theme .modal-overlay/.modal sized up for the form. */
+    .modal.dsl-modal-card { max-width: 720px; max-height: 80vh; overflow-y: auto; border-color: var(--c-brass-deep); }
+    .dsl-modal-card .modal-title { color: var(--c-brass); }
     .dsl-form label { display: block; margin-bottom: 8px; font-size: 0.85rem; }
     .dsl-form input, .dsl-form select { width: 100%; background: var(--c-surface); color: var(--c-ink); border: 1px solid var(--c-border); border-radius: 2px; padding: 6px 8px; }
     .dsl-form fieldset { border: 1px solid var(--c-border); padding: 8px 12px; margin: 12px 0; }
-    .dsl-form legend { color: var(--c-brass); font-family: Cinzel, serif; font-size: 0.75rem; padding: 0 6px; }
+    .dsl-form legend { color: var(--c-brass); font-family: var(--font-display); font-size: 0.75rem; padding: 0 6px; }
     .dsl-effect-row { display: flex; gap: 6px; margin: 4px 0; align-items: center; flex-wrap: wrap; }
     .dsl-effect-row select, .dsl-effect-row input { flex: 1; }
     .dsl-effect-row button { flex: 0; }
@@ -62,50 +52,47 @@
     .dsl-param-field input[type="number"] { width: 60px; }
     .dsl-param-field input[type="text"] { width: 100px; }
     .dsl-param-field select { min-width: 80px; }
-    .dsl-modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1rem; }
-    .impact-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    .impact-table th, .impact-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--c-border); }
-    .impact-table th { font-family: Cinzel, serif; color: var(--c-brass); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    .impact-table th { color: var(--c-brass); }
     /* Trial log color coding by event type — subtle palette so the log
        stays scannable without fighting the slate+teal theme. */
     .log-line { padding: 1px 0; }
-    .log-attack       { color: var(--c-ink, #dde7e9); }
+    .log-attack       { color: var(--c-ink); }
     .log-attack.crit  { color: #ffb35c; font-weight: 600; }
-    .log-attack.miss  { color: var(--c-ink-faint, #8b9da3); }
+    .log-attack.miss  { color: var(--c-ink-faint); }
     .log-damage       { color: #d97a7a; }
     .log-heal         { color: #6dd58c; }
     .log-regen        { color: #6dd58c; }
     .log-save         { color: #7ec5e6; }
     .log-save.failed  { color: #d97a7a; }
-    .log-feature              { color: var(--c-brass-bright, #d4a85a); font-weight: 500; }
+    .log-feature              { color: var(--c-brass-bright); font-weight: 500; }
     .log-feature.is-damage    { color: #e0a060; }
     .log-feature.is-prevented { color: #6da3d9; }
-    .log-feature.is-gate      { color: var(--c-ink-faint, #8b9da3); font-style: italic; font-weight: normal; }
+    .log-feature.is-gate      { color: var(--c-ink-faint); font-style: italic; font-weight: normal; }
     .log-killed { font-weight: 600; }
 
     /* v2 tactical viewer */
     .tactical-board { background: var(--c-bg); border: 1px solid var(--c-border); }
     .tactical-board .grid-line { stroke: var(--c-border); stroke-width: 0.5; opacity: 0.5; }
     .tactical-board .token { cursor: pointer; }
-    .tactical-board .token circle { fill: var(--c-accent); stroke: var(--c-brass); stroke-width: 1.5; transition: transform 600ms ease-out; }
+    .tactical-board .token circle { fill: var(--c-teal); stroke: var(--c-brass); stroke-width: 1.5; transition: transform 600ms ease-out; }
     .tactical-board .token.monster circle { fill: #c43838; }
-    .tactical-board .token text { fill: var(--c-bg); font-family: Cinzel, serif; font-weight: 600; font-size: 0.65rem; pointer-events: none; }
+    .tactical-board .token text { fill: var(--c-bg); font-family: var(--font-display); font-weight: 600; font-size: 0.65rem; pointer-events: none; }
     .tactical-board .token.dead { opacity: 0.35; }
     .tactical-board .token.dead text { text-decoration: line-through; }
-    .tactical-board .token.downed circle { fill: #8b9da3; }
+    .tactical-board .token.downed circle { fill: var(--c-ink-faint); }
     .tactical-board .hp-bar { fill: #6dd58c; }
     .tactical-board .aoe-cell { fill: #c87cd4; opacity: 0.35; transition: opacity 600ms ease-out; }
-    .tactical-board .move-trail { fill: none; stroke: var(--c-accent); stroke-width: 1.5; stroke-dasharray: 3 3; opacity: 0.6; }
-    .tactical-board .terrain-wall { fill: var(--c-ink-faint, #4a4a52); }
+    .tactical-board .move-trail { fill: none; stroke: var(--c-teal); stroke-width: 1.5; stroke-dasharray: 3 3; opacity: 0.6; }
+    .tactical-board .terrain-wall { fill: var(--c-ink-faint); }
     .tactical-board .terrain-difficult { fill: #806c3a; opacity: 0.4; }
     .tactical-board .terrain-damaging rect { fill: #c43838; opacity: 0.35; }
-    .tactical-board .terrain-damaging text { fill: #ffdd99; font-family: Cinzel, serif;
+    .tactical-board .terrain-damaging text { fill: #ffdd99; font-family: var(--font-display);
                                               font-size: 0.55rem; pointer-events: none; }
 
     .terrain-paint { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.5rem;
                      background: var(--c-bg); border: 1px solid var(--c-border); border-radius: 4px;
                      margin-bottom: 0.5rem; }
-    .terrain-paint h3 { font-family: Cinzel, serif; color: var(--c-accent); margin: 0;
+    .terrain-paint h3 { font-family: var(--font-display); color: var(--c-teal-bright); margin: 0;
                         font-size: 0.85rem; letter-spacing: 0.06em; }
     .terrain-paint-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
     .terrain-paint-row label { color: var(--c-ink-faint); font-size: 0.8rem; }
@@ -113,16 +100,16 @@
     .terrain-paint-brushes button { padding: 4px 10px; font-size: 0.78rem;
                                     background: var(--c-surface-2); color: var(--c-ink);
                                     border: 1px solid var(--c-border); cursor: pointer; border-radius: 3px; }
-    .terrain-paint-brushes button.active { background: var(--c-accent); color: var(--c-bg);
-                                           border-color: var(--c-accent); }
+    .terrain-paint-brushes button.active { background: var(--c-teal); color: var(--c-bg);
+                                           border-color: var(--c-teal); }
     .terrain-paint-grid { background: var(--c-bg); border: 1px solid var(--c-border); }
     .terrain-paint-grid .grid-line { stroke: var(--c-border); stroke-width: 0.5; opacity: 0.5; }
     .terrain-paint-grid .cell { fill: transparent; }
     .terrain-paint-grid .cell:hover { fill: rgba(126, 197, 197, 0.15); }
-    .terrain-paint-grid .terrain-wall { fill: var(--c-ink-faint, #4a4a52); }
+    .terrain-paint-grid .terrain-wall { fill: var(--c-ink-faint); }
     .terrain-paint-grid .terrain-difficult { fill: #806c3a; opacity: 0.5; }
     .terrain-paint-grid .terrain-damaging rect { fill: #c43838; opacity: 0.5; }
-    .terrain-paint-grid .terrain-damaging text { fill: #ffdd99; font-family: Cinzel, serif;
+    .terrain-paint-grid .terrain-damaging text { fill: #ffdd99; font-family: var(--font-display);
                                                   font-size: 0.55rem; pointer-events: none; }
 
     .viewer-flex { display: flex; gap: 1rem; align-items: flex-start; }
@@ -132,7 +119,7 @@
                    font-size: 0.8rem; }
     .viewer-log .log-line { cursor: pointer; padding: 2px 0; }
     .viewer-log .log-active { background: rgba(126, 197, 197, 0.15);
-                              border-left: 2px solid var(--c-accent); padding-left: 6px; }
+                              border-left: 2px solid var(--c-teal); padding-left: 6px; }
     .viewer-controls { display: flex; gap: 8px; align-items: center; margin-top: 0.5rem; }
     .viewer-controls button { padding: 4px 10px; font-size: 1rem;
                               background: var(--c-surface-2); color: var(--c-ink);
@@ -149,39 +136,41 @@
 </head>
 <body>
 <script src="auth.js?v=2"></script>
+<script src="spire-api.js?v=2"></script>
+<script src="spire-ui.js?v=1"></script>
 <script src="encounter-schema.js"></script>
 
-<div class="topbar">
-  <h1>⚔ The Crucible</h1>
-  <button class="btn btn-teal" id="btn-run" disabled>Run Simulation ▶</button>
-  <select id="trials-select" class="btn">
+<header class="topbar">
+  <h1 class="topbar-title topbar-title--brass">⚔ The Crucible</h1>
+  <button class="btn btn--primary" id="btn-run" disabled>Run Simulation ▶</button>
+  <select id="trials-select">
     <option value="100">100 trials</option>
     <option value="500" selected>500 trials</option>
     <option value="2000">2000 trials</option>
   </select>
-  <div class="spacer"></div>
-  <a class="btn" href="home.html">⌂ Home</a>
-</div>
+  <div class="topbar-spacer"></div>
+  <a class="btn btn--ghost btn--sm" href="home.html">⌂ Home</a>
+</header>
 
 <div class="layout">
   <section class="pane" id="pane-party">
-    <h2>PARTY <span id="party-count" style="color:var(--c-ink-faint)"></span></h2>
+    <h2 class="section-heading">PARTY <span id="party-count" style="color:var(--c-ink-faint)"></span></h2>
     <div id="party-list" class="empty-state">No PCs yet. (Pane A under construction.)</div>
     <button class="btn" id="btn-add-pc" style="margin-top:0.5rem">+ Add PC</button>
     <button class="btn" id="btn-import-war-table" style="margin-top:0.5rem">Import from War Table</button>
   </section>
 
   <section class="pane" id="pane-encounter">
-    <h2>ENCOUNTER</h2>
+    <h2 class="section-heading">ENCOUNTER</h2>
     <div id="battlefield-panel"></div>
     <div id="encounter-list" class="empty-state">No monsters yet. (Pane B under construction.)</div>
     <button class="btn" id="btn-add-monster" style="margin-top:0.5rem">+ Add from Bestiary</button>
     <div id="fm-budget" style="margin-top:1rem; padding:0.5rem; background:var(--c-surface);
-         border-left:3px solid var(--c-accent); font-size:0.85rem;"></div>
+         border-left:3px solid var(--c-teal); font-size:0.85rem;"></div>
   </section>
 
   <section class="pane" id="pane-results">
-    <h2>RESULTS</h2>
+    <h2 class="section-heading">RESULTS</h2>
     <div id="results-area" class="empty-state">Run a simulation to see how this fight plays out.</div>
   </section>
 </div>
@@ -303,7 +292,7 @@ function renderParty() {
 function renderPCCard(pm) {
   const expanded = expandedPC.has(pm.id);
   const posLabel = pcPositionLabel(pm);
-  const pillColor = pm.positionOverride ? 'var(--c-accent)' : 'var(--c-ink-faint)';
+  const pillColor = pm.positionOverride ? 'var(--c-teal-bright)' : 'var(--c-ink-faint)';
   return `
     <div class="pc-card" style="border:1px solid var(--c-border); border-radius:4px; margin-bottom:0.5rem; padding:0.5rem;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -329,7 +318,7 @@ function renderPCEditor(pm) {
   const p = pm.profs.saves;
   return `
     <div style="padding:0.5rem 0; border-top:1px solid var(--c-border); margin-top:0.5rem;">
-      <div style="font-family:'Cinzel',serif; font-size:0.8rem; color:var(--c-accent); margin-bottom:0.25rem">IDENTITY</div>
+      <div style="font-family:var(--font-display); font-size:0.8rem; color:var(--c-teal-bright); margin-bottom:0.25rem">IDENTITY</div>
       <input type="text" value="${escapeHtml(pm.identity.name)}" placeholder="Name"
         oninput="updatePC('${pm.id}', 'identity.name', this.value)" class="pc-input">
       <input type="number" value="${pm.identity.level}" placeholder="Level" min="1" max="20"
@@ -337,7 +326,7 @@ function renderPCEditor(pm) {
       <input type="text" value="${escapeHtml(pm.identity.class||'')}" placeholder="Class"
         oninput="updatePC('${pm.id}', 'identity.class', this.value)" class="pc-input">
 
-      <div style="font-family:'Cinzel',serif; font-size:0.8rem; color:var(--c-accent); margin:0.5rem 0 0.25rem">STATS</div>
+      <div style="font-family:var(--font-display); font-size:0.8rem; color:var(--c-teal-bright); margin:0.5rem 0 0.25rem">STATS</div>
       <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.25rem">
         <label>HP <input type="number" value="${pm.combat.maxHp}" min="1"
           oninput="updatePC('${pm.id}', 'combat.maxHp', parseInt(this.value)||1); updatePC('${pm.id}', 'combat.hp', parseInt(this.value)||1)" class="pc-input"></label>
@@ -347,7 +336,7 @@ function renderPCEditor(pm) {
           oninput="updatePC('${pm.id}', 'combat.initBonus', parseInt(this.value)||0)" class="pc-input"></label>
       </div>
 
-      <div style="font-family:'Cinzel',serif; font-size:0.8rem; color:var(--c-accent); margin:0.5rem 0 0.25rem">ABILITY SCORES</div>
+      <div style="font-family:var(--font-display); font-size:0.8rem; color:var(--c-teal-bright); margin:0.5rem 0 0.25rem">ABILITY SCORES</div>
       <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:0.25rem">
         ${['str','dex','con','int','wis','cha'].map(k => `
           <label style="font-size:0.75rem">${k.toUpperCase()}
@@ -359,9 +348,9 @@ function renderPCEditor(pm) {
           </label>`).join('')}
       </div>
 
-      <div style="font-family:'Cinzel',serif; font-size:0.8rem; color:var(--c-accent); margin:0.5rem 0 0.25rem">ACTIONS</div>
+      <div style="font-family:var(--font-display); font-size:0.8rem; color:var(--c-teal-bright); margin:0.5rem 0 0.25rem">ACTIONS</div>
       <div id="actions-${pm.id}">${(pm.actions || []).map(act => renderActionRow(pm, act)).join('')}</div>
-      <button class="btn" style="font-size:0.8rem; margin-top:0.25rem"
+      <button class="btn btn--sm" style="margin-top:0.25rem"
         onclick="addAction('${pm.id}')">+ Add action</button>
 
       ${(() => {
@@ -400,7 +389,7 @@ function renderPCEditor(pm) {
                   return `<option value="${id}" ${taken ? 'disabled' : ''}>${escapeHtml(def.name)}${def.classHint ? ' (' + def.classHint + ')' : ''}</option>`;
                 }).join('')}
               </select>
-              <button onclick="openDSLEditor('${pm.id}')">+ Custom feature...</button>
+              <button class="btn btn--sm" onclick="openDSLEditor('${pm.id}')">+ Custom feature...</button>
             </div>
           </details>
         `;
@@ -408,7 +397,7 @@ function renderPCEditor(pm) {
       })()}
 
       <div style="margin-top:0.5rem; display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
-        <span class="tactics-label" style="font-family:'Cinzel',serif; font-size:0.75rem; color:var(--c-brass);">Mode</span>
+        <span class="tactics-label" style="font-family:var(--font-display); font-size:0.75rem; color:var(--c-brass);">Mode</span>
         <select onchange="updatePCMode('${pm.id}', this.value)">
           <option value="nova"      ${pm.tactics.mode === 'nova' ? 'selected' : ''}>Nova</option>
           <option value="sustained" ${pm.tactics.mode === 'sustained' ? 'selected' : ''}>Sustained</option>
@@ -417,7 +406,7 @@ function renderPCEditor(pm) {
       </div>
 
       <div style="margin-top:0.5rem; display:flex; gap:0.5rem;">
-        <button class="btn" style="font-size:0.8rem" onclick="removePC('${pm.id}')">✕ Remove PC</button>
+        <button class="btn btn--danger btn--sm" onclick="removePC('${pm.id}')">✕ Remove PC</button>
       </div>
     </div>`;
 }
@@ -504,14 +493,14 @@ function renderActionEditor(pm, act) {
           placeholder="${act.actionRange === 'ranged' ? '6' : '1'}"
           oninput="updateAction('${pm.id}','${act.id}','range', this.value === '' ? null : parseInt(this.value))"
           class="pc-input" style="width:5rem"></label>
-      <span style="color:var(--c-accent); font-size:0.78rem">→ engine reads ${engineCells} cell${engineCells === 1 ? '' : 's'}</span>
+      <span style="color:var(--c-teal-bright); font-size:0.78rem">→ engine reads ${engineCells} cell${engineCells === 1 ? '' : 's'}</span>
       <label>Type <select onchange="changeActionType('${pm.id}','${act.id}', this.value)">${typeSel}</select></label>
       ${body}
       <label>Uses/day (blank=at-will) <input type="number" value="${act.usesPerDay ?? ''}"
         oninput="updateAction('${pm.id}','${act.id}','usesPerDay', this.value === '' ? null : parseInt(this.value))" class="pc-input"></label>
       <label>Recharge minRoll (blank=none) <input type="number" min="2" max="6" value="${act.recharge ? act.recharge.minRoll : ''}"
         oninput="updateAction('${pm.id}','${act.id}','recharge', this.value === '' ? null : { dice:'d6', minRoll: parseInt(this.value) })" class="pc-input"></label>
-      <button class="btn" style="font-size:0.75rem; margin-top:0.25rem"
+      <button class="btn btn--danger btn--sm" style="margin-top:0.25rem"
         onclick="removeAction('${pm.id}','${act.id}')">✕ Remove action</button>
     </div>`;
 }
@@ -668,7 +657,7 @@ function openDSLEditor(pmId) {
   document.getElementById('dsl-uses').value = 1;
   document.getElementById('dsl-condition').value = 'always';
   dslRenderEffects();
-  document.getElementById('dsl-modal').style.display = 'flex';
+  document.getElementById('dsl-modal').classList.add('is-visible');
 }
 
 function openDSLEditorForEdit(pmId, featureId) {
@@ -705,11 +694,11 @@ function openDSLEditorForEdit(pmId, featureId) {
   }));
   dslRenderEffects();
 
-  document.getElementById('dsl-modal').style.display = 'flex';
+  document.getElementById('dsl-modal').classList.add('is-visible');
 }
 
 function dslClose() {
-  document.getElementById('dsl-modal').style.display = 'none';
+  document.getElementById('dsl-modal').classList.remove('is-visible');
   dslEditingPmId = null;
   dslEditingFeatureId = null;
   dslEffects = [];
@@ -951,10 +940,7 @@ function addAction(pmId) {
   saveParty(); renderParty();
 }
 
-function escapeHtml(s) {
-  return String(s || '').replace(/[&<>"']/g, ch =>
-    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-}
+const escapeHtml = UI.escapeHtml;
 
 // ─────────── Style for inputs ───────────
 const STYLE = document.createElement('style');
@@ -962,7 +948,7 @@ STYLE.textContent = `
   .pc-input { width:100%; padding:0.2rem 0.4rem; font-family:inherit;
               background:var(--c-bg); color:var(--c-ink);
               border:1px solid var(--c-border); border-radius:3px; }
-  .pc-input:focus { outline:1px solid var(--c-accent); }
+  .pc-input:focus { outline:1px solid var(--c-teal); }
 `;
 document.head.appendChild(STYLE);
 
@@ -1030,9 +1016,9 @@ document.getElementById('btn-run').addEventListener('click', async () => {
   root.className = '';
   root.innerHTML = `
     <div style="padding:1rem; text-align:center;">
-      <div style="font-family:'Cinzel',serif; margin-bottom:0.5rem;">Running ${trials} trials…</div>
+      <div style="font-family:var(--font-display); margin-bottom:0.5rem;">Running ${trials} trials…</div>
       <div id="progress-bar" style="width:100%; height:10px; background:var(--c-bg); border:1px solid var(--c-border); border-radius:4px; overflow:hidden;">
-        <div id="progress-fill" style="height:100%; width:0%; background:var(--c-accent); transition:width 100ms;"></div>
+        <div id="progress-fill" style="height:100%; width:0%; background:var(--c-teal); transition:width 100ms;"></div>
       </div>
       <div id="progress-text" style="margin-top:0.5rem; color:var(--c-ink-faint);">0/${trials}</div>
       <div id="winrate-live" style="margin-top:0.5rem; color:var(--c-ink-faint);"></div>
@@ -1095,7 +1081,7 @@ function renderResults(r) {
       </div>
 
       <div style="margin:1rem 0; padding:1rem; background:var(--c-surface); border-left:5px solid ${band.color}; border-radius:4px;">
-        <div style="font-family:'Cinzel',serif; font-size:1.4rem; color:${band.color}; letter-spacing:0.05em">
+        <div style="font-family:var(--font-display); font-size:1.4rem; color:${band.color}; letter-spacing:0.05em">
           ${band.label}
         </div>
         ${fm ? `<div style="margin-top:0.5rem; color:var(--c-ink-faint); font-size:0.9rem">
@@ -1179,7 +1165,7 @@ function renderPerPc(r) {
   if (!r.perPc.length) { root.innerHTML = ''; return; }
   root.innerHTML = `
     <details open style="margin-top:0.5rem;">
-      <summary style="font-family:'Cinzel',serif; color:var(--c-accent); cursor:pointer;">Per-PC outcomes</summary>
+      <summary style="font-family:var(--font-display); color:var(--c-teal-bright); cursor:pointer;">Per-PC outcomes</summary>
       <table style="width:100%; font-size:0.85rem; border-collapse:collapse; margin-top:0.5rem;">
         <thead>
           <tr style="border-bottom:1px solid var(--c-border); color:var(--c-ink-faint); text-align:left;">
@@ -1213,7 +1199,7 @@ function renderDistribution(r) {
   const maxR = Math.max(...rounds, 1);
   root.innerHTML = `
     <details open style="margin-top:0.5rem;">
-      <summary style="font-family:'Cinzel',serif; color:var(--c-accent); cursor:pointer;">Distribution</summary>
+      <summary style="font-family:var(--font-display); color:var(--c-teal-bright); cursor:pointer;">Distribution</summary>
       <div style="display:flex; gap:1.5rem; margin-top:0.5rem;">
         <div style="flex:1">
           <div style="font-size:0.8rem; color:var(--c-ink-faint); margin-bottom:0.25rem">PCs downed per fight</div>
@@ -1233,8 +1219,8 @@ function renderBars(rows, max) {
       const w = 200 / rows.length;
       const h = Math.round((row.value / max) * 90);
       return `<g>
-        <rect x="${i*w + 1}" y="${100 - h}" width="${w - 2}" height="${h}" fill="#4a9595"/>
-        <text x="${i*w + w/2}" y="98" text-anchor="middle" font-size="6" fill="#a0adb2">${escapeHtml(row.label)}</text>
+        <rect x="${i*w + 1}" y="${100 - h}" width="${w - 2}" height="${h}" fill="var(--c-teal)"/>
+        <text x="${i*w + w/2}" y="98" text-anchor="middle" font-size="6" fill="var(--c-ink-light)">${escapeHtml(row.label)}</text>
       </g>`;
     }).join('')}
   </svg>`;
@@ -1246,7 +1232,7 @@ function renderPerAction(r) {
     (b.totalDmg + b.totalHealed) - (a.totalDmg + a.totalHealed));
   root.innerHTML = `
     <details open style="margin-top:0.5rem;">
-      <summary style="font-family:'Cinzel',serif; color:var(--c-accent); cursor:pointer;">Action effectiveness</summary>
+      <summary style="font-family:var(--font-display); color:var(--c-teal-bright); cursor:pointer;">Action effectiveness</summary>
       <table style="width:100%; font-size:0.85rem; border-collapse:collapse; margin-top:0.5rem;">
         <thead>
           <tr style="border-bottom:1px solid var(--c-border); color:var(--c-ink-faint); text-align:left;">
@@ -1283,8 +1269,8 @@ function renderFeatureImpact(r) {
   if (!r.featureStats || Object.keys(r.featureStats).length === 0) { root.innerHTML = ''; return; }
   root.innerHTML = `
     <details open style="margin-top:0.5rem;">
-      <summary style="font-family:'Cinzel',serif; color:var(--c-accent); cursor:pointer;">Feature Impact</summary>
-      <table class="impact-table" style="margin-top:0.5rem;">
+      <summary style="font-family:var(--font-display); color:var(--c-teal-bright); cursor:pointer;">Feature Impact</summary>
+      <table class="table impact-table" style="margin-top:0.5rem;">
         <thead>
           <tr><th>Feature</th><th>Activations / fight</th><th>Avg impact</th></tr>
         </thead>
@@ -1312,7 +1298,7 @@ function renderReplays(r) {
   if (!r.representative || !r.representative.low) { root.innerHTML = ''; return; }
   root.innerHTML = `
     <details open style="margin-top:0.5rem;">
-      <summary style="font-family:'Cinzel',serif; color:var(--c-accent); cursor:pointer;">Tactical replay</summary>
+      <summary style="font-family:var(--font-display); color:var(--c-teal-bright); cursor:pointer;">Tactical replay</summary>
       <div style="margin-top:0.5rem; display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
         <button class="btn" onclick="switchReplay('low')">Low (p10)</button>
         <button class="btn" onclick="switchReplay('median')">Median</button>
@@ -1345,9 +1331,7 @@ function switchReplay(which) {
 //  (the local bestiary.json/fm.json files are dev scrape artifacts; the public
 //  repo + GitHub Pages don't ship them). Cached on `window._CRUCIBLE_BESTIARY`
 //  + a localStorage fallback for offline.
-const WORKER_URL = (typeof CRUCIBLE_WORKER_URL !== 'undefined')
-  ? CRUCIBLE_WORKER_URL
-  : 'https://dnd-perk-webhook.jacobgiff.workers.dev/';
+const WORKER_URL = API.WORKER_URL;
 
 // Track the last load's status so the picker can show a useful empty-state
 // message ("worker said 401 — sign in again" vs "KV is empty" vs "offline").
@@ -1403,6 +1387,7 @@ async function loadBestiary() {
 function showWarn(msg) {
   // Lightweight toast; replaced by a proper warnings list in Task 32.
   console.warn('[Crucible]', msg);
+  UI.toast(msg, 'error');
 }
 
 // ─────────── Role helpers ───────────
@@ -1420,9 +1405,9 @@ function monsterActiveRole(m) {
 }
 
 function roleBadgeColor(source) {
-  if (source === 'override') return 'var(--c-accent)';   // teal
-  if (source === 'fm')       return '#b88a5a';            // gold
-  return 'var(--c-ink-faint)';                            // slate
+  if (source === 'override') return 'var(--c-teal-bright)';  // teal
+  if (source === 'fm')       return 'var(--c-brass)';        // brass
+  return 'var(--c-ink-faint)';                               // slate
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1610,12 +1595,12 @@ function uidPick() { return 'p-' + Math.random().toString(36).slice(2, 6); }
 async function openPickerModal() {
   const bestiary = await loadBestiary();
   const modal = document.createElement('div');
-  modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:10; display:flex; align-items:center; justify-content:center;';
+  modal.className = 'modal-overlay is-visible';
   modal.innerHTML = `
-    <div style="background:var(--c-surface); border:1px solid var(--c-border); border-radius:6px; width:min(720px,90vw); max-height:80vh; display:flex; flex-direction:column;">
+    <div class="modal" style="max-width:min(720px,90vw); max-height:80vh; display:flex; flex-direction:column; padding:0;">
       <div style="padding:0.75rem 1rem; border-bottom:1px solid var(--c-border); display:flex; justify-content:space-between;">
-        <b style="font-family:'Cinzel',serif; color:var(--c-accent);">Pick monsters</b>
-        <button class="btn" onclick="document.body.removeChild(this.closest('[data-modal]'))">✕</button>
+        <b style="font-family:var(--font-display); color:var(--c-teal-bright);">Pick monsters</b>
+        <button class="btn btn--ghost btn--sm" onclick="document.body.removeChild(this.closest('[data-modal]'))">✕</button>
       </div>
       <div style="padding:0.5rem 1rem;">
         <input type="text" id="picker-filter" class="pc-input" placeholder="Filter by name…" autofocus>
@@ -1643,7 +1628,7 @@ async function openPickerModal() {
         <span>${escapeHtml(m.name || '?')}
           <span style="color:var(--c-ink-faint); font-size:0.85em">
             CR ${escapeHtml(String(m.crText || m.cr || '?'))} · HP ${m.hp ?? '?'} · AC ${m.ac ?? '?'}
-          </span>${m._custom ? ' <span style="color:#b88a5a">(custom)</span>' : ''}
+          </span>${m._custom ? ' <span style="color:var(--c-brass)">(custom)</span>' : ''}
         </span>
         <button class="btn" data-pick="${escapeHtml(m.name)}" data-source="${escapeHtml(m._source||'')}">Add</button>
       </div>`).join('') +
@@ -1717,7 +1702,7 @@ function renderEncounter() {
         </span>
       </div>
       <div style="margin-top:0.25rem; font-size:0.78em; color:var(--c-ink-faint);">
-        <b style="color:var(--c-accent);">Spatial:</b>
+        <b style="color:var(--c-teal-bright);">Spatial:</b>
         speed ${Crucible.monsterSpeedCells(p.monster)} cells
         (${p.monster.speedText || (p.monster.speed && p.monster.speed.walk ? p.monster.speed.walk + ' ft.' : '30 ft. default')})
         · reach ${Crucible.monsterReachCells(p.monster)} cell${Crucible.monsterReachCells(p.monster) > 1 ? 's' : ''}
@@ -1739,12 +1724,12 @@ function renderEncounter() {
               const need = Crucible.multiattackRange(pa, p.monster.parsedActions || []);
               tags.push(`effective range ${need}c`);
             }
-            const tagStr = tags.length ? ` <span style="color:var(--c-accent); font-size:0.9em">· ${tags.join(' · ')}</span>` : '';
+            const tagStr = tags.length ? ` <span style="color:var(--c-teal-bright); font-size:0.9em">· ${tags.join(' · ')}</span>` : '';
             return `<li>${escapeHtml(pa.sourceActionName)} —
               <span style="color:${pa.kind === 'unparsed' ? '#e77878' : 'var(--c-ink-faint)'}">${pa.kind}</span>${tagStr}</li>`;
           }).join('')}
         </ul>
-        <button class="btn" style="font-size:0.75em; margin-top:0.25rem"
+        <button class="btn btn--sm" style="margin-top:0.25rem"
           onclick="openOverridePanel('${p.pickId}')">Review parsed actions</button>
       </details>
     </div>`).join('');
@@ -1757,12 +1742,12 @@ function openOverridePanel(pickId) {
   if (!pick) return;
   const m = pick.monster;
   const modal = document.createElement('div');
-  modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:10; display:flex; align-items:center; justify-content:center;';
+  modal.className = 'modal-overlay is-visible';
   modal.innerHTML = `
-    <div data-modal style="background:var(--c-surface); border:1px solid var(--c-border); border-radius:6px; width:min(800px,95vw); max-height:90vh; display:flex; flex-direction:column;">
+    <div data-modal class="modal" style="max-width:min(800px,95vw); max-height:90vh; display:flex; flex-direction:column; padding:0;">
       <div style="padding:0.75rem 1rem; border-bottom:1px solid var(--c-border); display:flex; justify-content:space-between;">
-        <b style="font-family:'Cinzel',serif; color:var(--c-accent);">Review parsed actions — ${escapeHtml(m.name)}</b>
-        <button class="btn" onclick="document.body.removeChild(this.closest('[data-modal]').parentElement)">✕</button>
+        <b style="font-family:var(--font-display); color:var(--c-teal-bright);">Review parsed actions — ${escapeHtml(m.name)}</b>
+        <button class="btn btn--ghost btn--sm" onclick="document.body.removeChild(this.closest('[data-modal]').parentElement)">✕</button>
       </div>
       <div style="flex:1; overflow-y:auto; padding:1rem;">
         ${(() => {
@@ -1779,7 +1764,7 @@ function openOverridePanel(pickId) {
           </div>`;
         })()}
         <div style="margin-bottom:1rem; padding:0.5rem; border:1px solid var(--c-border); border-radius:4px;">
-          <b style="color:var(--c-accent);">Spatial:</b>
+          <b style="color:var(--c-teal-bright);">Spatial:</b>
           <label style="margin-left:0.5rem;">Speed (ft)
             <input type="number" min="0" step="5"
               value="${(m.speed && m.speed.walk) || ''}"
@@ -1811,7 +1796,7 @@ function openOverridePanel(pickId) {
           </div>` : ''}
       </div>
       <div style="padding:0.5rem 1rem; border-top:1px solid var(--c-border); text-align:right">
-        <button class="btn btn-teal" onclick="saveOverride('${pickId}')">Save to bestiary_custom</button>
+        <button class="btn btn--primary" onclick="saveOverride('${pickId}')">Save to bestiary_custom</button>
       </div>
     </div>`;
   document.body.appendChild(modal);
@@ -1859,7 +1844,7 @@ function renderOverrideFields(pa, pickId, idx) {
         <label>Range far (ft)
           <input type="number" min="0" step="5" value="${rangeFar}" class="pc-input"
             oninput="overrideRangeFar('${pickId}', ${idx}, this.value)"></label>
-        <span style="color:var(--c-accent); font-size:0.85em">→ engine reads ${cells} cell${cells === 1 ? '' : 's'}</span>
+        <span style="color:var(--c-teal-bright); font-size:0.85em">→ engine reads ${cells} cell${cells === 1 ? '' : 's'}</span>
       </div>
       <label>To-hit <input type="number" value="${pa.toHit ?? 0}" class="pc-input"
         oninput="overrideField('${pickId}', ${idx}, 'toHit', parseInt(this.value)||0)"></label>
@@ -2149,7 +2134,7 @@ function renderFmBudget() {
   const b = computeFmBudget();
   if (!b) { el.textContent = ''; return; }
   const color = { trivial:'#5a9da3', easy:'#7fd49a', standard:'#dbb965',
-                  hard:'#e09a5a', extreme:'#e77878' }[b.band] || '#dde7e9';
+                  hard:'#e09a5a', extreme:'#e77878' }[b.band] || 'var(--c-ink)';
   el.innerHTML = `<b style="color:${color}">FM budget says: ${b.band.toUpperCase()}</b>
     <span style="color:var(--c-ink-faint); font-size:0.85em">
     · L${b.level} × ${b.size} · total CR ${b.totalCr} · cap ${b.capCr}</span>`;
@@ -2217,16 +2202,16 @@ loadBestiary().catch(e => console.warn('Bestiary preload failed', e));
   const paneB = document.getElementById('pane-encounter');
   if (paneB) {
     const chip = document.createElement('div');
-    chip.style.cssText = 'padding:6px 10px;background:rgba(184,138,90,0.15);border-left:3px solid var(--c-brass);font-family:"Crimson Text",serif;margin-bottom:8px';
+    chip.style.cssText = 'padding:6px 10px;background:rgba(184,138,90,0.15);border-left:3px solid var(--c-brass);font-family:var(--font-body);margin-bottom:8px';
     chip.innerHTML = `Testing: <strong>${escapeHtml(enc.name)}</strong> — <a href="encounter-dm.html?id=${encodeURIComponent(enc.id)}" style="color:var(--c-brass)">back to The Anvil</a>`;
     paneB.prepend(chip);
   }
 })();
 </script>
 
-<div id="dsl-modal" class="dsl-modal" style="display:none">
-  <div class="dsl-modal-card">
-    <h3>Custom Feature</h3>
+<div id="dsl-modal" class="modal-overlay">
+  <div class="modal dsl-modal-card">
+    <h3 class="modal-title">Custom Feature</h3>
     <div class="dsl-form">
       <label>Name <input type="text" id="dsl-name"></label>
       <label>Summary <input type="text" id="dsl-summary"></label>
@@ -2261,13 +2246,13 @@ loadBestiary().catch(e => console.warn('Bestiary preload failed', e));
       <fieldset>
         <legend>Effects (executed in order)</legend>
         <div id="dsl-effects-list"></div>
-        <button onclick="dslAddEffect()">+ Add effect</button>
+        <button class="btn btn--sm" onclick="dslAddEffect()">+ Add effect</button>
       </fieldset>
     </div>
-    <div class="dsl-modal-actions">
-      <button onclick="dslSave()">Save feature</button>
-      <button onclick="dslSaveAsTemplate()">Save as template</button>
-      <button onclick="dslClose()">Cancel</button>
+    <div class="modal-actions">
+      <button class="btn btn--primary" onclick="dslSave()">Save feature</button>
+      <button class="btn" onclick="dslSaveAsTemplate()">Save as template</button>
+      <button class="btn btn--ghost" onclick="dslClose()">Cancel</button>
     </div>
   </div>
 </div>

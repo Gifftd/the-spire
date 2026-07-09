@@ -9,6 +9,82 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-07-09
 
+### Restyle batch 2 — initiative-dm.html (War Table) consumes theme.css
+
+- Alias `:root` block, local gold palette, and reset/body boilerplate
+  deleted; all old tokens substituted (`--gold*` → `--c-brass*`, `--red`/
+  never-defined `--rust` → `--c-error`, `--amber` → `--c-warn`,
+  `--green-light` → `--c-success`, fonts → theme stacks). Combat-identity
+  tokens kept as page tokens: pc/enemy/lobby accents, condition + hp-bar
+  colors, `--active-glow` (retinted brass).
+- STATIC markup buttons → theme `.btn--brass/--danger/--ghost/--sm`
+  (42 swaps); JS-written button classes (`btn-gold` etc. in row builders)
+  kept and their CSS retinted to mirror the theme variants — the render
+  pipeline is untouched.
+- Deliberately NOT migrated, with reasons: local `escapeHTML`/`escapeHtml`
+  keep their bodies (they escape single quotes for onclick contexts —
+  `UI.escapeHtml` escapes fewer characters, so delegation would be unsafe);
+  `showExportToast` keeps its bottom-right/6s lingering-warning behavior
+  (`UI.toast` is 2.8s bottom-center); modals stay on `.modal-backdrop`
+  (retinted) since swapping would need JS edits outside the safe whitelist.
+- Verified: token grep 0 remaining; jsc parse clean; git-diff hunk audit
+  confirms zero hunks inside `render()`, `pushState`, `pollPlayerNotes`,
+  `uid`, or any combat-row builder.
+
+### Restyle batch 2 — crucible-dm.html (The Crucible) consumes theme.css
+
+- **crucible-dm.html**: local `.topbar/.btn/.btn-teal/.pane h2` CSS + body
+  boilerplate deleted; markup now uses theme `.topbar/.topbar-title--brass/
+  .topbar-spacer`, `.section-heading` pane headings, `.btn--primary` (Run
+  Simulation / Save to bestiary_custom), `.btn--ghost .btn--sm` (Home, modal
+  ✕ buttons), `.btn--danger .btn--sm` (Remove PC/action), `.btn--sm` for the
+  formerly font-size-shrunk buttons. `#trials-select` got a small page rule
+  (theme has no bare-select component).
+- Phantom `--c-accent` token (never defined anywhere — no-fallback usages
+  silently inherited text color) eliminated: text accents → `--c-teal-bright`,
+  fills/backgrounds (progress bar, brush active, PC tokens, move trail,
+  log-active border, distribution bars) → `--c-teal`. All stale old-palette
+  `var(--c-*, #hex)` fallbacks stripped; font stacks → `--font-display`/
+  `--font-body`; `#b88a5a` inline hexes → `var(--c-brass)`.
+- All three modals on theme `.modal-overlay/.modal` + `is-visible`: the DSL
+  feature editor (static markup; JS `style.display` toggles → classList,
+  actions row → `.modal-actions` with `.btn` classes), and the JS-created
+  bestiary picker + parsed-action review overlays (inline cssText →
+  `modal-overlay is-visible`; `data-modal` close semantics unchanged).
+  `.dsl-modal-card` reduced to a size/tint override on `.modal`.
+- Feature-impact table → theme `.table` + one-line brass th retint.
+- JS adoption: `escapeHtml` delegates to `UI.escapeHtml`; `WORKER_URL =
+  API.WORKER_URL` (dead `CRUCIBLE_WORKER_URL` override hook dropped —
+  referenced nowhere); `showWarn()` now also surfaces via `UI.toast(…,
+  'error')` in addition to console. Raw fetches kept (bestiary load needs
+  offline-catch semantics API helpers don't expose). Sim outcome band
+  colors, trial-log palette, and battlefield terrain/team colors stay
+  page-specific by design. Engine files untouched.
+
+### Restyle batch 2 — map.html (The Atlas) consumes theme.css
+
+- **map.html** (−47 lines): alias `:root` block + gold local palette +
+  reset/body boilerplate deleted; only page token left is `--topbar`. All
+  old tokens substituted per the alias map (`--gold*` → `--c-brass*`,
+  `--ink-dim` → `--c-ink-light`, `--surface2` → `--c-surface-2`,
+  `--red` → `--c-error`, `--radius` → `--radius-sm`, font stacks →
+  `--font-display`/`--font-body`) across page CSS, inline styles, and the
+  JS template strings (breadcrumb "Region"/location-name spans).
+- Topbar Home link + player-badge buttons (NPCs/Whispers/Log out) →
+  `.btn--ghost .btn--sm`; "Claim a character" → `.btn--brass .btn--sm`;
+  local `.btn/.btn-ghost/.btn-gold/.btn-pill/.btn-pill-gold` CSS deleted
+  (the first three were defined but never used in markup).
+- Login overlay → theme `.modal-overlay/.modal/.modal-close/.modal-title/
+  .modal-sub/.field/.field-error` + `.btn--primary .btn--block`; open/close
+  JS toggles `visible` → `is-visible`. Page keeps `#login-code` uppercase
+  claim-code styling and `.login-skip`.
+- Three local `esc` helpers now delegate to `UI.escapeHtml` (superset
+  escaper, null-safe).
+- Map canvas untouched beyond token substitution: pin/zone/legend
+  structural CSS, pan/zoom/drag JS, `buildRegionMap`/`showLocation`/
+  `renderLocationSubMap`/`handleHash`, and the SVG zone-label font string
+  are byte-identical.
+
 ### Full restyle, batch 1 — brew, index, initiative-player, brew-dm, encounter-dm consume theme.css
 
 Steps C1–C3 of the unification plan. Each page loses its alias `:root` block
