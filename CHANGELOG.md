@@ -7,6 +7,31 @@ Dates are YYYY-MM-DD.
 
 ---
 
+## [Unreleased] — 2026-07-10
+
+### Chronicle Workshop UX — dirty tracking, discard guards, Cmd+S, collapsible sections
+
+Step H1 of the shops/Hearth feature batch (sessions-dm.html only, no backend
+changes):
+
+- **Unsaved-changes tracking.** `serializeWork()` (a non-mutating mirror of
+  the save payload) is snapshotted at load/new/save; a `● unsaved` /
+  `✓ saved` dot lives in the sticky editor header. Any input/change in the
+  form, chip toggles, prep/loot/combat mutations update it (250ms debounce).
+- **Discard guards.** Switching entries, + NEW ENTRY, CANCEL, and deep-link
+  hash changes now prompt "You have unsaved changes… Discard?" via
+  UI.confirmDialog when dirty; a `beforeunload` guard covers tab close/nav.
+  DELETE now uses the styled confirm too.
+- **Cmd/Ctrl+S** saves the open entry; save success/failure now toasts
+  (previously silent beyond the KV sync chip).
+- **Collapsible editor sections.** All 10 top-level form sections wrap in
+  `.ed-sec` with ▾ toggles; collapsed set persists in localStorage (a DM
+  working-style preference, not per-entry). Default-collapsed: Structured
+  Loot, Attached Combats, Visible To, Encounters. Countable sections show a
+  live `(n)` hint so collapsed ≠ hidden information.
+- List cards now show 👤 linked-NPC and 📍 location counts alongside the
+  existing attendance/⚔/◆ badges.
+
 ## [Unreleased] — 2026-07-09
 
 ### Restyle batch 3 — map-dm.html (Atlas Workshop) + bestiary-dm.html (The Menagerie) consume theme.css
