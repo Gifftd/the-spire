@@ -9,6 +9,32 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-07-10
 
+### The Hearth — player homepage (player-hub.html)
+
+Step H6, the batch's centerpiece. One page with everything a player wants
+(player-only; card on the hub with a NEW badge):
+
+- Single scroll, sticky scrollspy section nav: **Whispers** (unread-first,
+  auto mark-read after 2s in view — persists via `journals_read`) ·
+  **Character Sheet** (DM-authored sections; "Player can edit" sections get
+  an inline editor riding `sheet_update`, optimistic with revert-and-reopen
+  on failure) · **The Story So Far** (3 newest chronicle entries, deep-links
+  into timeline.html) · **People You Know** (searchable NPC cards with
+  expand + Atlas links) · **Places You've Found** (type pin-dots; shops/
+  taverns get a WARES ▾ table) · **Satchel & Cauldron** (ingredients +
+  recipes) · **My Notes** (player-authored notes attachable to NPCs/
+  locations/chronicle entries or freestanding; inline editors, 2000-char
+  counter, orphaned-entity handling) · **Table Rules** (Codex docs,
+  long bodies clamped with read-more).
+- No polling: one `home_view` fetch, localStorage instant paint, refetch on
+  tab focus (>60s) or the ⟳ button; sections with an open editor are never
+  repainted under the player's cursor.
+- timeline.html: `#entry-<id>` deep links now expand + scroll to the entry
+  (used by the Hearth and the Atlas Timeline tab alike).
+
+Player features light up after the H2 worker deploy; until then the page
+paints cached/empty states gracefully.
+
 ### The Codex — homebrew rules library (codex-dm.html) + hub cards
 
 Step H5:

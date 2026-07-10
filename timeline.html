@@ -662,7 +662,22 @@
       } catch {}
 
       render();
+      handleEntryHash();
     }
+
+    // Deep links: #entry-<id> (e.g. from player-hub.html / sessions-dm.html)
+    // expands that entry and scrolls to it. Runs after the first render and
+    // again on every hashchange.
+    function handleEntryHash() {
+      const h = decodeURIComponent((location.hash || '').slice(1));
+      if (!h.startsWith('entry-')) return;
+      const id = h.slice('entry-'.length);
+      const entry = entries.find(e => String(e.id) === id);
+      if (!entry) return;
+      if (!expanded.has(entry.id)) { expanded.add(entry.id); render(); }
+      document.getElementById('entry-' + entry.id)?.scrollIntoView({ block: 'start' });
+    }
+    window.addEventListener('hashchange', handleEntryHash);
 
     function showError(el, msg) {
       el.classList.add('error');
