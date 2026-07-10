@@ -9,6 +9,19 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-07-10
 
+### Hearth: collapsed Places & Story rows, Atlas links in new tabs
+
+- **Places** rows collapse to pin-dot + name + type chip (🪙 marker on rows
+  with wares); click expands the blurb, Atlas link, wares disclosure, and
+  note affordance — the People-tab interaction, now shared.
+- **Story** shows EVERY chronicle entry the player can access (the
+  latest-3 cap is gone), each collapsed to kind pill + title + date;
+  click for the recap, Read more link, and notes.
+- "Open in Atlas →" links open in a new tab (`target=_blank noopener`) so
+  players keep their place on the Hearth.
+- My Notes entity-chip jumps now auto-expand the target row for locations
+  and chronicle entries too (previously NPCs only).
+
 ### Hearth: readable sheet field labels
 
 Field labels on the character sheet (ARMOR CLASS, HIT POINTS, …) rendered
