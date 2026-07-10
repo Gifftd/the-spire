@@ -9,6 +9,12 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-07-10
 
+### Hearth: readable sheet field labels
+
+Field labels on the character sheet (ARMOR CLASS, HIT POINTS, …) rendered
+in the theme's faintest ink at the smallest type size — near-invisible on
+the dark surface. Bumped to `--c-ink-light` at `--text-xs`.
+
 ### The Hearth — sections are now tabs
 
 Player feedback: the single-scroll layout meant scrolling past everything
