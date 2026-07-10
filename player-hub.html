@@ -65,6 +65,8 @@ body {
 }
 .hero-unread:hover { border-color: var(--c-teal-bright); background: rgba(74,149,149,0.16); }
 #offline-banner { margin-bottom: var(--space-3); }
+/* theme.css sets .banner{display:flex}, which outranks the UA [hidden] rule */
+.banner[hidden] { display: none; }
 
 /* ── Sticky section nav ── */
 #section-nav {
@@ -118,8 +120,11 @@ body {
 }
 .nav-badge[hidden] { display: none; }
 
-/* ── Sections ── */
+/* ── Sections (tab panels — one visible at a time, all kept in DOM) ── */
 section.hearth-section { scroll-margin-top: 60px; }
+section.hearth-section.hub-tab-hidden { display: none; }
+/* Entity cards are scroll targets for the My Notes chips — clear the sticky tab bar */
+.npc-rcard, .loc-row, .entry-card { scroll-margin-top: 70px; }
 .empty-state {
   font-style: italic;
   color: var(--c-ink-faint);
@@ -422,17 +427,17 @@ a.npc-rcard-loc:hover{color:var(--c-teal-bright)}
 
   <div class="banner banner--warn" id="offline-banner" hidden>⚠ Couldn't reach the keep — showing what was cached.</div>
 
-  <!-- STICKY SECTION NAV -->
-  <nav id="section-nav" aria-label="Sections">
+  <!-- STICKY TAB BAR -->
+  <nav id="section-nav" aria-label="Sections" role="tablist">
     <div class="nav-row">
-      <a class="nav-chip" href="#whispers">✉ Whispers <span class="nav-badge" id="nav-unread" hidden>0</span></a>
-      <a class="nav-chip" href="#sheet">Sheet</a>
-      <a class="nav-chip" href="#chronicle">Story</a>
-      <a class="nav-chip" href="#npcs">People</a>
-      <a class="nav-chip" href="#locations">Places</a>
-      <a class="nav-chip" href="#satchel">Satchel</a>
-      <a class="nav-chip" href="#notes">Notes</a>
-      <a class="nav-chip" href="#rules">Rules</a>
+      <a class="nav-chip" role="tab" href="#whispers" data-tab="whispers">✉ Whispers <span class="nav-badge" id="nav-unread" hidden>0</span></a>
+      <a class="nav-chip" role="tab" href="#sheet" data-tab="sheet">Sheet</a>
+      <a class="nav-chip" role="tab" href="#chronicle" data-tab="chronicle">Story</a>
+      <a class="nav-chip" role="tab" href="#npcs" data-tab="npcs">People</a>
+      <a class="nav-chip" role="tab" href="#locations" data-tab="locations">Places</a>
+      <a class="nav-chip" role="tab" href="#satchel" data-tab="satchel">Satchel</a>
+      <a class="nav-chip" role="tab" href="#notes" data-tab="notes">Notes</a>
+      <a class="nav-chip" role="tab" href="#rules" data-tab="rules">Rules</a>
     </div>
   </nav>
 
@@ -607,6 +612,7 @@ async function fetchHome() {
     writeCache();
     document.getElementById('offline-banner').hidden = true;
     paintAll();
+    armWhisperTimer();   // fresh unread may have landed while Whispers is active
   } catch (e) {
     // Fetch failure: keep whatever is painted (cached) + show the warn banner.
     document.getElementById('offline-banner').hidden = false;
@@ -673,7 +679,7 @@ function renderHeroUnread() {
     unread === 1 ? '1 unread whisper awaits' : `${unread} unread whispers await`;
 }
 document.getElementById('hero-unread').addEventListener('click', () => {
-  document.getElementById('whispers').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  switchTab('whispers');
 });
 
 function updateNavBadge() {
@@ -704,21 +710,17 @@ function renderWhispers() {
   `).join('');
 }
 
-// Auto mark-read: when the whispers section has been ≥50% visible
-// (or fills half the viewport) for 2s, flip unread → read.
+// Auto mark-read: when the Whispers TAB has been active for 2s, flip
+// unread → read. The timer is (re)armed on tab activation and after a
+// fresh fetch lands; switching away cancels it. markWhispersRead is a
+// no-op when nothing is unread, so it fires once per set of unread ids.
 let whisperTimer = null;
-const whisperObserver = new IntersectionObserver((ents) => {
-  const e = ents[0];
-  const mostlyVisible = e.isIntersecting &&
-    (e.intersectionRatio >= 0.5 || e.intersectionRect.height >= window.innerHeight * 0.5);
-  if (mostlyVisible) {
-    if (!whisperTimer) whisperTimer = setTimeout(markWhispersRead, 2000);
-  } else if (whisperTimer) {
-    clearTimeout(whisperTimer);
-    whisperTimer = null;
+function armWhisperTimer() {
+  if (whisperTimer) { clearTimeout(whisperTimer); whisperTimer = null; }
+  if (activeTab === 'whispers' && journals().some(j => j.unread)) {
+    whisperTimer = setTimeout(markWhispersRead, 2000);
   }
-}, { threshold: [0, 0.25, 0.5, 0.75, 1] });
-whisperObserver.observe(document.getElementById('whispers'));
+}
 
 function markWhispersRead() {
   whisperTimer = null;
@@ -878,7 +880,7 @@ function renderChronicle() {
     const body = (e.body || '').toString();
     const preview = body.length > 300 ? body.slice(0, 300).trimEnd() + '…' : body;
     return `
-      <article class="entry-card kind-${esc(kind)}">
+      <article class="entry-card kind-${esc(kind)}" data-id="${esc(e.id)}">
         <div class="entry-card-head">
           <span class="entry-kind ${esc(kind)}">${esc(kind)}</span>
           <span class="entry-card-title">${esc(e.title || '(Untitled)')}</span>
@@ -1076,7 +1078,7 @@ function entityChipHtml(n) {
   if (!spec) return 'about <span class="chip">General</span>';
   const entity = spec.find();
   if (!entity) return `about <span class="chip note-echip is-gone">${spec.icon} no longer in view</span>`;
-  return `about <button type="button" class="chip chip--player note-echip" data-act="goto" data-target="${spec.target}">${spec.icon} ${esc(spec.name(entity) || '(unnamed)')}</button>`;
+  return `about <button type="button" class="chip chip--player note-echip" data-act="goto" data-target="${spec.target}" data-eid="${esc(n.entityId)}">${spec.icon} ${esc(spec.name(entity) || '(unnamed)')}</button>`;
 }
 
 function renderNotes() {
@@ -1387,25 +1389,72 @@ document.getElementById('hearth-main').addEventListener('click', (ev) => {
       break;
     }
     case 'goto': {
-      const target = document.querySelector(t.dataset.target || '');
-      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Switch to the entity's tab first, then scroll to its card in there.
+      const tabId = (t.dataset.target || '').replace('#', '');
+      if (!TAB_IDS.includes(tabId)) return;
+      const eid = t.dataset.eid;
+      switchTab(tabId);
+      if (eid != null && eid !== '') {
+        const panel = document.getElementById(tabId);
+        const card = [...panel.querySelectorAll('[data-id]')].find(el => String(el.dataset.id) === String(eid));
+        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
       break;
     }
   }
 });
 
 // ══════════════════════════════════════════════════════════════
-//  SCROLLSPY — highlight the section under the reading line.
+//  TABS — one panel visible at a time. Panels stay in the DOM
+//  (hidden with .hub-tab-hidden) so paintSection / openEditor and
+//  an in-flight editor in a hidden tab keep working unchanged.
 // ══════════════════════════════════════════════════════════════
-const spyObserver = new IntersectionObserver((ents) => {
-  ents.forEach(en => {
-    if (!en.isIntersecting) return;
-    document.querySelectorAll('#section-nav .nav-chip').forEach(chip => {
-      chip.classList.toggle('is-active', chip.getAttribute('href') === '#' + en.target.id);
-    });
+const TAB_IDS = ['whispers', 'sheet', 'chronicle', 'npcs', 'locations', 'satchel', 'notes', 'rules'];
+const TAB_STORE_KEY = 'player_hub_tab';
+let activeTab = null;
+
+function switchTab(id, opts = {}) {
+  if (!TAB_IDS.includes(id)) id = 'whispers';
+  activeTab = id;
+  document.querySelectorAll('section.hearth-section').forEach(s => {
+    s.classList.toggle('hub-tab-hidden', s.id !== id);
   });
-}, { rootMargin: '-15% 0px -75% 0px', threshold: 0 });
-document.querySelectorAll('section.hearth-section').forEach(s => spyObserver.observe(s));
+  document.querySelectorAll('#section-nav .nav-chip').forEach(chip => {
+    const active = chip.dataset.tab === id;
+    chip.classList.toggle('is-active', active);
+    chip.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+  try { localStorage.setItem(TAB_STORE_KEY, id); } catch {}
+  // replaceState (not location.hash=) so tab flips don't pollute history.
+  if (!opts.keepHash) history.replaceState(null, '', '#' + id);
+  if (!opts.noScroll) window.scrollTo({ top: 0 });
+  armWhisperTimer();   // arms on the whispers tab, cancels elsewhere
+}
+
+// Tab clicks — intercept the anchors so navigation stays replaceState.
+document.getElementById('section-nav').addEventListener('click', (ev) => {
+  const chip = ev.target.closest('.nav-chip');
+  if (!chip) return;
+  ev.preventDefault();
+  switchTab(chip.dataset.tab);
+});
+
+// Deep links: #whispers|#sheet|… selects that tab on load + hashchange.
+window.addEventListener('hashchange', () => {
+  const h = decodeURIComponent((location.hash || '').slice(1));
+  if (TAB_IDS.includes(h) && h !== activeTab) switchTab(h, { keepHash: true });
+});
+
+// Default tab: URL hash wins, then last-used tab, then whispers.
+function initialTab() {
+  const h = decodeURIComponent((location.hash || '').slice(1));
+  if (TAB_IDS.includes(h)) return h;
+  try {
+    const stored = localStorage.getItem(TAB_STORE_KEY);
+    if (TAB_IDS.includes(stored)) return stored;
+  } catch {}
+  return 'whispers';
+}
 
 // ══════════════════════════════════════════════════════════════
 //  BOOT — paint cached bundle immediately, then fetch fresh.
@@ -1418,6 +1467,7 @@ function boot() {
     lastFetchAt = cached.at || 0;
   }
   paintAll();
+  switchTab(initialTab(), { noScroll: true });
   updateSynced();
   fetchHome();
 }
