@@ -213,7 +213,10 @@ section.hearth-section.hub-tab-hidden { display: none; }
 .entry-card.kind-session   { border-left-color: #4a90d4; }
 .entry-card.kind-event     { border-left-color: #c87800; }
 .entry-card.kind-milestone { border-left-color: var(--c-teal-bright); }
-.entry-card-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3); }
+.entry-card:hover { border-color: var(--c-border-light); }
+.entry-card-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3); cursor: pointer; }
+.entry-card-details { margin-top: var(--space-2); }
+.entry-card:not(.expanded) .entry-card-details { display: none; }
 .entry-kind {
   font-family: var(--font-display);
   font-size: var(--text-2xs);
@@ -279,7 +282,9 @@ a.npc-rcard-loc:hover{color:var(--c-teal-bright)}
   border-radius: var(--radius-sm);
   padding: var(--space-3) var(--space-4);
 }
-.loc-row-main { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.loc-row:hover { border-color: var(--c-border-light); }
+.loc-row.expanded { border-color: var(--c-teal-deep); }
+.loc-row-main { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; cursor: pointer; }
 .pin-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 0 2px rgba(248,245,238,0.22); }
 .loc-row-name { font-family: var(--font-display); font-size: var(--text-base); letter-spacing: 0.04em; color: var(--c-ink); }
 .loc-type-chip {
@@ -291,8 +296,24 @@ a.npc-rcard-loc:hover{color:var(--c-teal-bright)}
   border-radius: var(--radius-pill);
   border: 1px solid;
 }
-.loc-row-main .loc-atlas-link { margin-left: auto; }
-.loc-row-desc { font-size: var(--text-sm); color: var(--c-ink-light); line-height: 1.5; margin-top: var(--space-1); }
+/* Shared expand/collapse caret (Places + Story rows) */
+.row-caret {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  line-height: 1;
+  color: var(--c-teal);
+  width: 14px;
+  flex-shrink: 0;
+  text-align: center;
+  transition: transform var(--motion-base) var(--ease-out), color var(--motion-fast) var(--ease-out);
+}
+.loc-row.expanded .row-caret, .entry-card.expanded .row-caret { transform: rotate(90deg); color: var(--c-teal-bright); }
+.loc-wares-mark { margin-left: auto; font-size: 0.85rem; opacity: 0.75; }
+.loc-row-details { margin-top: var(--space-2); }
+.loc-row:not(.expanded) .loc-row-details { display: none; }
+.loc-row-details .loc-atlas-link { display: inline-block; margin-top: var(--space-2); }
+.loc-row-details .wares-btn { display: block; }
+.loc-row-desc { font-size: var(--text-sm); color: var(--c-ink-light); line-height: 1.5; }
 .wares-btn { margin-top: var(--space-2); }
 .wares-wrap { overflow-x: auto; margin-top: var(--space-2); border: 1px solid var(--c-border); border-radius: var(--radius-sm); }
 .loc-row:not(.wares-open) .wares-wrap { display: none; }
@@ -408,7 +429,6 @@ a.npc-rcard-loc:hover{color:var(--c-teal-bright)}
   .sheet-fields { grid-template-columns: 1fr; }
   .sheet-field-edit { grid-template-columns: 1fr; }
   .entry-card-date { margin-left: 0; width: 100%; }
-  .loc-row-main .loc-atlas-link { margin-left: 0; width: 100%; }
   .note-when { margin-left: 0; }
 }
 </style>
@@ -521,6 +541,8 @@ let fetching = false;
 let openEditor = null;         // { kind:'note'|'sheet', section, ctx, el, container, locate, init, read }
 const dirtySections = new Set();     // sections skipped during a repaint because their editor was open
 const expandedNpcIds = new Set();
+const expandedLocIds = new Set();
+const expandedEntryIds = new Set();
 const expandedWareIds = new Set();
 
 // Safe accessors — every section must degrade gracefully when the
@@ -868,27 +890,32 @@ function tlSortKey(e) { return (e.dateSort || '') + '~' + (e.id || ''); }
 
 function renderChronicle() {
   const list = document.getElementById('chronicle-list');
-  const latest = timelineEntries().slice()
-    .sort((a, b) => tlSortKey(b).localeCompare(tlSortKey(a)))
-    .slice(0, 3);
-  if (!latest.length) {
+  // ALL entries the player can see, newest first. Rows render collapsed
+  // (kind pill + title + in-game date); clicking expands the recap —
+  // same class-toggle pattern as the People tab.
+  const all = timelineEntries().slice()
+    .sort((a, b) => tlSortKey(b).localeCompare(tlSortKey(a)));
+  if (!all.length) {
     list.innerHTML = '<div class="empty-state">Nothing has been chronicled yet — the story starts soon.</div>';
     return;
   }
-  list.innerHTML = latest.map(e => {
+  list.innerHTML = all.map(e => {
     const kind = e.kind || 'event';
     const body = (e.body || '').toString();
-    const preview = body.length > 300 ? body.slice(0, 300).trimEnd() + '…' : body;
+    const expanded = expandedEntryIds.has(String(e.id));
     return `
-      <article class="entry-card kind-${esc(kind)}" data-id="${esc(e.id)}">
-        <div class="entry-card-head">
+      <article class="entry-card kind-${esc(kind)} ${expanded ? 'expanded' : ''}" data-id="${esc(e.id)}">
+        <div class="entry-card-head" data-act="toggle-entry">
+          <span class="row-caret">▸</span>
           <span class="entry-kind ${esc(kind)}">${esc(kind)}</span>
           <span class="entry-card-title">${esc(e.title || '(Untitled)')}</span>
           ${e.dateInGame ? `<span class="entry-card-date">${esc(e.dateInGame)}</span>` : ''}
         </div>
-        ${preview ? `<div class="entry-card-body">${esc(preview)}</div>` : ''}
-        <a class="entry-readmore" href="timeline.html#entry-${esc(e.id)}">Read more →</a>
-        <div class="note-slot" data-etype="chronicle" data-eid="${esc(e.id)}">${noteSlotHtml('chronicle', e.id)}</div>
+        <div class="entry-card-details">
+          ${body ? `<div class="entry-card-body">${esc(body)}</div>` : ''}
+          <a class="entry-readmore" href="timeline.html#entry-${esc(e.id)}">Read more →</a>
+          <div class="note-slot" data-etype="chronicle" data-eid="${esc(e.id)}">${noteSlotHtml('chronicle', e.id)}</div>
+        </div>
       </article>
     `;
   }).join('');
@@ -929,7 +956,7 @@ function renderNPCs() {
         <div class="npc-rcard-details">
           ${n.description ? `<div class="npc-rcard-section">About</div><div>${esc(n.description)}</div>` : ''}
           ${n.notes ? `<div class="npc-rcard-section">Notes</div><div>${esc(n.notes)}</div>` : ''}
-          ${loc ? `<div class="npc-rcard-section">Last seen</div><div><a class="npc-rcard-loc" href="map.html#${esc(loc.id)}">📍 ${esc(loc.name)} — open in Atlas →</a></div>` : ''}
+          ${loc ? `<div class="npc-rcard-section">Last seen</div><div><a class="npc-rcard-loc" href="map.html#${esc(loc.id)}" target="_blank" rel="noopener">📍 ${esc(loc.name)} — open in Atlas →</a></div>` : ''}
           ${history.length ? `<div class="npc-rcard-section">History</div>${history.map(h => `
             <div class="npc-rcard-history-entry">
               <div class="npc-rcard-history-date">${esc(h.date)}${h.locationId && locationById(h.locationId) ? ' · 📍 ' + esc(locationById(h.locationId).name) : ''}</div>
@@ -963,35 +990,43 @@ function renderLocations() {
     return;
   }
   const { TYPE_COLORS, TYPE_LABELS, TYPE_ICONS } = MapRender;
+  // Rows render collapsed (pin-dot + name + type chip, plus a 🪙 hint on
+  // rows with wares); clicking expands the blurb / Atlas link / wares /
+  // note — same class-toggle pattern as the People tab.
   list.innerHTML = locs.map(loc => {
     const type = loc.type || 'default';
     const color = TYPE_COLORS[type] || TYPE_COLORS.default;
     const inv = (loc.shop && Array.isArray(loc.shop.inventory)) ? loc.shop.inventory : [];
     const hasWares = inv.length > 0 || type === 'shop' || type === 'tavern';
-    const open = expandedWareIds.has(String(loc.id));
+    const expanded = expandedLocIds.has(String(loc.id));
+    const waresOpen = expandedWareIds.has(String(loc.id));
     return `
-      <div class="loc-row ${open ? 'wares-open' : ''}" data-id="${esc(loc.id)}">
-        <div class="loc-row-main">
+      <div class="loc-row ${expanded ? 'expanded' : ''} ${waresOpen ? 'wares-open' : ''}" data-id="${esc(loc.id)}">
+        <div class="loc-row-main" data-act="toggle-loc">
+          <span class="row-caret">▸</span>
           <span class="pin-dot" style="background:${esc(color)}"></span>
           <span class="loc-row-name">${esc(loc.name)}</span>
           <span class="loc-type-chip" style="color:${esc(color)};border-color:${esc(color)}">${TYPE_ICONS[type] || TYPE_ICONS.default} ${esc(TYPE_LABELS[type] || type)}</span>
-          <a class="loc-atlas-link" href="map.html#${esc(loc.id)}">Open in Atlas →</a>
+          ${hasWares ? '<span class="loc-wares-mark" title="Sells wares">🪙</span>' : ''}
         </div>
-        ${loc.shortDesc ? `<div class="loc-row-desc">${esc(loc.shortDesc)}</div>` : ''}
-        ${hasWares ? `<button type="button" class="btn btn--ghost btn--sm wares-btn" data-act="toggle-wares">Wares ▾</button>
-        <div class="wares-wrap">${inv.length ? `
-          <table class="table">
-            <thead><tr><th>Item</th><th>Price</th><th>Stock</th><th>Notes</th></tr></thead>
-            <tbody>${inv.map(r => `
-              <tr>
-                <td>${esc(r.item || '')}</td>
-                <td>${esc(r.price || '—')}</td>
-                <td>${(r.qty ?? '').toString().trim() ? esc(String(r.qty)) : '—'}</td>
-                <td>${esc(r.notes || '')}</td>
-              </tr>`).join('')}</tbody>
-          </table>` : '<div class="wares-empty">The shelves are bare — or the keeper isn\'t selling to you.</div>'}
-        </div>` : ''}
-        <div class="note-slot" data-etype="location" data-eid="${esc(loc.id)}">${noteSlotHtml('location', loc.id)}</div>
+        <div class="loc-row-details">
+          ${loc.shortDesc ? `<div class="loc-row-desc">${esc(loc.shortDesc)}</div>` : ''}
+          <a class="loc-atlas-link" href="map.html#${esc(loc.id)}" target="_blank" rel="noopener">Open in Atlas →</a>
+          ${hasWares ? `<button type="button" class="btn btn--ghost btn--sm wares-btn" data-act="toggle-wares">Wares ${waresOpen ? '▴' : '▾'}</button>
+          <div class="wares-wrap">${inv.length ? `
+            <table class="table">
+              <thead><tr><th>Item</th><th>Price</th><th>Stock</th><th>Notes</th></tr></thead>
+              <tbody>${inv.map(r => `
+                <tr>
+                  <td>${esc(r.item || '')}</td>
+                  <td>${esc(r.price || '—')}</td>
+                  <td>${(r.qty ?? '').toString().trim() ? esc(String(r.qty)) : '—'}</td>
+                  <td>${esc(r.notes || '')}</td>
+                </tr>`).join('')}</tbody>
+            </table>` : '<div class="wares-empty">The shelves are bare — or the keeper isn\'t selling to you.</div>'}
+          </div>` : ''}
+          <div class="note-slot" data-etype="location" data-eid="${esc(loc.id)}">${noteSlotHtml('location', loc.id)}</div>
+        </div>
       </div>
     `;
   }).join('');
@@ -1340,6 +1375,24 @@ document.getElementById('hearth-main').addEventListener('click', (ev) => {
       card.classList.toggle('expanded');   // in place — never rebuilds the card
       break;
     }
+    case 'toggle-loc': {
+      if (ev.target.closest('a, button, .note-slot')) return;
+      const row = t.closest('.loc-row');
+      if (!row) return;
+      const id = String(row.dataset.id);
+      if (expandedLocIds.has(id)) expandedLocIds.delete(id); else expandedLocIds.add(id);
+      row.classList.toggle('expanded');    // in place — never rebuilds the row
+      break;
+    }
+    case 'toggle-entry': {
+      if (ev.target.closest('a, button, .note-slot')) return;
+      const card = t.closest('.entry-card');
+      if (!card) return;
+      const id = String(card.dataset.id);
+      if (expandedEntryIds.has(id)) expandedEntryIds.delete(id); else expandedEntryIds.add(id);
+      card.classList.toggle('expanded');   // in place — never rebuilds the card
+      break;
+    }
     case 'toggle-wares': {
       const row = t.closest('.loc-row');
       if (!row) return;
@@ -1397,7 +1450,15 @@ document.getElementById('hearth-main').addEventListener('click', (ev) => {
       if (eid != null && eid !== '') {
         const panel = document.getElementById(tabId);
         const card = [...panel.querySelectorAll('[data-id]')].find(el => String(el.dataset.id) === String(eid));
-        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (card) {
+          // Expand the target row so the note/blurb is in view.
+          const id = String(card.dataset.id);
+          if (card.classList.contains('npc-rcard')) expandedNpcIds.add(id);
+          else if (card.classList.contains('loc-row')) expandedLocIds.add(id);
+          else if (card.classList.contains('entry-card')) expandedEntryIds.add(id);
+          card.classList.add('expanded');
+          card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
       }
       break;
     }
