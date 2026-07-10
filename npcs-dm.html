@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Spire — Dramatis Personae (DM)</title>
+<meta name="theme-color" content="#060a0e">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css?v=2">
+<style>
+/* ──────────────────────────────────────────────────────────
+   Page-specific styles (npcs-dm.html — Dramatis Personae).
+   Shared tokens & components live in theme.css.
+   ────────────────────────────────────────────────────────── */
+
+html, body { height: 100%; overflow: hidden; }
+body { display: flex; flex-direction: column; }
+
+.topbar-sub {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.10em;
+  color: var(--c-ink-faint);
+  text-transform: uppercase;
+}
+.sync-status {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.10em;
+  color: var(--c-ink-faint);
+  text-transform: uppercase;
+}
+.sync-status.ok   { color: var(--c-success); }
+.sync-status.fail { color: var(--c-error); }
+.sync-status.ing  { color: var(--c-warn); }
+
+/* ── 2-pane layout ── */
+.layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  overflow: hidden;
+  min-height: 0;
+}
+.pane-list {
+  background: var(--c-surface);
+  border-right: 1px solid var(--c-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+.pane-editor {
+  background: var(--c-bg);
+  overflow-y: auto;
+  padding: 0 var(--space-5) var(--space-5);
+  min-height: 0;
+}
+
+/* Under 900px the panes stack vertically and the page scrolls. */
+@media (max-width: 900px) {
+  html, body { overflow: auto; height: auto; }
+  body { min-height: 100vh; }
+  .layout { display: flex; flex-direction: column; overflow: visible; }
+  .pane-list { border-right: none; border-bottom: 1px solid var(--c-border); overflow: visible; }
+  .list-content { max-height: 40vh; }
+  .pane-editor { overflow: visible; padding: 0 var(--space-3) var(--space-5); }
+}
+
+/* ── List pane ── */
+.list-toolbar {
+  padding: var(--space-3) var(--space-3);
+  border-bottom: 1px solid var(--c-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  background: var(--c-surface);
+}
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.count-line {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.08em;
+  color: var(--c-ink-faint);
+  text-transform: uppercase;
+  text-align: right;
+}
+.list-toolbar input[type=text] {
+  width: 100%;
+  background: var(--c-bg-elevated);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  color: var(--c-ink);
+  padding: 6px 9px;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  outline: none;
+  transition: border-color var(--motion-fast) var(--ease-out);
+}
+.list-toolbar input[type=text]:focus { border-color: var(--c-brass); }
+
+.filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px var(--space-2); }
+.filter label {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.56rem;
+  letter-spacing: 0.14em;
+  color: var(--c-ink-faint);
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.filter select {
+  width: 100%;
+  background: var(--c-bg-elevated);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  color: var(--c-ink);
+  padding: 4px 6px;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  outline: none;
+}
+.filter select:focus { border-color: var(--c-brass); }
+
+.list-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-2) var(--space-2);
+  min-height: 0;
+}
+.list-empty {
+  padding: var(--space-5) var(--space-3);
+  color: var(--c-ink-faint);
+  font-style: italic;
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+/* NPC rows */
+.npc-card {
+  background: var(--c-surface-2);
+  border: 1px solid var(--c-border);
+  border-left: 3px solid var(--c-border-light);
+  border-radius: var(--radius-sm);
+  padding: 7px 11px;
+  margin-bottom: var(--space-2);
+  cursor: pointer;
+  transition: border-color var(--motion-fast) var(--ease-out),
+              background var(--motion-fast) var(--ease-out);
+}
+.npc-card:hover { border-color: var(--c-border-light); background: var(--c-surface-3); }
+.npc-card.selected { border-color: var(--c-brass); border-left-color: var(--c-brass); background: var(--c-surface-3); }
+.npc-card-top { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+.npc-card-name {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  color: var(--c-ink);
+  line-height: 1.25;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.npc-card-role {
+  font-size: var(--text-sm);
+  color: var(--c-ink-faint);
+  font-style: italic;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.npc-card-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 3px;
+}
+.npc-card-loc {
+  font-size: 0.74rem;
+  color: var(--c-ink-faint);
+  margin-right: 2px;
+}
+.npc-card-loc--none { font-style: italic; opacity: 0.75; }
+
+.status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+  align-self: center;
+}
+.status-dot--alive   { background: var(--c-success); }
+.status-dot--dead    { background: var(--c-error); }
+.status-dot--missing { background: var(--c-warn); }
+.status-dot--unknown { background: var(--c-ink-faint); }
+
+.known-chip {
+  font-family: var(--font-display);
+  font-size: 0.55rem;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  border: 1px solid;
+  flex-shrink: 0;
+}
+.known-chip.known { color: var(--c-teal-bright); border-color: rgba(74,149,149,0.45); background: rgba(74,149,149,0.12); }
+.known-chip.unmet { color: var(--c-ink-faint);   border-color: var(--c-border);       background: rgba(108,120,127,0.10); }
+
+.tag-chip {
+  font-family: var(--font-display);
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(184,138,90,0.40);
+  color: var(--c-brass-bright);
+  background: rgba(184,138,90,0.08);
+}
+
+/* ── Editor pane ── */
+.editor-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--c-ink-faint);
+  font-style: italic;
+  text-align: center;
+  padding: var(--space-7);
+  min-height: 60vh;
+}
+.editor-empty h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  letter-spacing: 0.10em;
+  color: var(--c-ink-dim);
+  margin-bottom: var(--space-2);
+  font-style: normal;
+  text-transform: uppercase;
+}
+.editor-empty p { max-width: 36rem; line-height: 1.55; font-size: var(--text-sm); }
+
+#editor { max-width: 760px; }
+.editor-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) 0 var(--space-2);
+  margin-bottom: var(--space-3);
+  border-bottom: 1px solid var(--c-border);
+}
+.editor-glyph { font-size: 1.2rem; flex-shrink: 0; }
+.editor-header h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  letter-spacing: 0.06em;
+  color: var(--c-brass-bright);
+  line-height: 1.25;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Player notes card (below the editor) ── */
+.pn-section {
+  margin-top: var(--space-5);
+  border-top: 1px solid var(--c-border);
+  padding-top: var(--space-3);
+}
+.pn-title {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.14em;
+  color: var(--c-brass);
+  text-transform: uppercase;
+  margin-bottom: var(--space-2);
+}
+.pn-title .hint {
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  letter-spacing: 0;
+  color: var(--c-ink-faint);
+  font-style: italic;
+  text-transform: none;
+}
+.pn-card {
+  background: var(--c-surface-2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 9px;
+  margin-bottom: 5px;
+}
+.pn-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.72rem;
+  color: var(--c-ink-faint);
+  margin-bottom: 2px;
+}
+.pn-del {
+  background: transparent;
+  border: none;
+  color: var(--c-ink-faint);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 0 3px;
+}
+.pn-del:hover { color: var(--c-error); }
+.pn-body {
+  color: var(--c-ink-light);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+.pn-empty { font-size: var(--text-sm); color: var(--c-ink-faint); font-style: italic; padding: 2px 0; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <span class="topbar-title topbar-title--brass">DRAMATIS PERSONAE</span>
+  <span class="topbar-sub">every soul the party has met — or hasn't yet</span>
+  <span class="sync-status" id="sync-status">—</span>
+  <span class="topbar-spacer"></span>
+  <div class="topbar-actions">
+    <a class="btn btn--ghost btn--sm" href="home.html">← HUB</a>
+  </div>
+</header>
+
+<main class="layout">
+  <!-- LIST PANE -->
+  <aside class="pane-list">
+    <div class="list-toolbar">
+      <div class="toolbar-row">
+        <button class="btn btn--brass btn--sm" id="btn-new" type="button">+ NEW NPC</button>
+        <span class="count-line" id="count-line">—</span>
+      </div>
+      <input type="text" id="search" placeholder="Search name, role, activity, tags…  ( / )">
+      <div class="filter-grid">
+        <div class="filter"><label for="flt-location">Location</label>
+          <select id="flt-location"><option value="">— anywhere —</option></select>
+        </div>
+        <div class="filter"><label for="flt-status">Status</label>
+          <select id="flt-status">
+            <option value="">— any —</option>
+            <option value="alive">Alive</option>
+            <option value="dead">Dead</option>
+            <option value="missing">Missing</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </div>
+        <div class="filter"><label for="flt-known">Known to</label>
+          <select id="flt-known"><option value="">— any —</option></select>
+        </div>
+        <div class="filter"><label for="flt-tag">Tag</label>
+          <select id="flt-tag"><option value="">— any tag —</option></select>
+        </div>
+      </div>
+      <div class="filter"><label for="sort">Sort</label>
+        <select id="sort">
+          <option value="name">Name A–Z</option>
+          <option value="location">Location</option>
+          <option value="status">Status</option>
+          <option value="recent">Recently referenced</option>
+        </select>
+      </div>
+    </div>
+    <div class="list-content" id="list-content"></div>
+  </aside>
+
+  <!-- EDITOR PANE -->
+  <section class="pane-editor" id="pane-editor">
+    <div class="editor-empty" id="editor-empty">
+      <h2>No soul selected</h2>
+      <p>Pick a soul from the list, or create one. Everything about them lives here — who they are, where they are, who has met them, and every chronicle entry they appear in.</p>
+    </div>
+    <div id="editor" style="display:none">
+      <div class="editor-header">
+        <span class="editor-glyph" aria-hidden="true">👤</span>
+        <h2 id="hdr-name">New NPC</h2>
+      </div>
+      <div id="editor-host"></div>
+      <div class="pn-section" id="player-notes-card" style="display:none">
+        <div class="pn-title">PLAYER NOTES <span class="hint">— written by players about this NPC, read-only</span></div>
+        <div class="pn-list"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="auth.js?v=2"></script>
+<script src="spire-api.js?v=2"></script>
+<script src="spire-ui.js?v=1"></script>
+<script src="npc-editor.js?v=2"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  Dramatis Personae — npcs-dm.html
+//  Full-width NPC workshop: filter-rich cast list on the left, the
+//  shared NPCEditor module (npc-editor.js) on the right. Reads the
+//  `npcs` KV key; all writes go through the merge-before-write
+//  saveNPCsKV persist callback (same pattern as the Atlas Workshop).
+// ═══════════════════════════════════════════════════════════════
+
+// DM gate
+if (!window.Auth || !Auth.requireRole('dm', { reason: 'Dramatis Personae is for the DM only.' })) {
+  throw new Error('DM required');
+}
+
+// ─── State ───
+// `npcs` must keep ONE stable array reference for its whole life —
+// the shared NPC editor captures it, so adopt updates in place
+// (npcs.length = 0; npcs.push(...fresh)), never reassign.
+const npcs = [];
+let characters = [];
+let worldData  = { locations: [] };
+let timeline   = [];
+
+let selectedId = null;     // npc id | '__new__' | null
+let editingNew = false;    // a '__new__' editor is open and not yet saved
+
+const esc = UI.escapeHtml;
+
+const STATUS_LABELS = { alive: 'Alive', dead: 'Dead', missing: 'Missing', unknown: 'Unknown' };
+
+// ═══════════════════════════════════════════════════════════════
+//  SYNC STATUS / SESSION
+// ═══════════════════════════════════════════════════════════════
+function setStatus(msg, cls) {
+  const el = document.getElementById('sync-status');
+  el.textContent = msg;
+  el.className = 'sync-status' + (cls ? ' ' + cls : '');
+}
+
+function expire() {
+  Auth.logout();
+  window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.'));
+}
+
+async function dmGet(type) {
+  try {
+    return await API.dmGet(type);
+  } catch (err) {
+    if (err && err.status === 401) { expire(); }
+    return null; // network down / 404 — degrade to the local cache
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  LOAD (cache-then-network) + PERSIST (merge-before-write)
+// ═══════════════════════════════════════════════════════════════
+async function loadAll() {
+  setStatus('Loading…', 'ing');
+  // Instant paint from the same localStorage caches the other DM pages keep.
+  try {
+    const np = JSON.parse(localStorage.getItem('dm_npcs') || 'null');
+    if (Array.isArray(np)) { npcs.length = 0; npcs.push(...np); }
+    const ch = JSON.parse(localStorage.getItem('dm_characters') || 'null');
+    if (Array.isArray(ch)) characters = ch;
+    const md = JSON.parse(localStorage.getItem('dm_map_data') || 'null');
+    if (md && typeof md === 'object' && Array.isArray(md.locations)) worldData = md;
+    const tl = JSON.parse(localStorage.getItem('dm_timeline') || 'null');
+    if (Array.isArray(tl)) timeline = tl;
+  } catch {}
+  rebuildFilterOptions(); renderCount(); renderList();
+
+  const [np, ch, md, tl] = await Promise.all([
+    dmGet('npcs'), dmGet('characters'), dmGet('map_data_dm'), dmGet('timeline_dm'),
+  ]);
+  if (Array.isArray(np)) { npcs.length = 0; npcs.push(...np); localStorage.setItem('dm_npcs', JSON.stringify(npcs)); }
+  if (Array.isArray(ch)) { characters = ch; localStorage.setItem('dm_characters', JSON.stringify(ch)); }
+  if (md && typeof md === 'object' && Array.isArray(md.locations)) { worldData = md; localStorage.setItem('dm_map_data', JSON.stringify(md)); }
+  if (Array.isArray(tl)) { timeline = tl; localStorage.setItem('dm_timeline', JSON.stringify(tl)); }
+  rebuildFilterOptions(); renderCount(); renderList();
+  // Deliberately NOT re-rendering an already-open editor here: it would
+  // destroy in-progress typing. The editor works off the live npcs array,
+  // which was adopted in place above.
+  setStatus(Array.isArray(np) ? 'Synced' : 'Offline — local copy', Array.isArray(np) ? 'ok' : 'fail');
+}
+
+// Deleted-NPC ids since the last successful save — passed to the merge-write
+// so another tab's copy can't resurrect them. (Same as the Atlas Workshop.)
+const _deletedNpcIds = new Set();
+
+async function saveNPCsKV(meta) {
+  if (meta && meta.deletedId) _deletedNpcIds.add(meta.deletedId);
+  setStatus('Saving…', 'ing');
+  // Merge-before-write: local wins by id, remote-only NPCs (added in the
+  // Atlas or Chronicle Workshop, or another tab) are kept, deletions applied.
+  const { ok, status, merged } = await API.dmPostMerged('npcs', 'npcs', npcs, {
+    deletedIds: [..._deletedNpcIds],
+  });
+  if (status === 401) { expire(); return false; }
+  if (ok) {
+    npcs.length = 0;           // adopt the merge in place — the shared NPC
+    npcs.push(...merged);      // editor holds a reference to this array
+    _deletedNpcIds.clear();
+  }
+  localStorage.setItem('dm_npcs', JSON.stringify(npcs));
+  setStatus(ok ? 'Saved' : 'Save failed', ok ? 'ok' : 'fail');
+  return ok;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════════
+// World locations + their sub-map pins, flattened with the parent name
+// (same shape sessions-dm.html uses; NPCEditor renders "name · parent").
+function flattenLocations() {
+  const out = [];
+  (worldData.locations || []).forEach(l => {
+    out.push({ id: l.id, name: l.name, parent: '' });
+    (l.subMap?.locations || []).forEach(sl => out.push({ id: sl.id, name: sl.name, parent: l.name }));
+  });
+  return out;
+}
+
+function locationName(id) { return flattenLocations().find(l => String(l.id) === String(id))?.name || ''; }
+function characterName(id) { return characters.find(c => String(c.id) === String(id))?.name || String(id); }
+
+function allTags() {
+  const set = new Set();
+  npcs.forEach(n => (n.tags || []).forEach(t => { if (t) set.add(t); }));
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+
+// npcId → newest linked timeline dateSort (for the "Recently referenced" sort)
+function lastRefMap() {
+  const m = new Map();
+  timeline.forEach(e => {
+    const d = e.dateSort || e.dateReal || '';
+    (e.npcIds || []).forEach(id => {
+      const k = String(id);
+      if (d > (m.get(k) || '')) m.set(k, d);
+    });
+  });
+  return m;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  FILTERS
+// ═══════════════════════════════════════════════════════════════
+function rebuildFilterOptions() {
+  // Preserve the current selection if it still exists after rebuild.
+  const setOpts = (sel, html) => {
+    const v = sel.value;
+    sel.innerHTML = html;
+    if ([...sel.options].some(o => o.value === v)) sel.value = v;
+  };
+
+  const locs = flattenLocations().slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  setOpts(document.getElementById('flt-location'),
+    '<option value="">— anywhere —</option><option value="__offmap__">off-map / unknown</option>' +
+    locs.map(l => `<option value="${esc(String(l.id))}">${esc(l.name)}${l.parent ? ` · ${esc(l.parent)}` : ''}</option>`).join(''));
+
+  const chars = characters.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  setOpts(document.getElementById('flt-known'),
+    '<option value="">— any —</option><option value="__nobody__">nobody yet</option>' +
+    chars.map(c => `<option value="${esc(String(c.id))}">${esc(c.name || '')}</option>`).join(''));
+
+  setOpts(document.getElementById('flt-tag'),
+    '<option value="">— any tag —</option>' +
+    allTags().map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join(''));
+}
+
+function filteredNPCs() {
+  const q = (document.getElementById('search').value || '').trim().toLowerCase();
+  const fLoc    = document.getElementById('flt-location').value;
+  const fStatus = document.getElementById('flt-status').value;
+  const fKnown  = document.getElementById('flt-known').value;
+  const fTag    = document.getElementById('flt-tag').value;
+  const locIds  = new Set(flattenLocations().map(l => String(l.id)));
+
+  const list = npcs.filter(n => {
+    if (q) {
+      const hay = [n.name, n.role, n.currentActivity, n.description, (n.tags || []).join(' ')]
+        .join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (fStatus && (n.status || 'unknown') !== fStatus) return false;
+    if (fLoc) {
+      if (fLoc === '__offmap__') {
+        // off-map = no location, or a dangling id the map no longer knows
+        if (n.currentLocationId && locIds.has(String(n.currentLocationId))) return false;
+      } else if (String(n.currentLocationId || '') !== fLoc) return false;
+    }
+    if (fKnown) {
+      const kt = (n.knownTo || []).map(String);
+      if (fKnown === '__nobody__') { if (kt.length) return false; }
+      else if (!kt.includes(fKnown)) return false;
+    }
+    if (fTag && !(n.tags || []).includes(fTag)) return false;
+    return true;
+  });
+
+  const byName = (a, b) => (a.name || '').localeCompare(b.name || '');
+  const mode = document.getElementById('sort').value;
+  if (mode === 'location') {
+    // NPCs without a resolvable location sort last
+    list.sort((a, b) =>
+      (locationName(a.currentLocationId) || '￿').localeCompare(locationName(b.currentLocationId) || '￿')
+      || byName(a, b));
+  } else if (mode === 'status') {
+    const ord = { alive: 0, missing: 1, unknown: 2, dead: 3 };
+    list.sort((a, b) => (ord[a.status] ?? 2) - (ord[b.status] ?? 2) || byName(a, b));
+  } else if (mode === 'recent') {
+    const ref = lastRefMap();   // unreferenced NPCs ('' key) sort last
+    list.sort((a, b) =>
+      (ref.get(String(b.id)) || '').localeCompare(ref.get(String(a.id)) || '')
+      || byName(a, b));
+  } else {
+    list.sort(byName);
+  }
+  return list;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  LIST PANE (read-only rebuild — no interactive elements inside,
+//  and this page doesn't poll, so innerHTML rebuild is fine)
+// ═══════════════════════════════════════════════════════════════
+function renderCount() {
+  const known = npcs.filter(n => (n.knownTo || []).length > 0).length;
+  document.getElementById('count-line').textContent =
+    `${npcs.length} soul${npcs.length === 1 ? '' : 's'} · ${known} known to someone`;
+}
+
+function renderList() {
+  const list = filteredNPCs();
+  const el = document.getElementById('list-content');
+  if (!list.length) {
+    el.innerHTML = `<div class="list-empty">${npcs.length ? 'No souls match your filters.' : 'No NPCs yet — introduce the first one.'}</div>`;
+    return;
+  }
+  el.innerHTML = list.map(n => {
+    const status = STATUS_LABELS[n.status] ? n.status : 'unknown';
+    const locName = locationName(n.currentLocationId);
+    const kt = (n.knownTo || []).length;
+    const tags = (n.tags || []).slice(0, 4).map(t => `<span class="tag-chip">${esc(t)}</span>`).join('');
+    return `
+      <div class="npc-card ${String(n.id) === String(selectedId) ? 'selected' : ''}" data-npc-id="${esc(String(n.id))}">
+        <div class="npc-card-top">
+          <span class="status-dot status-dot--${status}" title="${STATUS_LABELS[status]}"></span>
+          <span class="npc-card-name">${esc(n.name || '(unnamed)')}</span>
+          <span class="npc-card-role">${esc(n.role || '')}</span>
+        </div>
+        <div class="npc-card-meta">
+          <span class="npc-card-loc ${locName ? '' : 'npc-card-loc--none'}">📍 ${esc(locName || 'off-map')}</span>
+          <span class="known-chip ${kt ? 'known' : 'unmet'}">${kt ? `known to ${kt}` : 'unmet'}</span>
+          ${tags}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SELECTION / EDITOR PANE
+// ═══════════════════════════════════════════════════════════════
+// LIMITATION (accepted): the shared NPCEditor doesn't expose dirty state
+// for EXISTING NPCs — it owns its Save/Cancel and keeps edits in a working
+// copy. Switching list selection mid-edit simply re-renders and unsaved
+// field edits are lost. We only guard the NEW-NPC case, where the whole
+// record would silently vanish.
+async function confirmAbandonNew() {
+  if (selectedId === '__new__' && editingNew) {
+    return UI.confirmDialog('You have a new, unsaved NPC open. Discard it?',
+      { confirmLabel: 'Discard', cancelLabel: 'Keep editing' });
+  }
+  return true;
+}
+
+async function selectNPC(id) {
+  if (String(id) === String(selectedId)) return;
+  if (!(await confirmAbandonNew())) return;
+  selectedId = id;
+  editingNew = false;
+  renderEditor();
+  renderList();
+}
+
+async function newNPC() {
+  if (selectedId === '__new__') return;   // already open
+  selectedId = '__new__';
+  editingNew = true;
+  renderEditor();
+  renderList();
+}
+
+function renderEditor() {
+  const empty  = document.getElementById('editor-empty');
+  const editor = document.getElementById('editor');
+  if (!selectedId) {
+    empty.style.display = 'flex';
+    editor.style.display = 'none';
+    document.getElementById('editor-host').innerHTML = '';
+    renderPlayerNotes();
+    return;
+  }
+  const isNew = selectedId === '__new__';
+  const npc = isNew ? null : npcs.find(n => String(n.id) === String(selectedId));
+  if (!isNew && !npc) { selectedId = null; renderEditor(); return; }
+
+  empty.style.display = 'none';
+  editor.style.display = 'block';
+  document.getElementById('hdr-name').textContent = isNew ? 'New NPC' : (npc.name || '(unnamed)');
+
+  NPCEditor.open({
+    host: document.getElementById('editor-host'),
+    npc,
+    npcs, characters,
+    locations: flattenLocations(),
+    timeline,
+    entryHref: (e) => `sessions-dm.html#entry-${encodeURIComponent(e.id)}`,
+    persist: saveNPCsKV,
+    onSaved: (rec, wasNew) => {
+      editingNew = false;
+      selectedId = rec.id;
+      document.getElementById('hdr-name').textContent = rec.name || '(unnamed)';
+      rebuildFilterOptions(); renderCount(); renderList();
+      if (wasNew) renderPlayerNotes();   // the notes card appears once the NPC exists
+    },
+    onDeleted: () => {
+      editingNew = false;
+      selectedId = null;
+      renderEditor();
+      rebuildFilterOptions(); renderCount(); renderList();
+    },
+    onCancel: () => {
+      editingNew = false;
+      selectedId = null;
+      renderEditor();
+      renderList();
+    },
+  });
+  document.getElementById('pane-editor').scrollTop = 0;
+  renderPlayerNotes();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PLAYER NOTES (lazy, read-only + DM delete)
+//  player_notes_dm is a map { characterId: [note, ...] }; we show every
+//  note across characters where entityType==='npc' && entityId===selected.
+//  May 404 until the worker is redeployed — degrade to a hint.
+// ═══════════════════════════════════════════════════════════════
+let _playerNotesDM = null;       // the fetched map, or null until loaded
+let _playerNotesFailed = false;  // fetch failed (worker not deployed?)
+let _playerNotesLoading = false;
+
+function renderPlayerNotes() {
+  const card = document.getElementById('player-notes-card');
+  const isReal = selectedId && selectedId !== '__new__';
+  card.style.display = isReal ? '' : 'none';
+  if (!isReal) return;
+  const list = card.querySelector('.pn-list');
+
+  if (_playerNotesFailed) {
+    list.innerHTML = '<div class="pn-empty">Player notes unavailable (worker not deployed yet?).</div>';
+    return;
+  }
+  if (!_playerNotesDM) {
+    list.innerHTML = '<div class="pn-empty">Loading…</div>';
+    if (!_playerNotesLoading) {
+      _playerNotesLoading = true;
+      API.dmGet('player_notes_dm')
+        .then(m => { _playerNotesDM = (m && typeof m === 'object') ? m : {}; renderPlayerNotes(); })
+        .catch(err => {
+          if (err && err.status === 401) { expire(); return; }
+          _playerNotesFailed = true;
+          renderPlayerNotes();
+        });
+    }
+    return;
+  }
+
+  const rows = [];
+  Object.keys(_playerNotesDM).forEach(charId => {
+    const notes = Array.isArray(_playerNotesDM[charId]) ? _playerNotesDM[charId] : [];
+    notes.forEach(n => {
+      if (n && n.entityType === 'npc' && String(n.entityId) === String(selectedId)) {
+        rows.push({ charId, note: n });
+      }
+    });
+  });
+  rows.sort((a, b) => (b.note.updatedAt || 0) - (a.note.updatedAt || 0));
+  if (!rows.length) {
+    list.innerHTML = '<div class="pn-empty">No player has written notes on this NPC yet.</div>';
+    return;
+  }
+  list.innerHTML = rows.map(({ charId, note }) => `
+    <div class="pn-card">
+      <div class="pn-meta">
+        <span>✎ ${esc(characterName(charId))}${note.title ? ' · ' + esc(note.title) : ''}</span>
+        <button class="pn-del" type="button" title="Delete this player note"
+                data-char="${esc(String(charId))}" data-note="${esc(String(note.id))}">✕</button>
+      </div>
+      <div class="pn-body">${esc(note.body || '')}</div>
+    </div>`).join('');
+}
+
+async function dmDeletePlayerNote(characterId, noteId) {
+  if (!(await UI.confirmDialog('Delete this player-written note? The player will lose it.'))) return;
+  const res = await fetch(API.WORKER_URL, {
+    method: 'POST',
+    headers: Auth.dmHeaders(),
+    body: JSON.stringify({ type: 'player_note_delete', characterId, noteId }),
+  }).catch(() => null);
+  let ok = false;
+  try { ok = !!(res && res.ok && (await res.json()).ok); } catch {}
+  if (!ok) { UI.toast('Could not delete the note.', 'error'); return; }
+  if (_playerNotesDM && Array.isArray(_playerNotesDM[characterId])) {
+    _playerNotesDM[characterId] = _playerNotesDM[characterId].filter(n => n.id !== noteId);
+  }
+  renderPlayerNotes();
+  UI.toast('Player note deleted.', 'success');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BOOTSTRAP
+// ═══════════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('btn-new').addEventListener('click', newNPC);
+
+  // List row selection — event delegation (rows are rebuilt wholesale)
+  document.getElementById('list-content').addEventListener('click', (e) => {
+    const row = e.target.closest('[data-npc-id]');
+    if (row) selectNPC(row.dataset.npcId);
+  });
+
+  // Player-note delete — delegation on the card
+  document.getElementById('player-notes-card').addEventListener('click', (e) => {
+    const btn = e.target.closest('.pn-del');
+    if (btn) dmDeletePlayerNote(btn.dataset.char, btn.dataset.note);
+  });
+
+  // Search + filters + sort re-render the (read-only) list
+  document.getElementById('search').addEventListener('input', renderList);
+  ['flt-location', 'flt-status', 'flt-known', 'flt-tag', 'sort'].forEach(id => {
+    document.getElementById(id).addEventListener('change', renderList);
+  });
+
+  // '/' focuses search (unless already typing somewhere)
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== '/') return;
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+    e.preventDefault();
+    document.getElementById('search').focus();
+  });
+
+  loadAll();
+});
+</script>
+</body>
+</html>
