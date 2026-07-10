@@ -9,6 +9,27 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-07-10
 
+### Character sheets — DM-authored, per-section player editing (Atlas)
+
+Step H4. The character inspector in the Atlas Workshop is now tabbed:
+
+- **PROFILE** — the existing character editor, plus a read-only **PLAYER
+  NOTES** card (lazy-loaded from `player_notes_dm`) showing everything that
+  player has written, grouped by what it's attached to, with a DM delete ✕.
+- **SHEET** — a sections builder: each section has a heading, an optional
+  labeled-fields grid (AC/HP/whatever — freeform), a freeform text block,
+  and two flags: **Player can edit** (the player can update that section's
+  fields/text from The Hearth via `sheet_update`) and **🔒 DM only** (never
+  sent to the player). The flags are mutually exclusive. Sections reorder
+  with ▲/▼. Saves via `API.dmPostMerged('character_sheets', …)` — the
+  array's `id === characterId` scheme makes merge-writes work unchanged.
+  Editor copy warns that a DM save replaces the whole sheet (player edits
+  to OTHER sections survive via merge; same-sheet concurrent edits are
+  last-write-wins, as planned).
+
+Requires the H2 worker deploy for persistence; the editor degrades to an
+empty local sheet until then.
+
 ### Shops & taverns — first-class locations with browsable wares
 
 Step H3:
