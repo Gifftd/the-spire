@@ -9,6 +9,24 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-07-10
 
+### The Hearth — sections are now tabs
+
+Player feedback: the single-scroll layout meant scrolling past everything
+to reach later sections. The section nav is now a sticky tab bar — exactly
+one section visible at a time, page scrolls to top on switch:
+
+- Deep links (`#whispers` … `#rules`) select the tab (hash updates via
+  replaceState — no back-button pollution); the hero unread banner and
+  My Notes entity chips switch tabs before scrolling to their target.
+- Last-used tab persists (localStorage); a URL hash wins over it.
+- Whisper auto-mark-read now fires after the Whispers tab has been active
+  ~2s (cancelled on switch-away) instead of on scroll-into-view.
+- Open note/sheet editors survive tab switches — panels hide, never tear
+  down; the one-editor-at-a-time lock still guards cross-tab opens.
+- Fixed a latent bug the conversion surfaced: theme.css's
+  `.banner{display:flex}` outranked the UA `[hidden]` rule, so the hero and
+  offline banners never actually hid (`.banner[hidden]{display:none}`).
+
 ### The Hearth — player homepage (player-hub.html)
 
 Step H6, the batch's centerpiece. One page with everything a player wants
