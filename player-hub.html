@@ -1,0 +1,1427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Spire — The Hearth</title>
+<meta name="theme-color" content="#060a0e">
+<meta name="description" content="The Hearth — a player's one-stop homepage: whispers, sheet, story, people, places, satchel, and notes.">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css?v=2">
+<style>
+/* ──────────────────────────────────────────────────────────
+   Page-specific styles (player-hub.html — The Hearth).
+   Shared tokens & components live in theme.css.
+   ────────────────────────────────────────────────────────── */
+body {
+  padding-bottom: 4rem;
+  background-image:
+    radial-gradient(ellipse at 20% 8%, rgba(74,149,149,0.12) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 95%, rgba(184,138,90,0.06) 0%, transparent 55%);
+}
+.wrap { max-width: 860px; margin: 0 auto; padding: 0 1rem; }
+
+.synced-note {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.10em;
+  color: var(--c-ink-faint);
+  white-space: nowrap;
+}
+
+/* ── Hero strip ── */
+.hero { padding: var(--space-5) 0 var(--space-4); animation: hero-rise 320ms var(--ease-out) both; }
+.hero-tag {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.36em;
+  text-transform: uppercase;
+  color: var(--c-teal-bright);
+  opacity: 0.7;
+  margin-bottom: var(--space-1);
+}
+.hero-name {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--c-ink);
+  line-height: 1.15;
+}
+.hero-player {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: var(--text-base);
+  color: var(--c-ink-light);
+  margin-top: var(--space-1);
+}
+.hero-unread {
+  width: 100%;
+  margin-top: var(--space-3);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-body);
+  transition: border-color var(--motion-fast) var(--ease-out), background var(--motion-fast) var(--ease-out);
+}
+.hero-unread:hover { border-color: var(--c-teal-bright); background: rgba(74,149,149,0.16); }
+#offline-banner { margin-bottom: var(--space-3); }
+
+/* ── Sticky section nav ── */
+#section-nav {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-elevated);
+  background: var(--c-bg);
+  border-bottom: 1px solid var(--c-border);
+  margin: var(--space-2) -1rem 0;
+  padding: var(--space-2) 1rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+#section-nav::-webkit-scrollbar { display: none; }
+.nav-row { display: flex; gap: var(--space-2); width: max-content; }
+.nav-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--c-border);
+  background: var(--c-surface);
+  color: var(--c-ink-light);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out), background var(--motion-fast) var(--ease-out);
+}
+.nav-chip:hover { color: var(--c-ink); border-color: var(--c-border-light); }
+.nav-chip.is-active {
+  color: var(--c-teal-bright);
+  border-color: rgba(74,149,149,0.55);
+  background: rgba(74,149,149,0.12);
+}
+.nav-badge {
+  background: var(--c-teal);
+  color: var(--c-bg);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+  padding: 0 6px;
+  min-width: 14px;
+  text-align: center;
+  line-height: 1.4;
+}
+.nav-badge[hidden] { display: none; }
+
+/* ── Sections ── */
+section.hearth-section { scroll-margin-top: 60px; }
+.empty-state {
+  font-style: italic;
+  color: var(--c-ink-faint);
+  font-size: var(--text-base);
+  padding: var(--space-3) 0 var(--space-2);
+}
+.section-foot { margin-top: var(--space-3); }
+.section-foot a, .loc-atlas-link, .entry-readmore {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--c-teal);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color var(--motion-fast) var(--ease-out);
+}
+.section-foot a:hover, .loc-atlas-link:hover, .entry-readmore:hover { color: var(--c-teal-bright); }
+
+/* ── Whisper cards (copied from map.html) ── */
+.whisper-card{background:var(--c-surface-2);border:1px solid var(--c-border);border-radius:var(--radius-sm);padding:0.75rem 0.9rem;margin-bottom:0.6rem;border-left:3px solid var(--c-border-light)}
+.whisper-card.unread{border-left-color:var(--c-brass)}
+.whisper-meta{display:flex;align-items:center;gap:8px;font-size:0.72rem;color:var(--c-ink-faint);margin-bottom:5px}
+.whisper-date{font-family:var(--font-display);letter-spacing:0.08em}
+.whisper-unread{background:rgba(184,138,90,0.14);color:var(--c-brass-bright);padding:1px 6px;border-radius:8px;font-family:var(--font-display);font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase}
+.whisper-title{font-family:var(--font-display);font-size:0.92rem;letter-spacing:0.04em;color:var(--c-ink);margin-bottom:5px;line-height:1.3}
+.whisper-body{font-size:0.92rem;line-height:1.55;color:var(--c-ink-light);white-space:pre-wrap}
+
+/* ── Character sheet ── */
+#sheet-body { display: flex; flex-direction: column; gap: var(--space-3); }
+.sheet-card-head { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-3); }
+.sheet-card-title {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--c-teal-bright);
+  flex: 1;
+}
+.sheet-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-5);
+  margin-bottom: var(--space-3);
+}
+.sheet-field-label {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--c-ink-faint);
+}
+.sheet-field-value { font-size: var(--text-base); color: var(--c-ink); line-height: 1.4; }
+.sheet-body { font-size: var(--text-base); line-height: 1.65; color: var(--c-ink-light); white-space: pre-wrap; }
+.sheet-fields-editor { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-3); }
+.sheet-field-edit { display: grid; grid-template-columns: minmax(0,2fr) minmax(0,3fr); gap: var(--space-2); }
+.sheet-field-edit input, .sheet-body-editor, .note-ed-title, .note-ed-body {
+  background: var(--c-bg-elevated);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  color: var(--c-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  padding: 6px 10px;
+  outline: none;
+  width: 100%;
+  transition: border-color var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out);
+}
+.sheet-field-edit input:focus, .sheet-body-editor:focus, .note-ed-title:focus, .note-ed-body:focus {
+  border-color: var(--c-teal);
+  box-shadow: 0 0 0 3px rgba(74,149,149,0.16);
+}
+.sheet-body-editor { min-height: 140px; resize: vertical; line-height: 1.55; }
+.editor-actions { display: flex; gap: var(--space-2); justify-content: flex-end; margin-top: var(--space-3); flex-wrap: wrap; }
+
+/* ── Chronicle recap cards (adapted from timeline.html) ── */
+#chronicle-list { display: flex; flex-direction: column; gap: var(--space-3); }
+.entry-card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+  border-left: 3px solid var(--c-border-light);
+  box-shadow: var(--shadow-1);
+}
+.entry-card.kind-session   { border-left-color: #4a90d4; }
+.entry-card.kind-event     { border-left-color: #c87800; }
+.entry-card.kind-milestone { border-left-color: var(--c-teal-bright); }
+.entry-card-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3); }
+.entry-kind {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  border: 1px solid;
+}
+.entry-kind.session   { color: #8fbceb; border-color: #4a80c0; background: rgba(74,144,212,0.08); }
+.entry-kind.event     { color: #f0b076; border-color: #c87800; background: rgba(200,120,0,0.08); }
+.entry-kind.milestone { color: var(--c-teal-bright); border-color: var(--c-teal); background: rgba(74,149,149,0.10); }
+.entry-card-title {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--c-ink);
+  flex: 1;
+  min-width: 0;
+  line-height: 1.3;
+}
+.entry-card-date { font-family: var(--font-display); font-size: var(--text-2xs); letter-spacing: 0.10em; color: var(--c-teal); margin-left: auto; }
+.entry-card-body { font-size: var(--text-base); line-height: 1.65; color: var(--c-ink-light); white-space: pre-wrap; margin-top: var(--space-2); }
+.entry-card .entry-readmore { display: inline-block; margin-top: var(--space-2); }
+
+/* ── NPC roster cards (copied/adapted from map.html) ── */
+#npc-search{width:100%;margin-bottom:var(--space-3);padding:7px 12px;background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:var(--radius-sm);color:var(--c-ink);font-family:var(--font-body);font-size:var(--text-sm);outline:none;transition:border-color var(--motion-fast) var(--ease-out),box-shadow var(--motion-fast) var(--ease-out)}
+#npc-search:focus{border-color:var(--c-teal);box-shadow:0 0 0 3px rgba(74,149,149,0.16)}
+#npc-grid{display:grid;grid-template-columns:1fr;gap:var(--space-2)}
+@media(min-width:900px){ #npc-grid{grid-template-columns:repeat(2, minmax(0,1fr))} }
+.npc-rcard{background:var(--c-surface-2);border:1px solid var(--c-border);border-radius:var(--radius-sm);padding:0.7rem 0.85rem;transition:border-color 0.15s;align-self:start}
+.npc-rcard:hover{border-color:var(--c-brass-deep)}
+.npc-rcard.expanded{border-color:var(--c-brass)}
+.npc-rcard-head{cursor:pointer}
+.npc-rcard-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.npc-rcard-name{font-family:var(--font-display);font-size:0.95rem;letter-spacing:0.04em;color:var(--c-ink);flex:1}
+.npc-rcard-role{font-size:0.78rem;color:var(--c-ink-faint);font-style:italic}
+.npc-rcard-status{font-family:var(--font-display);font-size:0.56rem;letter-spacing:0.14em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid}
+.npc-rcard-status.alive   {color:#8fc8a4;border-color:#3a6a3f;background:rgba(45,106,63,0.18)}
+.npc-rcard-status.dead    {color:#e88;border-color:#8a3030;background:rgba(139,32,32,0.18)}
+.npc-rcard-status.missing {color:#c0a0f0;border-color:#5a3e9b;background:rgba(90,62,155,0.2)}
+.npc-rcard-status.unknown {color:var(--c-ink-faint);border-color:var(--c-border)}
+.npc-rcard-meta{display:flex;align-items:center;gap:8px;margin-top:5px;font-size:0.78rem;color:var(--c-ink-light)}
+.npc-rcard-loc{display:inline-flex;align-items:center;gap:4px;color:var(--c-ink-light);text-decoration:none}
+a.npc-rcard-loc:hover{color:var(--c-teal-bright)}
+.npc-rcard-activity{font-style:italic;font-size:0.85rem;color:var(--c-ink-light);margin-top:5px;line-height:1.4}
+.npc-rcard-details{border-top:1px solid var(--c-border);margin-top:0.6rem;padding-top:0.6rem;font-size:0.88rem;line-height:1.5;color:var(--c-ink-light)}
+.npc-rcard:not(.expanded) .npc-rcard-details{display:none}
+.npc-rcard-section{font-family:var(--font-display);font-size:0.6rem;letter-spacing:0.12em;color:var(--c-brass-deep);margin:0.55rem 0 0.3rem;text-transform:uppercase}
+.npc-rcard-section:first-child{margin-top:0}
+.npc-rcard-history-entry{background:var(--c-bg);border:1px solid var(--c-border);border-radius:2px;padding:0.4rem 0.55rem;margin-bottom:0.35rem;font-size:0.82rem;color:var(--c-ink-light);line-height:1.4}
+.npc-rcard-history-date{font-family:var(--font-display);font-size:0.62rem;letter-spacing:0.1em;color:var(--c-ink-faint);margin-bottom:3px}
+.npc-rcard-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.npc-rcard-tag{font-family:var(--font-display);font-size:0.55rem;letter-spacing:0.08em;padding:1px 7px;border-radius:8px;background:rgba(74,149,149,0.10);border:1px solid rgba(74,149,149,0.35);color:var(--c-teal-bright);text-transform:uppercase}
+
+/* ── Location rows ── */
+#loc-list { display: flex; flex-direction: column; gap: var(--space-2); }
+.loc-row {
+  background: var(--c-surface-2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+}
+.loc-row-main { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.pin-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 0 2px rgba(248,245,238,0.22); }
+.loc-row-name { font-family: var(--font-display); font-size: var(--text-base); letter-spacing: 0.04em; color: var(--c-ink); }
+.loc-type-chip {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid;
+}
+.loc-row-main .loc-atlas-link { margin-left: auto; }
+.loc-row-desc { font-size: var(--text-sm); color: var(--c-ink-light); line-height: 1.5; margin-top: var(--space-1); }
+.wares-btn { margin-top: var(--space-2); }
+.wares-wrap { overflow-x: auto; margin-top: var(--space-2); border: 1px solid var(--c-border); border-radius: var(--radius-sm); }
+.loc-row:not(.wares-open) .wares-wrap { display: none; }
+.wares-empty { font-style: italic; color: var(--c-ink-faint); font-size: var(--text-sm); padding: var(--space-2) var(--space-3); }
+
+/* ── Satchel ── */
+.satchel-grid { display: flex; flex-direction: column; gap: var(--space-4); }
+.satchel-sub {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-brass);
+  margin-bottom: var(--space-2);
+}
+.table-wrap { overflow-x: auto; border: 1px solid var(--c-border); border-radius: var(--radius-sm); }
+.recipe-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* ── Notes ── */
+.notes-head { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); }
+#notes-list { display: flex; flex-direction: column; gap: var(--space-2); }
+.note-card {
+  background: var(--c-surface-2);
+  border: 1px solid var(--c-border);
+  border-left: 3px solid var(--c-teal);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+}
+.note-card-meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-1); }
+.note-about { font-style: italic; font-size: var(--text-sm); color: var(--c-ink-faint); display: inline-flex; align-items: center; gap: var(--space-2); }
+.note-echip { cursor: pointer; }
+.note-echip.is-gone { color: var(--c-ink-dim); border-color: var(--c-border); background: transparent; font-style: italic; text-transform: none; letter-spacing: 0.04em; cursor: default; }
+.note-when { margin-left: auto; font-family: var(--font-display); font-size: var(--text-2xs); letter-spacing: 0.10em; color: var(--c-ink-faint); }
+.note-card-title { font-family: var(--font-display); font-size: var(--text-sm); font-weight: 600; letter-spacing: 0.05em; color: var(--c-ink); margin-bottom: var(--space-1); }
+.note-card-body { font-size: var(--text-sm); line-height: 1.55; color: var(--c-ink-light); white-space: pre-wrap; }
+.note-card-actions { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
+.note-del:hover { color: var(--c-error); border-color: var(--c-error); }
+
+/* Inline note view beneath entity cards */
+.note-slot { margin-top: var(--space-2); }
+.note-view {
+  background: rgba(74,149,149,0.06);
+  border: 1px solid rgba(74,149,149,0.30);
+  border-left: 3px solid var(--c-teal);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+}
+.note-view-label {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-teal-bright);
+  margin-bottom: 3px;
+}
+.note-view-title { font-family: var(--font-display); font-size: var(--text-sm); color: var(--c-ink); margin-bottom: 2px; }
+.note-view-body { font-size: var(--text-sm); line-height: 1.5; color: var(--c-ink-light); white-space: pre-wrap; }
+.note-view .btn { margin-top: var(--space-2); }
+
+/* The one inline note editor */
+.note-editor {
+  background: var(--c-surface);
+  border: 1px solid var(--c-teal-deep);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  box-shadow: 0 0 0 1px rgba(74,149,149,0.14);
+}
+.note-editor-label {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--c-teal-bright);
+  margin-bottom: var(--space-2);
+}
+.note-ed-title { margin-bottom: var(--space-2); }
+.note-ed-body { min-height: 96px; resize: vertical; line-height: 1.5; }
+.note-editor-foot { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-2); flex-wrap: wrap; }
+.note-ed-count { font-family: var(--font-display); font-size: var(--text-2xs); letter-spacing: 0.10em; color: var(--c-ink-faint); }
+.note-editor-spring { flex: 1; }
+
+/* ── Rules ── */
+#rules-list { display: flex; flex-direction: column; gap: var(--space-3); }
+.rule-title {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--c-brass-bright);
+  margin-bottom: var(--space-2);
+}
+.rule-body { font-size: var(--text-base); line-height: 1.65; color: var(--c-ink-light); white-space: pre-wrap; }
+.rule-body.clamped {
+  max-height: 9.5em;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 65%, transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 65%, transparent 100%);
+}
+.rule-toggle { margin-top: var(--space-2); align-self: flex-start; }
+
+/* ── Footer ── */
+.footer { margin-top: var(--space-7); text-align: center; padding-top: var(--space-4); border-top: 1px solid var(--c-border); }
+.footer-text {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--c-ink-dim);
+}
+
+/* ── Mobile ── */
+@media (max-width: 480px) {
+  .sheet-fields { grid-template-columns: 1fr; }
+  .sheet-field-edit { grid-template-columns: 1fr; }
+  .entry-card-date { margin-left: 0; width: 100%; }
+  .loc-row-main .loc-atlas-link { margin-left: 0; width: 100%; }
+  .note-when { margin-left: 0; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap" id="hearth-main">
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="hero-tag">The Hearth</div>
+    <h1 class="hero-name" id="hero-name">—</h1>
+    <div class="hero-player" id="hero-player"></div>
+    <button type="button" class="banner banner--info hero-unread" id="hero-unread" hidden>✉ <span id="hero-unread-text">Unread whispers await</span> — read them</button>
+  </header>
+
+  <div class="banner banner--warn" id="offline-banner" hidden>⚠ Couldn't reach the keep — showing what was cached.</div>
+
+  <!-- STICKY SECTION NAV -->
+  <nav id="section-nav" aria-label="Sections">
+    <div class="nav-row">
+      <a class="nav-chip" href="#whispers">✉ Whispers <span class="nav-badge" id="nav-unread" hidden>0</span></a>
+      <a class="nav-chip" href="#sheet">Sheet</a>
+      <a class="nav-chip" href="#chronicle">Story</a>
+      <a class="nav-chip" href="#npcs">People</a>
+      <a class="nav-chip" href="#locations">Places</a>
+      <a class="nav-chip" href="#satchel">Satchel</a>
+      <a class="nav-chip" href="#notes">Notes</a>
+      <a class="nav-chip" href="#rules">Rules</a>
+    </div>
+  </nav>
+
+  <!-- 1 · WHISPERS -->
+  <section class="hearth-section" id="whispers" aria-label="Whispers">
+    <h2 class="section-heading">Whispers</h2>
+    <div id="whispers-list"></div>
+  </section>
+
+  <!-- 2 · CHARACTER SHEET -->
+  <section class="hearth-section" id="sheet" aria-label="Character sheet">
+    <h2 class="section-heading">Character Sheet</h2>
+    <div id="sheet-body"></div>
+  </section>
+
+  <!-- 3 · CHRONICLE RECAP -->
+  <section class="hearth-section" id="chronicle" aria-label="The story so far">
+    <h2 class="section-heading">The Story So Far</h2>
+    <div id="chronicle-list"></div>
+    <div class="section-foot"><a href="timeline.html">Open the full Chronicle →</a></div>
+  </section>
+
+  <!-- 4 · PEOPLE YOU KNOW -->
+  <section class="hearth-section" id="npcs" aria-label="People you know">
+    <h2 class="section-heading">People You Know</h2>
+    <input type="text" id="npc-search" placeholder="Search by name, role, or tag…" autocomplete="off">
+    <div id="npc-grid"></div>
+  </section>
+
+  <!-- 5 · PLACES YOU'VE FOUND -->
+  <section class="hearth-section" id="locations" aria-label="Places you've found">
+    <h2 class="section-heading">Places You've Found</h2>
+    <div id="loc-list"></div>
+  </section>
+
+  <!-- 6 · SATCHEL & CAULDRON -->
+  <section class="hearth-section" id="satchel" aria-label="Satchel and cauldron">
+    <h2 class="section-heading">Satchel &amp; Cauldron</h2>
+    <div id="satchel-body"></div>
+    <div class="section-foot"><a href="brew.html">Brew something →</a></div>
+  </section>
+
+  <!-- 7 · MY NOTES -->
+  <section class="hearth-section" id="notes" aria-label="My notes">
+    <h2 class="section-heading">My Notes</h2>
+    <div class="notes-head">
+      <button type="button" class="btn btn--primary btn--sm" id="new-note-btn">+ New Note</button>
+    </div>
+    <div id="new-note-slot"></div>
+    <div id="notes-list"></div>
+  </section>
+
+  <!-- 8 · TABLE RULES -->
+  <section class="hearth-section" id="rules" aria-label="Table rules and homebrew">
+    <h2 class="section-heading">Table Rules &amp; Homebrew</h2>
+    <div id="rules-list"></div>
+  </section>
+
+  <footer class="footer">
+    <p class="footer-text">The Spire · The Hearth</p>
+  </footer>
+</div>
+
+<script src="auth.js?v=2"></script>
+<script src="spire-api.js?v=2"></script>
+<script src="spire-ui.js?v=1"></script>
+<script src="map-render.js?v=2"></script>
+<script>
+if (!window.Auth || !Auth.requireRole('player', { reason: 'The Hearth is for sworn players — claim your character first.' })) throw new Error('redirecting');
+
+// ══════════════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════════════
+const creds = Auth.playerCreds();
+const esc = UI.escapeHtml;
+const CACHE_KEY = `player_home_${creds.characterId}`;
+
+let home = null;               // the home_view bundle (cached or fresh)
+let lastFetchAt = 0;           // Date.now() of last successful fetch
+let fetching = false;
+let openEditor = null;         // { kind:'note'|'sheet', section, ctx, el, container, locate, init, read }
+const dirtySections = new Set();     // sections skipped during a repaint because their editor was open
+const expandedNpcIds = new Set();
+const expandedWareIds = new Set();
+
+// Safe accessors — every section must degrade gracefully when the
+// worker isn't deployed yet / the bundle is partial.
+function H()         { return home || {}; }
+function journals()  { const j = H().journals;  return Array.isArray(j) ? j : []; }
+function npcs()      { const n = H().npcs;      return Array.isArray(n) ? n : []; }
+function timelineEntries() { const t = H().timeline; return Array.isArray(t) ? t : []; }
+function notes()     { const n = H().notes;     return Array.isArray(n) ? n : []; }
+function rules()     { const r = H().rules;     return Array.isArray(r) ? r : []; }
+function locationsList() { const m = H().map; return (m && Array.isArray(m.locations)) ? m.locations : []; }
+
+function writeCache() {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ at: lastFetchAt || Date.now(), data: home })); } catch {}
+}
+
+function relTime(ts) {
+  if (!ts) return 'not synced yet';
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 10) return 'synced just now';
+  if (s < 60) return `synced ${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `synced ${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `synced ${h}h ago`;
+  return `synced ${Math.floor(h / 24)}d ago`;
+}
+
+function fmtWhen(v) {
+  if (v == null || v === '') return '';
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  HEADER (shared topbar) + refresh / synced indicator
+// ══════════════════════════════════════════════════════════════
+const hdr = UI.mountHeader({ title: 'The Hearth', homeHref: 'home.html' });
+const syncedEl = document.createElement('span');
+syncedEl.className = 'synced-note';
+syncedEl.textContent = 'not synced yet';
+const refreshBtn = document.createElement('button');
+refreshBtn.type = 'button';
+refreshBtn.className = 'btn btn--ghost btn--sm';
+refreshBtn.textContent = '⟳ Refresh';
+refreshBtn.addEventListener('click', () => fetchHome());
+hdr.actionsEl.append(syncedEl, refreshBtn);
+
+function updateSynced() { syncedEl.textContent = fetching ? 'syncing…' : relTime(lastFetchAt); }
+setInterval(updateSynced, 30000);
+
+// ══════════════════════════════════════════════════════════════
+//  WORKER I/O — no polling. Cache-then-network (sessions-dm pattern):
+//  paint from localStorage immediately, then fetch, then repaint.
+// ══════════════════════════════════════════════════════════════
+async function postPlayer(type, payload) {
+  try {
+    const res = await fetch(API.WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, characterId: creds.characterId, code: creds.code, ...payload }),
+    });
+    let body = null;
+    try { body = await res.json(); } catch {}
+    return { ok: res.ok && !(body && body.ok === false), status: res.status, body };
+  } catch (e) {
+    return { ok: false, status: 0, body: { error: e.message } };
+  }
+}
+
+async function fetchHome() {
+  if (fetching) return;
+  fetching = true;
+  refreshBtn.disabled = true;
+  updateSynced();
+  try {
+    const url = `${API.WORKER_URL}?type=home_view&characterId=${encodeURIComponent(creds.characterId)}&code=${encodeURIComponent(creds.code)}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (res.status === 401 || res.status === 403) {
+      Auth.logout();
+      window.location.replace('home.html?notice=' + encodeURIComponent('Your character claim expired — log in again.'));
+      return;
+    }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const d = await res.json();
+    if (!d || typeof d !== 'object') throw new Error('bad payload');
+    home = d;
+    lastFetchAt = Date.now();
+    writeCache();
+    document.getElementById('offline-banner').hidden = true;
+    paintAll();
+  } catch (e) {
+    // Fetch failure: keep whatever is painted (cached) + show the warn banner.
+    document.getElementById('offline-banner').hidden = false;
+  } finally {
+    fetching = false;
+    refreshBtn.disabled = false;
+    updateSynced();
+  }
+}
+
+function maybeRefetch() {
+  if (document.visibilityState !== 'visible') return;
+  if (Date.now() - lastFetchAt > 60000) fetchHome();
+}
+window.addEventListener('focus', maybeRefetch);
+document.addEventListener('visibilitychange', maybeRefetch);
+
+// ══════════════════════════════════════════════════════════════
+//  PAINTING — full innerHTML rebuilds are fine here (no polling),
+//  EXCEPT we never repaint a section whose editor is open: it is
+//  marked dirty and repainted when the editor closes.
+// ══════════════════════════════════════════════════════════════
+const RENDERERS = {
+  whispers: renderWhispers,
+  sheet: renderSheet,
+  chronicle: renderChronicle,
+  npcs: renderNPCs,
+  locations: renderLocations,
+  satchel: renderSatchel,
+  notes: renderNotes,
+  rules: renderRules,
+};
+
+function paintSection(id) {
+  if (openEditor && openEditor.section === id) { dirtySections.add(id); return; }
+  const fn = RENDERERS[id];
+  if (fn) fn();
+}
+
+function paintAll() {
+  Object.keys(RENDERERS).forEach(paintSection);
+  renderHero();
+  updateNavBadge();
+}
+
+function sectionOf(el) {
+  const sec = el.closest('section.hearth-section');
+  return sec ? sec.id : 'notes';
+}
+
+// ── Hero ────────────────────────────────────────────────────────
+function renderHero() {
+  const ch = H().character || {};
+  document.getElementById('hero-name').textContent = ch.name || creds.name || 'Adventurer';
+  document.getElementById('hero-player').textContent = ch.player ? `played by ${ch.player}` : '';
+  renderHeroUnread();
+}
+
+function renderHeroUnread() {
+  const unread = journals().filter(j => j.unread).length;
+  const banner = document.getElementById('hero-unread');
+  banner.hidden = unread === 0;
+  document.getElementById('hero-unread-text').textContent =
+    unread === 1 ? '1 unread whisper awaits' : `${unread} unread whispers await`;
+}
+document.getElementById('hero-unread').addEventListener('click', () => {
+  document.getElementById('whispers').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+function updateNavBadge() {
+  const unread = journals().filter(j => j.unread).length;
+  const badge = document.getElementById('nav-unread');
+  badge.textContent = unread;
+  badge.hidden = unread === 0;
+}
+
+// ── 1 · Whispers (cards copied from map.html renderWhispers) ────
+function renderWhispers() {
+  const list = document.getElementById('whispers-list');
+  const js = journals().slice().sort((a, b) =>
+    ((b.unread ? 1 : 0) - (a.unread ? 1 : 0)) || (b.date || '').localeCompare(a.date || ''));
+  if (!js.length) {
+    list.innerHTML = '<div class="empty-state">No whispers yet. The DM hasn\'t sent you anything.</div>';
+    return;
+  }
+  list.innerHTML = js.map(j => `
+    <div class="whisper-card ${j.unread ? 'unread' : ''}">
+      <div class="whisper-meta">
+        <span class="whisper-date">${esc(j.date)}</span>
+        ${j.unread ? '<span class="whisper-unread">new</span>' : ''}
+      </div>
+      <div class="whisper-title">${esc(j.title) || '(no title)'}</div>
+      <div class="whisper-body">${esc(j.body)}</div>
+    </div>
+  `).join('');
+}
+
+// Auto mark-read: when the whispers section has been ≥50% visible
+// (or fills half the viewport) for 2s, flip unread → read.
+let whisperTimer = null;
+const whisperObserver = new IntersectionObserver((ents) => {
+  const e = ents[0];
+  const mostlyVisible = e.isIntersecting &&
+    (e.intersectionRatio >= 0.5 || e.intersectionRect.height >= window.innerHeight * 0.5);
+  if (mostlyVisible) {
+    if (!whisperTimer) whisperTimer = setTimeout(markWhispersRead, 2000);
+  } else if (whisperTimer) {
+    clearTimeout(whisperTimer);
+    whisperTimer = null;
+  }
+}, { threshold: [0, 0.25, 0.5, 0.75, 1] });
+whisperObserver.observe(document.getElementById('whispers'));
+
+function markWhispersRead() {
+  whisperTimer = null;
+  const unread = journals().filter(j => j.unread);
+  if (!unread.length) return;
+  const ids = unread.map(j => j.id);
+  // Optimistic client flip (fire-and-forget POST, like map.html).
+  journals().forEach(j => { j.unread = false; });
+  writeCache();
+  fetch(API.WORKER_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'journals_read', characterId: creds.characterId, code: creds.code, journalIds: ids }),
+  }).catch(() => {});
+  // Surgical DOM update — don't reorder cards under the reader.
+  document.querySelectorAll('#whispers .whisper-card.unread').forEach(el => el.classList.remove('unread'));
+  document.querySelectorAll('#whispers .whisper-unread').forEach(el => el.remove());
+  renderHeroUnread();
+  updateNavBadge();
+}
+
+// ── 2 · Character sheet ─────────────────────────────────────────
+function renderSheet() {
+  const wrap = document.getElementById('sheet-body');
+  const sheet = H().sheet;
+  if (!sheet || !Array.isArray(sheet.sections) || !sheet.sections.length) {
+    wrap.innerHTML = '<div class="empty-state">The keeper hasn\'t written your sheet yet.</div>';
+    return;
+  }
+  wrap.innerHTML = sheet.sections.map(s => {
+    const fields = Array.isArray(s.fields) ? s.fields : [];
+    return `
+      <div class="card sheet-card" data-sid="${esc(s.id)}">
+        <div class="sheet-card-head">
+          <h3 class="sheet-card-title">${esc(s.heading || 'Untitled')}</h3>
+          ${s.playerEditable ? `<button type="button" class="btn btn--ghost btn--sm" data-act="edit-sheet" data-sid="${esc(s.id)}">✎ Edit — yours to keep</button>` : ''}
+        </div>
+        ${fields.length ? `<div class="sheet-fields">${fields.map(f => `
+          <div class="sheet-field">
+            <div class="sheet-field-label">${esc(f.label || '')}</div>
+            <div class="sheet-field-value">${esc(f.value || '') || '—'}</div>
+          </div>`).join('')}</div>` : ''}
+        ${s.body ? `<div class="sheet-body">${esc(s.body)}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function findSheetCard(sid) {
+  return [...document.querySelectorAll('#sheet .sheet-card')].find(el => el.dataset.sid === String(sid)) || null;
+}
+
+function openSheetEditor(sid, prefill) {
+  const sheet = H().sheet;
+  const sec = sheet && (sheet.sections || []).find(s => String(s.id) === String(sid));
+  if (!sec || !sec.playerEditable) return;
+  const card = findSheetCard(sid);
+  if (!card) return;
+  if (!tryTakeEditorLock()) return;
+
+  const fields = Array.isArray(sec.fields) ? sec.fields : [];
+  card.innerHTML = `
+    <div class="sheet-card-head">
+      <h3 class="sheet-card-title">${esc(sec.heading || 'Untitled')}</h3>
+      <span class="chip chip--player">Editing</span>
+    </div>
+    ${fields.length ? '<div class="sheet-fields-editor"></div>' : ''}
+    <textarea class="sheet-body-editor" placeholder="Write it in your own hand…"></textarea>
+    <div class="editor-actions">
+      <button type="button" class="btn btn--ghost btn--sm sheet-ed-cancel">Cancel</button>
+      <button type="button" class="btn btn--primary btn--sm sheet-ed-save">Save</button>
+    </div>
+  `;
+  const fieldsWrap = card.querySelector('.sheet-fields-editor');
+  const rows = [];
+  if (fieldsWrap) {
+    const prefFields = prefill && Array.isArray(prefill.fields) ? prefill.fields : null;
+    fields.forEach((f, i) => {
+      const row = document.createElement('div');
+      row.className = 'sheet-field-edit';
+      const li = document.createElement('input');
+      li.type = 'text'; li.placeholder = 'Label';
+      li.value = prefFields ? (prefFields[i]?.label ?? '') : (f.label || '');
+      const vi = document.createElement('input');
+      vi.type = 'text'; vi.placeholder = 'Value';
+      vi.value = prefFields ? (prefFields[i]?.value ?? '') : (f.value || '');
+      row.append(li, vi);
+      fieldsWrap.appendChild(row);
+      rows.push({ orig: f, li, vi });
+    });
+  }
+  const bodyTa = card.querySelector('.sheet-body-editor');
+  bodyTa.value = prefill ? (prefill.body ?? '') : (sec.body || '');
+
+  const read = () => ({
+    body: bodyTa.value,
+    fields: rows.map(r => ({ id: r.orig.id, label: r.li.value, value: r.vi.value })),
+  });
+  openEditor = {
+    kind: 'sheet', section: 'sheet', ctx: { sectionId: sec.id, hadFields: fields.length > 0 },
+    el: card, container: card,
+    locate: () => findSheetCard(sid),
+    init: JSON.stringify(read()), read: () => JSON.stringify(read()), readState: read,
+  };
+  card.querySelector('.sheet-ed-cancel').addEventListener('click', () => closeEditor());
+  card.querySelector('.sheet-ed-save').addEventListener('click', saveSheetFromEditor);
+  bodyTa.focus();
+}
+
+async function saveSheetFromEditor() {
+  if (!openEditor || openEditor.kind !== 'sheet') return;
+  const { sectionId, hadFields } = openEditor.ctx;
+  const state = openEditor.readState();
+  const snapshot = JSON.stringify(H().sheet);
+
+  // Optimistic local update.
+  const sec = (H().sheet.sections || []).find(s => String(s.id) === String(sectionId));
+  if (sec) {
+    if (hadFields) sec.fields = state.fields;
+    sec.body = state.body;
+    H().sheet.updatedAt = new Date().toISOString();
+  }
+  writeCache();
+  closeEditor();          // repaints #sheet with the optimistic values
+
+  const payload = { sectionId, body: state.body };
+  if (hadFields) payload.fields = state.fields;
+  const res = await postPlayer('sheet_update', payload);
+  if (res.ok) {
+    if (res.body && res.body.sheet) { home.sheet = res.body.sheet; writeCache(); }
+    paintSection('sheet');
+    UI.toast('Sheet saved.', 'success');
+  } else {
+    // Revert + reopen the editor with the typed text so nothing is lost.
+    home.sheet = JSON.parse(snapshot);
+    writeCache();
+    paintSection('sheet');
+    openSheetEditor(sectionId, state);
+    UI.toast("Couldn't save your sheet — the keep is unreachable.", 'error');
+  }
+}
+
+// ── 3 · Chronicle recap (cards adapted from timeline.html renderEntry) ──
+function tlSortKey(e) { return (e.dateSort || '') + '~' + (e.id || ''); }
+
+function renderChronicle() {
+  const list = document.getElementById('chronicle-list');
+  const latest = timelineEntries().slice()
+    .sort((a, b) => tlSortKey(b).localeCompare(tlSortKey(a)))
+    .slice(0, 3);
+  if (!latest.length) {
+    list.innerHTML = '<div class="empty-state">Nothing has been chronicled yet — the story starts soon.</div>';
+    return;
+  }
+  list.innerHTML = latest.map(e => {
+    const kind = e.kind || 'event';
+    const body = (e.body || '').toString();
+    const preview = body.length > 300 ? body.slice(0, 300).trimEnd() + '…' : body;
+    return `
+      <article class="entry-card kind-${esc(kind)}">
+        <div class="entry-card-head">
+          <span class="entry-kind ${esc(kind)}">${esc(kind)}</span>
+          <span class="entry-card-title">${esc(e.title || '(Untitled)')}</span>
+          ${e.dateInGame ? `<span class="entry-card-date">${esc(e.dateInGame)}</span>` : ''}
+        </div>
+        ${preview ? `<div class="entry-card-body">${esc(preview)}</div>` : ''}
+        <a class="entry-readmore" href="timeline.html#entry-${esc(e.id)}">Read more →</a>
+        <div class="note-slot" data-etype="chronicle" data-eid="${esc(e.id)}">${noteSlotHtml('chronicle', e.id)}</div>
+      </article>
+    `;
+  }).join('');
+}
+
+// ── 4 · People you know (cards copied/adapted from map.html roster) ──
+function locationById(id) {
+  if (id == null || id === '') return null;
+  return locationsList().find(l => String(l.id) === String(id)) || null;
+}
+
+function renderNPCs() {
+  const grid = document.getElementById('npc-grid');
+  const all = npcs();
+  if (!all.length) {
+    grid.innerHTML = '<div class="empty-state">You haven\'t met anyone yet. The DM grants faces as you encounter them.</div>';
+    return;
+  }
+  grid.innerHTML = all.map(n => {
+    const status = (n.status || 'alive').toLowerCase();
+    const loc = locationById(n.currentLocationId);
+    const expanded = expandedNpcIds.has(String(n.id));
+    const tags = Array.isArray(n.tags) ? n.tags.filter(Boolean) : [];
+    const history = (n.history || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const haystack = [n.name, n.role, tags.join(' ')].join(' ').toLowerCase();
+    return `
+      <div class="npc-rcard ${expanded ? 'expanded' : ''}" data-id="${esc(n.id)}" data-search="${esc(haystack)}">
+        <div class="npc-rcard-head" data-act="toggle-npc">
+          <div class="npc-rcard-row">
+            <span class="npc-rcard-name">${esc(n.name)}</span>
+            ${n.role ? `<span class="npc-rcard-role">${esc(n.role)}</span>` : ''}
+            <span class="npc-rcard-status ${esc(status)}">${esc(status)}</span>
+          </div>
+          ${loc ? `<div class="npc-rcard-meta"><span class="npc-rcard-loc">📍 ${esc(loc.name)}</span></div>` : ''}
+          ${n.currentActivity ? `<div class="npc-rcard-activity">${esc(n.currentActivity)}</div>` : ''}
+          ${tags.length ? `<div class="npc-rcard-tags">${tags.map(t => `<span class="npc-rcard-tag">${esc(t)}</span>`).join('')}</div>` : ''}
+        </div>
+        <div class="npc-rcard-details">
+          ${n.description ? `<div class="npc-rcard-section">About</div><div>${esc(n.description)}</div>` : ''}
+          ${n.notes ? `<div class="npc-rcard-section">Notes</div><div>${esc(n.notes)}</div>` : ''}
+          ${loc ? `<div class="npc-rcard-section">Last seen</div><div><a class="npc-rcard-loc" href="map.html#${esc(loc.id)}">📍 ${esc(loc.name)} — open in Atlas →</a></div>` : ''}
+          ${history.length ? `<div class="npc-rcard-section">History</div>${history.map(h => `
+            <div class="npc-rcard-history-entry">
+              <div class="npc-rcard-history-date">${esc(h.date)}${h.locationId && locationById(h.locationId) ? ' · 📍 ' + esc(locationById(h.locationId).name) : ''}</div>
+              ${h.activity ? `<div style="font-style:italic">${esc(h.activity)}</div>` : ''}
+              ${h.note ? `<div>${esc(h.note)}</div>` : ''}
+            </div>`).join('')}` : ''}
+        </div>
+        <div class="note-slot" data-etype="npc" data-eid="${esc(n.id)}">${noteSlotHtml('npc', n.id)}</div>
+      </div>
+    `;
+  }).join('');
+  applyNpcFilter();
+}
+
+// Search filters in place (display toggle) so it never rebuilds the
+// grid — an open note editor inside a card survives typing.
+function applyNpcFilter() {
+  const q = (document.getElementById('npc-search').value || '').trim().toLowerCase();
+  document.querySelectorAll('#npc-grid .npc-rcard').forEach(card => {
+    card.style.display = (!q || (card.dataset.search || '').includes(q)) ? '' : 'none';
+  });
+}
+document.getElementById('npc-search').addEventListener('input', applyNpcFilter);
+
+// ── 5 · Places you've found (top-level locations only) ──────────
+function renderLocations() {
+  const list = document.getElementById('loc-list');
+  const locs = locationsList();
+  if (!locs.length) {
+    list.innerHTML = '<div class="empty-state">You haven\'t discovered anywhere yet. The world awaits.</div>';
+    return;
+  }
+  const { TYPE_COLORS, TYPE_LABELS, TYPE_ICONS } = MapRender;
+  list.innerHTML = locs.map(loc => {
+    const type = loc.type || 'default';
+    const color = TYPE_COLORS[type] || TYPE_COLORS.default;
+    const inv = (loc.shop && Array.isArray(loc.shop.inventory)) ? loc.shop.inventory : [];
+    const hasWares = inv.length > 0 || type === 'shop' || type === 'tavern';
+    const open = expandedWareIds.has(String(loc.id));
+    return `
+      <div class="loc-row ${open ? 'wares-open' : ''}" data-id="${esc(loc.id)}">
+        <div class="loc-row-main">
+          <span class="pin-dot" style="background:${esc(color)}"></span>
+          <span class="loc-row-name">${esc(loc.name)}</span>
+          <span class="loc-type-chip" style="color:${esc(color)};border-color:${esc(color)}">${TYPE_ICONS[type] || TYPE_ICONS.default} ${esc(TYPE_LABELS[type] || type)}</span>
+          <a class="loc-atlas-link" href="map.html#${esc(loc.id)}">Open in Atlas →</a>
+        </div>
+        ${loc.shortDesc ? `<div class="loc-row-desc">${esc(loc.shortDesc)}</div>` : ''}
+        ${hasWares ? `<button type="button" class="btn btn--ghost btn--sm wares-btn" data-act="toggle-wares">Wares ▾</button>
+        <div class="wares-wrap">${inv.length ? `
+          <table class="table">
+            <thead><tr><th>Item</th><th>Price</th><th>Stock</th><th>Notes</th></tr></thead>
+            <tbody>${inv.map(r => `
+              <tr>
+                <td>${esc(r.item || '')}</td>
+                <td>${esc(r.price || '—')}</td>
+                <td>${(r.qty ?? '').toString().trim() ? esc(String(r.qty)) : '—'}</td>
+                <td>${esc(r.notes || '')}</td>
+              </tr>`).join('')}</tbody>
+          </table>` : '<div class="wares-empty">The shelves are bare — or the keeper isn\'t selling to you.</div>'}
+        </div>` : ''}
+        <div class="note-slot" data-etype="location" data-eid="${esc(loc.id)}">${noteSlotHtml('location', loc.id)}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ── 6 · Satchel & Cauldron ──────────────────────────────────────
+function renderSatchel() {
+  const wrap = document.getElementById('satchel-body');
+  const brew = H().brew || {};
+  const ingredients = Array.isArray(brew.ingredients) ? brew.ingredients : [];
+  const inventory = Array.isArray(brew.inventory) ? brew.inventory : [];
+  const recipes = Array.isArray(brew.recipes) ? brew.recipes : [];
+
+  const ingName = (id) => {
+    const ing = ingredients.find(i => String(i.id) === String(id));
+    return ing ? (ing.name || String(id)) : String(id);
+  };
+  // Recipe shape may vary — render a name-ish field defensively.
+  const recipeName = (r) => {
+    if (typeof r === 'string') return r;
+    if (!r || typeof r !== 'object') return 'Recipe';
+    return r.name || r.title || r.potionName || r.potion
+      || (r.result && (r.result.name || r.result.title))
+      || 'Recipe';
+  };
+
+  if (!inventory.length && !recipes.length) {
+    wrap.innerHTML = '<div class="empty-state">Your satchel is empty and your cauldron is cold.</div>';
+    return;
+  }
+  wrap.innerHTML = `
+    <div class="satchel-grid">
+      <div>
+        <div class="satchel-sub">Ingredients</div>
+        ${inventory.length ? `
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Ingredient</th><th>Qty</th></tr></thead>
+            <tbody>${inventory.map(i => `
+              <tr><td>${esc(ingName(i.ingredientId))}</td><td>${esc(String(i.qty ?? 0))}</td></tr>`).join('')}</tbody>
+          </table>
+        </div>` : '<div class="empty-state">No ingredients gathered yet.</div>'}
+      </div>
+      <div>
+        <div class="satchel-sub">Known recipes</div>
+        ${recipes.length
+          ? `<div class="recipe-chips">${recipes.map(r => `<span class="chip chip--player">${esc(recipeName(r))}</span>`).join('')}</div>`
+          : '<div class="empty-state">No recipes learned yet.</div>'}
+      </div>
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  NOTES — one shared inline editor, note affordances on every
+//  chronicle / NPC / location card, freestanding notes in #notes.
+// ══════════════════════════════════════════════════════════════
+function noteFor(etype, eid) {
+  return notes().find(n =>
+    n.entityType === etype && String(n.entityId ?? '') === String(eid ?? '')) || null;
+}
+
+function noteSlotHtml(etype, eid) {
+  const n = noteFor(etype, eid);
+  if (!n) return '<button type="button" class="btn btn--ghost btn--sm" data-act="add-note">✎ Add note</button>';
+  return `
+    <div class="note-view">
+      <div class="note-view-label">✎ Your note</div>
+      ${n.title ? `<div class="note-view-title">${esc(n.title)}</div>` : ''}
+      <div class="note-view-body">${esc(n.body)}</div>
+      <button type="button" class="btn btn--ghost btn--sm" data-act="edit-note">Edit</button>
+    </div>
+  `;
+}
+
+// ── 7 · My notes section ────────────────────────────────────────
+function entityChipHtml(n) {
+  if (n.entityType === 'general' || !n.entityType) return 'about <span class="chip">General</span>';
+  const spec = {
+    npc:       { icon: '👤', target: '#npcs',      find: () => npcs().find(x => String(x.id) === String(n.entityId)),             name: x => x.name },
+    location:  { icon: '📍', target: '#locations', find: () => locationById(n.entityId),                                          name: x => x.name },
+    chronicle: { icon: '📜', target: '#chronicle', find: () => timelineEntries().find(x => String(x.id) === String(n.entityId)),  name: x => x.title },
+  }[n.entityType];
+  if (!spec) return 'about <span class="chip">General</span>';
+  const entity = spec.find();
+  if (!entity) return `about <span class="chip note-echip is-gone">${spec.icon} no longer in view</span>`;
+  return `about <button type="button" class="chip chip--player note-echip" data-act="goto" data-target="${spec.target}">${spec.icon} ${esc(spec.name(entity) || '(unnamed)')}</button>`;
+}
+
+function renderNotes() {
+  const list = document.getElementById('notes-list');
+  const sorted = notes().slice().sort((a, b) =>
+    String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')));
+  if (!sorted.length) {
+    list.innerHTML = '<div class="empty-state">No notes yet — jot down your first thought.</div>';
+    return;
+  }
+  list.innerHTML = sorted.map(n => `
+    <div class="note-card" data-note-id="${esc(n.id)}">
+      <div class="note-card-inner">
+        <div class="note-card-meta">
+          <span class="note-about">${entityChipHtml(n)}</span>
+          <span class="note-when">${esc(fmtWhen(n.updatedAt || n.createdAt))}</span>
+        </div>
+        ${n.title ? `<div class="note-card-title">${esc(n.title)}</div>` : ''}
+        <div class="note-card-body">${esc(n.body)}</div>
+        <div class="note-card-actions">
+          <button type="button" class="btn btn--ghost btn--sm" data-act="edit-note-card">Edit</button>
+          <button type="button" class="btn btn--ghost btn--sm note-del" data-act="delete-note">Delete</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function repaintNoteSections() {
+  ['chronicle', 'npcs', 'locations', 'notes'].forEach(paintSection);
+}
+
+// ── The one inline note editor ──────────────────────────────────
+function editorPristine() {
+  if (!openEditor) return true;
+  try { return openEditor.read() === openEditor.init; } catch { return true; }
+}
+
+function tryTakeEditorLock() {
+  if (!openEditor) return true;
+  if (editorPristine()) { closeEditor(); return true; }
+  UI.toast('Finish or cancel your open editor first.', 'error');
+  if (openEditor.el && openEditor.el.isConnected) {
+    openEditor.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  return false;
+}
+
+function closeEditor() {
+  if (!openEditor) return;
+  const { kind, section, el, container } = openEditor;
+  openEditor = null;
+  // Note editors live inside a slot whose container may not be rebuilt by
+  // the section repaint (e.g. #new-note-slot) — remove the editor and
+  // un-hide the slot's own content explicitly.
+  if (kind === 'note') {
+    if (el && el.isConnected) el.remove();
+    if (container && container.isConnected) {
+      [...container.children].forEach(c => { c.style.display = ''; });
+    }
+  }
+  const toPaint = new Set(dirtySections);
+  dirtySections.clear();
+  toPaint.add(section);
+  toPaint.forEach(id => { const fn = RENDERERS[id]; if (fn) fn(); });
+}
+
+function buildNoteEditor(ctx, prefill) {
+  const root = document.createElement('div');
+  root.className = 'note-editor';
+  root.innerHTML = `
+    <div class="note-editor-label">${ctx.note ? '✎ Edit your note' : '✎ New note'}</div>
+    <input type="text" class="note-ed-title" maxlength="120" placeholder="Title (optional)">
+    <textarea class="note-ed-body" maxlength="2000" placeholder="Write it down before you forget…"></textarea>
+    <div class="note-editor-foot">
+      <span class="note-ed-count">0 / 2000</span>
+      <span class="note-editor-spring"></span>
+      ${ctx.note ? '<button type="button" class="btn btn--danger btn--sm note-ed-delete">Delete</button>' : ''}
+      <button type="button" class="btn btn--ghost btn--sm note-ed-cancel">Cancel</button>
+      <button type="button" class="btn btn--primary btn--sm note-ed-save">Save</button>
+    </div>
+  `;
+  const titleIn = root.querySelector('.note-ed-title');
+  const bodyTa = root.querySelector('.note-ed-body');
+  const count = root.querySelector('.note-ed-count');
+  titleIn.value = prefill ? (prefill.title || '') : ((ctx.note && ctx.note.title) || '');
+  bodyTa.value = prefill ? (prefill.body || '') : ((ctx.note && ctx.note.body) || '');
+  const updateCount = () => { count.textContent = `${bodyTa.value.length} / 2000`; };
+  bodyTa.addEventListener('input', updateCount);
+  updateCount();
+  return {
+    root, titleIn, bodyTa,
+    saveBtn: root.querySelector('.note-ed-save'),
+    cancelBtn: root.querySelector('.note-ed-cancel'),
+    delBtn: root.querySelector('.note-ed-delete'),
+  };
+}
+
+// container: element whose children get hidden while the editor lives
+// inside it. locate: re-finds the container after a repaint (used to
+// reopen the editor when a save fails).
+function openNoteEditorIn(container, ctx, prefill, locate) {
+  if (!container) return;
+  if (!tryTakeEditorLock()) return;
+  [...container.children].forEach(el => { el.style.display = 'none'; });
+  const ed = buildNoteEditor(ctx, prefill);
+  container.appendChild(ed.root);
+  openEditor = {
+    kind: 'note',
+    section: sectionOf(container),
+    ctx, el: ed.root, container, locate,
+    init: JSON.stringify({ t: ed.titleIn.value, b: ed.bodyTa.value }),
+    read: () => JSON.stringify({ t: ed.titleIn.value, b: ed.bodyTa.value }),
+    fields: { titleIn: ed.titleIn, bodyTa: ed.bodyTa, saveBtn: ed.saveBtn },
+  };
+  ed.saveBtn.addEventListener('click', saveNoteFromEditor);
+  ed.cancelBtn.addEventListener('click', () => closeEditor());
+  if (ed.delBtn) ed.delBtn.addEventListener('click', () => deleteNote(ctx.note.id));
+  ed.bodyTa.focus();
+}
+
+// Shared entry point: open the editor for an entity's note slot.
+function openNoteEditor(opts, container, prefill) {
+  const ctx = {
+    entityType: opts.entityType || 'general',
+    entityId: opts.entityId ?? null,
+    note: opts.note || null,
+  };
+  const locate = opts.locate || (() => container);
+  openNoteEditorIn(container, ctx, prefill || null, locate);
+}
+
+function upsertLocalNote(note) {
+  if (!home) home = {};
+  if (!Array.isArray(home.notes)) home.notes = [];
+  const i = home.notes.findIndex(n => String(n.id) === String(note.id));
+  if (i >= 0) home.notes[i] = note; else home.notes.push(note);
+}
+
+async function saveNoteFromEditor() {
+  if (!openEditor || openEditor.kind !== 'note') return;
+  const { ctx, locate, fields } = openEditor;
+  const title = fields.titleIn.value.trim().slice(0, 120);
+  const body = fields.bodyTa.value.trim().slice(0, 2000);
+  if (!body) { UI.toast('Write something first.', 'error'); return; }
+
+  const snapshot = JSON.stringify(notes());
+  const now = new Date().toISOString();
+  const isNew = !ctx.note;
+  const local = isNew
+    ? { id: 'tmp_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        entityType: ctx.entityType, entityId: ctx.entityId ?? null,
+        title, body, createdAt: now, updatedAt: now }
+    : { ...ctx.note, title, body, updatedAt: now };
+
+  // Optimistic: apply locally, close the editor, repaint.
+  upsertLocalNote(local);
+  writeCache();
+  closeEditor();
+  repaintNoteSections();
+
+  const payload = { entityType: local.entityType, title, body };
+  if (local.entityId != null && local.entityId !== '') payload.entityId = local.entityId;
+  if (!isNew) payload.noteId = ctx.note.id;
+  const res = await postPlayer('player_note', payload);
+
+  if (res.ok) {
+    const b = res.body || {};
+    if (Array.isArray(b.notes)) {
+      home.notes = b.notes;
+    } else if (b.note) {
+      home.notes = notes().filter(n => String(n.id) !== String(local.id));
+      upsertLocalNote(b.note);
+    }
+    writeCache();
+    repaintNoteSections();
+    UI.toast('Note saved.', 'success');
+  } else {
+    // Revert the optimistic write, then reopen the editor with the
+    // typed text so nothing is lost.
+    home.notes = JSON.parse(snapshot);
+    writeCache();
+    repaintNoteSections();
+    const container = locate && locate();
+    if (container) openNoteEditorIn(container, ctx, { title, body }, locate);
+    UI.toast("Couldn't save your note — the keep is unreachable.", 'error');
+  }
+}
+
+async function deleteNote(noteId) {
+  const sure = await UI.confirmDialog('Burn this note? It cannot be recovered.', { confirmLabel: 'Delete' });
+  if (!sure) return;
+  const snapshot = JSON.stringify(notes());
+  home.notes = notes().filter(n => String(n.id) !== String(noteId));
+  writeCache();
+  if (openEditor && openEditor.kind === 'note' && openEditor.ctx.note && String(openEditor.ctx.note.id) === String(noteId)) {
+    closeEditor();
+  }
+  repaintNoteSections();
+  const res = await postPlayer('player_note_delete', { noteId });
+  if (res.ok) {
+    UI.toast('Note deleted.', 'success');
+  } else {
+    home.notes = JSON.parse(snapshot);
+    writeCache();
+    repaintNoteSections();
+    UI.toast("Couldn't delete — the keep is unreachable.", 'error');
+  }
+}
+
+function findNoteSlot(etype, eid) {
+  return [...document.querySelectorAll('.note-slot')].find(s =>
+    s.dataset.etype === etype && String(s.dataset.eid || '') === String(eid || '')) || null;
+}
+function findNoteCard(noteId) {
+  return [...document.querySelectorAll('#notes .note-card')].find(c =>
+    c.dataset.noteId === String(noteId)) || null;
+}
+
+document.getElementById('new-note-btn').addEventListener('click', () => {
+  const slot = document.getElementById('new-note-slot');
+  openNoteEditor({ entityType: 'general', entityId: null, note: null, locate: () => document.getElementById('new-note-slot') }, slot);
+});
+
+// ── 8 · Table rules & homebrew ──────────────────────────────────
+function renderRules() {
+  const list = document.getElementById('rules-list');
+  const sorted = rules().slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  if (!sorted.length) {
+    list.innerHTML = '<div class="empty-state">No table rules posted. Play nice anyway.</div>';
+    return;
+  }
+  list.innerHTML = sorted.map(r => {
+    const body = (r.body || '').toString();
+    const long = body.length > 400;
+    return `
+      <div class="card rule-card" data-id="${esc(r.id)}">
+        <div class="rule-title">${esc(r.title || 'Untitled rule')}</div>
+        <div class="rule-body ${long ? 'clamped' : ''}">${esc(body)}</div>
+        ${long ? '<button type="button" class="btn btn--ghost btn--sm rule-toggle" data-act="toggle-rule">Read more ▾</button>' : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  DELEGATED CLICKS (toggles + note affordances)
+// ══════════════════════════════════════════════════════════════
+document.getElementById('hearth-main').addEventListener('click', (ev) => {
+  const t = ev.target.closest('[data-act]');
+  if (!t) return;
+  switch (t.dataset.act) {
+    case 'toggle-npc': {
+      if (ev.target.closest('a, button, .note-slot')) return;
+      const card = t.closest('.npc-rcard');
+      if (!card) return;
+      const id = String(card.dataset.id);
+      if (expandedNpcIds.has(id)) expandedNpcIds.delete(id); else expandedNpcIds.add(id);
+      card.classList.toggle('expanded');   // in place — never rebuilds the card
+      break;
+    }
+    case 'toggle-wares': {
+      const row = t.closest('.loc-row');
+      if (!row) return;
+      const id = String(row.dataset.id);
+      if (expandedWareIds.has(id)) expandedWareIds.delete(id); else expandedWareIds.add(id);
+      const open = row.classList.toggle('wares-open');
+      t.textContent = open ? 'Wares ▴' : 'Wares ▾';
+      break;
+    }
+    case 'toggle-rule': {
+      const bodyEl = t.closest('.rule-card')?.querySelector('.rule-body');
+      if (!bodyEl) return;
+      const clamped = bodyEl.classList.toggle('clamped');
+      t.textContent = clamped ? 'Read more ▾' : 'Show less ▴';
+      break;
+    }
+    case 'edit-sheet':
+      openSheetEditor(t.dataset.sid);
+      break;
+    case 'add-note':
+    case 'edit-note': {
+      const slot = t.closest('.note-slot');
+      if (!slot) return;
+      const etype = slot.dataset.etype;
+      const eid = slot.dataset.eid || null;
+      openNoteEditor({
+        entityType: etype, entityId: eid, note: noteFor(etype, eid),
+        locate: () => findNoteSlot(etype, eid),
+      }, slot);
+      break;
+    }
+    case 'edit-note-card': {
+      const card = t.closest('.note-card');
+      if (!card) return;
+      const id = card.dataset.noteId;
+      const note = notes().find(n => String(n.id) === String(id));
+      if (!note) return;
+      openNoteEditor({
+        entityType: note.entityType || 'general', entityId: note.entityId ?? null, note,
+        locate: () => findNoteCard(id),
+      }, card);
+      break;
+    }
+    case 'delete-note': {
+      const card = t.closest('.note-card');
+      if (card) deleteNote(card.dataset.noteId);
+      break;
+    }
+    case 'goto': {
+      const target = document.querySelector(t.dataset.target || '');
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      break;
+    }
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  SCROLLSPY — highlight the section under the reading line.
+// ══════════════════════════════════════════════════════════════
+const spyObserver = new IntersectionObserver((ents) => {
+  ents.forEach(en => {
+    if (!en.isIntersecting) return;
+    document.querySelectorAll('#section-nav .nav-chip').forEach(chip => {
+      chip.classList.toggle('is-active', chip.getAttribute('href') === '#' + en.target.id);
+    });
+  });
+}, { rootMargin: '-15% 0px -75% 0px', threshold: 0 });
+document.querySelectorAll('section.hearth-section').forEach(s => spyObserver.observe(s));
+
+// ══════════════════════════════════════════════════════════════
+//  BOOT — paint cached bundle immediately, then fetch fresh.
+// ══════════════════════════════════════════════════════════════
+function boot() {
+  let cached = null;
+  try { cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); } catch {}
+  if (cached && cached.data && typeof cached.data === 'object') {
+    home = cached.data;
+    lastFetchAt = cached.at || 0;
+  }
+  paintAll();
+  updateSynced();
+  fetchHome();
+}
+boot();
+</script>
+</body>
+</html>

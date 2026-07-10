@@ -488,6 +488,31 @@ body{overflow:hidden}
 
 /* Legacy editor markup — hidden during v2 transition; removed in Task 17 */
 .editor-col,.editor-tabs,.editor-pane,.dm-breadcrumb,.sync-status,.in-submap-banner{display:none!important}
+
+/* Shop inventory rows (SHOP tab) */
+.shop-row{display:flex;gap:5px;margin-bottom:5px;align-items:center}
+.shop-row input{background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:2px;color:var(--c-ink);font-family:var(--font-body);font-size:0.85rem;padding:5px 8px;outline:none;min-width:0}
+.shop-row input:focus{border-color:var(--c-teal)}
+.shop-item{flex:2}
+.shop-price{flex:0 0 90px}
+.shop-qty{flex:0 0 60px}
+.shop-notes{flex:2}
+.shop-del{background:transparent;border:none;color:var(--c-ink-faint);cursor:pointer;font-size:0.85rem;padding:0 4px}
+.shop-del:hover{color:var(--c-error)}
+
+/* Character sheet builder (SHEET tab) */
+.sheet-heading{flex:1;min-width:0;background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:2px;color:var(--c-ink);font-family:var(--font-display);font-size:0.78rem;letter-spacing:0.06em;padding:4px 8px;outline:none}
+.sheet-heading:focus{border-color:var(--c-teal)}
+.sheet-flags{display:flex;gap:14px;margin:6px 0}
+.sheet-flags label{display:flex;align-items:center;gap:5px;font-size:0.74rem;color:var(--c-ink-light);cursor:pointer}
+.sheet-fields{margin-bottom:6px}
+.sheet-field-row{display:flex;gap:5px;margin-bottom:4px;align-items:center}
+.sheet-field-row input{background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:2px;color:var(--c-ink);font-family:var(--font-body);font-size:0.85rem;padding:4px 8px;outline:none;min-width:0}
+.sheet-field-row input:focus{border-color:var(--c-teal)}
+.sf-label{flex:0 0 130px}
+.sf-value{flex:1}
+.sheet-sections textarea{width:100%;background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:2px;color:var(--c-ink);font-family:var(--font-body);font-size:0.88rem;padding:6px 9px;outline:none;resize:vertical;line-height:1.45}
+.sheet-sections textarea:focus{border-color:var(--c-teal)}
 </style>
 </head>
 <body>
@@ -617,6 +642,8 @@ body{overflow:hidden}
           <option value="ruin">Ruin</option>
           <option value="port">Port</option>
           <option value="fort">Fort</option>
+          <option value="shop">Shop</option>
+          <option value="tavern">Tavern</option>
           <option value="default">Other</option>
         </select>
       </div>
@@ -664,6 +691,17 @@ body{overflow:hidden}
   <div class="editor-pane" id="lpane-quests">
     <button class="btn btn--brass btn--sm" style="margin-bottom:0.6rem" onclick="addQuest()">+ Add quest hook</button>
     <div id="quest-editor-list"></div>
+  </div>
+
+  <div class="editor-pane" id="lpane-shop">
+    <div style="font-size:0.8rem;color:var(--c-ink-light);line-height:1.5;margin-bottom:0.6rem">
+      Wares players can browse on this location's page. Prices and stock are
+      freeform text. Row notes are <strong>player-visible</strong> — keep
+      secrets in DM Notes. Staff/proprietors are just NPCs placed here.
+      Publish to make changes visible.
+    </div>
+    <button class="btn btn--brass btn--sm" style="margin-bottom:0.6rem" type="button" onclick="addShopRow()">+ Add item</button>
+    <div id="shop-editor-list"></div>
   </div>
 
   <div class="editor-pane" id="lpane-submap">
@@ -733,7 +771,7 @@ body{overflow:hidden}
 <script src="auth.js?v=2"></script>
 <script src="spire-api.js?v=2"></script>
 <script src="spire-ui.js?v=1"></script>
-<script src="map-render.js?v=1"></script>
+<script src="map-render.js?v=2"></script>
 <script src="npc-editor.js?v=2"></script>
 <script src="encounter-schema.js"></script>
 <script>//<![CDATA[
@@ -796,6 +834,8 @@ let selectedEntity = null;   // { type, id }
 
 let tempNPCs       = [];
 let tempQuests     = [];
+let tempShopRows   = [];      // working copy of the location's shop inventory
+let sheets         = [];      // character_sheets KV array (id === characterId)
 let tempVisibleTo  = [];      // ids of characters who can see the location currently being edited
 let tempConnected  = [];      // ids of locations connected to the location currently being edited
 let characters     = [];      // [{id,name,player,code,dmNotes}]
@@ -2326,9 +2366,12 @@ function renderNPCInspector() {
   });
 }
 
-// Task 13: clone the legacy #char-detail editor into the inspector body, then
-// call the legacy `editCharacter(id)` to populate the cloned fields.
-// inspectorScope() makes editor helpers pick up the inspector clones first.
+// Character inspector — tabbed: PROFILE (legacy #char-detail clone) and
+// SHEET (the DM-authored character sheet, sections with per-section
+// playerEditable/dmOnly flags; players edit playerEditable sections from
+// The Hearth via the sheet_update endpoint).
+let charInspTab = 'profile';
+
 function renderCharacterInspector() {
   const c = characters.find(x => x.id === selectedEntity.id);
   if (!c) { closeInspector(); return; }
@@ -2342,17 +2385,189 @@ function renderCharacterInspector() {
     `;
   }
   const tabs = document.getElementById('fp-right-tabs');
-  if (tabs) tabs.innerHTML = '';   // single-pane inspector
+  if (tabs) {
+    tabs.innerHTML = [
+      { key:'profile', label:'PROFILE' },
+      { key:'sheet',   label:'SHEET' },
+    ].map(t => `<button class="fp-tab ${t.key===charInspTab?'active':''}" data-ctab="${t.key}" type="button">${t.label}</button>`).join('');
+    tabs.querySelectorAll('.fp-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        charInspTab = btn.dataset.ctab;
+        renderCharacterInspector();
+      });
+    });
+  }
 
   const body = document.getElementById('fp-right-body');
   if (!body) return;
   body.innerHTML = '';
+
+  if (charInspTab === 'sheet') {
+    renderCharSheetTab(c, body);
+    return;
+  }
+
   const src = document.getElementById('char-detail');
   if (src) {
     Array.from(src.children).forEach(ch => body.appendChild(ch.cloneNode(true)));
   }
   // Populate the freshly-cloned fields via the legacy editor.
   if (typeof editCharacter === 'function') editCharacter(c.id);
+  renderPlayerNotesCard(c, body);
+}
+
+// ── Player notes (read-only, lazy) ────────────────────────────
+let _playerNotesDM = null;   // { [characterId]: [note...] } | null until fetched
+
+function renderPlayerNotesCard(c, body) {
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `<div class="section-header" style="margin-top:0.8rem">PLAYER NOTES <span style="font-size:0.62rem;color:var(--c-ink-faint);letter-spacing:0;text-transform:none">— written by the player, read-only</span></div><div class="pn-list"><div class="visibleto-empty">Loading…</div></div>`;
+  body.appendChild(wrap);
+  const list = wrap.querySelector('.pn-list');
+  const paint = () => {
+    const notes = (_playerNotesDM && _playerNotesDM[c.id]) || [];
+    if (!notes.length) { list.innerHTML = '<div class="visibleto-empty">No notes from this player yet.</div>'; return; }
+    const label = n => n.entityType === 'npc' ? ('👤 ' + (npcs.find(x=>x.id===n.entityId)?.name || n.entityId))
+      : n.entityType === 'location' ? ('📍 ' + (locationName(n.entityId) || n.entityId))
+      : n.entityType === 'chronicle' ? ('📜 ' + (timeline.find(x=>x.id===n.entityId)?.title || n.entityId))
+      : 'General';
+    list.innerHTML = notes.slice().sort((a,b) => (b.updatedAt||0)-(a.updatedAt||0)).map(n => `
+      <div class="npc-history-card">
+        <div class="npc-history-meta"><span>${escapeHtml(label(n))}${n.title ? ' · ' + escapeHtml(n.title) : ''}</span>
+          <button class="npc-history-del" type="button" title="Delete this player note" onclick="dmDeletePlayerNote('${escapeHtml(c.id)}','${escapeHtml(n.id)}')">✕</button></div>
+        <div class="npc-history-body" style="white-space:pre-wrap">${escapeHtml(n.body || '')}</div>
+      </div>`).join('');
+  };
+  if (_playerNotesDM) { paint(); return; }
+  API.dmGet('player_notes_dm')
+    .then(m => { _playerNotesDM = (m && typeof m === 'object') ? m : {}; paint(); })
+    .catch(() => { list.innerHTML = '<div class="visibleto-empty">Player notes unavailable (worker not deployed yet?).</div>'; });
+}
+
+async function dmDeletePlayerNote(characterId, noteId) {
+  if (!(await confirmDialog('Delete this player-written note? The player will lose it.'))) return;
+  const res = await fetch(WORKER_URL, {
+    method: 'POST',
+    headers: Auth.dmHeaders(),
+    body: JSON.stringify({ type: 'player_note_delete', characterId, noteId }),
+  }).catch(() => null);
+  let ok = false;
+  try { ok = !!(res && res.ok && (await res.json()).ok); } catch {}
+  if (!ok) { toast('Could not delete the note.', 'error'); return; }
+  if (_playerNotesDM && Array.isArray(_playerNotesDM[characterId])) {
+    _playerNotesDM[characterId] = _playerNotesDM[characterId].filter(n => n.id !== noteId);
+  }
+  if (selectedEntity && selectedEntity.type === 'character') renderCharacterInspector();
+}
+
+// ── Character sheet builder (SHEET tab) ───────────────────────
+let sheetWork = null;   // deep working copy for the character being edited
+
+function sheetUid(prefix) { return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+function ensureSheetWork(c) {
+  if (sheetWork && sheetWork.id === c.id) return sheetWork;
+  const existing = sheets.find(x => x && String(x.id) === String(c.id));
+  sheetWork = existing
+    ? JSON.parse(JSON.stringify(existing))
+    : { id: c.id, characterId: c.id, sections: [], updatedAt: null };
+  return sheetWork;
+}
+
+function renderCharSheetTab(c, body) {
+  const w = ensureSheetWork(c);
+  const secHtml = (sec, i) => `
+    <div class="item-card">
+      <div class="item-card-header">
+        <input type="text" class="sheet-heading" placeholder="Section heading (e.g. Combat Stats)" value="${escapeHtml(sec.heading || '')}"
+               oninput="sheetWork.sections[${i}].heading=this.value">
+        <button class="item-card-del" type="button" title="Move up" onclick="sheetMoveSection(${i},-1)">▲</button>
+        <button class="item-card-del" type="button" title="Move down" onclick="sheetMoveSection(${i},1)">▼</button>
+        <button class="item-card-del" type="button" title="Delete section" onclick="sheetRemoveSection(${i})">✕</button>
+      </div>
+      <div class="sheet-flags">
+        <label><input type="checkbox" ${sec.playerEditable ? 'checked' : ''} onchange="sheetSetFlag(${i},'playerEditable',this.checked)"> Player can edit</label>
+        <label><input type="checkbox" ${sec.dmOnly ? 'checked' : ''} onchange="sheetSetFlag(${i},'dmOnly',this.checked)"> 🔒 DM only</label>
+      </div>
+      <div class="sheet-fields">
+        ${(sec.fields || []).map((f, fi) => `
+          <div class="sheet-field-row">
+            <input type="text" class="sf-label" placeholder="Label (AC, HP…)" value="${escapeHtml(f.label || '')}" oninput="sheetWork.sections[${i}].fields[${fi}].label=this.value">
+            <input type="text" class="sf-value" placeholder="Value" value="${escapeHtml(f.value || '')}" oninput="sheetWork.sections[${i}].fields[${fi}].value=this.value">
+            <button class="shop-del" type="button" onclick="sheetRemoveField(${i},${fi})" title="Remove field">✕</button>
+          </div>`).join('')}
+        <button class="btn btn--ghost btn--sm" type="button" onclick="sheetAddField(${i})">+ field</button>
+      </div>
+      <textarea rows="3" placeholder="Freeform text for this section (background, abilities…)"
+                oninput="sheetWork.sections[${i}].body=this.value">${escapeHtml(sec.body || '')}</textarea>
+    </div>`;
+
+  body.innerHTML = `
+    <div style="font-size:0.8rem;color:var(--c-ink-light);line-height:1.5;margin-bottom:0.6rem">
+      ${escapeHtml(c.name || 'This character')}'s sheet, shown on their Hearth page.
+      <strong>Player can edit</strong> sections accept player writes (fields + text only);
+      <strong>DM only</strong> sections are never sent to the player. Saving replaces the
+      whole sheet — refresh before editing if the player may have written meanwhile.
+    </div>
+    <div class="sheet-sections">${(w.sections || []).map(secHtml).join('') || '<div class="visibleto-empty">No sections yet.</div>'}</div>
+    <div style="display:flex;gap:6px;margin-top:0.8rem">
+      <button class="btn btn--ghost btn--sm" type="button" onclick="sheetAddSection()">+ ADD SECTION</button>
+      <button class="btn btn--brass btn--sm" type="button" style="margin-left:auto" onclick="saveCharSheet()">SAVE SHEET</button>
+    </div>
+  `;
+}
+
+function _rerenderSheetTab() {
+  if (selectedEntity && selectedEntity.type === 'character' && charInspTab === 'sheet') renderCharacterInspector();
+}
+function sheetAddSection() {
+  sheetWork.sections.push({ id: sheetUid('sec'), heading: '', fields: [], body: '', playerEditable: false, dmOnly: false });
+  _rerenderSheetTab();
+}
+function sheetRemoveSection(i) {
+  sheetWork.sections.splice(i, 1);
+  _rerenderSheetTab();
+}
+function sheetMoveSection(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= sheetWork.sections.length) return;
+  const t = sheetWork.sections[i]; sheetWork.sections[i] = sheetWork.sections[j]; sheetWork.sections[j] = t;
+  _rerenderSheetTab();
+}
+function sheetAddField(si) {
+  const sec = sheetWork.sections[si];
+  sec.fields = sec.fields || [];
+  sec.fields.push({ id: sheetUid('f'), label: '', value: '' });
+  _rerenderSheetTab();
+}
+function sheetRemoveField(si, fi) {
+  sheetWork.sections[si].fields.splice(fi, 1);
+  _rerenderSheetTab();
+}
+function sheetSetFlag(i, flag, checked) {
+  const sec = sheetWork.sections[i];
+  sec[flag] = checked;
+  // playerEditable and dmOnly are mutually exclusive
+  if (checked && flag === 'playerEditable') sec.dmOnly = false;
+  if (checked && flag === 'dmOnly') sec.playerEditable = false;
+  _rerenderSheetTab();
+}
+
+async function saveCharSheet() {
+  if (!sheetWork) return;
+  sheetWork.updatedAt = new Date().toISOString();
+  const idx = sheets.findIndex(x => x && String(x.id) === String(sheetWork.id));
+  const record = JSON.parse(JSON.stringify(sheetWork));
+  if (idx >= 0) sheets[idx] = record; else sheets.push(record);
+  const { ok, status, merged } = await API.dmPostMerged('character_sheets', 'character_sheets', sheets);
+  if (status === 401) {
+    Auth.logout();
+    window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.'));
+    return;
+  }
+  if (!ok) { toast('Sheet save failed — try again.', 'error'); return; }
+  sheets.length = 0; sheets.push(...merged);
+  toast('Sheet saved.', 'success');
 }
 // ── Timeline inspector (READ-ONLY) ────────────────────────────
 // Timeline editing consolidated into the Chronicle Workshop
@@ -2436,10 +2651,18 @@ const LOC_INSP_TABS = [
   { key:'lore',   label:'LORE' },
   { key:'npcs',   label:'NPCs' },
   { key:'quests', label:'QUESTS' },
+  { key:'shop',   label:'SHOP' },
   { key:'submap', label:'SUB-MAP' },
   { key:'dm',     label:'DM NOTES' },
 ];
 let locInspTab = 'info';
+
+// SHOP tab shows for shop/tavern types — OR any location that already has
+// inventory rows, so shop data can't become unreachable after a type change.
+function locHasShopTab(loc) {
+  return loc && (loc.type === 'shop' || loc.type === 'tavern'
+    || (loc.shop && Array.isArray(loc.shop.inventory) && loc.shop.inventory.length > 0));
+}
 
 function renderLocationInspector() {
   const loc = data.locations.find(l => l.id === selectedEntity.id);
@@ -2461,6 +2684,7 @@ function renderLocationInspector() {
   if (tabs) {
     tabs.innerHTML = LOC_INSP_TABS
       .filter(t => !(inSub && (t.key === 'submap' || t.key === 'npcs')))
+      .filter(t => !(t.key === 'shop' && !locHasShopTab(loc)))
       .map(t => `<button class="fp-tab ${t.key===locInspTab?'active':''}" data-itab="${t.key}" type="button">${t.label}</button>`)
       .join('');
     tabs.querySelectorAll('.fp-tab').forEach(btn => {
@@ -2482,6 +2706,7 @@ function renderLocationInspectorBody(loc) {
     case 'lore':   body.appendChild(buildLocLoreForm(loc));    break;
     case 'npcs':   body.appendChild(buildLocNPCsForm(loc));    break;
     case 'quests': body.appendChild(buildLocQuestsForm(loc));  break;
+    case 'shop':   body.appendChild(buildLocShopForm(loc));    break;
     case 'submap': body.appendChild(buildLocSubmapForm(loc));  break;
     case 'dm':     body.appendChild(buildLocDMForm(loc));      break;
   }
@@ -2517,6 +2742,7 @@ function buildLocInfoForm(loc)   { return buildLocTabFragment('lpane-info'); }
 function buildLocLoreForm(loc)   { return buildLocTabFragment('lpane-lore'); }
 function buildLocNPCsForm(loc)   { return buildLocTabFragment('lpane-npcs'); }
 function buildLocQuestsForm(loc) { return buildLocTabFragment('lpane-quests'); }
+function buildLocShopForm(loc)   { return buildLocTabFragment('lpane-shop'); }
 function buildLocSubmapForm(loc) { return buildLocTabFragment('lpane-submap'); }
 function buildLocDMForm(loc)     { return buildLocTabFragment('lpane-dm'); }
 
@@ -2923,6 +3149,7 @@ function openLocModal(id, defaultX, defaultY) {
   $.qs('loc-dmNotes').value    = loc?.dmNotes || '';
   tempNPCs   = JSON.parse(JSON.stringify(loc?.npcs   || []));
   tempQuests = JSON.parse(JSON.stringify(loc?.quests || []));
+  tempShopRows = JSON.parse(JSON.stringify(loc?.shop?.inventory || []));
   tempVisibleTo = Array.isArray(loc?.visibleTo) ? loc.visibleTo.slice() : [];
   // Sub-map fields
   const sub = loc?.subMap || null;
@@ -2939,7 +3166,7 @@ function openLocModal(id, defaultX, defaultY) {
       const rb = document.getElementById('reset-submap-btn'); if (rb) rb.style.display = 'none';
     }
   }
-  renderQuestEditor(); renderVisibleToChips(); renderConnectedChips();
+  renderQuestEditor(); renderShopEditor(); renderVisibleToChips(); renderConnectedChips();
   renderLocationNPCsHere(loc?.id);
   renderLocEncounters(loc || null);
   const nameInput = $.qs('loc-name');
@@ -3043,6 +3270,7 @@ function saveLocation() {
     connected: tempConnected.slice(),
     npcs:      [],                 // NPCs are first-class now; managed in the NPCs tab
     quests:    tempQuests,
+    shop:      tempShopRows.length ? { inventory: JSON.parse(JSON.stringify(tempShopRows)) } : null,
     dmNotes:   $.qs('loc-dmNotes').value.trim(),
     visibleTo: tempVisibleTo.slice(),
     subMap:    subMap,
@@ -3071,6 +3299,34 @@ async function deleteLocation() {
 //  NPC & QUEST EDITORS
 // ══════════════════════════════════════════════════════════════
 function addQuest() { tempQuests.push({title:'',desc:''}); renderQuestEditor(); }
+
+// ── Shop inventory editor (SHOP tab) ──────────────────────────
+function shopRowUid() { return 'shp_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function addShopRow() {
+  tempShopRows.push({ id: shopRowUid(), item: '', price: '', qty: '', notes: '' });
+  renderShopEditor();
+  const list = inspectorScope().qs('shop-editor-list');
+  const rows = list ? list.querySelectorAll('.shop-row .shop-item') : [];
+  if (rows.length) rows[rows.length - 1].focus();
+}
+function removeShopRow(i) { tempShopRows.splice(i, 1); renderShopEditor(); }
+function renderShopEditor() {
+  const list = inspectorScope().qs('shop-editor-list');
+  if (!list) return;
+  if (!tempShopRows.length) {
+    list.innerHTML = '<div class="visibleto-empty">No wares yet. Add rows, Save the location, then Publish.</div>';
+    return;
+  }
+  list.innerHTML = tempShopRows.map((r, i) => `
+    <div class="shop-row">
+      <input class="shop-item"  type="text" placeholder="Item"      value="${escapeHtml(r.item || '')}"  oninput="tempShopRows[${i}].item=this.value">
+      <input class="shop-price" type="text" placeholder="Price"     value="${escapeHtml(r.price || '')}" oninput="tempShopRows[${i}].price=this.value">
+      <input class="shop-qty"   type="text" placeholder="Qty"       value="${escapeHtml(r.qty || '')}"   oninput="tempShopRows[${i}].qty=this.value">
+      <input class="shop-notes" type="text" placeholder="Notes (player-visible)" value="${escapeHtml(r.notes || '')}" oninput="tempShopRows[${i}].notes=this.value">
+      <button class="shop-del" type="button" onclick="removeShopRow(${i})" title="Remove">✕</button>
+    </div>
+  `).join('');
+}
 function removeQuest(i) { tempQuests.splice(i,1); renderQuestEditor(); }
 function renderQuestEditor() {
   const list=document.getElementById('quest-editor-list'); list.innerHTML='';
@@ -3209,6 +3465,12 @@ async function init() {
   await loadJournalsKV();
   await loadNPCsKV();
   await loadTimelineKV();
+
+  // Character sheets (tolerates a not-yet-deployed worker → stays empty).
+  try {
+    const arr = await API.dmGet('character_sheets');
+    if (Array.isArray(arr)) sheets = arr;
+  } catch {}
 
   // One-shot migration of nested NPCs → first-class records.
   await migrateNestedNPCs();
@@ -3722,7 +3984,7 @@ function parseLocationNote(baseName, fm, body) {
 
   // Map type — prefer explicit map_type field, fall back to type field
   const rawType = (fm.map_type || fm.mapType || fm.type || '').toLowerCase();
-  const typeMap = { city:'city', town:'city', village:'city', settlement:'city', dungeon:'dungeon', cave:'dungeon', ruins:'ruin', ruin:'ruin', wilderness:'wilderness', forest:'wilderness', port:'port', harbour:'port', harbor:'port', fort:'fort', fortress:'fort', castle:'fort', keep:'fort', stronghold:'fort' };
+  const typeMap = { city:'city', town:'city', village:'city', settlement:'city', dungeon:'dungeon', cave:'dungeon', ruins:'ruin', ruin:'ruin', wilderness:'wilderness', forest:'wilderness', port:'port', harbour:'port', harbor:'port', fort:'fort', fortress:'fort', castle:'fort', keep:'fort', stronghold:'fort', shop:'shop', store:'shop', market:'shop', emporium:'shop', tavern:'tavern', inn:'tavern', bar:'tavern', pub:'tavern' };
   const locType = typeMap[rawType] || 'default';
 
   return {

@@ -290,6 +290,23 @@ body { display: flex; flex-direction: column; }
   flex-wrap: wrap;
 }
 .editor-header .title-stack { flex: 1; min-width: 200px; }
+.dirty-dot {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.1em;
+  color: var(--c-ink-faint);
+  white-space: nowrap;
+}
+.dirty-dot.is-dirty { color: var(--c-warn); }
+.ed-sec > .section-header { cursor: pointer; user-select: none; }
+.ed-sec-caret {
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform var(--motion-fast) var(--ease-out);
+}
+.ed-sec.collapsed .ed-sec-caret { transform: rotate(-90deg); }
+.ed-sec.collapsed > *:not(.section-header) { display: none !important; }
+.ed-sec-count { color: var(--c-ink-faint); letter-spacing: 0; text-transform: none; }
 .editor-header h2 {
   font-family: var(--font-display);
   font-size: var(--text-lg);
@@ -760,6 +777,7 @@ body { display: flex; flex-direction: column; }
           <h2 id="hdr-title">Untitled entry</h2>
           <div class="sub" id="hdr-sub">—</div>
         </div>
+        <span class="dirty-dot" id="dirty-dot"></span>
         <button class="btn btn--brass btn--sm" onclick="saveSession()">SAVE</button>
         <button class="btn btn--ghost btn--sm" onclick="cancelEdit()">CANCEL</button>
         <button class="btn btn--danger btn--sm" onclick="deleteSession()">DELETE</button>
@@ -787,10 +805,13 @@ body { display: flex; flex-direction: column; }
         <input type="text" id="f-tags" placeholder="session-three, warrant, quarry">
       </div>
 
-      <div class="section-header">SUMMARY <span class="hint">— what players see in the Chronicle (becomes <code>## Summary</code> on export)</span></div>
+      <div class="ed-sec" data-sec="summary">
+      <div class="section-header" onclick="toggleEdSec(event,'summary')"><span class="ed-sec-caret">▾</span>SUMMARY <span class="hint">— what players see in the Chronicle (becomes <code>## Summary</code> on export)</span></div>
       <div class="field"><textarea id="f-body" class="body" placeholder="A short, read-aloud-ready recap…"></textarea></div>
+      </div>
 
-      <div class="section-header">PREP
+      <div class="ed-sec" data-sec="prep">
+      <div class="section-header" onclick="toggleEdSec(event,'prep')"><span class="ed-sec-caret">▾</span>PREP <span class="ed-sec-count" id="sec-count-prep"></span> 
         <span class="hint">— DM-only. Each section round-trips to your vault as <code>## Heading</code> markdown.</span>
         <span style="margin-left:auto;display:flex;gap:5px;flex-shrink:0">
           <button class="btn btn--ghost btn--sm" type="button" onclick="collapseAllPrep()" title="Minimize every section">MIN ALL</button>
@@ -815,14 +836,20 @@ body { display: flex; flex-direction: column; }
         </datalist>
         <button class="btn btn--ghost btn--sm" type="button" onclick="addPrepFromInput()">+ ADD</button>
       </div>
+      </div>
 
-      <div class="section-header">ATTENDANCE <span class="hint">— who showed up</span></div>
+      <div class="ed-sec" data-sec="attendance">
+      <div class="section-header" onclick="toggleEdSec(event,'attendance')"><span class="ed-sec-caret">▾</span>ATTENDANCE <span class="ed-sec-count" id="sec-count-attendance"></span> <span class="hint">— who showed up</span></div>
       <div class="pick-grid" id="f-attend-chips"></div>
+      </div>
 
-      <div class="section-header">LINKED LOCATIONS</div>
+      <div class="ed-sec" data-sec="locations">
+      <div class="section-header" onclick="toggleEdSec(event,'locations')"><span class="ed-sec-caret">▾</span>LINKED LOCATIONS <span class="ed-sec-count" id="sec-count-locations"></span></div>
       <div class="pick-grid" id="f-loc-chips"></div>
+      </div>
 
-      <div class="section-header">LINKED NPCs
+      <div class="ed-sec" data-sec="npcs">
+      <div class="section-header" onclick="toggleEdSec(event,'npcs')"><span class="ed-sec-caret">▾</span>LINKED NPCs <span class="ed-sec-count" id="sec-count-npcs"></span> 
         <button class="btn btn--brass btn--sm" type="button" onclick="openAddNpc()" style="margin-left:auto">+ ADD NPC</button>
         <button class="btn btn--ghost btn--sm" type="button" onclick="openScanPrep()" title="Find [[Wikilinks]] in your prep that aren't NPCs yet">↑ SCAN PREP</button>
       </div>
@@ -830,29 +857,40 @@ body { display: flex; flex-direction: column; }
              style="width:100%;margin-bottom:6px;background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:3px;color:var(--c-ink);font-family:var(--font-body);font-size:0.9rem;padding:6px 10px;outline:none">
       <div class="pick-hint" style="margin-bottom:4px">Click a chip to link/unlink · click ✎ to edit the NPC in place.</div>
       <div class="pick-grid" id="f-npc-chips"></div>
+      </div>
 
-      <div class="section-header">STRUCTURED LOOT <span class="hint">— for initiative exports &amp; per-recipient tracking. Markdown lists in the Prep block stay too.</span></div>
+      <div class="ed-sec" data-sec="loot">
+      <div class="section-header" onclick="toggleEdSec(event,'loot')"><span class="ed-sec-caret">▾</span>STRUCTURED LOOT <span class="ed-sec-count" id="sec-count-loot"></span> <span class="hint">— for initiative exports &amp; per-recipient tracking. Markdown lists in the Prep block stay too.</span></div>
       <div id="f-loot-rows"></div>
       <button class="btn btn--ghost btn--sm" type="button" onclick="addLootRow()" style="margin-top:4px">+ ADD LOOT ROW</button>
       <datalist id="loot-recipients"></datalist>
+      </div>
 
-      <div class="section-header">ATTACHED COMBATS <span class="hint">— pushed in from the War Table</span></div>
+      <div class="ed-sec" data-sec="combats">
+      <div class="section-header" onclick="toggleEdSec(event,'combats')"><span class="ed-sec-caret">▾</span>ATTACHED COMBATS <span class="ed-sec-count" id="sec-count-combats"></span> <span class="hint">— pushed in from the War Table</span></div>
       <div id="f-combats"></div>
+      </div>
 
-      <div class="section-header">VISIBLE TO <span class="hint">— leave empty for all players</span></div>
+      <div class="ed-sec" data-sec="visibility">
+      <div class="section-header" onclick="toggleEdSec(event,'visibility')"><span class="ed-sec-caret">▾</span>VISIBLE TO <span class="ed-sec-count" id="sec-count-visibility"></span> <span class="hint">— leave empty for all players</span></div>
       <div class="pick-grid" id="f-visible-chips"></div>
       <div class="pick-hint">Empty = visible to every player who can read the Chronicle. Planned entries are DM-only regardless.</div>
+      </div>
 
-      <div class="section-header">DM LOG <span class="hint">— post-session notes, becomes <code>## Log</code> on export</span></div>
+      <div class="ed-sec" data-sec="dmlog">
+      <div class="section-header" onclick="toggleEdSec(event,'dmlog')"><span class="ed-sec-caret">▾</span>DM LOG <span class="hint">— post-session notes, becomes <code>## Log</code> on export</span></div>
       <div class="dm-note-area">
         <div class="dm-note-label">🔒 DM ONLY</div>
         <textarea id="f-dmNotes" rows="5" placeholder="What actually happened. Threads opened, threads closed, who said what."></textarea>
       </div>
+      </div>
 
-      <div id="session-encounters-panel" style="margin-top:1rem;padding:8px;border:1px solid var(--c-border-light);border-radius:3px">
-        <div style="font-family:Cinzel,serif;font-size:0.66rem;letter-spacing:0.1em;color:var(--c-brass);margin-bottom:6px;text-transform:uppercase">Encounters planned</div>
+      <div class="ed-sec" data-sec="encounters">
+      <div class="section-header" onclick="toggleEdSec(event,'encounters')"><span class="ed-sec-caret">▾</span>ENCOUNTERS PLANNED <span class="hint">— built in the Anvil, staged from here</span></div>
+      <div id="session-encounters-panel" style="padding:8px;border:1px solid var(--c-border-light);border-radius:3px">
         <div id="session-encounters-list">—</div>
-        <button onclick="newEncounterForCurrentSession()" style="margin-top:6px">+ Add encounter to this session</button>
+        <button class="btn btn--ghost btn--sm" onclick="newEncounterForCurrentSession()" style="margin-top:6px">+ Add encounter to this session</button>
+      </div>
       </div>
 
       <div class="action-row">
@@ -1547,6 +1585,8 @@ function renderList() {
       <div class="entry-card-meta">
         ${date ? `<span>${escapeHtml(date)}</span>` : ''}
         ${attN ? `<span class="att">${attN} attended</span>` : ''}
+        ${s.npcIds?.length ? `<span>👤 ${s.npcIds.length}</span>` : ''}
+        ${s.locationIds?.length ? `<span>📍 ${s.locationIds.length}</span>` : ''}
         ${s.combats?.length ? `<span>⚔ ${s.combats.length}</span>` : ''}
         ${s.loot?.length ? `<span>◆ ${s.loot.length} loot</span>` : ''}
         ${encTally}
@@ -1585,13 +1625,16 @@ function sessionNumber(s) {
 // ═══════════════════════════════════════════════════════════════
 //  EDITOR
 // ═══════════════════════════════════════════════════════════════
-function selectSession(id) {
+async function selectSession(id) {
+  if (id === editingId) return;
   const s = timeline.find(t => t.id === id);
   if (!s) return;
+  if (!(await confirmDiscard())) return;
   editingId = id;
   loadIntoWork(s);
   renderList(); renderEditor(); renderSidebar();
   document.getElementById('pane-editor').scrollTop = 0;
+  markClean();
 }
 
 function loadIntoWork(s) {
@@ -1618,7 +1661,8 @@ function loadIntoWork(s) {
 }
 
 // Create a new entry. Kind defaults to the currently-filtered kind, else 'session'.
-function newEntry(forceKind) {
+async function newEntry(forceKind) {
+  if (!(await confirmDiscard())) return;
   editingId = '__new__';
   work = blankWork();
   const filterKind = document.getElementById('kind-filter')?.value || '';
@@ -1631,6 +1675,7 @@ function newEntry(forceKind) {
     work.prepSections = [];
   }
   renderList(); renderEditor(); renderSidebar();
+  markClean();
   setTimeout(() => document.getElementById('f-title')?.focus(), 30);
 }
 
@@ -1652,10 +1697,12 @@ function handleHash() {
 }
 window.addEventListener('hashchange', handleHash);
 
-function cancelEdit() {
+async function cancelEdit() {
+  if (!(await confirmDiscard())) return;
   editingId = null;
   work = blankWork();
   renderList(); renderEditor(); renderSidebar();
+  markClean();
 }
 
 function renderEditor() {
@@ -1682,6 +1729,7 @@ function renderEditor() {
     ? (timeline.find(t => t.id === editingId) || null)
     : null;
   renderSessionEncounters(entryForPanel);
+  applySecCollapsed();
 }
 
 function onKindChange() {
@@ -1747,7 +1795,7 @@ function toggleChip(which, id) {
   if (!Array.isArray(arr)) return;
   const i = arr.indexOf(id);
   if (i >= 0) arr.splice(i, 1); else arr.push(id);
-  renderChips(); renderSidebar();
+  renderChips(); renderSidebar(); scheduleDirtyCheck();
 }
 
 // ── Prep sections ──
@@ -1800,7 +1848,7 @@ function updatePrepBody(i, v)    { if (work.prepSections[i]) work.prepSections[i
 function addPrepSection(headingHint) {
   const heading = (headingHint || '').trim();
   work.prepSections.push({ uid: newPrepUid(), heading, body: '' });
-  renderPrepSections();
+  renderPrepSections(); scheduleDirtyCheck();
   setTimeout(() => {
     const cards = document.querySelectorAll('#f-prep-sections .prep-section');
     const last = cards[cards.length - 1];
@@ -1820,7 +1868,7 @@ function removePrepSection(i) {
   const label = (s?.heading || '').trim() || '(unnamed section)';
   if ((s?.body || '').trim() && !confirm(`Delete the "${label}" section? Its contents will be lost.`)) return;
   work.prepSections.splice(i, 1);
-  renderPrepSections();
+  renderPrepSections(); scheduleDirtyCheck();
 }
 function movePrepSection(i, dir) {
   const j = i + dir;
@@ -1828,7 +1876,7 @@ function movePrepSection(i, dir) {
   const tmp = work.prepSections[i];
   work.prepSections[i] = work.prepSections[j];
   work.prepSections[j] = tmp;
-  renderPrepSections();
+  renderPrepSections(); scheduleDirtyCheck();
 }
 
 function renderLoot() {
@@ -1850,13 +1898,13 @@ function renderLoot() {
 }
 function addLootRow() {
   work.loot.push({ id: lootUid(), item: '', qty: '1', recipient: '' });
-  renderLoot();
+  renderLoot(); scheduleDirtyCheck();
   setTimeout(() => {
     const rows = document.querySelectorAll('#f-loot-rows .loot-row .loot-item');
     if (rows.length) rows[rows.length - 1].focus();
   }, 20);
 }
-function removeLootRow(i) { work.loot.splice(i, 1); renderLoot(); renderSidebar(); }
+function removeLootRow(i) { work.loot.splice(i, 1); renderLoot(); renderSidebar(); scheduleDirtyCheck(); }
 
 function renderCombats() {
   const box = document.getElementById('f-combats');
@@ -1876,7 +1924,115 @@ function removeCombat(i) {
   const c = work.combats[i];
   if (!confirm(`Detach combat "${c?.title || 'Combat'}" from this entry? Its log and summary are removed from the Chronicle.`)) return;
   work.combats.splice(i, 1);
-  renderCombats(); renderSidebar();
+  renderCombats(); renderSidebar(); scheduleDirtyCheck();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DIRTY TRACKING
+//  savedSnapshot is what the entry looked like at load/last save;
+//  serializeWork() is a NON-MUTATING mirror of saveSession's payload
+//  (keep the two in sync). collectFromForm() is not reused here because
+//  it mutates work (drops blank loot rows mid-typing).
+// ═══════════════════════════════════════════════════════════════
+let savedSnapshot = null;
+let _dirtyTimer = null;
+
+function serializeWork() {
+  const val = id => document.getElementById(id)?.value ?? '';
+  return JSON.stringify({
+    kind: normalizeKind(val('f-kind') || 'session'),
+    title: val('f-title').trim(),
+    body: val('f-body').trim(),
+    prep: serializePrepSections(work.prepSections || []),
+    dmNotes: val('f-dmNotes'),
+    dateReal: val('f-dateReal'),
+    dateInGame: val('f-dateInGame').trim(),
+    dateSort: val('f-dateSort') || val('f-dateReal') || '',
+    tags: (val('f-tags') || '').split(',').map(s => s.trim()).filter(Boolean),
+    locationIds: work.locationIds,
+    characterIds: work.characterIds,
+    npcIds: work.npcIds,
+    visibleTo: work.visibleTo,
+    loot: (work.loot || []).filter(l => (l.item || '').trim()).map(l => ({
+      item: (l.item || '').trim(),
+      qty: (l.qty || '1').toString().trim() || '1',
+      recipient: (l.recipient || 'Party').trim() || 'Party',
+    })),
+    combats: work.combats,
+  });
+}
+
+function markClean() {
+  savedSnapshot = editingId ? serializeWork() : null;
+  updateDirtyUI();
+}
+function isDirty() {
+  return !!editingId && savedSnapshot !== null && serializeWork() !== savedSnapshot;
+}
+function updateDirtyUI() {
+  const dot = document.getElementById('dirty-dot');
+  if (dot) {
+    if (!editingId) { dot.textContent = ''; dot.className = 'dirty-dot'; }
+    else {
+      const d = isDirty();
+      dot.textContent = d ? '● unsaved' : '✓ saved';
+      dot.className = 'dirty-dot' + (d ? ' is-dirty' : '');
+    }
+  }
+  updateSecCounts();
+}
+function scheduleDirtyCheck() {
+  if (_dirtyTimer) clearTimeout(_dirtyTimer);
+  _dirtyTimer = setTimeout(updateDirtyUI, 250);
+}
+async function confirmDiscard() {
+  if (!isDirty()) return true;
+  return UI.confirmDialog(
+    `You have unsaved changes on "${work.title || 'this entry'}". Discard them?`,
+    { confirmLabel: 'Discard', cancelLabel: 'Keep editing' }
+  );
+}
+window.addEventListener('beforeunload', (e) => {
+  if (isDirty()) e.preventDefault();
+});
+
+// ── Collapsible editor sections (collapse state is a DM working-style
+//    preference — global, persisted, not per-entry) ──
+function loadSecCollapsed() {
+  try {
+    const a = JSON.parse(localStorage.getItem('sessions_dm_sec_collapsed') || 'null');
+    if (Array.isArray(a)) return new Set(a);
+  } catch {}
+  return new Set(['loot', 'combats', 'visibility', 'encounters']);
+}
+let secCollapsed = loadSecCollapsed();
+
+function applySecCollapsed() {
+  document.querySelectorAll('.ed-sec').forEach(el =>
+    el.classList.toggle('collapsed', secCollapsed.has(el.dataset.sec)));
+  updateSecCounts();
+}
+function toggleEdSec(event, key) {
+  if (event && event.target.closest('button, input, select, textarea, a')) return;
+  if (secCollapsed.has(key)) secCollapsed.delete(key); else secCollapsed.add(key);
+  localStorage.setItem('sessions_dm_sec_collapsed', JSON.stringify([...secCollapsed]));
+  applySecCollapsed();
+}
+function updateSecCounts() {
+  if (!work) return;
+  const counts = {
+    prep: (work.prepSections || []).length,
+    attendance: (work.characterIds || []).length,
+    locations: (work.locationIds || []).length,
+    npcs: (work.npcIds || []).length,
+    loot: (work.loot || []).filter(l => (l.item || '').trim()).length,
+    combats: (work.combats || []).length,
+    visibility: (work.visibleTo || []).length,
+  };
+  for (const [k, v] of Object.entries(counts)) {
+    const el = document.getElementById('sec-count-' + k);
+    if (el) el.textContent = v ? `(${v})` : '';
+  }
 }
 
 function collectFromForm() {
@@ -1930,20 +2086,27 @@ async function saveSession() {
     if (idx < 0) { alert('Entry not found.'); return; }
     timeline[idx] = { ...timeline[idx], ...payload };
   }
-  await persistTimeline();
+  const ok = await persistTimeline();
   renderList(); renderEditor(); renderSidebar();
+  if (ok) {
+    markClean();
+    UI.toast('Entry saved.', 'success');
+  } else {
+    UI.toast('Save failed — your changes are still here. Try again.', 'error');
+  }
 }
 
 async function deleteSession() {
   if (!editingId || editingId === '__new__') { cancelEdit(); return; }
   const s = timeline.find(t => t.id === editingId);
   if (!s) return;
-  if (!confirm(`Delete "${s.title || 'this entry'}"? This cannot be undone.`)) return;
+  if (!(await UI.confirmDialog(`Delete "${s.title || 'this entry'}"? This cannot be undone.`))) return;
   _deletedTimelineIds.add(editingId);
   timeline = timeline.filter(t => t.id !== editingId);
   editingId = null;
   await persistTimeline();
   renderList(); renderEditor(); renderSidebar();
+  markClean();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2286,6 +2449,16 @@ async function createScannedNpcs() {
 window.addEventListener('DOMContentLoaded', () => {
   wireDrop();
   loadAll().then(handleHash);
+  // Dirty tracking: any input/change inside the editor form
+  document.getElementById('editor')?.addEventListener('input', scheduleDirtyCheck);
+  document.getElementById('editor')?.addEventListener('change', scheduleDirtyCheck);
+  // Cmd/Ctrl+S saves the open entry
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+      if (editingId) { e.preventDefault(); saveSession(); }
+    }
+  });
+  applySecCollapsed();
   ['f-kind','f-title','f-dateReal','f-dateInGame','f-dateSort','f-tags','f-body','f-dmNotes']
     .forEach(id => document.getElementById(id)?.addEventListener('input', () => {
       collectFromForm();

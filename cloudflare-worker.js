@@ -205,6 +205,65 @@ const INITIATIVE_NOTES = (function () {
 })();
 // END initiative-notes.js (inlined)
 
+// ═══════════════════════════════════════════════════════════════════════
+// Player content (character sheets, homebrew rules, player notes,
+// whisper read-state) — caps + filter helpers.
+//   KV keys:
+//     character_sheets — ARRAY, one record per character, id === characterId
+//     rules            — ARRAY of {id,title,body,order,visibleTo,updatedAt}
+//     player_notes     — MAP { [characterId]: [note...] } (worker-managed;
+//                        NEVER in DM_WRITE_TYPES — players own this data)
+//     journal_reads    — MAP { [characterId]: [journalId...] } (ditto)
+// ═══════════════════════════════════════════════════════════════════════
+const PLAYER_CONTENT = {
+  NOTE_BODY_MAX: 2000,
+  NOTE_TITLE_MAX: 120,
+  NOTES_PER_CHARACTER: 200,
+  NOTE_ENTITY_TYPES: ['general', 'npc', 'location', 'chronicle'],
+  SHEET_MAX_FIELDS: 40,
+  SHEET_LABEL_MAX: 80,
+  SHEET_FIELD_MAX: 2000,
+  SHEET_BODY_MAX: 8000,
+  READS_MAX: 1000,
+};
+
+// Rules visible to a character: visibleTo empty/missing = everyone.
+// Strips visibleTo/updatedAt from the player payload; sorts by order.
+function rulesForCharacter(rules, characterId) {
+  return (Array.isArray(rules) ? rules : [])
+    .filter(r => r && (!Array.isArray(r.visibleTo) || r.visibleTo.length === 0 || r.visibleTo.includes(characterId)))
+    .sort((a, b) => (a.order || 0) - (b.order || 0))
+    .map(r => ({ id: r.id, title: r.title || '', body: r.body || '', order: r.order || 0 }));
+}
+
+// A character's own sheet with dmOnly sections stripped. Null if none exists.
+function sheetForCharacter(sheets, characterId) {
+  const s = (Array.isArray(sheets) ? sheets : []).find(x => x && String(x.id) === String(characterId));
+  if (!s) return null;
+  return {
+    id: s.id,
+    characterId,
+    updatedAt: s.updatedAt || null,
+    sections: (Array.isArray(s.sections) ? s.sections : [])
+      .filter(sec => sec && !sec.dmOnly)
+      .map(sec => ({
+        id: sec.id,
+        heading: sec.heading || '',
+        fields: Array.isArray(sec.fields) ? sec.fields : [],
+        body: sec.body || '',
+        playerEditable: sec.playerEditable === true,
+      })),
+  };
+}
+
+// Overlay persisted per-player read-state onto served journals.
+// DM-authored unread:false stays read; everything else is unread until
+// the player marks it via journals_read.
+function journalsWithReadState(journals, readIds) {
+  const reads = new Set(readIds || []);
+  return (journals || []).map(j => ({ ...j, unread: (j.unread !== false) && !reads.has(j.id) }));
+}
+
 function sanitizeCharacters(chars) {
   return (chars || []).map(c => ({ id: c.id, name: c.name, player: c.player || '' }));
 }
@@ -679,7 +738,11 @@ export default {
         const filteredMap = filterForCharacter(baseMap, characterId);
 
         const allJournals = await kvGet(env, 'journals', []);
-        const myJournals  = allJournals.filter(j => j.characterId === characterId);
+        const readsAll    = await kvGet(env, 'journal_reads', {}) || {};
+        const myJournals  = journalsWithReadState(
+          allJournals.filter(j => j.characterId === characterId),
+          readsAll[characterId]
+        );
 
         const allNpcs   = await kvGet(env, 'npcs', []);
         const knownNpcs = npcsForCharacter(allNpcs, characterId);
@@ -711,6 +774,88 @@ export default {
           inventory: Array.isArray(invAll[characterId]) ? invAll[characterId] : [],
           recipes: Array.isArray(recAll[characterId]) ? recAll[characterId] : []
         });
+      }
+
+      // ── Player hub aggregate ("The Hearth") ─────────────────────────
+      // One credential check, one round trip, every slice reuses an
+      // existing audited filter helper. Granular refresh endpoints below.
+      if (type === 'home_view') {
+        const characterId = url.searchParams.get('characterId') || '';
+        const code        = url.searchParams.get('code') || '';
+        if (!characterId || !code) return json({ error: 'characterId and code required' }, 400);
+        const chars = await kvGet(env, 'characters', []);
+        const me = chars.find(c => c.id === characterId);
+        if (!me || me.code !== code) return json({ error: 'invalid character or code' }, 401);
+
+        const [playerMap, dmMap, allJournals, readsAll, allNpcs, allTimeline,
+               ingredients, invAll, recAll, notesAll, rules, sheets] = await Promise.all([
+          kvGet(env, 'map_data', null),
+          kvGet(env, 'map_data_dm', null),
+          kvGet(env, 'journals', []),
+          kvGet(env, 'journal_reads', {}),
+          kvGet(env, 'npcs', []),
+          kvGet(env, 'timeline', []),
+          kvGet(env, 'potion_ingredients', []),
+          kvGet(env, 'potion_inventories', {}),
+          kvGet(env, 'potion_recipes', {}),
+          kvGet(env, 'player_notes', {}),
+          kvGet(env, 'rules', []),
+          kvGet(env, 'character_sheets', []),
+        ]);
+
+        return json({
+          character: { id: me.id, name: me.name, player: me.player || '' },
+          map: filterForCharacter(playerMap || dmMap || {}, characterId),
+          journals: journalsWithReadState(
+            allJournals.filter(j => j.characterId === characterId),
+            (readsAll || {})[characterId]
+          ),
+          npcs: npcsForCharacter(allNpcs, characterId),
+          timeline: timelineForCharacter(allTimeline, characterId),
+          brew: {
+            ingredients,
+            inventory: Array.isArray((invAll || {})[characterId]) ? invAll[characterId] : [],
+            recipes: Array.isArray((recAll || {})[characterId]) ? recAll[characterId] : [],
+          },
+          notes: Array.isArray((notesAll || {})[characterId]) ? notesAll[characterId] : [],
+          rules: rulesForCharacter(rules, characterId),
+          sheet: sheetForCharacter(sheets, characterId),
+        });
+      }
+
+      // Granular player reads (same creds; used for post-write refreshes)
+      if (type === 'rules_view' || type === 'sheet_view' || type === 'player_notes') {
+        const characterId = url.searchParams.get('characterId') || '';
+        const code        = url.searchParams.get('code') || '';
+        if (!characterId || !code) return json({ error: 'characterId and code required' }, 400);
+        const chars = await kvGet(env, 'characters', []);
+        const me = chars.find(c => c.id === characterId);
+        if (!me || me.code !== code) return json({ error: 'invalid character or code' }, 401);
+        if (type === 'rules_view') {
+          return json(rulesForCharacter(await kvGet(env, 'rules', []), characterId));
+        }
+        if (type === 'sheet_view') {
+          return json(sheetForCharacter(await kvGet(env, 'character_sheets', []), characterId));
+        }
+        const notesAll = await kvGet(env, 'player_notes', {}) || {};
+        return json(Array.isArray(notesAll[characterId]) ? notesAll[characterId] : []);
+      }
+
+      // DM-only: raw player-content stores
+      if (type === 'character_sheets') {
+        const auth = await verifyDMAuth(request, env);
+        if (!auth.ok) return json({ error: 'DM auth required' }, 401);
+        return json(await kvGet(env, 'character_sheets', []));
+      }
+      if (type === 'rules') {
+        const auth = await verifyDMAuth(request, env);
+        if (!auth.ok) return json({ error: 'DM auth required' }, 401);
+        return json(await kvGet(env, 'rules', []));
+      }
+      if (type === 'player_notes_dm') {
+        const auth = await verifyDMAuth(request, env);
+        if (!auth.ok) return json({ error: 'DM auth required' }, 401);
+        return json(await kvGet(env, 'player_notes', {}));
       }
 
       // DM-only: full bestiary (monsters scraped + normalized from source books).
@@ -1014,8 +1159,147 @@ export default {
       return json({ ok: true, learned, recipes: Array.isArray(recAll[characterId]) ? recAll[characterId] : [] });
     }
 
+    // ── Player edits a playerEditable sheet section ────────────
+    // Per-section write: replaces ONLY that section's fields/body, so a
+    // player edit can't clobber DM edits elsewhere on the sheet.
+    if (body?.type === 'sheet_update') {
+      const auth = await verifyCharacterAuth(body, env);
+      if (!auth.ok) return json({ error: auth.error }, 401);
+      const characterId = auth.character.id;
+
+      const sectionId = (body.sectionId || '').toString();
+      if (!sectionId) return json({ error: 'sectionId required' }, 400);
+
+      const C = PLAYER_CONTENT;
+      let fields = null;
+      if (body.fields !== undefined) {
+        if (!Array.isArray(body.fields) || body.fields.length > C.SHEET_MAX_FIELDS)
+          return json({ error: `fields must be an array of at most ${C.SHEET_MAX_FIELDS}` }, 400);
+        fields = body.fields.map(f => ({
+          id: (f && f.id ? String(f.id) : 'f_' + Math.random().toString(36).slice(2, 9)),
+          label: (f && f.label || '').toString().slice(0, C.SHEET_LABEL_MAX),
+          value: (f && f.value || '').toString().slice(0, C.SHEET_FIELD_MAX),
+        }));
+      }
+      let newBody = null;
+      if (body.body !== undefined) {
+        newBody = (body.body || '').toString();
+        if (newBody.length > C.SHEET_BODY_MAX) return json({ error: `body too long (max ${C.SHEET_BODY_MAX})` }, 400);
+      }
+      if (fields === null && newBody === null) return json({ error: 'nothing to update' }, 400);
+
+      const sheets = await kvGet(env, 'character_sheets', []);
+      const sheet = (Array.isArray(sheets) ? sheets : []).find(s => s && String(s.id) === String(characterId));
+      if (!sheet) return json({ error: 'no sheet for this character' }, 404);
+      const section = (sheet.sections || []).find(sec => sec && String(sec.id) === sectionId);
+      if (!section) return json({ error: 'unknown section' }, 404);
+      if (section.playerEditable !== true || section.dmOnly === true)
+        return json({ error: 'this section is not player-editable' }, 403);
+
+      if (fields !== null) section.fields = fields;
+      if (newBody !== null) section.body = newBody;
+      sheet.updatedAt = new Date().toISOString();
+      const ok = await kvPut(env, 'character_sheets', sheets);
+      if (!ok) return json({ error: 'KV not bound' }, 500);
+      return json({ ok: true, sheet: sheetForCharacter(sheets, characterId) });
+    }
+
+    // ── Player note create/update ──────────────────────────────
+    if (body?.type === 'player_note') {
+      const auth = await verifyCharacterAuth(body, env);
+      if (!auth.ok) return json({ error: auth.error }, 401);
+      const characterId = auth.character.id;
+
+      const C = PLAYER_CONTENT;
+      const entityType = (body.entityType || 'general').toString();
+      if (!C.NOTE_ENTITY_TYPES.includes(entityType)) return json({ error: 'invalid entityType' }, 400);
+      const entityId = entityType === 'general' ? null : ((body.entityId || '').toString() || null);
+      const title = (body.title || '').toString().slice(0, C.NOTE_TITLE_MAX);
+      const noteBody = (body.body || '').toString();
+      if (!noteBody.trim()) return json({ error: 'note body required' }, 400);
+      if (noteBody.length > C.NOTE_BODY_MAX) return json({ error: `note too long (max ${C.NOTE_BODY_MAX})` }, 400);
+
+      const notesAll = await kvGet(env, 'player_notes', {}) || {};
+      const mine = Array.isArray(notesAll[characterId]) ? notesAll[characterId] : [];
+      const now = Date.now();
+      let note;
+      if (body.noteId) {
+        note = mine.find(n => n && n.id === body.noteId);
+        if (!note) return json({ error: 'unknown note' }, 404);
+        note.entityType = entityType;
+        note.entityId = entityId;
+        note.title = title;
+        note.body = noteBody;
+        note.updatedAt = now;
+      } else {
+        if (mine.length >= C.NOTES_PER_CHARACTER)
+          return json({ error: `note limit reached (${C.NOTES_PER_CHARACTER})` }, 400);
+        note = {
+          id: 'pn_' + now.toString(36) + Math.random().toString(36).slice(2, 8),
+          entityType, entityId, title, body: noteBody,
+          createdAt: now, updatedAt: now,
+        };
+        mine.push(note);
+      }
+      notesAll[characterId] = mine;
+      const ok = await kvPut(env, 'player_notes', notesAll);
+      if (!ok) return json({ error: 'KV not bound' }, 500);
+      return json({ ok: true, note, notes: mine });
+    }
+
+    // ── Player note delete (own via creds, any via DM headers) ──
+    if (body?.type === 'player_note_delete') {
+      const noteId = (body.noteId || '').toString();
+      if (!noteId) return json({ error: 'noteId required' }, 400);
+
+      let ownerId = null;
+      const dm = await verifyDMAuth(request, env);
+      if (dm.ok) {
+        ownerId = (body.characterId || '').toString();
+        if (!ownerId) return json({ error: 'characterId (note owner) required' }, 400);
+      } else {
+        const auth = await verifyCharacterAuth(body, env);
+        if (!auth.ok) return json({ error: auth.error }, 401);
+        ownerId = auth.character.id;
+      }
+
+      const notesAll = await kvGet(env, 'player_notes', {}) || {};
+      const mine = Array.isArray(notesAll[ownerId]) ? notesAll[ownerId] : [];
+      const idx = mine.findIndex(n => n && n.id === noteId);
+      if (idx < 0) return json({ error: 'unknown note' }, 404);
+      mine.splice(idx, 1);
+      notesAll[ownerId] = mine;
+      const ok = await kvPut(env, 'player_notes', notesAll);
+      if (!ok) return json({ error: 'KV not bound' }, 500);
+      return json({ ok: true });
+    }
+
+    // ── Player marks whispers read ─────────────────────────────
+    if (body?.type === 'journals_read') {
+      const auth = await verifyCharacterAuth(body, env);
+      if (!auth.ok) return json({ error: auth.error }, 401);
+      const characterId = auth.character.id;
+
+      const ids = Array.isArray(body.journalIds) ? body.journalIds.map(String) : [];
+      const journals = await kvGet(env, 'journals', []);
+      const myIds = new Set(journals.filter(j => j.characterId === characterId).map(j => String(j.id)));
+
+      const readsAll = await kvGet(env, 'journal_reads', {}) || {};
+      const prev = Array.isArray(readsAll[characterId]) ? readsAll[characterId] : [];
+      // Union with previous, keep only ids that still exist (self-pruning), cap.
+      const merged = [...new Set([...prev, ...ids])]
+        .filter(id => myIds.has(String(id)))
+        .slice(0, PLAYER_CONTENT.READS_MAX);
+      readsAll[characterId] = merged;
+      const ok = await kvPut(env, 'journal_reads', readsAll);
+      if (!ok) return json({ error: 'KV not bound' }, 500);
+      return json({ ok: true, readIds: merged });
+    }
+
     // ── DM-only writes ────────────────────────────────────────
-    const DM_WRITE_TYPES = ['initiative_state','map_data','map_data_dm','characters','journals','npcs','timeline','potion_ingredients','potions','negative_potions','potion_inventories','potion_recipes','potion_library','bestiary','bestiary_custom','encounters','feature_library','combat_drafts'];
+    // player_notes / journal_reads are deliberately NOT here — those keys
+    // hold player-authored data and must never be whole-blob clobbered.
+    const DM_WRITE_TYPES = ['initiative_state','map_data','map_data_dm','characters','journals','npcs','timeline','potion_ingredients','potions','negative_potions','potion_inventories','potion_recipes','potion_library','bestiary','bestiary_custom','encounters','feature_library','combat_drafts','character_sheets','rules'];
     if (DM_WRITE_TYPES.includes(body?.type)) {
       const auth = await verifyDMAuth(request, env);
       if (!auth.ok) return json({ error: 'DM auth required' }, 401);

@@ -16,9 +16,9 @@
 //  page — only the type→color mapping is generated here.
 // ═══════════════════════════════════════════════════════════════
 (function () {
-  const TYPE_COLORS = { city:'#3a6fd0', dungeon:'#c43838', wilderness:'#4ca050', ruin:'#a89478', port:'#16b5a0', fort:'#b060d0', default:'#e0a830' };
-  const TYPE_LABELS = { city:'City', dungeon:'Dungeon', wilderness:'Wilderness', ruin:'Ruin', port:'Port', fort:'Fort', default:'Location' };
-  const TYPE_ICONS  = { city:'🏙', dungeon:'⚔', wilderness:'🌲', ruin:'🏚', port:'⚓', fort:'🏰', default:'📍' };
+  const TYPE_COLORS = { city:'#3a6fd0', dungeon:'#c43838', wilderness:'#4ca050', ruin:'#a89478', port:'#16b5a0', fort:'#b060d0', shop:'#d4772f', tavern:'#8a5a3b', default:'#e0a830' };
+  const TYPE_LABELS = { city:'City', dungeon:'Dungeon', wilderness:'Wilderness', ruin:'Ruin', port:'Port', fort:'Fort', shop:'Shop', tavern:'Tavern', default:'Location' };
+  const TYPE_ICONS  = { city:'🏙', dungeon:'⚔', wilderness:'🌲', ruin:'🏚', port:'⚓', fort:'🏰', shop:'🪙', tavern:'🍺', default:'📍' };
 
   function legendPinSVG(color) {
     return `<svg class="legend-pin" viewBox="0 0 16 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">

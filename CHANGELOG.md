@@ -7,6 +7,149 @@ Dates are YYYY-MM-DD.
 
 ---
 
+## [Unreleased] — 2026-07-10
+
+### The Hearth — player homepage (player-hub.html)
+
+Step H6, the batch's centerpiece. One page with everything a player wants
+(player-only; card on the hub with a NEW badge):
+
+- Single scroll, sticky scrollspy section nav: **Whispers** (unread-first,
+  auto mark-read after 2s in view — persists via `journals_read`) ·
+  **Character Sheet** (DM-authored sections; "Player can edit" sections get
+  an inline editor riding `sheet_update`, optimistic with revert-and-reopen
+  on failure) · **The Story So Far** (3 newest chronicle entries, deep-links
+  into timeline.html) · **People You Know** (searchable NPC cards with
+  expand + Atlas links) · **Places You've Found** (type pin-dots; shops/
+  taverns get a WARES ▾ table) · **Satchel & Cauldron** (ingredients +
+  recipes) · **My Notes** (player-authored notes attachable to NPCs/
+  locations/chronicle entries or freestanding; inline editors, 2000-char
+  counter, orphaned-entity handling) · **Table Rules** (Codex docs,
+  long bodies clamped with read-more).
+- No polling: one `home_view` fetch, localStorage instant paint, refetch on
+  tab focus (>60s) or the ⟳ button; sections with an open editor are never
+  repainted under the player's cursor.
+- timeline.html: `#entry-<id>` deep links now expand + scroll to the entry
+  (used by the Hearth and the Atlas Timeline tab alike).
+
+Player features light up after the H2 worker deploy; until then the page
+paints cached/empty states gracefully.
+
+### The Codex — homebrew rules library (codex-dm.html) + hub cards
+
+Step H5:
+
+- **codex-dm.html** (new DM workshop, 656 lines): list + editor for rule
+  documents {title, order, body, visibleTo}. Left pane: + NEW RULE, search,
+  cards sorted by explicit `order` with visibility badges (ALL PLAYERS vs
+  "N players"). Right pane: title/order/body editor + VISIBLE TO pick-chips
+  (empty = every player). Full house dirty-tracking pattern (snapshot /
+  dirty dot / discard guards / beforeunload / Cmd+S / save toasts). Saves
+  via `API.dmPostMerged('rules', …)` with a deleted-ids set; degrades to
+  local-only until the H2 worker deploy.
+- **home.html**: DM card "The Codex" (open-book icon) after the Chronicle
+  Workshop; player card "The Hearth" (hearth icon, NEW badge) linking
+  player-hub.html — shown to players only (DMs have the workshops).
+
+### Character sheets — DM-authored, per-section player editing (Atlas)
+
+Step H4. The character inspector in the Atlas Workshop is now tabbed:
+
+- **PROFILE** — the existing character editor, plus a read-only **PLAYER
+  NOTES** card (lazy-loaded from `player_notes_dm`) showing everything that
+  player has written, grouped by what it's attached to, with a DM delete ✕.
+- **SHEET** — a sections builder: each section has a heading, an optional
+  labeled-fields grid (AC/HP/whatever — freeform), a freeform text block,
+  and two flags: **Player can edit** (the player can update that section's
+  fields/text from The Hearth via `sheet_update`) and **🔒 DM only** (never
+  sent to the player). The flags are mutually exclusive. Sections reorder
+  with ▲/▼. Saves via `API.dmPostMerged('character_sheets', …)` — the
+  array's `id === characterId` scheme makes merge-writes work unchanged.
+  Editor copy warns that a DM save replaces the whole sheet (player edits
+  to OTHER sections survive via merge; same-sheet concurrent edits are
+  last-write-wins, as planned).
+
+Requires the H2 worker deploy for persistence; the editor degrades to an
+empty local sheet until then.
+
+### Shops & taverns — first-class locations with browsable wares
+
+Step H3:
+
+- **New location types `shop` 🪙 and `tavern` 🍺** in the map-render.js
+  palette (v2 — bumped on both map pages), the Atlas type select, and the
+  vault-import alias map (store/market/emporium → shop, inn/bar/pub →
+  tavern).
+- **Atlas SHOP tab** on the location inspector (shown for shop/tavern types
+  — or any location that already has inventory, so data can't orphan on a
+  type change): item · price · qty · notes rows, freeform strings, working
+  copy in `tempShopRows`, persisted as `loc.shop.inventory` on Save. Rides
+  the normal autosave → **Publish** flow — players see wares only after
+  Publish, gated by the location's `visibleTo` like everything else. Row
+  notes are player-visible; secrets belong in DM Notes. Works on sub-map
+  pins too (a tavern inside a city sub-map).
+- **Player Atlas (map.html)**: location pages show a WARES & PRICES table
+  (theme `.table`) when the location has inventory; shop/tavern locations
+  with empty shelves get an in-fiction empty state. Proprietors/staff are
+  simply NPCs placed at the location.
+- **Whisper read-state now persists**: opening the whispers panel fires a
+  `journals_read` POST (optimistic UI, fire-and-forget) so unread badges
+  survive reloads and feed The Hearth. Requires the H2 worker deploy.
+
+### Worker: player content — home_view aggregate, sheets, rules, notes, whisper read-state
+
+Step H2. ⚠️ **Requires a manual worker deploy** (paste cloudflare-worker.js
+into the Cloudflare dashboard), then run
+`DM_USER=… DM_PASS=… CHAR=… CODE=… bash scripts/smoke-test-worker.sh`.
+All endpoints return sane empties before any UI exists, so nothing breaks
+if the frontend steps land first — but player features stay dark until the
+deploy.
+
+- **New KV keys**: `character_sheets` (array, id === characterId — merge-safe
+  for `dmPostMerged`), `rules` (array with explicit `order` + `visibleTo`),
+  `player_notes` (map by characterId — worker-managed, deliberately NOT in
+  DM_WRITE_TYPES), `journal_reads` (map by characterId, ditto — kept separate
+  from the DM-authored `journals` blob so neither side can clobber the other).
+- **GET `home_view`** (player creds): one aggregate bundle for The Hearth —
+  character, visibleTo-filtered map (incl. upcoming shop data), whispers with
+  persisted read-state, known NPCs, visible chronicle entries, brew
+  inventory/recipes, own notes, visible rules, own sheet (dmOnly sections
+  stripped). Every slice reuses an existing audited filter helper. Granular
+  `rules_view` / `sheet_view` / `player_notes` for post-write refreshes;
+  DM raw reads `character_sheets` / `rules` / `player_notes_dm`.
+- **Player POSTs** (all re-validate characterId+code server-side):
+  `sheet_update` (edits ONLY a playerEditable section's fields/body — heads,
+  flags, order untouchable; 403 otherwise), `player_note` (create/update,
+  entityType enum general/npc/location/chronicle, body ≤2000, 200/character),
+  `player_note_delete` (own via creds, any via DM headers), `journals_read`
+  (idempotent union, self-pruning to existing journal ids).
+- `player_view` journals now carry the persisted `unread` overlay (additive;
+  map.html unchanged).
+- `DM_WRITE_TYPES` += character_sheets, rules.
+
+### Chronicle Workshop UX — dirty tracking, discard guards, Cmd+S, collapsible sections
+
+Step H1 of the shops/Hearth feature batch (sessions-dm.html only, no backend
+changes):
+
+- **Unsaved-changes tracking.** `serializeWork()` (a non-mutating mirror of
+  the save payload) is snapshotted at load/new/save; a `● unsaved` /
+  `✓ saved` dot lives in the sticky editor header. Any input/change in the
+  form, chip toggles, prep/loot/combat mutations update it (250ms debounce).
+- **Discard guards.** Switching entries, + NEW ENTRY, CANCEL, and deep-link
+  hash changes now prompt "You have unsaved changes… Discard?" via
+  UI.confirmDialog when dirty; a `beforeunload` guard covers tab close/nav.
+  DELETE now uses the styled confirm too.
+- **Cmd/Ctrl+S** saves the open entry; save success/failure now toasts
+  (previously silent beyond the KV sync chip).
+- **Collapsible editor sections.** All 10 top-level form sections wrap in
+  `.ed-sec` with ▾ toggles; collapsed set persists in localStorage (a DM
+  working-style preference, not per-entry). Default-collapsed: Structured
+  Loot, Attached Combats, Visible To, Encounters. Countable sections show a
+  live `(n)` hint so collapsed ≠ hidden information.
+- List cards now show 👤 linked-NPC and 📍 location counts alongside the
+  existing attendance/⚔/◆ badges.
+
 ## [Unreleased] — 2026-07-09
 
 ### Restyle batch 3 — map-dm.html (Atlas Workshop) + bestiary-dm.html (The Menagerie) consume theme.css
