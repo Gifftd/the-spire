@@ -9,6 +9,30 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-07-10
 
+### Shops & taverns — first-class locations with browsable wares
+
+Step H3:
+
+- **New location types `shop` 🪙 and `tavern` 🍺** in the map-render.js
+  palette (v2 — bumped on both map pages), the Atlas type select, and the
+  vault-import alias map (store/market/emporium → shop, inn/bar/pub →
+  tavern).
+- **Atlas SHOP tab** on the location inspector (shown for shop/tavern types
+  — or any location that already has inventory, so data can't orphan on a
+  type change): item · price · qty · notes rows, freeform strings, working
+  copy in `tempShopRows`, persisted as `loc.shop.inventory` on Save. Rides
+  the normal autosave → **Publish** flow — players see wares only after
+  Publish, gated by the location's `visibleTo` like everything else. Row
+  notes are player-visible; secrets belong in DM Notes. Works on sub-map
+  pins too (a tavern inside a city sub-map).
+- **Player Atlas (map.html)**: location pages show a WARES & PRICES table
+  (theme `.table`) when the location has inventory; shop/tavern locations
+  with empty shelves get an in-fiction empty state. Proprietors/staff are
+  simply NPCs placed at the location.
+- **Whisper read-state now persists**: opening the whispers panel fires a
+  `journals_read` POST (optimistic UI, fire-and-forget) so unread badges
+  survive reloads and feed The Hearth. Requires the H2 worker deploy.
+
 ### Worker: player content — home_view aggregate, sheets, rules, notes, whisper read-state
 
 Step H2. ⚠️ **Requires a manual worker deploy** (paste cloudflare-worker.js

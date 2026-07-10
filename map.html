@@ -295,7 +295,7 @@ body{display:flex;flex-direction:column}
 <script src="auth.js?v=2"></script>
 <script src="spire-api.js?v=2"></script>
 <script src="spire-ui.js?v=1"></script>
-<script src="map-render.js?v=1"></script>
+<script src="map-render.js?v=2"></script>
 <script>
 // ══════════════════════════════════════════════════════════════
 //  DATA SOURCE
@@ -566,9 +566,19 @@ function toggleWhispers() {
   panel.classList.toggle('open', opening);
   panel.setAttribute('aria-hidden', opening ? 'false' : 'true');
   if (opening && journals.some(j => j.unread)) {
-    // Mark as read client-side. (Read state is not persisted to the worker yet.)
+    const unreadIds = journals.filter(j => j.unread).map(j => j.id);
+    // Optimistic client flip…
     journals.forEach(j => j.unread = false);
     renderWhispers();
+    // …then persist read-state (fire-and-forget; requires the H2 worker).
+    const creds = Auth.playerCreds && Auth.playerCreds();
+    if (creds) {
+      fetch(WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'journals_read', characterId: creds.characterId, code: creds.code, journalIds: unreadIds }),
+      }).catch(() => {});
+    }
   }
 }
 
@@ -1016,6 +1026,27 @@ function showLocation(loc) {
     ${loc.lore ? `
       <div class="loc-main-section-title">ABOUT ${loc.name.toUpperCase()}</div>
       <div class="loc-lore">${loc.lore.replace(/\n/g,'<br>')}</div>
+    ` : ''}
+
+    ${loc.shop && Array.isArray(loc.shop.inventory) && loc.shop.inventory.length > 0 ? `
+      <div class="loc-main-section-title">WARES & PRICES</div>
+      <div style="overflow-x:auto">
+        <table class="table">
+          <thead><tr><th>Item</th><th>Price</th><th>Stock</th><th>Notes</th></tr></thead>
+          <tbody>
+            ${loc.shop.inventory.map(r => `
+              <tr>
+                <td>${esc(r.item || '')}</td>
+                <td>${esc(r.price || '—')}</td>
+                <td>${(r.qty || '').toString().trim() ? esc(String(r.qty)) : '—'}</td>
+                <td>${esc(r.notes || '')}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    ` : (loc.type === 'shop' || loc.type === 'tavern') ? `
+      <div class="loc-main-section-title">WARES & PRICES</div>
+      <div style="font-style:italic;color:var(--c-ink-faint);font-size:0.9rem">The shelves are bare — or the keeper isn't selling to you.</div>
     ` : ''}
 
     ${loc.quests && loc.quests.length > 0 ? `

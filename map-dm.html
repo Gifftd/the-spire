@@ -488,6 +488,17 @@ body{overflow:hidden}
 
 /* Legacy editor markup — hidden during v2 transition; removed in Task 17 */
 .editor-col,.editor-tabs,.editor-pane,.dm-breadcrumb,.sync-status,.in-submap-banner{display:none!important}
+
+/* Shop inventory rows (SHOP tab) */
+.shop-row{display:flex;gap:5px;margin-bottom:5px;align-items:center}
+.shop-row input{background:var(--c-bg-elevated);border:1px solid var(--c-border);border-radius:2px;color:var(--c-ink);font-family:var(--font-body);font-size:0.85rem;padding:5px 8px;outline:none;min-width:0}
+.shop-row input:focus{border-color:var(--c-teal)}
+.shop-item{flex:2}
+.shop-price{flex:0 0 90px}
+.shop-qty{flex:0 0 60px}
+.shop-notes{flex:2}
+.shop-del{background:transparent;border:none;color:var(--c-ink-faint);cursor:pointer;font-size:0.85rem;padding:0 4px}
+.shop-del:hover{color:var(--c-error)}
 </style>
 </head>
 <body>
@@ -617,6 +628,8 @@ body{overflow:hidden}
           <option value="ruin">Ruin</option>
           <option value="port">Port</option>
           <option value="fort">Fort</option>
+          <option value="shop">Shop</option>
+          <option value="tavern">Tavern</option>
           <option value="default">Other</option>
         </select>
       </div>
@@ -664,6 +677,17 @@ body{overflow:hidden}
   <div class="editor-pane" id="lpane-quests">
     <button class="btn btn--brass btn--sm" style="margin-bottom:0.6rem" onclick="addQuest()">+ Add quest hook</button>
     <div id="quest-editor-list"></div>
+  </div>
+
+  <div class="editor-pane" id="lpane-shop">
+    <div style="font-size:0.8rem;color:var(--c-ink-light);line-height:1.5;margin-bottom:0.6rem">
+      Wares players can browse on this location's page. Prices and stock are
+      freeform text. Row notes are <strong>player-visible</strong> — keep
+      secrets in DM Notes. Staff/proprietors are just NPCs placed here.
+      Publish to make changes visible.
+    </div>
+    <button class="btn btn--brass btn--sm" style="margin-bottom:0.6rem" type="button" onclick="addShopRow()">+ Add item</button>
+    <div id="shop-editor-list"></div>
   </div>
 
   <div class="editor-pane" id="lpane-submap">
@@ -733,7 +757,7 @@ body{overflow:hidden}
 <script src="auth.js?v=2"></script>
 <script src="spire-api.js?v=2"></script>
 <script src="spire-ui.js?v=1"></script>
-<script src="map-render.js?v=1"></script>
+<script src="map-render.js?v=2"></script>
 <script src="npc-editor.js?v=2"></script>
 <script src="encounter-schema.js"></script>
 <script>//<![CDATA[
@@ -796,6 +820,7 @@ let selectedEntity = null;   // { type, id }
 
 let tempNPCs       = [];
 let tempQuests     = [];
+let tempShopRows   = [];      // working copy of the location's shop inventory
 let tempVisibleTo  = [];      // ids of characters who can see the location currently being edited
 let tempConnected  = [];      // ids of locations connected to the location currently being edited
 let characters     = [];      // [{id,name,player,code,dmNotes}]
@@ -2436,10 +2461,18 @@ const LOC_INSP_TABS = [
   { key:'lore',   label:'LORE' },
   { key:'npcs',   label:'NPCs' },
   { key:'quests', label:'QUESTS' },
+  { key:'shop',   label:'SHOP' },
   { key:'submap', label:'SUB-MAP' },
   { key:'dm',     label:'DM NOTES' },
 ];
 let locInspTab = 'info';
+
+// SHOP tab shows for shop/tavern types — OR any location that already has
+// inventory rows, so shop data can't become unreachable after a type change.
+function locHasShopTab(loc) {
+  return loc && (loc.type === 'shop' || loc.type === 'tavern'
+    || (loc.shop && Array.isArray(loc.shop.inventory) && loc.shop.inventory.length > 0));
+}
 
 function renderLocationInspector() {
   const loc = data.locations.find(l => l.id === selectedEntity.id);
@@ -2461,6 +2494,7 @@ function renderLocationInspector() {
   if (tabs) {
     tabs.innerHTML = LOC_INSP_TABS
       .filter(t => !(inSub && (t.key === 'submap' || t.key === 'npcs')))
+      .filter(t => !(t.key === 'shop' && !locHasShopTab(loc)))
       .map(t => `<button class="fp-tab ${t.key===locInspTab?'active':''}" data-itab="${t.key}" type="button">${t.label}</button>`)
       .join('');
     tabs.querySelectorAll('.fp-tab').forEach(btn => {
@@ -2482,6 +2516,7 @@ function renderLocationInspectorBody(loc) {
     case 'lore':   body.appendChild(buildLocLoreForm(loc));    break;
     case 'npcs':   body.appendChild(buildLocNPCsForm(loc));    break;
     case 'quests': body.appendChild(buildLocQuestsForm(loc));  break;
+    case 'shop':   body.appendChild(buildLocShopForm(loc));    break;
     case 'submap': body.appendChild(buildLocSubmapForm(loc));  break;
     case 'dm':     body.appendChild(buildLocDMForm(loc));      break;
   }
@@ -2517,6 +2552,7 @@ function buildLocInfoForm(loc)   { return buildLocTabFragment('lpane-info'); }
 function buildLocLoreForm(loc)   { return buildLocTabFragment('lpane-lore'); }
 function buildLocNPCsForm(loc)   { return buildLocTabFragment('lpane-npcs'); }
 function buildLocQuestsForm(loc) { return buildLocTabFragment('lpane-quests'); }
+function buildLocShopForm(loc)   { return buildLocTabFragment('lpane-shop'); }
 function buildLocSubmapForm(loc) { return buildLocTabFragment('lpane-submap'); }
 function buildLocDMForm(loc)     { return buildLocTabFragment('lpane-dm'); }
 
@@ -2923,6 +2959,7 @@ function openLocModal(id, defaultX, defaultY) {
   $.qs('loc-dmNotes').value    = loc?.dmNotes || '';
   tempNPCs   = JSON.parse(JSON.stringify(loc?.npcs   || []));
   tempQuests = JSON.parse(JSON.stringify(loc?.quests || []));
+  tempShopRows = JSON.parse(JSON.stringify(loc?.shop?.inventory || []));
   tempVisibleTo = Array.isArray(loc?.visibleTo) ? loc.visibleTo.slice() : [];
   // Sub-map fields
   const sub = loc?.subMap || null;
@@ -2939,7 +2976,7 @@ function openLocModal(id, defaultX, defaultY) {
       const rb = document.getElementById('reset-submap-btn'); if (rb) rb.style.display = 'none';
     }
   }
-  renderQuestEditor(); renderVisibleToChips(); renderConnectedChips();
+  renderQuestEditor(); renderShopEditor(); renderVisibleToChips(); renderConnectedChips();
   renderLocationNPCsHere(loc?.id);
   renderLocEncounters(loc || null);
   const nameInput = $.qs('loc-name');
@@ -3043,6 +3080,7 @@ function saveLocation() {
     connected: tempConnected.slice(),
     npcs:      [],                 // NPCs are first-class now; managed in the NPCs tab
     quests:    tempQuests,
+    shop:      tempShopRows.length ? { inventory: JSON.parse(JSON.stringify(tempShopRows)) } : null,
     dmNotes:   $.qs('loc-dmNotes').value.trim(),
     visibleTo: tempVisibleTo.slice(),
     subMap:    subMap,
@@ -3071,6 +3109,34 @@ async function deleteLocation() {
 //  NPC & QUEST EDITORS
 // ══════════════════════════════════════════════════════════════
 function addQuest() { tempQuests.push({title:'',desc:''}); renderQuestEditor(); }
+
+// ── Shop inventory editor (SHOP tab) ──────────────────────────
+function shopRowUid() { return 'shp_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function addShopRow() {
+  tempShopRows.push({ id: shopRowUid(), item: '', price: '', qty: '', notes: '' });
+  renderShopEditor();
+  const list = inspectorScope().qs('shop-editor-list');
+  const rows = list ? list.querySelectorAll('.shop-row .shop-item') : [];
+  if (rows.length) rows[rows.length - 1].focus();
+}
+function removeShopRow(i) { tempShopRows.splice(i, 1); renderShopEditor(); }
+function renderShopEditor() {
+  const list = inspectorScope().qs('shop-editor-list');
+  if (!list) return;
+  if (!tempShopRows.length) {
+    list.innerHTML = '<div class="visibleto-empty">No wares yet. Add rows, Save the location, then Publish.</div>';
+    return;
+  }
+  list.innerHTML = tempShopRows.map((r, i) => `
+    <div class="shop-row">
+      <input class="shop-item"  type="text" placeholder="Item"      value="${escapeHtml(r.item || '')}"  oninput="tempShopRows[${i}].item=this.value">
+      <input class="shop-price" type="text" placeholder="Price"     value="${escapeHtml(r.price || '')}" oninput="tempShopRows[${i}].price=this.value">
+      <input class="shop-qty"   type="text" placeholder="Qty"       value="${escapeHtml(r.qty || '')}"   oninput="tempShopRows[${i}].qty=this.value">
+      <input class="shop-notes" type="text" placeholder="Notes (player-visible)" value="${escapeHtml(r.notes || '')}" oninput="tempShopRows[${i}].notes=this.value">
+      <button class="shop-del" type="button" onclick="removeShopRow(${i})" title="Remove">✕</button>
+    </div>
+  `).join('');
+}
 function removeQuest(i) { tempQuests.splice(i,1); renderQuestEditor(); }
 function renderQuestEditor() {
   const list=document.getElementById('quest-editor-list'); list.innerHTML='';
@@ -3722,7 +3788,7 @@ function parseLocationNote(baseName, fm, body) {
 
   // Map type — prefer explicit map_type field, fall back to type field
   const rawType = (fm.map_type || fm.mapType || fm.type || '').toLowerCase();
-  const typeMap = { city:'city', town:'city', village:'city', settlement:'city', dungeon:'dungeon', cave:'dungeon', ruins:'ruin', ruin:'ruin', wilderness:'wilderness', forest:'wilderness', port:'port', harbour:'port', harbor:'port', fort:'fort', fortress:'fort', castle:'fort', keep:'fort', stronghold:'fort' };
+  const typeMap = { city:'city', town:'city', village:'city', settlement:'city', dungeon:'dungeon', cave:'dungeon', ruins:'ruin', ruin:'ruin', wilderness:'wilderness', forest:'wilderness', port:'port', harbour:'port', harbor:'port', fort:'fort', fortress:'fort', castle:'fort', keep:'fort', stronghold:'fort', shop:'shop', store:'shop', market:'shop', emporium:'shop', tavern:'tavern', inn:'tavern', bar:'tavern', pub:'tavern' };
   const locType = typeMap[rawType] || 'default';
 
   return {
