@@ -7,6 +7,28 @@ Dates are YYYY-MM-DD.
 
 ---
 
+## [Unreleased] — 2026-07-10 (later)
+
+### Dramatis Personae — dedicated NPC workshop (npcs-dm.html)
+
+The Atlas's narrow NPC side-panel wasn't enough for tracking a growing
+cast. New full-width DM page:
+
+- **Roster list** with search (name/role/activity/description/tags),
+  filters — LOCATION (world + sub-map pins, incl. "off-map / unknown"),
+  STATUS, KNOWN TO (any / per-character / **"nobody yet"** for spotting
+  unmet NPCs), TAG — and sorts (name, location, status, recently
+  referenced by chronicle links). Rows show a status dot, role, location,
+  a "known to N"/"unmet" chip, and tag chips; count line up top.
+- **The same shared editor** (npc-editor.js) in a full-width pane — knownTo
+  grants, tags, move/log history, computed APPEARS IN deep-linking into the
+  Chronicle Workshop. Saves ride the merge-write path (dmPostMerged with
+  deletion tracking), identical to the Atlas integration.
+- **Player notes card** under the editor: everything players have written
+  about the selected NPC, with author attribution and DM delete.
+- '/' focuses search; new-NPC discard guard; hub gets a "Dramatis
+  Personae" DM card next to the Atlas Workshop.
+
 ## [Unreleased] — 2026-07-10
 
 ### Hearth: collapsed Places & Story rows, Atlas links in new tabs
