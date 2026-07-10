@@ -9,6 +9,37 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-07-10
 
+### Worker: player content — home_view aggregate, sheets, rules, notes, whisper read-state
+
+Step H2. ⚠️ **Requires a manual worker deploy** (paste cloudflare-worker.js
+into the Cloudflare dashboard), then run
+`DM_USER=… DM_PASS=… CHAR=… CODE=… bash scripts/smoke-test-worker.sh`.
+All endpoints return sane empties before any UI exists, so nothing breaks
+if the frontend steps land first — but player features stay dark until the
+deploy.
+
+- **New KV keys**: `character_sheets` (array, id === characterId — merge-safe
+  for `dmPostMerged`), `rules` (array with explicit `order` + `visibleTo`),
+  `player_notes` (map by characterId — worker-managed, deliberately NOT in
+  DM_WRITE_TYPES), `journal_reads` (map by characterId, ditto — kept separate
+  from the DM-authored `journals` blob so neither side can clobber the other).
+- **GET `home_view`** (player creds): one aggregate bundle for The Hearth —
+  character, visibleTo-filtered map (incl. upcoming shop data), whispers with
+  persisted read-state, known NPCs, visible chronicle entries, brew
+  inventory/recipes, own notes, visible rules, own sheet (dmOnly sections
+  stripped). Every slice reuses an existing audited filter helper. Granular
+  `rules_view` / `sheet_view` / `player_notes` for post-write refreshes;
+  DM raw reads `character_sheets` / `rules` / `player_notes_dm`.
+- **Player POSTs** (all re-validate characterId+code server-side):
+  `sheet_update` (edits ONLY a playerEditable section's fields/body — heads,
+  flags, order untouchable; 403 otherwise), `player_note` (create/update,
+  entityType enum general/npc/location/chronicle, body ≤2000, 200/character),
+  `player_note_delete` (own via creds, any via DM headers), `journals_read`
+  (idempotent union, self-pruning to existing journal ids).
+- `player_view` journals now carry the persisted `unread` overlay (additive;
+  map.html unchanged).
+- `DM_WRITE_TYPES` += character_sheets, rules.
+
 ### Chronicle Workshop UX — dirty tracking, discard guards, Cmd+S, collapsible sections
 
 Step H1 of the shops/Hearth feature batch (sessions-dm.html only, no backend
