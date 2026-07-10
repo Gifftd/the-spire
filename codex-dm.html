@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Spire — The Codex (DM)</title>
+<meta name="theme-color" content="#060a0e">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css?v=2">
+<style>
+/* ──────────────────────────────────────────────────────────
+   Page-specific styles (codex-dm.html — The Codex).
+   Shared tokens & components live in theme.css.
+   ────────────────────────────────────────────────────────── */
+
+html, body { height: 100%; overflow: hidden; }
+body { display: flex; flex-direction: column; }
+
+.topbar-sub {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.10em;
+  color: var(--c-ink-faint);
+  text-transform: uppercase;
+}
+.sync-status {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.10em;
+  color: var(--c-ink-faint);
+  text-transform: uppercase;
+}
+.sync-status.ok   { color: var(--c-success); }
+.sync-status.fail { color: var(--c-error); }
+.sync-status.ing  { color: var(--c-warn); }
+
+/* ── 2-pane layout ── */
+.layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  overflow: hidden;
+  min-height: 0;
+}
+.pane-list {
+  background: var(--c-surface);
+  border-right: 1px solid var(--c-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+.pane-editor {
+  background: var(--c-bg);
+  overflow-y: auto;
+  padding: 0 var(--space-5) var(--space-5);
+  min-height: 0;
+}
+@media (max-width: 800px) {
+  .layout { grid-template-columns: 260px 1fr; }
+}
+
+/* ── List pane ── */
+.list-toolbar {
+  padding: var(--space-3) var(--space-3);
+  border-bottom: 1px solid var(--c-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  background: var(--c-surface);
+}
+.list-toolbar input[type=text] {
+  width: 100%;
+  background: var(--c-bg-elevated);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  color: var(--c-ink);
+  padding: 6px 9px;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  outline: none;
+  transition: border-color var(--motion-fast) var(--ease-out);
+}
+.list-toolbar input[type=text]:focus { border-color: var(--c-brass); }
+.list-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-2) var(--space-2);
+  min-height: 0;
+}
+.list-empty {
+  padding: var(--space-5) var(--space-3);
+  color: var(--c-ink-faint);
+  font-style: italic;
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+/* Rule cards in the list pane */
+.rule-card {
+  background: var(--c-surface-2);
+  border: 1px solid var(--c-border);
+  border-left: 3px solid var(--c-border-light);
+  border-radius: var(--radius-sm);
+  padding: 7px 11px;
+  margin-bottom: var(--space-2);
+  cursor: pointer;
+  transition: border-color var(--motion-fast) var(--ease-out),
+              background var(--motion-fast) var(--ease-out);
+}
+.rule-card:hover { border-color: var(--c-border-light); background: var(--c-surface-3); }
+.rule-card.selected { border-color: var(--c-brass); border-left-color: var(--c-brass); background: var(--c-surface-3); }
+.rule-card-row { display: flex; align-items: baseline; gap: 6px; }
+.rule-card-order {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.10em;
+  color: var(--c-brass-bright);
+  background: rgba(184,138,90,0.10);
+  border: 1px solid rgba(184,138,90,0.55);
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+.rule-card-title {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  color: var(--c-ink);
+  flex: 1;
+  line-height: 1.25;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rule-card-vis {
+  font-family: var(--font-display);
+  font-size: 0.55rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  border: 1px solid;
+  flex-shrink: 0;
+  color: var(--c-teal-bright);
+  border-color: var(--c-teal);
+  background: rgba(74,149,149,0.12);
+}
+.rule-card-vis.limited {
+  color: var(--c-brass-bright);
+  border-color: rgba(184,138,90,0.55);
+  background: rgba(184,138,90,0.10);
+}
+
+/* ── Editor pane ── */
+.editor-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--c-ink-faint);
+  font-style: italic;
+  text-align: center;
+  padding: var(--space-7);
+  min-height: 60vh;
+}
+.editor-empty h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  letter-spacing: 0.10em;
+  color: var(--c-ink-dim);
+  margin-bottom: var(--space-2);
+  font-style: normal;
+  text-transform: uppercase;
+}
+.editor-empty p { max-width: 36rem; line-height: 1.55; font-size: var(--text-sm); }
+
+.editor-header {
+  position: sticky;
+  top: 0;
+  background: var(--c-bg);
+  padding: var(--space-4) 0 var(--space-2);
+  z-index: 5;
+  border-bottom: 1px solid var(--c-border);
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.editor-header h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  letter-spacing: 0.06em;
+  color: var(--c-brass-bright);
+  line-height: 1.25;
+  flex: 1;
+  min-width: 200px;
+}
+.dirty-dot {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.1em;
+  color: var(--c-ink-faint);
+  white-space: nowrap;
+}
+.dirty-dot.is-dirty { color: var(--c-warn); }
+
+.field { margin-bottom: var(--space-3); }
+.field textarea.body {
+  min-height: 320px;
+  resize: vertical;
+  line-height: 1.55;
+}
+.field-row { display: flex; gap: var(--space-3); }
+.field-row .field { flex: 1; }
+
+.section-header {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.14em;
+  color: var(--c-brass);
+  margin: var(--space-4) 0 var(--space-1);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--c-border);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-transform: uppercase;
+}
+.section-header .hint {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  letter-spacing: 0;
+  color: var(--c-ink-faint);
+  font-style: italic;
+  text-transform: none;
+}
+
+/* Selector chips (toggleable) — copied from sessions-dm.html; renamed
+   .pick-chip there to avoid collision with theme.css .chip */
+.pick-grid { display: flex; flex-wrap: wrap; gap: 5px; padding: 6px 2px; }
+.pick-chip {
+  font-family: var(--font-display);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.06em;
+  padding: 3px 11px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--c-border-light);
+  color: var(--c-ink-faint);
+  background: var(--c-surface-2);
+  cursor: pointer;
+  transition: all var(--motion-fast) var(--ease-out);
+  user-select: none;
+}
+.pick-chip:hover { border-color: var(--c-ink-dim); color: var(--c-ink-dim); }
+.pick-chip.on { border-color: var(--c-brass); color: var(--c-brass-bright); background: rgba(184,138,90,0.18); }
+.pick-empty { font-size: var(--text-sm); color: var(--c-ink-faint); font-style: italic; padding: 4px 0; }
+.pick-hint { font-size: var(--text-sm); color: var(--c-ink-faint); font-style: italic; margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <span class="topbar-title topbar-title--brass">THE CODEX</span>
+  <span class="topbar-sub">homebrew rules &amp; table rulings</span>
+  <span class="sync-status" id="sync-status">—</span>
+  <span class="topbar-spacer"></span>
+  <div class="topbar-actions">
+    <a class="btn btn--ghost btn--sm" href="home.html">← HUB</a>
+  </div>
+</header>
+
+<main class="layout">
+  <!-- LIST PANE -->
+  <aside class="pane-list">
+    <div class="list-toolbar">
+      <button class="btn btn--brass btn--sm" onclick="newRule()">+ NEW RULE</button>
+      <input type="text" id="search" placeholder="Search title or body…" oninput="renderList()">
+    </div>
+    <div class="list-content" id="list-content"></div>
+  </aside>
+
+  <!-- EDITOR PANE -->
+  <section class="pane-editor" id="pane-editor">
+    <div class="editor-empty" id="editor-empty">
+      <h2>No rule selected</h2>
+      <p>Pick a rule from the list, or start a new one. The Codex holds your homebrew rules and standing table rulings — write each one once, order it, and choose which players can see it.</p>
+    </div>
+    <div id="editor" style="display:none">
+      <div class="editor-header">
+        <h2 id="hdr-title">Untitled rule</h2>
+        <span class="dirty-dot" id="dirty-dot"></span>
+        <button class="btn btn--brass btn--sm" onclick="saveRule()">SAVE</button>
+        <button class="btn btn--ghost btn--sm" onclick="cancelEdit()">CANCEL</button>
+        <button class="btn btn--danger btn--sm" onclick="deleteRule()">DELETE</button>
+      </div>
+
+      <div class="field-row" style="margin-top:0.7rem">
+        <div class="field"><label>TITLE</label>
+          <input type="text" id="f-title" placeholder="Flanking grants +2, not advantage" oninput="syncHeader()">
+        </div>
+        <div class="field" style="flex:0 0 110px"><label>ORDER</label>
+          <input type="number" id="f-order" step="1" placeholder="1" title="Display position on the player side — lower numbers first">
+        </div>
+      </div>
+
+      <div class="field"><label>BODY</label>
+        <textarea id="f-body" class="body" placeholder="The full ruling, as your players should read it…"></textarea>
+        <div class="pick-hint">Plain text — players see it exactly as written, line breaks preserved (no markdown rendering).</div>
+      </div>
+
+      <div class="section-header">VISIBLE TO <span class="hint">— leave all unselected to show this rule to everyone</span></div>
+      <div class="pick-grid" id="chips-visibleTo"></div>
+      <div class="pick-hint" id="vis-hint"></div>
+    </div>
+  </section>
+</main>
+
+<script src="auth.js?v=2"></script>
+<script src="spire-api.js?v=2"></script>
+<script src="spire-ui.js?v=1"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  The Codex — codex-dm.html
+//  Homebrew-rules library editor. Reads/writes the `rules` KV key.
+//  Rule: { id, title, body, order, visibleTo:[], updatedAt }
+//  visibleTo: [] = every player; populated = only those characters.
+// ═══════════════════════════════════════════════════════════════
+
+// DM gate
+if (!window.Auth || !Auth.requireRole('dm', { redirect: 'home.html?notice=' + encodeURIComponent('Sign in as DM to edit the Codex.') })) {
+  throw new Error('DM required');
+}
+
+// ─── State ───
+let rules      = [];
+let characters = [];
+let editingId  = null;
+
+let work = blankWork();
+
+function blankWork() {
+  return { title: '', body: '', order: 1, visibleTo: [] };
+}
+
+function ruleUid() { return 'rule_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function nextOrder() { return rules.reduce((m, r) => Math.max(m, Number(r.order) || 0), 0) + 1; }
+
+// ═══════════════════════════════════════════════════════════════
+//  PERSISTENCE
+// ═══════════════════════════════════════════════════════════════
+function setStatus(msg, cls) {
+  const el = document.getElementById('sync-status');
+  el.textContent = msg;
+  el.className = 'sync-status' + (cls ? ' ' + cls : '');
+}
+
+function expire() {
+  Auth.logout();
+  window.location.replace('home.html?notice=' + encodeURIComponent('Your DM session expired — sign in again.'));
+}
+
+async function dmGet(type) {
+  try {
+    return await API.dmGet(type);
+  } catch (err) {
+    if (err && err.status === 401) { expire(); }
+    return null; // 404 etc. — worker may not serve this type yet; degrade gracefully
+  }
+}
+
+async function loadAll() {
+  setStatus('Loading…', 'ing');
+  try {
+    const rl = JSON.parse(localStorage.getItem('dm_rules') || 'null'); if (Array.isArray(rl)) rules = rl;
+    const ch = JSON.parse(localStorage.getItem('dm_characters') || 'null'); if (Array.isArray(ch)) characters = ch;
+  } catch {}
+  renderList(); renderEditor();
+
+  const [rl, ch] = await Promise.all([dmGet('rules'), dmGet('characters')]);
+  if (Array.isArray(rl)) { rules = rl; localStorage.setItem('dm_rules', JSON.stringify(rules)); }
+  if (Array.isArray(ch)) { characters = ch; localStorage.setItem('dm_characters', JSON.stringify(ch)); }
+  renderList(); renderEditor();
+  setStatus(Array.isArray(rl) ? 'Synced' : 'Offline — local copy', Array.isArray(rl) ? 'ok' : 'fail');
+}
+
+// Deleted-rule ids since the last successful save — passed to the
+// merge-write so another tab's copy can't resurrect them.
+const _deletedRuleIds = new Set();
+
+async function persistRules() {
+  setStatus('Saving…', 'ing');
+  const { ok, status, merged } = await API.dmPostMerged('rules', 'rules', rules, {
+    deletedIds: [..._deletedRuleIds],
+  });
+  if (status === 401) { expire(); return false; }
+  if (ok && Array.isArray(merged)) {
+    rules = merged;
+    _deletedRuleIds.clear();
+  }
+  localStorage.setItem('dm_rules', JSON.stringify(rules));
+  setStatus(ok ? 'Saved' : 'Save failed', ok ? 'ok' : 'fail');
+  return ok;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════════
+// Local (not UI.escapeHtml): also escapes ' for single-quoted onclick attrs.
+function escapeHtml(s) {
+  return (s == null ? '' : String(s))
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function sortedRules() {
+  return rules.slice().sort((a, b) =>
+    (Number(a.order) || 0) - (Number(b.order) || 0) ||
+    (a.title || '').localeCompare(b.title || ''));
+}
+
+function visBadge(r) {
+  const n = (r.visibleTo || []).length;
+  if (!n) return '<span class="rule-card-vis">ALL PLAYERS</span>';
+  return `<span class="rule-card-vis limited">${n} PLAYER${n === 1 ? '' : 'S'}</span>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  LIST PANE (read-only rebuild — no interactive elements inside)
+// ═══════════════════════════════════════════════════════════════
+function renderList() {
+  const q = (document.getElementById('search').value || '').trim().toLowerCase();
+  const list = sortedRules().filter(r =>
+    !q || (r.title || '').toLowerCase().includes(q) || (r.body || '').toLowerCase().includes(q));
+
+  const el = document.getElementById('list-content');
+  if (!list.length) {
+    el.innerHTML = `<div class="list-empty">${rules.length ? 'No rules match your search.' : 'No rules yet — write your first one.'}</div>`;
+    return;
+  }
+  el.innerHTML = list.map(r => `
+    <div class="rule-card ${r.id === editingId ? 'selected' : ''}" onclick="selectRule('${escapeHtml(String(r.id))}')">
+      <div class="rule-card-row">
+        <span class="rule-card-order">#${Number(r.order) || 0}</span>
+        <span class="rule-card-title">${escapeHtml(r.title || 'Untitled rule')}</span>
+        ${visBadge(r)}
+      </div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  EDITOR PANE
+// ═══════════════════════════════════════════════════════════════
+async function selectRule(id) {
+  if (!(await confirmDiscard())) return;
+  const r = rules.find(x => String(x.id) === String(id));
+  if (!r) return;
+  editingId = r.id;
+  work = {
+    title: r.title || '',
+    body: r.body || '',
+    order: Number(r.order) || 0,
+    visibleTo: Array.isArray(r.visibleTo) ? r.visibleTo.slice() : [],
+  };
+  renderEditor();
+  markClean();
+}
+
+async function newRule() {
+  if (!(await confirmDiscard())) return;
+  editingId = '__new__';
+  work = blankWork();
+  work.order = nextOrder();
+  renderEditor();
+  markClean();
+  document.getElementById('f-title').focus();
+}
+
+async function cancelEdit() {
+  if (!(await confirmDiscard())) return;
+  editingId = null;
+  work = blankWork();
+  renderEditor();
+  markClean();
+}
+
+function renderEditor() {
+  const empty  = document.getElementById('editor-empty');
+  const editor = document.getElementById('editor');
+  if (!editingId) {
+    empty.style.display = 'flex';
+    editor.style.display = 'none';
+    renderList();
+    return;
+  }
+  empty.style.display = 'none';
+  editor.style.display = 'block';
+  document.getElementById('f-title').value = work.title;
+  document.getElementById('f-order').value = work.order;
+  document.getElementById('f-body').value  = work.body;
+  syncHeader();
+  renderChips();
+  renderList();
+}
+
+function syncHeader() {
+  const t = document.getElementById('f-title').value.trim();
+  document.getElementById('hdr-title').textContent =
+    t || (editingId === '__new__' ? 'New rule' : 'Untitled rule');
+}
+
+function renderChips() {
+  const grid = document.getElementById('chips-visibleTo');
+  if (!characters.length) {
+    grid.innerHTML = '<div class="pick-empty">No characters yet — create them in the Atlas Workshop. Until then, rules are visible to everyone.</div>';
+  } else {
+    grid.innerHTML = characters.map(c =>
+      `<span class="pick-chip ${work.visibleTo.includes(c.id) ? 'on' : ''}" onclick="toggleChip('${escapeHtml(String(c.id))}')">${escapeHtml(c.name || '')}${c.player ? ` <span style="opacity:0.6">· ${escapeHtml(c.player)}</span>` : ''}</span>`
+    ).join('');
+  }
+  document.getElementById('vis-hint').textContent = work.visibleTo.length
+    ? `Only ${work.visibleTo.length} selected character${work.visibleTo.length === 1 ? '' : 's'} will see this rule.`
+    : 'Visible to all players.';
+}
+
+function toggleChip(id) {
+  const i = work.visibleTo.indexOf(id);
+  if (i >= 0) work.visibleTo.splice(i, 1); else work.visibleTo.push(id);
+  renderChips();
+  scheduleDirtyCheck();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DIRTY TRACKING (house pattern — mirrors sessions-dm.html)
+//  savedSnapshot is what the rule looked like at load/last save;
+//  serializeWork() is a NON-MUTATING mirror of saveRule's payload
+//  (keep the two in sync).
+// ═══════════════════════════════════════════════════════════════
+let savedSnapshot = null;
+let _dirtyTimer = null;
+
+function serializeWork() {
+  const val = id => document.getElementById(id)?.value ?? '';
+  return JSON.stringify({
+    title: val('f-title').trim(),
+    body: val('f-body').trim(),
+    order: parseInt(val('f-order'), 10) || 0,
+    visibleTo: work.visibleTo,
+  });
+}
+
+function markClean() {
+  savedSnapshot = editingId ? serializeWork() : null;
+  updateDirtyUI();
+}
+function isDirty() {
+  return !!editingId && savedSnapshot !== null && serializeWork() !== savedSnapshot;
+}
+function updateDirtyUI() {
+  const dot = document.getElementById('dirty-dot');
+  if (!dot) return;
+  if (!editingId) { dot.textContent = ''; dot.className = 'dirty-dot'; }
+  else {
+    const d = isDirty();
+    dot.textContent = d ? '● unsaved' : '✓ saved';
+    dot.className = 'dirty-dot' + (d ? ' is-dirty' : '');
+  }
+}
+function scheduleDirtyCheck() {
+  if (_dirtyTimer) clearTimeout(_dirtyTimer);
+  _dirtyTimer = setTimeout(updateDirtyUI, 250);
+}
+async function confirmDiscard() {
+  if (!isDirty()) return true;
+  return UI.confirmDialog(
+    `You have unsaved changes on "${document.getElementById('f-title').value.trim() || 'this rule'}". Discard them?`,
+    { confirmLabel: 'Discard', cancelLabel: 'Keep editing' }
+  );
+}
+window.addEventListener('beforeunload', (e) => {
+  if (isDirty()) e.preventDefault();
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  SAVE / DELETE
+// ═══════════════════════════════════════════════════════════════
+function collectFromForm() {
+  work.title = document.getElementById('f-title').value.trim();
+  work.body  = document.getElementById('f-body').value;
+  work.order = parseInt(document.getElementById('f-order').value, 10) || 0;
+}
+
+async function saveRule() {
+  collectFromForm();
+  if (!work.title) { UI.toast('Rule needs a title.', 'error'); return; }
+
+  const payload = {
+    title: work.title,
+    body: work.body.trim(),
+    order: work.order,
+    visibleTo: work.visibleTo.slice(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (editingId === '__new__') {
+    const id = ruleUid();
+    rules.push({ id, ...payload });
+    editingId = id;
+  } else {
+    const idx = rules.findIndex(r => String(r.id) === String(editingId));
+    if (idx < 0) { UI.toast('Rule not found.', 'error'); return; }
+    rules[idx] = { ...rules[idx], ...payload };
+  }
+  const ok = await persistRules();
+  renderList(); renderEditor();
+  if (ok) {
+    markClean();
+    UI.toast('Rule saved.', 'success');
+  } else {
+    UI.toast('Save failed — your changes are still here. Try again.', 'error');
+  }
+}
+
+async function deleteRule() {
+  if (!editingId || editingId === '__new__') { cancelEdit(); return; }
+  const r = rules.find(x => String(x.id) === String(editingId));
+  if (!r) return;
+  if (!(await UI.confirmDialog(`Delete "${r.title || 'this rule'}"? This cannot be undone.`))) return;
+  _deletedRuleIds.add(editingId);
+  rules = rules.filter(x => String(x.id) !== String(editingId));
+  editingId = null;
+  await persistRules();
+  renderList(); renderEditor();
+  markClean();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BOOTSTRAP
+// ═══════════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  loadAll();
+  // Dirty tracking: any input/change inside the editor form
+  document.getElementById('editor')?.addEventListener('input', scheduleDirtyCheck);
+  document.getElementById('editor')?.addEventListener('change', scheduleDirtyCheck);
+  // Cmd/Ctrl+S saves the open rule
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+      if (editingId) { e.preventDefault(); saveRule(); }
+    }
+  });
+});
+</script>
+</body>
+</html>

@@ -9,6 +9,22 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-07-10
 
+### The Codex — homebrew rules library (codex-dm.html) + hub cards
+
+Step H5:
+
+- **codex-dm.html** (new DM workshop, 656 lines): list + editor for rule
+  documents {title, order, body, visibleTo}. Left pane: + NEW RULE, search,
+  cards sorted by explicit `order` with visibility badges (ALL PLAYERS vs
+  "N players"). Right pane: title/order/body editor + VISIBLE TO pick-chips
+  (empty = every player). Full house dirty-tracking pattern (snapshot /
+  dirty dot / discard guards / beforeunload / Cmd+S / save toasts). Saves
+  via `API.dmPostMerged('rules', …)` with a deleted-ids set; degrades to
+  local-only until the H2 worker deploy.
+- **home.html**: DM card "The Codex" (open-book icon) after the Chronicle
+  Workshop; player card "The Hearth" (hearth icon, NEW badge) linking
+  player-hub.html — shown to players only (DMs have the workshops).
+
 ### Character sheets — DM-authored, per-section player editing (Atlas)
 
 Step H4. The character inspector in the Atlas Workshop is now tabbed:
