@@ -9,6 +9,41 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-07-15
 
+### Crucible: PC character sheet modal (crucible-dm.html)
+
+Added a **⛨ SHEET** button on every PC card that opens a roomy, organized
+character-sheet editor (reuses the page's `.modal-overlay`/`.modal` chrome, like
+the DSL editor). The modal is a 2-column grid of Cinzel-headed sections:
+
+- **Identity** — name, player, class (the 12 PHB classes + blank), subclass,
+  level (1–20), race.
+- **Abilities** — six score inputs with live `+N` modifiers and per-ability
+  save-proficiency checkboxes; derived proficiency bonus and passive perception
+  update live (formulas mirror the engine's `mod()`/`pb()`).
+- **Combat** — max HP / HP / AC / init / speed (entered in feet, stored as cells
+  ÷5, both shown) / reach, with an effective-speed note.
+- **Actions** — embeds the existing `renderActionRow` editor unchanged (100%
+  reuse of the per-action editor + `updateAction*` writers), plus **+ Add action**
+  and an **action-template picker** (Longsword, Greatsword, Shortbow, Longbow,
+  Dagger offhand, Fire Bolt, Fireball, Cure Wounds, Patient Defense, Shove) that
+  appends pre-filled, engine-ready action shapes.
+- **Features** — reuses the shared `renderFeatureRows` list + param editors;
+  adds a **picker grouped by `classHint`** (the 20 built-ins, suggested class
+  starred and listed first, plus saved homebrew templates) and the existing
+  **+ Custom…** DSL editor.
+- **Tactics** — role / mode / AI-hint selects (AI hint is new to the UI).
+
+Edits live-sync straight into the `pm` record + `saveParty()`, updating derived
+displays surgically and the card summary behind the modal — no full
+`renderParty()` while the modal is open (structural add/remove/type-change route
+through a new `afterStructuralChange` that re-renders only the modal's dynamic
+sections). Opening the sheet collapses that PC's inline card so the reused
+action/feature renderers never emit duplicate element ids; the modal body is
+cleared on close. Esc closes the topmost modal (DSL above sheet); backdrop click
+and a Done button also close it. **Additive** — all existing inline card editing
+still works; no engine, worker, or shared-module files were touched (engine test
+suite: 42/42 pass).
+
 ### Crucible: monster action parser robustness (crucible-parser.js) — v3.7
 
 Monster stat-block actions were failing to parse a large fraction of the time.
