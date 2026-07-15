@@ -17,6 +17,47 @@
 
   CrucibleSpatial.chebyshev = chebyshev;
 
+  // ─────────── Creature size / grid footprints (v3.8) ───────────
+  // A combatant occupies an N×N block of cells anchored at its (x, y)
+  // top-left corner, where N = c.sizeCells (Tiny/Small/Medium→1, Large→2,
+  // Huge→3, Gargantuan→4). Absent/invalid sizeCells defaults to 1.
+  function sizeOf(c) {
+    const n = c && c.sizeCells;
+    return (typeof n === 'number' && n >= 1) ? Math.floor(n) : 1;
+  }
+  CrucibleSpatial.sizeOf = sizeOf;
+
+  // Every cell occupied by c's footprint.
+  function footprintCells(c) {
+    const n = sizeOf(c);
+    const out = [];
+    for (let dy = 0; dy < n; dy++) {
+      for (let dx = 0; dx < n; dx++) out.push({ x: c.x + dx, y: c.y + dy });
+    }
+    return out;
+  }
+  CrucibleSpatial.footprintCells = footprintCells;
+
+  // Gap between two closed integer intervals [lo1,hi1] and [lo2,hi2] on one
+  // axis: 0 if they overlap/touch-with-overlap, else the positive separation.
+  function axisGap(lo1, hi1, lo2, hi2) {
+    if (hi1 < lo2) return lo2 - hi1;
+    if (hi2 < lo1) return lo1 - hi2;
+    return 0;
+  }
+
+  // Chebyshev distance between the two footprints, edge-to-edge:
+  //   0 = the footprints overlap, 1 = adjacent (incl. diagonally), etc.
+  // Reduces to chebyshev(a, b) when both are 1×1. This is the canonical
+  // COMBATANT-to-COMBATANT distance; cell-to-cell math still uses chebyshev.
+  function combatDistance(a, b) {
+    const an = sizeOf(a), bn = sizeOf(b);
+    const dx = axisGap(a.x, a.x + an - 1, b.x, b.x + bn - 1);
+    const dy = axisGap(a.y, a.y + an - 1, b.y, b.y + bn - 1);
+    return Math.max(dx, dy);
+  }
+  CrucibleSpatial.combatDistance = combatDistance;
+
   // Terrain accessors. map.terrain is an optional 2D array [y][x] of cells:
   //   null | { type: 'wall'|'difficult'|'damaging', dice?, mod?, dmgType? }
   // Empty/missing cells are open ground.
@@ -74,6 +115,10 @@
     // implicitly allowed since stopWhenAdjacent stops one cell short.
     // Pass a Set of "x,y" strings, or omit for no occupancy filtering.
     const occupied = options.occupied || null;
+    // v3.8: N×N mover footprint. A cell is enterable only if all N×N cells
+    // anchored there are in-bounds, non-wall, and non-occupied.
+    const sizeCells = (typeof options.sizeCells === 'number' && options.sizeCells >= 1)
+      ? Math.floor(options.sizeCells) : 1;
 
     if (start.x === goal.x && start.y === goal.y) return [];
 
@@ -82,10 +127,26 @@
     function inBounds(x, y) { return x >= 0 && x < w && y >= 0 && y < h; }
     function key(x, y) { return y * w + x; }
     function heuristic(x, y) { return Math.max(Math.abs(goal.x - x), Math.abs(goal.y - y)); }
+    // Can the mover's whole footprint sit at anchor (x, y)?
+    function canOccupy(x, y) {
+      for (let dy = 0; dy < sizeCells; dy++) {
+        for (let dx = 0; dx < sizeCells; dx++) {
+          const cx = x + dx, cy = y + dy;
+          if (!inBounds(cx, cy)) return false;
+          if (isWall(map, cx, cy)) return false;
+          if (occupied && occupied.has(cx + ',' + cy)) return false;
+        }
+      }
+      return true;
+    }
 
     function isGoal(x, y) {
-      if (stopAdj) return Math.max(Math.abs(x - stopAdj.x), Math.abs(y - stopAdj.y)) <= 1
-                         && !(x === stopAdj.x && y === stopAdj.y);
+      if (stopAdj) {
+        // Footprint-aware adjacency: the mover anchored at (x, y) is adjacent
+        // to the target when their footprints are edge-to-edge distance 1
+        // (0 would be overlap, prevented by occupancy).
+        return combatDistance({ x, y, sizeCells }, stopAdj) === 1;
+      }
       return x === goal.x && y === goal.y;
     }
 
@@ -138,9 +199,7 @@
         for (let dx = -1; dx <= 1; dx++) {
           if (dx === 0 && dy === 0) continue;
           const nx = cur.x + dx, ny = cur.y + dy;
-          if (!inBounds(nx, ny)) continue;
-          if (isWall(map, nx, ny)) continue;
-          if (occupied && occupied.has(nx + ',' + ny)) continue;
+          if (!canOccupy(nx, ny)) continue;
           const ng = cur.g + stepCost(map, nx, ny);
           if (ng > maxSteps) { hitMaxSteps = true; continue; }
           const k = key(nx, ny);
@@ -171,7 +230,10 @@
         : (action.actionRange === 'ranged') ? 6
           : (typeof action.reach === 'number') ? Math.max(1, Math.floor(action.reach / 5))
             : 1;
-    if (chebyshev(c, target) > need) return false;
+    // v3.8: footprint-aware edge-to-edge distance between the two combatants.
+    // c may be a bare {x,y} candidate cell (findShootingCell) — combatDistance
+    // treats a missing sizeCells as 1.
+    if (combatDistance(c, target) > need) return false;
     // Ranged attacks need LOS. Melee at reach 1 doesn't.
     if (action.actionRange === 'ranged' || need > 1) {
       return hasLineOfSight(map, c, target);
@@ -187,10 +249,26 @@
     options = options || {};
     const maxSteps = options.maxSteps != null ? options.maxSteps : Infinity;
     const occupied = options.occupied || null;
+    const sizeCells = (typeof options.sizeCells === 'number' && options.sizeCells >= 1)
+      ? Math.floor(options.sizeCells) : 1;
+    // Attach the mover's footprint size to a candidate anchor so canAttackFrom
+    // and the occupancy check reason about the whole N×N block.
+    const at = (x, y) => ({ x, y, sizeCells });
     // Quick win: already in a valid spot.
-    if (canAttackFrom(start, target, action, map)) return { path: [], cell: start };
+    if (canAttackFrom(at(start.x, start.y), target, action, map)) return { path: [], cell: start };
     const w = map.width, h = map.height;
     function inBounds(x, y) { return x >= 0 && x < w && y >= 0 && y < h; }
+    function canOccupy(x, y) {
+      for (let dy = 0; dy < sizeCells; dy++) {
+        for (let dx = 0; dx < sizeCells; dx++) {
+          const cx = x + dx, cy = y + dy;
+          if (!inBounds(cx, cy)) return false;
+          if (isWall(map, cx, cy)) return false;
+          if (occupied && occupied.has(cx + ',' + cy)) return false;
+        }
+      }
+      return true;
+    }
     function key(x, y) { return y * w + x; }
     function heuristic(x, y) {
       // Cheap admissible heuristic: distance to target minus the attacker's
@@ -221,7 +299,7 @@
       for (let i = 1; i < open.length; i++) if (open[i].f < open[bestIdx].f) bestIdx = i;
       const cur = open.splice(bestIdx, 1)[0];
       // Goal predicate: can attack from here?
-      if (canAttackFrom({ x: cur.x, y: cur.y }, target, action, map)) {
+      if (canAttackFrom(at(cur.x, cur.y), target, action, map)) {
         return { path: reconstruct(cur), cell: { x: cur.x, y: cur.y } };
       }
       if (cur.g > 0) {
@@ -239,9 +317,7 @@
         for (let dx = -1; dx <= 1; dx++) {
           if (dx === 0 && dy === 0) continue;
           const nx = cur.x + dx, ny = cur.y + dy;
-          if (!inBounds(nx, ny)) continue;
-          if (isWall(map, nx, ny)) continue;
-          if (occupied && occupied.has(nx + ',' + ny)) continue;
+          if (!canOccupy(nx, ny)) continue;
           const ng = cur.g + stepCost(map, nx, ny);
           if (ng > maxSteps) { hitMaxSteps = true; continue; }
           const k = key(nx, ny);
@@ -280,12 +356,25 @@
     const maxSteps = options.maxSteps != null ? options.maxSteps : Infinity;
     const occupied = options.occupied || null;
     const requireLosTo = options.requireLosTo || null;
+    const sizeCells = (typeof options.sizeCells === 'number' && options.sizeCells >= 1)
+      ? Math.floor(options.sizeCells) : 1;
     const living = (enemies || []).filter(e => e && !e.dead && !e.downed
                                                && typeof e.x === 'number');
     if (maxSteps <= 0 || !living.length) return null;
 
     const w = map.width, h = map.height;
     function inBounds(x, y) { return x >= 0 && x < w && y >= 0 && y < h; }
+    function canOccupy(x, y) {
+      for (let dy = 0; dy < sizeCells; dy++) {
+        for (let dx = 0; dx < sizeCells; dx++) {
+          const cx = x + dx, cy = y + dy;
+          if (!inBounds(cx, cy)) return false;
+          if (isWall(map, cx, cy)) return false;
+          if (occupied && occupied.has(cx + ',' + cy)) return false;
+        }
+      }
+      return true;
+    }
     function key(x, y) { return y * w + x; }
     function minEnemyDist(x, y) {
       let m = Infinity;
@@ -338,9 +427,7 @@
         for (let dx = -1; dx <= 1; dx++) {
           if (dx === 0 && dy === 0) continue;
           const nx = cur.x + dx, ny = cur.y + dy;
-          if (!inBounds(nx, ny)) continue;
-          if (isWall(map, nx, ny)) continue;
-          if (occupied && occupied.has(nx + ',' + ny)) continue;
+          if (!canOccupy(nx, ny)) continue;
           const ng = cur.g + stepCost(map, nx, ny);
           if (ng > maxSteps) continue;
           const k = key(nx, ny);
@@ -371,13 +458,50 @@
       }
     }
     const remaining = combatants.filter(c => !overridden.has(c.id));
-    if (remaining.length === 0) return;
+    if (remaining.length === 0) { resolveFootprintOverlaps(combatants, map); return; }
     // Default layout: PCs at y=1, monsters at y=height-2. Spread evenly across width.
     const pcs = remaining.filter(c => c.side === 'pc');
     const mons = remaining.filter(c => c.side === 'monster');
     spreadRow(pcs, map.width, 1);
     spreadRow(mons, map.width, map.height - 2);
+    // v3.8: large creatures (sizeCells > 1) span multiple cells, so two evenly
+    // spread anchors can overlap. Nudge anchors right (then clamp in-bounds) so
+    // no two footprints collide.
+    resolveFootprintOverlaps(combatants, map);
   }
+
+  // Push each combatant's anchor right until its N×N footprint clears every
+  // already-placed footprint and stays in-bounds. Deterministic scan order
+  // (as given); a pragmatic fallback, not an optimal packing.
+  function resolveFootprintOverlaps(combatants, map) {
+    const claimed = new Set();
+    const clampAnchor = (v, n) => Math.max(0, Math.min(v, (n - 1)));
+    for (const c of combatants) {
+      if (typeof c.x !== 'number' || typeof c.y !== 'number') continue;
+      const n = sizeOf(c);
+      c.x = clampAnchor(c.x, map.width - n + 1 > 0 ? map.width - n + 1 : 1);
+      c.y = clampAnchor(c.y, map.height - n + 1 > 0 ? map.height - n + 1 : 1);
+      const fits = (ax, ay) => {
+        for (let dy = 0; dy < n; dy++) {
+          for (let dx = 0; dx < n; dx++) {
+            const cx = ax + dx, cy = ay + dy;
+            if (cx < 0 || cx >= map.width || cy < 0 || cy >= map.height) return false;
+            if (claimed.has(cx + ',' + cy)) return false;
+          }
+        }
+        return true;
+      };
+      // Scan right along the row, then wrap to x=0, bounded by map width.
+      let placed = false;
+      for (let attempt = 0; attempt < map.width && !placed; attempt++) {
+        const ax = (c.x + attempt) % Math.max(1, map.width - n + 1);
+        if (fits(ax, c.y)) { c.x = ax; placed = true; }
+      }
+      // Give up gracefully: keep clamped anchor even if it overlaps (tiny maps).
+      for (const cell of footprintCells(c)) claimed.add(cell.x + ',' + cell.y);
+    }
+  }
+  CrucibleSpatial.resolveFootprintOverlaps = resolveFootprintOverlaps;
 
   function spreadRow(group, width, y) {
     const n = group.length;
