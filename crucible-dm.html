@@ -52,6 +52,35 @@
     .dsl-param-field input[type="number"] { width: 60px; }
     .dsl-param-field input[type="text"] { width: 100px; }
     .dsl-param-field select { min-width: 80px; }
+    /* ── Character sheet modal ──────────────────────────────────────
+       A roomy 2-column editor layered over the (collapsed) PC card.
+       Reuses the same .modal-overlay/.modal chrome as the DSL editor. */
+    .modal.sheet-modal-card { max-width: 860px; max-height: 88vh; overflow-y: auto; border-color: var(--c-teal-deep); }
+    .sheet-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem 1.25rem; }
+    .sheet-sec { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 4px; padding: 0.6rem 0.75rem; }
+    .sheet-sec--wide { grid-column: 1 / -1; }
+    .sheet-sec h4 { font-family: var(--font-display); font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase;
+                    color: var(--c-teal-bright); margin: 0 0 0.5rem; }
+    .sheet-field { display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: var(--c-ink-faint); }
+    .sheet-field input, .sheet-field select { width: 100%; margin-top: 2px; background: var(--c-bg); color: var(--c-ink);
+                    border: 1px solid var(--c-border); border-radius: 3px; padding: 0.3rem 0.45rem; font-family: inherit; }
+    .sheet-field input:focus, .sheet-field select:focus { outline: 1px solid var(--c-teal); }
+    .sheet-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .sheet-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; }
+    .sheet-abilities { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+    .sheet-abil { border: 1px solid var(--c-border); border-radius: 3px; padding: 0.35rem; text-align: center; }
+    .sheet-abil label { font-family: var(--font-display); font-size: 0.7rem; color: var(--c-brass); letter-spacing: 0.06em; }
+    .sheet-abil input[type="number"] { width: 100%; text-align: center; background: var(--c-bg); color: var(--c-ink);
+                    border: 1px solid var(--c-border); border-radius: 3px; padding: 0.2rem; margin: 2px 0; font-family: inherit; }
+    .sheet-abil .abil-mod { font-size: 0.95rem; font-weight: 600; color: var(--c-teal-bright); }
+    .sheet-abil .abil-save { font-size: 0.68rem; color: var(--c-ink-faint); display: block; margin-top: 2px; }
+    .sheet-derived { font-size: 0.78rem; color: var(--c-ink-faint); margin-top: 0.4rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+    .sheet-derived b { color: var(--c-brass); font-weight: 600; }
+    .sheet-note { font-size: 0.75rem; color: var(--c-teal-bright); margin-top: 0.35rem; }
+    .sheet-picker-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-top: 0.5rem; }
+    .sheet-picker-row select { flex: 1; min-width: 160px; background: var(--c-bg); color: var(--c-ink);
+                    border: 1px solid var(--c-border); border-radius: 3px; padding: 0.3rem; }
+    .pc-card-sheet-btn { font-size: 0.7rem; padding: 0.15rem 0.5rem; margin-left: 0.5rem; }
     .impact-table th { color: var(--c-brass); }
     /* Trial log color coding by event type — subtle palette so the log
        stays scannable without fighting the slate+teal theme. */
@@ -309,6 +338,8 @@ function renderPCCard(pm) {
         <div onclick="togglePC('${pm.id}')" style="cursor:pointer; flex:1;">
           <b id="pc-summary-${pm.id}">${escapeHtml(pcSummary(pm))}</b>
         </div>
+        <button class="btn btn--sm pc-card-sheet-btn" title="Open full character sheet"
+                onclick="openSheet('${pm.id}'); event.stopPropagation();">⛨ SHEET</button>
         <span onclick="cyclePositionOverride('${pm.id}'); event.stopPropagation();"
               title="Click to cycle override"
               style="cursor:pointer; font-size:0.7rem; padding:0.15rem 0.5rem;
@@ -368,27 +399,7 @@ function renderPCEditor(pm) {
           <details class="pc-section" id="pc-features-${pm.id}">
             <summary>Features (${(pm.features || []).length})</summary>
             <div class="pc-features-list">
-              ${(pm.features || []).map(f => {
-                const def = PCFeatures.resolve(f);
-                if (!def) return '';
-                const sourceTag = f.source === 'homebrew'
-                  ? '<span class="feature-tag homebrew">homebrew</span>'
-                  : '<span class="feature-tag builtin">built-in</span>';
-                const editBtn = f.source === 'homebrew'
-                  ? `<button class="feature-row-edit" onclick="openDSLEditorForEdit('${pm.id}', '${f.id}')">edit</button>`
-                  : (Array.isArray(def.paramSchema) && def.paramSchema.length > 0
-                      ? `<button class="feature-row-edit" onclick="toggleFeatureParamEditor('${pm.id}', '${f.id}')">edit params</button>`
-                      : '');
-                return `
-                  <div class="feature-row" data-feature-id="${f.id}">
-                    <div class="feature-row-name">${escapeHtml(def.name)} ${sourceTag}</div>
-                    <div class="feature-row-summary">${escapeHtml(def.summary || '')}</div>
-                    ${editBtn}
-                    <button class="feature-row-remove" onclick="removeFeatureFromPC('${pm.id}','${f.id}')">×</button>
-                  </div>
-                  <div class="feature-param-editor" id="feature-param-editor-${pm.id}-${f.id}" style="display:none"></div>
-                `;
-              }).join('')}
+              ${renderFeatureRows(pm)}
             </div>
             <div class="pc-features-actions">
               <select onchange="addFeatureFromLibrary('${pm.id}', this.value); this.value=''">
@@ -567,7 +578,8 @@ function renderActionEditor(pm, act) {
 
 function toggleAction(id) {
   if (expandedAction.has(id)) expandedAction.delete(id); else expandedAction.add(id);
-  renderParty();
+  const owner = party.find(p => (p.actions || []).some(a => a.id === id));
+  afterStructuralChange(owner ? owner.id : null);
 }
 
 function togglePC(id) {
@@ -630,14 +642,14 @@ function addFeatureFromLibrary(pmId, featureId) {
   const params = def.deriveParams ? def.deriveParams(pm) : {};
   pm.features.push({ id: featureId, source: 'builtin', params });
   saveParty();
-  renderParty();
+  afterStructuralChange(pmId);
 }
 function removeFeatureFromPC(pmId, featureId) {
   const pm = party.find(p => p.id === pmId);
   if (!pm) return;
   pm.features = (pm.features || []).filter(f => f.id !== featureId);
   saveParty();
-  renderParty();
+  afterStructuralChange(pmId);
 }
 
 function toggleFeatureParamEditor(pmId, featureId) {
@@ -913,7 +925,7 @@ function dslSave() {
     pm.features.push({ id: spec.id, source: 'homebrew', params: spec.params, _dslSpec: spec });
   }
   saveParty();
-  renderParty();
+  afterStructuralChange(dslEditingPmId);
   dslClose();
 }
 
@@ -980,7 +992,7 @@ function updateActionRider(pmId, aId, field, value) {
   }
   saveParty();
   refreshActionSummary(pmId, aId); refreshGate();
-  renderParty();   // rider sub-fields appear/disappear based on condition
+  afterStructuralChange(pmId);   // rider sub-fields appear/disappear based on condition
 }
 function changeActionType(pmId, aId, newType) {
   const pm = party.find(p => p.id === pmId); if (!pm) return;
@@ -1006,12 +1018,12 @@ function changeActionType(pmId, aId, newType) {
   } else {
     act.damage = null; act.save = null; act.heal = null;
   }
-  saveParty(); renderParty();
+  saveParty(); afterStructuralChange(pmId);
 }
 function removeAction(pmId, aId) {
   const pm = party.find(p => p.id === pmId); if (!pm) return;
   pm.actions = pm.actions.filter(a => a.id !== aId);
-  saveParty(); renderParty();
+  saveParty(); afterStructuralChange(pmId);
 }
 function addAction(pmId) {
   const pm = party.find(p => p.id === pmId); if (!pm) return;
@@ -1024,7 +1036,7 @@ function addAction(pmId) {
               usesPerDay:null, recharge:null, attacksPerAction:1 };
   pm.actions.push(a);
   expandedAction.add(a.id);
-  saveParty(); renderParty();
+  saveParty(); afterStructuralChange(pmId);
 }
 
 const escapeHtml = UI.escapeHtml;
@@ -1038,6 +1050,359 @@ STYLE.textContent = `
   .pc-input:focus { outline:1px solid var(--c-teal); }
 `;
 document.head.appendChild(STYLE);
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Character sheet modal (⛨ SHEET) — a roomy editor layered over the PC
+//  card. Additive: all inline card editing still works. While the modal is
+//  open the underlying card is collapsed so the reused action/feature
+//  renderers never produce duplicate element ids. See afterStructuralChange.
+// ═══════════════════════════════════════════════════════════════════════
+let sheetPmId = null;
+
+const SHEET_CLASSES = ['Barbarian','Bard','Cleric','Druid','Fighter','Monk',
+                       'Paladin','Ranger','Rogue','Sorcerer','Warlock','Wizard'];
+
+// Derived-stat helpers — mirror the engine's mod()/pb() so the sheet's live
+// displays match what the sim will actually compute (crucible-engine.js).
+function sheetMod(score) { return Math.floor((Number(score) - 10) / 2); }
+function sheetPB(level)  { return Math.ceil(1 + (Number(level) || 1) / 4); }
+function fmtSigned(n)    { return (n >= 0 ? '+' : '') + n; }
+
+function sheetIsOpen() {
+  const m = document.getElementById('sheet-modal');
+  return !!(m && m.classList.contains('is-visible') && sheetPmId);
+}
+
+// Structural re-render router. When the sheet is open for pmId, re-render the
+// modal's dynamic sections in place (never renderParty, per the modal-open
+// rule); otherwise fall back to the full card re-render.
+function afterStructuralChange(pmId) {
+  if (sheetIsOpen() && (pmId == null || pmId === sheetPmId)) {
+    renderSheetActions(sheetPmId);
+    renderSheetFeatures(sheetPmId);
+    refreshSheetDerived(sheetPmId);
+    refreshGate();
+    renderFmBudget();
+  } else {
+    renderParty();
+  }
+}
+
+// Shared feature-row list markup — reused by the inline card editor
+// (renderPCEditor) and the sheet modal so there is one source of truth.
+function renderFeatureRows(pm) {
+  return (pm.features || []).map(f => {
+    const def = PCFeatures.resolve(f);
+    if (!def) return '';
+    const sourceTag = f.source === 'homebrew'
+      ? '<span class="feature-tag homebrew">homebrew</span>'
+      : '<span class="feature-tag builtin">built-in</span>';
+    const editBtn = f.source === 'homebrew'
+      ? `<button class="feature-row-edit" onclick="openDSLEditorForEdit('${pm.id}', '${f.id}')">edit</button>`
+      : (Array.isArray(def.paramSchema) && def.paramSchema.length > 0
+          ? `<button class="feature-row-edit" onclick="toggleFeatureParamEditor('${pm.id}', '${f.id}')">edit params</button>`
+          : '');
+    return `
+      <div class="feature-row" data-feature-id="${f.id}">
+        <div class="feature-row-name">${escapeHtml(def.name)} ${sourceTag}</div>
+        <div class="feature-row-summary">${escapeHtml(def.summary || '')}</div>
+        ${editBtn}
+        <button class="feature-row-remove" onclick="removeFeatureFromPC('${pm.id}','${f.id}')">×</button>
+      </div>
+      <div class="feature-param-editor" id="feature-param-editor-${pm.id}-${f.id}" style="display:none"></div>
+    `;
+  }).join('');
+}
+
+// ── Action template presets (append pre-filled actions) ──
+// Shapes mirror defaultPC()/addAction so renderActionRow renders them and the
+// engine reads them without migration. range values are in cells (5 ft each).
+const ACTION_TEMPLATES = {
+  longsword:      { label:'Longsword (melee)', make:() => ({ name:'Longsword', source:'weapon', type:'attack', atkAbility:'str', atkBonusOverride:null, actionRange:'melee', cost:'action', damage:{ dice:'1d8', mod:'+atkAbility', type:'slashing', riderDice:null, riderType:null }, save:null, heal:null, aoeTargets:0, push:0, usesPerDay:null, recharge:null, attacksPerAction:1 }) },
+  greatsword:     { label:'Greatsword (melee, 2d6)', make:() => ({ name:'Greatsword', source:'weapon', type:'attack', atkAbility:'str', atkBonusOverride:null, actionRange:'melee', cost:'action', damage:{ dice:'2d6', mod:'+atkAbility', type:'slashing', riderDice:null, riderType:null }, save:null, heal:null, aoeTargets:0, push:0, usesPerDay:null, recharge:null, attacksPerAction:1 }) },
+  shortbow:       { label:'Shortbow (ranged)', make:() => ({ name:'Shortbow', source:'weapon', type:'attack', atkAbility:'dex', atkBonusOverride:null, actionRange:'ranged', range:16, cost:'action', damage:{ dice:'1d6', mod:'+atkAbility', type:'piercing', riderDice:null, riderType:null }, save:null, heal:null, aoeTargets:0, push:0, usesPerDay:null, recharge:null, attacksPerAction:1 }) },
+  longbow:        { label:'Longbow (ranged)', make:() => ({ name:'Longbow', source:'weapon', type:'attack', atkAbility:'dex', atkBonusOverride:null, actionRange:'ranged', range:30, cost:'action', damage:{ dice:'1d8', mod:'+atkAbility', type:'piercing', riderDice:null, riderType:null }, save:null, heal:null, aoeTargets:0, push:0, usesPerDay:null, recharge:null, attacksPerAction:1 }) },
+  daggerOffhand:  { label:'Dagger offhand (bonus)', make:() => ({ name:'Dagger (offhand)', source:'weapon', type:'attack', atkAbility:'dex', atkBonusOverride:null, actionRange:'melee', cost:'bonus', damage:{ dice:'1d4', mod:'0', type:'piercing', riderDice:null, riderType:null }, save:null, heal:null, aoeTargets:0, push:0, usesPerDay:null, recharge:null, attacksPerAction:1 }) },
+  fireBolt:       { label:'Fire Bolt (cantrip, ranged)', make:() => ({ name:'Fire Bolt', source:'spell', type:'attack', atkAbility:'int', atkBonusOverride:null, actionRange:'ranged', range:24, cost:'action', damage:{ dice:'1d10', mod:'0', type:'fire', riderDice:null, riderType:null }, save:null, heal:null, aoeTargets:0, push:0, usesPerDay:null, recharge:null, attacksPerAction:1 }) },
+  fireball:       { label:'Fireball (sphere save)', make:() => ({ name:'Fireball', source:'spell', type:'save', atkAbility:'dex', actionRange:'ranged', range:30, cost:'action', save:{ ability:'dex', dcOverride:null, halfOnSave:true, effectOnFail:'damage', condition:null }, damage:{ dice:'8d6', mod:0, type:'fire', riderDice:null, riderType:null }, heal:null, aoeTargets:3, shape:'sphere', size:4, push:0, usesPerDay:1, recharge:null, attacksPerAction:1 }) },
+  cureWounds:     { label:'Cure Wounds (heal)', make:() => ({ name:'Cure Wounds', source:'spell', type:'heal', atkAbility:'wis', actionRange:'melee', cost:'action', heal:{ dice:'1d8', mod:'+atkAbility', flat:0, target:'ally', aoeTargets:0, reviveDowned:false }, damage:null, save:null, aoeTargets:0, push:0, usesPerDay:null, recharge:null, attacksPerAction:1 }) },
+  patientDefense: { label:'Patient Defense (buff, bonus)', make:() => ({ name:'Patient Defense', source:'feature', type:'buff', grants:'dodging', buffTarget:'self', cost:'bonus', damage:null, save:null, heal:null, aoeTargets:0, push:0, usesPerDay:null, recharge:null, attacksPerAction:1 }) },
+  shove:          { label:'Shove (push attack)', make:() => ({ name:'Shove', source:'weapon', type:'attack', atkAbility:'str', atkBonusOverride:null, actionRange:'melee', cost:'action', damage:{ dice:'1d4', mod:'+atkAbility', type:'bludgeoning', riderDice:null, riderType:null }, push:2, save:null, heal:null, aoeTargets:0, usesPerDay:null, recharge:null, attacksPerAction:1 }) },
+};
+
+function addActionFromTemplate(pmId, key) {
+  if (!key) return;
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  const tmpl = ACTION_TEMPLATES[key]; if (!tmpl) return;
+  const a = tmpl.make();
+  a.id = 'a-' + Math.random().toString(36).slice(2, 6);
+  if (!Array.isArray(pm.actions)) pm.actions = [];
+  pm.actions.push(a);
+  expandedAction.add(a.id);
+  saveParty();
+  afterStructuralChange(pmId);
+}
+
+// ── Feature picker (grouped by classHint, suggested class first) ──
+function sheetFeaturePicker(pm) {
+  const taken = new Set((pm.features || []).map(f => f.id));
+  const groups = {};
+  Object.keys(PCFeatures.LIBRARY).forEach(id => {
+    const def = PCFeatures.LIBRARY[id];
+    const cls = def.classHint || 'other';
+    (groups[cls] = groups[cls] || []).push({ id, def });
+  });
+  const myClass = (pm.identity.class || '').toLowerCase();
+  const classNames = Object.keys(groups).sort();
+  classNames.sort((a, b) => (a === myClass ? -1 : b === myClass ? 1 : a.localeCompare(b)));
+  let opts = '<option value="">+ Add feature…</option>';
+  classNames.forEach(cls => {
+    const label = cls.charAt(0).toUpperCase() + cls.slice(1) + (cls === myClass ? ' ★' : '');
+    opts += `<optgroup label="${escapeHtml(label)}">`;
+    groups[cls].forEach(({ id, def }) => {
+      opts += `<option value="builtin:${id}" ${taken.has(id) ? 'disabled' : ''}>${escapeHtml(def.name)}</option>`;
+    });
+    opts += '</optgroup>';
+  });
+  let templates = [];
+  try { templates = JSON.parse(localStorage.getItem('crucible-feature-templates') || '[]'); } catch (e) {}
+  if (Array.isArray(templates) && templates.length) {
+    opts += '<optgroup label="Homebrew (saved templates)">';
+    templates.forEach((spec, i) => {
+      opts += `<option value="template:${i}">${escapeHtml(spec.name || ('Template ' + (i + 1)))}</option>`;
+    });
+    opts += '</optgroup>';
+  }
+  return `
+    <div class="sheet-picker-row">
+      <select onchange="sheetAddFeature('${pm.id}', this.value); this.value='';">${opts}</select>
+      <button class="btn btn--sm" onclick="openDSLEditor('${pm.id}')">+ Custom…</button>
+    </div>`;
+}
+
+function sheetAddFeature(pmId, value) {
+  if (!value) return;
+  if (value.indexOf('builtin:') === 0) addFeatureFromLibrary(pmId, value.slice(8));
+  else if (value.indexOf('template:') === 0) addHomebrewTemplateToPC(pmId, parseInt(value.slice(9), 10));
+}
+
+function addHomebrewTemplateToPC(pmId, idx) {
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  let templates = [];
+  try { templates = JSON.parse(localStorage.getItem('crucible-feature-templates') || '[]'); } catch (e) {}
+  const spec = templates[idx]; if (!spec) return;
+  let id = spec.id || ('hb-' + Math.random().toString(36).slice(2, 7));
+  if ((pm.features || []).some(f => f.id === id)) id = id + '-' + Math.random().toString(36).slice(2, 5);
+  const specCopy = { ...spec, id };
+  if (!PCFeatures.compileDSL(specCopy)) { alert('Template failed to compile.'); return; }
+  if (!Array.isArray(pm.features)) pm.features = [];
+  pm.features.push({ id, source: 'homebrew', params: spec.params, _dslSpec: specCopy });
+  saveParty();
+  afterStructuralChange(pmId);
+}
+
+function updatePCAiHint(pmId, hint) {
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  if (!pm.tactics) pm.tactics = {};
+  pm.tactics.aiHint = hint;
+  saveParty();
+}
+
+// ── Live-sync writers used by the sheet's inputs ──
+function sheetUpdate(pmId, path, value) {
+  updatePC(pmId, path, value);       // saves + refreshes card summary/gate/budget
+  if (path === 'identity.name') {
+    const t = document.getElementById('sheet-title');
+    if (t) t.textContent = 'Character Sheet — ' + (value || 'Unnamed');
+  }
+  refreshSheetDerived(pmId);
+}
+function sheetUpdateClass(pmId, value) {
+  updatePC(pmId, 'identity.class', value);
+  renderSheetFeatures(pmId);         // reorder picker suggestions to new class
+}
+function sheetUpdateMaxHp(pmId, val) {
+  const v = parseInt(val, 10) || 1;
+  updatePC(pmId, 'combat.maxHp', v);
+  updatePC(pmId, 'combat.hp', v);    // mirror card behavior — start the sim full
+  const hpInput = document.getElementById('sheet-hp-input');
+  if (hpInput) hpInput.value = v;
+  refreshSheetDerived(pmId);
+}
+function sheetUpdateSpeed(pmId, feet) {
+  const cells = Math.max(1, Math.round((Number(feet) || 0) / 5));
+  updatePC(pmId, 'combat.speed', cells);
+  refreshSheetDerived(pmId);
+}
+
+function refreshSheetDerived(pmId) {
+  if (!sheetIsOpen()) return;
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  const pb = sheetPB(pm.identity.level);
+  ['str','dex','con','int','wis','cha'].forEach(k => {
+    const m = sheetMod(pm.abilities[k]);
+    const modEl = document.getElementById('sheet-mod-' + k);
+    if (modEl) modEl.textContent = fmtSigned(m);
+    const prof = !!(pm.profs && pm.profs.saves && pm.profs.saves[k]);
+    const saveEl = document.getElementById('sheet-save-' + k);
+    if (saveEl) saveEl.textContent = 'save ' + fmtSigned(m + (prof ? pb : 0));
+  });
+  const pbEl = document.getElementById('sheet-pb'); if (pbEl) pbEl.textContent = fmtSigned(pb);
+  const ppEl = document.getElementById('sheet-pp'); if (ppEl) ppEl.textContent = String(10 + sheetMod(pm.abilities.wis));
+  const cells = pm.combat.speed || 0;
+  const noteEl = document.getElementById('sheet-speed-note');
+  if (noteEl) noteEl.textContent = cells + ' cell' + (cells === 1 ? '' : 's') + ' = ' + (cells * 5) + ' ft/round';
+}
+
+function renderSheetActions(pmId) {
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  const c = document.getElementById('sheet-actions'); if (!c) return;
+  c.innerHTML = (pm.actions || []).map(a => renderActionRow(pm, a)).join('');
+}
+function renderSheetFeatures(pmId) {
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  const c = document.getElementById('sheet-features'); if (!c) return;
+  c.innerHTML = '<div class="pc-features-list">' + renderFeatureRows(pm) + '</div>' + sheetFeaturePicker(pm);
+}
+
+function renderSheetBody(pm) {
+  const body = document.getElementById('sheet-body');
+  const abil = k => {
+    const m = sheetMod(pm.abilities[k]);
+    const prof = !!(pm.profs && pm.profs.saves && pm.profs.saves[k]);
+    const sv = m + (prof ? sheetPB(pm.identity.level) : 0);
+    return `<div class="sheet-abil">
+        <label>${k.toUpperCase()}</label>
+        <input type="number" min="1" max="30" value="${pm.abilities[k]}"
+          oninput="sheetUpdate('${pm.id}','abilities.${k}', parseInt(this.value)||10)">
+        <div class="abil-mod" id="sheet-mod-${k}">${fmtSigned(m)}</div>
+        <label class="abil-save"><input type="checkbox" ${prof ? 'checked' : ''}
+          onchange="sheetUpdate('${pm.id}','profs.saves.${k}', this.checked)">
+          <span id="sheet-save-${k}">save ${fmtSigned(sv)}</span></label>
+      </div>`;
+  };
+  const roleOpts = [['','Auto'],['frontline','Frontline'],['skirmisher','Skirmisher'],
+                    ['archer','Archer'],['caster','Caster'],['support','Support']]
+    .map(([v,l]) => `<option value="${v}" ${(pm.tactics.role||'')===v?'selected':''}>${l}</option>`).join('');
+  const modeOpts = [['nova','Nova'],['sustained','Sustained'],['defensive','Defensive']]
+    .map(([v,l]) => `<option value="${v}" ${pm.tactics.mode===v?'selected':''}>${l}</option>`).join('');
+  const aiOpts = [['focus','Focus fire'],['survival','Survival'],['spread','Spread']]
+    .map(([v,l]) => `<option value="${v}" ${(pm.tactics.aiHint||'focus')===v?'selected':''}>${l}</option>`).join('');
+  const speedCells = pm.combat.speed || 0;
+
+  body.innerHTML = `
+    <button class="modal-close" onclick="closeSheet()" aria-label="Close">×</button>
+    <h3 class="modal-title" id="sheet-title">Character Sheet — ${escapeHtml(pm.identity.name || 'Unnamed')}</h3>
+    <div class="sheet-grid">
+      <div class="sheet-sec">
+        <h4>Identity</h4>
+        <label class="sheet-field">Name<input type="text" value="${escapeHtml(pm.identity.name||'')}"
+          oninput="sheetUpdate('${pm.id}','identity.name', this.value)"></label>
+        <div class="sheet-row2">
+          <label class="sheet-field">Player<input type="text" value="${escapeHtml(pm.identity.player||'')}"
+            oninput="sheetUpdate('${pm.id}','identity.player', this.value)"></label>
+          <label class="sheet-field">Level<input type="number" min="1" max="20" value="${pm.identity.level}"
+            oninput="sheetUpdate('${pm.id}','identity.level', parseInt(this.value)||1)"></label>
+        </div>
+        <label class="sheet-field">Class<select onchange="sheetUpdateClass('${pm.id}', this.value)">
+          <option value="">—</option>
+          ${SHEET_CLASSES.map(c => `<option value="${c}" ${(pm.identity.class||'')===c?'selected':''}>${c}</option>`).join('')}
+        </select></label>
+        <div class="sheet-row2">
+          <label class="sheet-field">Subclass<input type="text" value="${escapeHtml(pm.identity.subclass||'')}"
+            oninput="sheetUpdate('${pm.id}','identity.subclass', this.value)"></label>
+          <label class="sheet-field">Race<input type="text" value="${escapeHtml(pm.identity.race||'')}"
+            oninput="sheetUpdate('${pm.id}','identity.race', this.value)"></label>
+        </div>
+      </div>
+
+      <div class="sheet-sec">
+        <h4>Abilities</h4>
+        <div class="sheet-abilities">
+          ${['str','dex','con','int','wis','cha'].map(abil).join('')}
+        </div>
+        <div class="sheet-derived">
+          <span>Prof. bonus <b id="sheet-pb">${fmtSigned(sheetPB(pm.identity.level))}</b></span>
+          <span>Passive perception <b id="sheet-pp">${10 + sheetMod(pm.abilities.wis)}</b></span>
+        </div>
+      </div>
+
+      <div class="sheet-sec">
+        <h4>Combat</h4>
+        <div class="sheet-row3">
+          <label class="sheet-field">Max HP<input type="number" min="1" value="${pm.combat.maxHp}"
+            oninput="sheetUpdateMaxHp('${pm.id}', this.value)"></label>
+          <label class="sheet-field">HP<input type="number" id="sheet-hp-input" value="${pm.combat.hp}"
+            oninput="sheetUpdate('${pm.id}','combat.hp', parseInt(this.value)||0)"></label>
+          <label class="sheet-field">AC<input type="number" min="5" max="30" value="${pm.combat.ac}"
+            oninput="sheetUpdate('${pm.id}','combat.ac', parseInt(this.value)||10)"></label>
+        </div>
+        <div class="sheet-row3">
+          <label class="sheet-field">Init<input type="number" min="-5" max="15" value="${pm.combat.initBonus}"
+            oninput="sheetUpdate('${pm.id}','combat.initBonus', parseInt(this.value)||0)"></label>
+          <label class="sheet-field">Speed (ft)<input type="number" min="5" step="5" value="${speedCells*5}"
+            oninput="sheetUpdateSpeed('${pm.id}', this.value)"></label>
+          <label class="sheet-field">Reach (cells)<input type="number" min="1" max="4" value="${pm.combat.reach}"
+            oninput="sheetUpdate('${pm.id}','combat.reach', parseInt(this.value)||1)"></label>
+        </div>
+        <div class="sheet-note" id="sheet-speed-note">${speedCells} cell${speedCells===1?'':'s'} = ${speedCells*5} ft/round</div>
+      </div>
+
+      <div class="sheet-sec">
+        <h4>Tactics</h4>
+        <label class="sheet-field">Role<select onchange="updatePCRole('${pm.id}', this.value)">${roleOpts}</select></label>
+        <label class="sheet-field">Mode<select onchange="updatePCMode('${pm.id}', this.value)">${modeOpts}</select></label>
+        <label class="sheet-field">AI hint<select onchange="updatePCAiHint('${pm.id}', this.value)">${aiOpts}</select></label>
+      </div>
+
+      <div class="sheet-sec sheet-sec--wide">
+        <h4>Actions</h4>
+        <div id="sheet-actions">${(pm.actions||[]).map(a => renderActionRow(pm, a)).join('')}</div>
+        <div class="sheet-picker-row">
+          <button class="btn btn--sm" onclick="addAction('${pm.id}')">+ Add action</button>
+          <select onchange="addActionFromTemplate('${pm.id}', this.value); this.value='';">
+            <option value="">+ From template…</option>
+            ${Object.keys(ACTION_TEMPLATES).map(k => `<option value="${k}">${escapeHtml(ACTION_TEMPLATES[k].label)}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+
+      <div class="sheet-sec sheet-sec--wide">
+        <h4>Features</h4>
+        <div id="sheet-features">${'<div class="pc-features-list">' + renderFeatureRows(pm) + '</div>' + sheetFeaturePicker(pm)}</div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn--primary" onclick="closeSheet()">Done</button>
+    </div>`;
+}
+
+function openSheet(pmId) {
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  // Collapse the inline card so its reused action/feature editors don't
+  // create element ids that collide with the modal's copies.
+  expandedPC.delete(pmId);
+  sheetPmId = pmId;
+  renderParty();               // sync the (now-collapsed) card behind the modal
+  renderSheetBody(pm);
+  document.getElementById('sheet-modal').classList.add('is-visible');
+}
+function closeSheet() {
+  document.getElementById('sheet-modal').classList.remove('is-visible');
+  // Clear the modal body so its reused rows don't linger in the DOM as
+  // duplicate element ids alongside the (re-expandable) inline card editor.
+  document.getElementById('sheet-body').innerHTML = '';
+  const id = sheetPmId; sheetPmId = null;
+  if (id) renderParty();       // full sync on close (the only renderParty while sheet-driven)
+}
+
+// Esc closes the topmost open modal (DSL editor sits above the sheet).
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const dsl = document.getElementById('dsl-modal');
+  if (dsl && dsl.classList.contains('is-visible')) { dslClose(); return; }
+  if (sheetIsOpen()) closeSheet();
+});
 
 // ─────────── Validation gate ───────────
 function refreshGate() {
@@ -2295,6 +2660,10 @@ loadBestiary().catch(e => console.warn('Bestiary preload failed', e));
   }
 })();
 </script>
+
+<div id="sheet-modal" class="modal-overlay" onclick="if(event.target===this) closeSheet()">
+  <div class="modal sheet-modal-card" id="sheet-body"></div>
+</div>
 
 <div id="dsl-modal" class="modal-overlay">
   <div class="modal dsl-modal-card">
