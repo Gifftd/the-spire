@@ -145,6 +145,82 @@
     return 1;
   }
 
+  // ─────────── v3.8: thrown weapons + ammo ───────────
+  // A thrown weapon is a 'both' (Melee or Ranged) weapon — it can be swung in
+  // melee OR hurled. Ammo (number of weapons to throw) is tracked per-combatant
+  // in c.ammoLeft[name]; an untracked action (bows, pure melee) is unlimited.
+  function actionIsThrown(action) {
+    return !!(action && (action.thrown || action.actionRange === 'both'));
+  }
+
+  // Melee reach of an action's melee mode, in cells. Falls back to the
+  // combatant's natural reach when the action carries no explicit reach.
+  function actionMeleeReach(c, action) {
+    if (action && typeof action.reach === 'number') return Math.max(1, Math.floor(action.reach / 5));
+    return (c && typeof c.naturalReach === 'number') ? c.naturalReach : 1;
+  }
+
+  // Remaining thrown ammo for c's action: a number, or Infinity when untracked
+  // (unlimited — bows/crossbows/pure-melee weapons).
+  function ammoRemaining(c, action) {
+    if (!c || !c.ammoLeft || !action) return Infinity;
+    const name = action.sourceActionName || action.name;
+    if (!(name in c.ammoLeft)) return Infinity;
+    const n = c.ammoLeft[name];
+    return n == null ? Infinity : n;
+  }
+
+  // Populate c.ammoLeft[name] for one action at build time. Finite ammo is
+  // tracked; unlimited (bows, pure melee, or an explicit ammo:null) is left
+  // absent so ammoRemaining reports Infinity. Thrown weapons default to 2.
+  function initAmmoFor(c, action, name) {
+    let ammo;
+    if (typeof action.ammo === 'number') ammo = action.ammo;   // DM/sheet override
+    else if (action.ammo === null)       ammo = null;          // explicit unlimited
+    else if (actionIsThrown(action))     ammo = 2;             // thrown default
+    else                                 ammo = null;          // untracked
+    if (ammo != null) c.ammoLeft[name] = ammo;
+  }
+
+  // Spend one thrown weapon. Floors at 0 — the last axe stays in hand, so an
+  // out-of-ammo thrown weapon remains usable as a MELEE weapon (resolvesAsRanged
+  // returns false once ammo is exhausted).
+  function consumeAmmo(c, action) {
+    if (!c || !c.ammoLeft || !action) return;
+    const name = action.sourceActionName || action.name;
+    if (name in c.ammoLeft && c.ammoLeft[name] != null) {
+      c.ammoLeft[name] = Math.max(0, c.ammoLeft[name] - 1);
+    }
+  }
+
+  // Does firing this action from the attacker's current position resolve as a
+  // RANGED attack (vs a melee swing)? Pure 'ranged' always does. A thrown
+  // ('both') weapon does ONLY when the target is out of melee reach AND ammo
+  // remains. No positions → treat as melee (safe default).
+  function resolvesAsRanged(attacker, target, action) {
+    if (!action) return false;
+    if (actionIsThrown(action)) {
+      // Thrown ('both') weapon: ranged only when out of melee reach AND ammo
+      // remains. Out of ammo → melee-only (the last axe stays in hand).
+      if (!(ammoRemaining(attacker, action) > 0)) return false;
+      if (typeof CrucibleSpatial === 'undefined'
+          || typeof attacker.x !== 'number' || typeof target.x !== 'number') return false;
+      return CrucibleSpatial.combatDistance(attacker, target) > actionMeleeReach(attacker, action);
+    }
+    // Non-thrown: a ranged weapon (explicit 'ranged' tag OR a range profile with
+    // no melee mode) always resolves as ranged; a pure melee weapon never does.
+    return actionIsRanged(action);
+  }
+
+  // Effective range gate (cells) for firing this action at target from here:
+  // the thrown/ranged range when it resolves as ranged, else the melee reach.
+  // This is what makes an out-of-ammo thrown weapon melee-only at the gate.
+  function effectiveAttackNeed(attacker, target, action) {
+    return resolvesAsRanged(attacker, target, action)
+      ? actionRange(action)
+      : actionMeleeReach(attacker, action);
+  }
+
   // Derive a monster's walking speed in cells from whatever shape the
   // bestiary data uses. Bestiary records can be { walk: 30 }, a bare number,
   // or just a "30 ft." string in speedText. Defaults to 6 cells (30 ft).
@@ -651,10 +727,17 @@
         sizeCells: sizeToCells(pm.combat.sizeCells || pm.combat.size || 1),
         x: 0, y: 0,  // populated by placeCombatants in runTrial
       });
+      // v3.8: thrown-weapon ammo. A 'both' PC action defaults to 2 throws
+      // unless the sheet sets an explicit ammo count (null = unlimited).
+      const pc = out[out.length - 1];
+      pc.ammoLeft = {};
+      for (const a of (pm.actions || [])) {
+        initAmmoFor(pc, a, a.name);
+      }
       // Initialize feature state for any PC class features on this PC.
       // (No-op when PC has no features array — backward compatible.)
       if (typeof PCFeatures !== 'undefined') {
-        PCFeatures.initFeatureState(out[out.length - 1]);
+        PCFeatures.initFeatureState(pc);
       }
     }
     for (const pick of (monsterPicks || [])) {
@@ -664,10 +747,11 @@
         const hp = rollHp && m.hpFormula
           ? Math.max(1, rollDice(m.hpFormula, rng))
           : (m.hp || 1);
-        const slotsLeft = {}, rechargeReady = {};
+        const slotsLeft = {}, rechargeReady = {}, ammoLeft = {};
         for (const pa of (m.parsedActions || [])) {
           if (pa.usesPerDay != null) slotsLeft[pa.sourceActionName] = pa.usesPerDay;
           if (pa.recharge)          rechargeReady[pa.sourceActionName] = true;
+          initAmmoFor({ ammoLeft }, pa, pa.sourceActionName);
         }
         out.push({
           id: pick.pickId + ':' + i,
@@ -680,7 +764,7 @@
           isMinion: !!m.isMinion, isSolo: !!m.isSolo,
           conditions: new Map(),
           downed: false, dead: false,
-          slotsLeft, rechargeReady,
+          slotsLeft, rechargeReady, ammoLeft,
           damageTypesReceivedLastTurn: new Set(),
           damageTypesReceivedThisTurn: new Set(),
           lastHealRound: -99,
@@ -889,7 +973,7 @@
   // ─────────── Advantage state for an attack roll ───────────
   // Net advantage state for an attack roll, per the spec's source table.
   // Melee = chebyshev dist <= 1 when positions exist, else actionRange check.
-  function attackAdvantageState(attacker, target, action) {
+  function attackAdvantageState(attacker, target, action, combatants) {
     const isMelee = (typeof attacker.x === 'number' && typeof target.x === 'number'
                      && typeof CrucibleSpatial !== 'undefined')
       ? CrucibleSpatial.combatDistance(attacker, target) <= 1
@@ -907,6 +991,17 @@
                || ac.has('restrained') || ac.has('blinded'))) dis = true;
     if (attacker.hidden) adv = true;
     if (attacker.helped) adv = true;
+    // v3.8: ranged/thrown-at-range attack made while an enemy is adjacent to
+    // the ATTACKER → disadvantage (5e RAW). A thrown weapon swung in melee
+    // resolves as melee (resolvesAsRanged → false) and is NOT penalized.
+    if (combatants && typeof CrucibleSpatial !== 'undefined'
+        && typeof attacker.x === 'number'
+        && resolvesAsRanged(attacker, target, action)) {
+      const pinned = combatants.some(d => d !== attacker && d.side !== attacker.side
+        && !d.dead && !d.downed && typeof d.x === 'number'
+        && CrucibleSpatial.combatDistance(attacker, d) <= 1);
+      if (pinned) dis = true;
+    }
     return netAdvantage(adv, dis);
   }
 
@@ -919,13 +1014,18 @@
     // tally results still get a sensible object back.
     if (typeof CrucibleSpatial !== 'undefined'
         && typeof me.x === 'number' && typeof target.x === 'number') {
-      const need = actionRange(action);
+      const need = effectiveAttackNeed(me, target, action);
       if (CrucibleSpatial.combatDistance(me, target) > need) {
         return { roll: 0, crit: false, hit: false, damageDealt: 0, damageByType: {} };
       }
     }
     me.hasAttacked = true;
-    const advState = attackAdvantageState(me, target, action);
+    // v3.8: a thrown weapon fired at range expends one weapon; swung in melee
+    // it does not. Determine the mode BEFORE the event so it carries `thrown`.
+    const firedAsRanged = resolvesAsRanged(me, target, action);
+    const isThrownThrow = firedAsRanged && actionIsThrown(action);
+    if (isThrownThrow) consumeAmmo(me, action);
+    const advState = attackAdvantageState(me, target, action, combatants);
     const roll = rollD20(rng, advState);
     const isCrit = roll === 20;
     const isFumble = roll === 1;
@@ -953,7 +1053,8 @@
     }
     events.push({ round, type:'attack', actor: me.name, target: target.name,
                   action: action.sourceActionName, roll, crit:isCrit, hit,
-                  damageDealt, adv: advState });
+                  damageDealt, adv: advState,
+                  ...(isThrownThrow ? { thrown: true } : {}) });
     // v3.5: on-hit rider condition + forced movement.
     if (hit) applyAttackRider(me, target, action, rng, events, round);
     if (hit && action.push > 0) pushTarget(me, target, action.push, me._mapRef, combatants, events, round);
@@ -971,7 +1072,7 @@
     // v2 spatial: refuse out-of-range, same as resolveAttackMonster.
     if (typeof CrucibleSpatial !== 'undefined'
         && typeof me.x === 'number' && typeof target.x === 'number') {
-      const need = actionRange(action);
+      const need = effectiveAttackNeed(me, target, action);
       if (CrucibleSpatial.combatDistance(me, target) > need) {
         return { roll: 0, crit: false, hit: false, damageDealt: 0, damageByType: {} };
       }
@@ -983,9 +1084,13 @@
       PCFeatures.dispatchHook(me, 'onBeforeOwnAttack', action, target,
         { round, combatants: combatants || [], eventLog: events });
     }
+    // v3.8: thrown-at-range expends a weapon; a melee swing does not.
+    const firedAsRanged = resolvesAsRanged(me, target, action);
+    const isThrownThrow = firedAsRanged && actionIsThrown(action);
+    if (isThrownThrow) consumeAmmo(me, action);
     // PC actions store inputs; derive to-hit + damage roll.
     const th = toHit(me.pm, action);
-    const advState = attackAdvantageState(me, target, action);
+    const advState = attackAdvantageState(me, target, action, combatants);
     const roll = rollD20(rng, advState);
     const isCrit = roll === 20;
     const isFumble = roll === 1;
@@ -1025,7 +1130,8 @@
     }
     events.push({ round, type:'attack', actor: me.name, target: target.name,
                   action: action.name, roll, crit:isCrit, hit, damageDealt,
-                  adv: advState });
+                  adv: advState,
+                  ...(isThrownThrow ? { thrown: true } : {}) });
     // v3.5: on-hit rider condition + forced movement.
     if (hit) applyAttackRider(me, target, action, rng, events, round);
     if (hit && action.push > 0) pushTarget(me, target, action.push, me._mapRef, combatants, events, round);
@@ -2137,6 +2243,39 @@
                   }
                   continue;
                 }
+              } else if (actionIsThrown(action)) {
+                // v3.8: thrown/'both' weapon — PREFER MELEE. Close to melee
+                // reach with free movement; throw only when melee is
+                // unreachable this turn AND ammo remains. This is the fix for
+                // "toughs with infinite handaxes throw forever": a thrown
+                // weapon engages in melee rather than kiting at throw range.
+                const meleeNeed = actionMeleeReach(c, action);
+                let dist = CrucibleSpatial.combatDistance(c, tgtCandidate);
+                if (dist > meleeNeed && c.movementBudgetThisTurn > 0) {
+                  const stepped = executeMove(c, tgtCandidate, c.movementBudgetThisTurn, 'engage',
+                    combatants, map, rng, events, round);
+                  c.movementBudgetThisTurn = Math.max(0, c.movementBudgetThisTurn - stepped);
+                  if (c.dead || c.downed) continue;
+                  dist = CrucibleSpatial.combatDistance(c, tgtCandidate);
+                }
+                if (dist <= meleeNeed) {
+                  // Reached melee → fall through to attack (resolves as a melee
+                  // swing: no ammo spent, no ranged-in-melee penalty).
+                } else if (ammoRemaining(c, action) > 0
+                           && CrucibleSpatial.canAttackFrom(c, tgtCandidate, action, map)) {
+                  // Can't close to melee this turn but a throw is in range and
+                  // LOS with ammo left → fall through to attack (throws).
+                } else {
+                  // Can't melee, can't/shouldn't throw (out of range or out of
+                  // ammo) → Dash to close for a melee engage next turn.
+                  const dashed = executeMove(c, tgtCandidate, effectiveSpeed(c), 'dash',
+                    combatants, map, rng, events, round);
+                  if (dashed > 0) {
+                    events.push({ type: 'dash', round, who: c.id, name: c.name, cells: dashed });
+                    tally(c.side, 'Dash', 'dash', false, 0, 0, 0, 0);
+                  }
+                  continue;
+                }
               } else {
                 // Single-target attack: check both range AND LOS via canAttackFrom.
                 if (!CrucibleSpatial.canAttackFrom(c, tgtCandidate, action, map)) {
@@ -2629,6 +2768,7 @@
     // Role-policy helpers
     clamp01, sumDice, actionIsMelee, actionIsRanged, actionRange, multiattackRange,
     monsterSpeedCells, monsterReachCells, sizeToCells, monsterSizeCells,
+    actionIsThrown, actionMeleeReach, ammoRemaining, resolvesAsRanged, effectiveAttackNeed,
     targetSaveBonus, actionEv,
     tagActions, bestEvAction, lowestPick, targetsInBucket,
     rangedness, bucket, position, positionOf,
