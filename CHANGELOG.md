@@ -9,6 +9,14 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-16
 
+### Crucible: fix pickEnemyTarget fallback AC tiebreak
+
+The v1 non-spatial fallback in `pickEnemyTarget` (used when no action context /
+spatial module is present) sorted by HP only; the lowest-AC tiebreak the Brute
+and Ambusher role policies implement had been lost in the Phase 6 rewrite.
+Restored as a secondary sort key — the engine test suite's one standing
+failure (`pickEnemyTarget(focus): ties by lowest AC`) is green again.
+
 ### Crucible v2 — LOS-aware repositioning + deterministic A* tiebreak
 
 Two terrain-related engine improvements:

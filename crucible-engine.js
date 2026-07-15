@@ -766,8 +766,11 @@
       }
       return best;
     }
-    // v1 fallback: lowest-HP heuristic.
-    return enemies.slice().sort((a, b) => a.hp - b.hp)[0];
+    // v1 fallback: lowest HP, ties broken by lowest AC (matches the Brute /
+    // Ambusher role-policy pickers — the AC tiebreak was lost when Phase 6
+    // rewrote this as an HP-only sort).
+    return enemies.slice().sort((a, b) =>
+      a.hp - b.hp || (a.ac || 10) - (b.ac || 10))[0];
   }
 
   // ─────────── Action availability ───────────
