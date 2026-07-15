@@ -612,6 +612,8 @@
         reactionAvailableThisRound: true,
         // v3 turn-scoped flags (NOT in the conditions duration Map).
         dodging: false, hidden: false, helped: false, disengagedThisTurn: false,
+        // v3.3 grapple bookkeeping: id of the combatant grappling this one.
+        _grappledBy: null,
         speed: typeof pm.combat.speed === 'number' ? pm.combat.speed : 6,
         naturalReach: typeof pm.combat.reach === 'number' ? pm.combat.reach : 1,
         x: 0, y: 0,  // populated by placeCombatants in runTrial
@@ -656,6 +658,8 @@
           reactionAvailableThisRound: true,
           // v3 turn-scoped flags (NOT in the conditions duration Map).
           dodging: false, hidden: false, helped: false, disengagedThisTurn: false,
+          // v3.3 grapple bookkeeping: id of the combatant grappling this one.
+          _grappledBy: null,
         });
       }
     }
@@ -1023,6 +1027,174 @@
     }
   }
 
+  // ─────────── v3.3: standard 5.5e actions ───────────
+
+  // Dodge: until the start of its next turn, attacks vs c have disadvantage
+  // and c makes DEX saves with advantage (both already honored by
+  // attackAdvantageState / saveAdvantageState via the dodging flag).
+  function resolveDodge(c, events, round) {
+    c.dodging = true;
+    events.push({ type: 'dodge', round, who: c.id, name: c.name });
+  }
+
+  // Disengage: c's movement this turn does not provoke opportunity attacks.
+  function resolveDisengage(c, events, round) {
+    c.disengagedThisTurn = true;
+    events.push({ type: 'disengage', round, who: c.id, name: c.name });
+  }
+
+  // Help: grant an adjacent ally advantage on its next attack roll.
+  function resolveHelp(c, ally, events, round) {
+    ally.helped = true;
+    events.push({ type: 'help', round, who: c.id, name: c.name,
+                  target: ally.id, targetName: ally.name });
+  }
+
+  // Hide: only possible when no living enemy has line of sight to c.
+  // Contest: d20 + DEX mod vs the highest enemy passive perception
+  // (10 + WIS mod). Success sets the hidden flag (adv on next attack,
+  // attacks vs c at dis; broken when c attacks).
+  function resolveHide(c, all, map, rng, events, round) {
+    const enemies = all.filter(t => t.side !== c.side && !t.dead && !t.downed);
+    const seen = typeof CrucibleSpatial !== 'undefined'
+      && enemies.some(e => CrucibleSpatial.hasLineOfSight(map, e, c));
+    if (seen) {
+      events.push({ type: 'hide', round, who: c.id, name: c.name, success: false, reason: 'seen' });
+      return false;
+    }
+    const dexMod = combatantAbilityMod(c, 'dex');
+    const stealth = rollDie(20, rng) + dexMod;
+    let bestPP = 10;
+    for (const e of enemies) bestPP = Math.max(bestPP, 10 + combatantAbilityMod(e, 'wis'));
+    const success = stealth >= bestPP;
+    if (success) c.hidden = true;
+    events.push({ type: 'hide', round, who: c.id, name: c.name, success, roll: stealth, dc: bestPP });
+    return success;
+  }
+
+  // Shared ability-mod accessor for either side's data shape.
+  // PCs store raw ability scores (mod() derives the modifier); monsters carry
+  // pre-computed { mod, save } objects from the parser.
+  function combatantAbilityMod(c, ability) {
+    if (c.side === 'pc' && c.pm && c.pm.abilities) return mod(c.pm.abilities[ability] || 10);
+    if (c.monster && c.monster.abilities && c.monster.abilities[ability]) {
+      const a = c.monster.abilities[ability];
+      return typeof a.mod === 'number' ? a.mod : 0;
+    }
+    return 0;
+  }
+
+  // Grapple/Shove DC per 5.5e unarmed strike: 8 + STR mod + PB.
+  // Monster PB comes from monster.pb when present (the parser already reads it
+  // at crucible-parser.js:292); bestiary monsters lacking the field default to
+  // 2 (CR ≤ 4).
+  function maneuverDc(attacker) {
+    const str = combatantAbilityMod(attacker, 'str');
+    const prof = attacker.side === 'pc'
+      ? pb((attacker.pm && attacker.pm.identity && attacker.pm.identity.level) || 1)
+      : ((attacker.monster && attacker.monster.pb) || 2);
+    return 8 + str + prof;
+  }
+
+  // Target's maneuver save: best of STR/DEX (2024: target's choice).
+  function maneuverSaveBonus(target) {
+    return Math.max(combatantAbilityMod(target, 'str'), combatantAbilityMod(target, 'dex'));
+  }
+
+  // Grapple: save-based. Fail → grappled (speed 0), tracked with the
+  // grappler's id so release/escape work. Requires melee adjacency.
+  function resolveGrapple(attacker, target, rng, events, round) {
+    const dc = maneuverDc(attacker);
+    const roll = rollD20(rng, 0) + maneuverSaveBonus(target);
+    const success = roll < dc;
+    if (success) {
+      target.conditions.set('grappled', 99);   // duration managed by escape/release, not ticking
+      target._grappledBy = attacker.id;
+    }
+    events.push({ type: 'grapple', round, who: attacker.id, name: attacker.name,
+                  target: target.id, targetName: target.name,
+                  success, roll, dc });
+    return success;
+  }
+
+  // Shove: save-based. mode 'push' → 1 cell straight away from attacker
+  // (only if the destination is in bounds, not a wall, not occupied);
+  // mode 'prone' → knocked prone. Fail-safe: an invalid push cell degrades
+  // to no effect (the save still happened).
+  function resolveShove(attacker, target, rng, events, round, map, combatants, mode) {
+    const dc = maneuverDc(attacker);
+    const roll = rollD20(rng, 0) + maneuverSaveBonus(target);
+    const failed = roll < dc;
+    let outcome = 'resisted';
+    if (failed) {
+      if (mode === 'prone') {
+        target.conditions.set('prone', 99);    // cleared by stand-up
+        outcome = 'prone';
+      } else {
+        const dx = Math.sign(target.x - attacker.x);
+        const dy = Math.sign(target.y - attacker.y);
+        const nx = target.x + dx, ny = target.y + dy;
+        const occupied = combatants.some(d => d !== target && !d.dead && !d.downed
+                                              && d.x === nx && d.y === ny);
+        const inB = map && nx >= 0 && nx < map.width && ny >= 0 && ny < map.height;
+        const wall = typeof CrucibleSpatial !== 'undefined' && CrucibleSpatial.isWall(map, nx, ny);
+        if (inB && !wall && !occupied && (dx !== 0 || dy !== 0)) {
+          target.x = nx; target.y = ny;
+          outcome = 'pushed';
+        } else {
+          outcome = 'blocked';
+        }
+      }
+    }
+    events.push({ type: 'shove', round, who: attacker.id, name: attacker.name,
+                  target: target.id, targetName: target.name, mode,
+                  outcome, roll, dc,
+                  to: outcome === 'pushed' ? { x: target.x, y: target.y } : null });
+    return outcome;
+  }
+
+  // v3.3: turn-start automatic recovery — stand up from prone, then attempt to
+  // escape a grapple (or auto-release if the grappler is gone). Extracted from
+  // the turn loop so it's unit-testable with hand-built combatants. Must be
+  // called AFTER c.movementBudgetThisTurn has been set to effectiveSpeed(c).
+  function applyTurnStartRecovery(c, combatants, rng, events, round) {
+    // Stand-up: prone combatants stand at turn start if they can move,
+    // spending half the turn's movement budget.
+    if (c.conditions.has('prone') && c.movementBudgetThisTurn > 0) {
+      c.conditions.delete('prone');
+      c.movementBudgetThisTurn = Math.floor(c.movementBudgetThisTurn / 2);
+      events.push({ type: 'stand-up', round, who: c.id, name: c.name });
+    }
+    // Grapple escape: one free attempt at turn start (RAW it's an action; the
+    // sim simplifies to keep fights moving). Escape DC = grappler's maneuver DC.
+    // ORDERING NOTE: a grappled+prone combatant has a 0 movement budget
+    // (effectiveSpeed → 0 while grappled), so the stand-up guard above fails
+    // and it stays prone this turn, then escapes the grapple here. Accepted
+    // simplification — it takes two turns to fully recover from prone+grapple.
+    if (c.conditions.has('grappled')) {
+      const grappler = combatants.find(d => d.id === c._grappledBy);
+      if (!grappler || grappler.dead || grappler.downed) {
+        c.conditions.delete('grappled');
+        c._grappledBy = null;
+        events.push({ type: 'condition-ended', round, who: c.id, name: c.name,
+                      condition: 'grappled', reason: 'grappler-down' });
+        c.movementBudgetThisTurn = effectiveSpeed(c);  // recompute now that grapple is gone
+      } else {
+        const dc = maneuverDc(grappler);
+        const roll = rollD20(rng, 0) + maneuverSaveBonus(c);
+        if (roll >= dc) {
+          c.conditions.delete('grappled');
+          c._grappledBy = null;
+          events.push({ type: 'condition-ended', round, who: c.id, name: c.name,
+                        condition: 'grappled', reason: 'escaped', roll, dc });
+          c.movementBudgetThisTurn = effectiveSpeed(c);  // recompute now that grapple is gone
+        } else {
+          events.push({ type: 'grapple-escape-failed', round, who: c.id, name: c.name, roll, dc });
+        }
+      }
+    }
+  }
+
   // ─────────── Move a combatant toward a target ───────────
   // Walks an A* path cell-by-cell up to `maxSteps`, firing opportunity
   // attacks whenever the mover leaves an enemy's threatened reach. Emits a
@@ -1060,16 +1232,20 @@
     for (const cell of path) {
       const prev = { x: c.x, y: c.y };
       // OoA detection: any enemy adjacent before step, not after.
-      for (const d of combatants) {
-        if (d.side === c.side || d.dead || d.downed) continue;
-        if (!d.reactionAvailableThisRound) continue;
-        const reach = d.naturalReach || 1;
-        const dPrev = CrucibleSpatial.chebyshev(d, prev);
-        const dCur  = CrucibleSpatial.chebyshev(d, cell);
-        if (dPrev > 0 && dPrev <= reach && dCur > reach) {
-          resolveOpportunityAttack(d, c, rng, events, round, combatants);
-          d.reactionAvailableThisRound = false;
-          if (c.dead || c.downed) break;
+      // v3.3 Disengage: a disengaged mover provokes no opportunity attacks
+      // this turn — skip the entire enemy scan.
+      if (!c.disengagedThisTurn) {
+        for (const d of combatants) {
+          if (d.side === c.side || d.dead || d.downed) continue;
+          if (!d.reactionAvailableThisRound) continue;
+          const reach = d.naturalReach || 1;
+          const dPrev = CrucibleSpatial.chebyshev(d, prev);
+          const dCur  = CrucibleSpatial.chebyshev(d, cell);
+          if (dPrev > 0 && dPrev <= reach && dCur > reach) {
+            resolveOpportunityAttack(d, c, rng, events, round, combatants);
+            d.reactionAvailableThisRound = false;
+            if (c.dead || c.downed) break;
+          }
         }
       }
       if (c.dead || c.downed) break;
@@ -1557,6 +1733,10 @@
         // action on Dash later in the loop refills it with another effectiveSpeed.
         c.movementBudgetThisTurn = effectiveSpeed(c);
         // reactionAvailableThisRound resets at onRoundEnd, not per turn.
+
+        // v3.3 automatic turn-start recovery: stand up from prone, attempt to
+        // escape a grapple, or auto-release if the grappler is gone.
+        applyTurnStartRecovery(c, combatants, rng, events, round);
 
         // Fire onTurnStart for PC features.
         if (c.side === 'pc' && typeof PCFeatures !== 'undefined') {
@@ -2104,7 +2284,11 @@
     pickEnemyTarget, isAvailable, consumeUse, healTriage,
     aliveEnemies, aliveAllies,
     damageMultiplier, resolveAttackMonster, resolveAttackPc,
-    resolveOpportunityAttack,
+    resolveOpportunityAttack, executeMove, executePath,
+    // v3.3 standard actions + turn-start recovery
+    resolveDodge, resolveDisengage, resolveHelp, resolveHide,
+    resolveGrapple, resolveShove, maneuverDc, maneuverSaveBonus,
+    combatantAbilityMod, applyTurnStartRecovery,
     resolveSave, resolveAoE, resolveHeal,
     applyDamage, resolveMultiattack, pickAction,
     runTrial, runSim,

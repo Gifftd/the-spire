@@ -184,6 +184,65 @@ test('renderSVG: draws wall + difficult + damaging cells from map.terrain', () =
   assert(host.querySelector('.terrain-difficult'), 'difficult rendered');
   assert(host.querySelector('.terrain-damaging'), 'damaging rendered');
 });
+
+// ═══════════════════ v3.3: standard actions ═══════════════════
+
+test('applyEvent: shove-pushed moves the target token to its new cell', () => {
+  const trial = syntheticTrial();
+  const state = CrucibleViewer.initialState(trial.events[0]);
+  const before = state.combatants.find(c => c.id === 'mon:0');
+  assertEq([before.x, before.y], [8, 8]);
+  CrucibleViewer.applyEvent(state, {
+    type: 'shove', round: 1, who: 'pc:1', name: 'PC',
+    target: 'mon:0', targetName: 'Goblin', mode: 'push',
+    outcome: 'pushed', to: { x: 7, y: 8 },
+  });
+  const after = state.combatants.find(c => c.id === 'mon:0');
+  assertEq([after.x, after.y], [7, 8], 'pushed target moved to the event destination');
+});
+
+test('applyEvent: a resisted shove leaves the target token in place', () => {
+  const trial = syntheticTrial();
+  const state = CrucibleViewer.initialState(trial.events[0]);
+  CrucibleViewer.applyEvent(state, {
+    type: 'shove', round: 1, who: 'pc:1', name: 'PC',
+    target: 'mon:0', targetName: 'Goblin', mode: 'push',
+    outcome: 'resisted', to: null,
+  });
+  const mon = state.combatants.find(c => c.id === 'mon:0');
+  assertEq([mon.x, mon.y], [8, 8], 'resisted shove does not move the token');
+});
+
+test('mount: replays a stream containing every new v3.3 event type without throwing', () => {
+  const trial = {
+    events: [
+      { type: 'placement', round: 0, map: { width: 10, height: 10, blocked: null },
+        placements: [
+          { id: 'pc:1', name: 'PC', side: 'pc', pos: { x: 1, y: 1 }, hp: 30, maxHp: 30, ac: 14, speed: 6 },
+          { id: 'pc:2', name: 'Ally', side: 'pc', pos: { x: 2, y: 1 }, hp: 30, maxHp: 30, ac: 14, speed: 6 },
+          { id: 'mon:0', name: 'Goblin', side: 'monster', pos: { x: 8, y: 8 }, hp: 20, maxHp: 20, ac: 13, speed: 6 },
+        ] },
+      { type: 'dodge', round: 1, who: 'pc:1', name: 'PC' },
+      { type: 'disengage', round: 1, who: 'pc:1', name: 'PC' },
+      { type: 'help', round: 1, who: 'pc:1', name: 'PC', target: 'pc:2', targetName: 'Ally' },
+      { type: 'hide', round: 1, who: 'pc:1', name: 'PC', success: true, roll: 18, dc: 11 },
+      { type: 'hide', round: 1, who: 'pc:1', name: 'PC', success: false, reason: 'seen' },
+      { type: 'grapple', round: 1, who: 'pc:1', name: 'PC', target: 'mon:0', targetName: 'Goblin', success: true, roll: 4, dc: 13 },
+      { type: 'shove', round: 1, who: 'pc:1', name: 'PC', target: 'mon:0', targetName: 'Goblin', mode: 'push', outcome: 'pushed', to: { x: 7, y: 8 } },
+      { type: 'stand-up', round: 2, who: 'mon:0', name: 'Goblin' },
+      { type: 'condition-ended', round: 2, who: 'mon:0', name: 'Goblin', condition: 'grappled', reason: 'escaped', roll: 15, dc: 13 },
+      { type: 'grapple-escape-failed', round: 2, who: 'mon:0', name: 'Goblin', roll: 3, dc: 13 },
+    ],
+    rounds: 2, winner: 'pc', partyView: [],
+  };
+  const host = document.getElementById('host');
+  host.innerHTML = '';
+  const v = CrucibleViewer.mount(host, trial);
+  // Step through every event; formatEvent + applyEvent must not throw.
+  for (let i = 0; i < trial.events.length; i++) v.stepForward();
+  assertEq(v.cursor, trial.events.length - 1, 'stepped to the final event');
+  assert(host.querySelector('svg.tactical-board'), 'board still rendered after the full stream');
+});
 </script>
 </body>
 </html>

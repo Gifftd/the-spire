@@ -99,7 +99,16 @@
         if (c) c.hp = Math.max(0, c.hp - (ev.amount || 0));
         break;
       }
+      case 'shove': {
+        if (ev.outcome === 'pushed' && ev.to) {
+          const t = state.combatants.find(cc => cc.id === ev.target);
+          if (t) { t.x = ev.to.x; t.y = ev.to.y; }
+        }
+        break;
+      }
       // attack/save/feature events don't change state — they're informational.
+      // v3.3 dodge/disengage/help/hide/grapple/stand-up/condition-ended are
+      // log-only here; token status glyphs arrive in V3.6.
     }
   }
   CrucibleViewer.applyEvent = applyEvent;
@@ -284,6 +293,15 @@
         case 'opportunity-attack': return 'R' + ev.round + ' · OoA ' + ev.attackerName + ' on ' + ev.targetName + ' → ' + (ev.hit ? 'hit ' + ev.damageDealt : 'miss');
         case 'feature':   return 'R' + ev.round + ' · ⚡ ' + (ev.what || '');
         case 'terrain-damage': return 'R' + ev.round + ' · ' + ev.name + ' takes ' + ev.amount + ' ' + ev.dmgType + ' (terrain)';
+        case 'dodge':      return 'R' + ev.round + ' · ' + ev.name + ' takes the Dodge action';
+        case 'disengage':  return 'R' + ev.round + ' · ' + ev.name + ' Disengages';
+        case 'help':       return 'R' + ev.round + ' · ' + ev.name + ' Helps ' + ev.targetName;
+        case 'hide':       return 'R' + ev.round + ' · ' + ev.name + (ev.success ? ' Hides (stealth ' + ev.roll + ' vs ' + ev.dc + ')' : ' fails to Hide' + (ev.reason === 'seen' ? ' (seen)' : ''));
+        case 'grapple':    return 'R' + ev.round + ' · ' + ev.name + (ev.success ? ' grapples ' : ' fails to grapple ') + ev.targetName;
+        case 'shove':      return 'R' + ev.round + ' · ' + ev.name + ' shoves ' + ev.targetName + ' → ' + ev.outcome;
+        case 'stand-up':   return 'R' + ev.round + ' · ' + ev.name + ' stands up';
+        case 'condition-ended': return 'R' + ev.round + ' · ' + ev.name + ' is no longer ' + ev.condition + (ev.reason ? ' (' + ev.reason + ')' : '');
+        case 'grapple-escape-failed': return 'R' + ev.round + ' · ' + ev.name + ' fails to escape the grapple';
         default:          return ev.type;
       }
     }
