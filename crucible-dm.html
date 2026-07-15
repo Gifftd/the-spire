@@ -208,12 +208,13 @@
   </section>
 </div>
 
-<script src="bestiary-merge.js"></script>
-<script src="crucible-parser.js"></script>
-<script src="pc-features.js"></script>
-<script src="crucible-spatial.js"></script>
-<script src="crucible-engine.js"></script>
-<script src="crucible-viewer.js"></script>
+<!-- ?v=N cache-busters: bump whenever the module changes (GitHub Pages CDN caches hard). -->
+<script src="bestiary-merge.js?v=1"></script>
+<script src="crucible-parser.js?v=2"></script>
+<script src="pc-features.js?v=1"></script>
+<script src="crucible-spatial.js?v=1"></script>
+<script src="crucible-engine.js?v=2"></script>
+<script src="crucible-viewer.js?v=2"></script>
 <script>
 // ─────────── DM auth gate ───────────
 Auth.requireRole('dm', { redirect: 'home.html?notice=dm-only' });
@@ -2176,8 +2177,11 @@ function renderEncounter() {
             } else if (pa.kind === 'multiattack') {
               const need = Crucible.multiattackRange(pa, p.monster.parsedActions || []);
               tags.push(`effective range ${need}c`);
+              const optSteps = (pa.multiattackPlan || []).filter(s => s.options || s.optionsWeighted);
+              if (optSteps.length) tags.push('picks weapon per swing');
             }
-            const tagStr = tags.length ? ` <span style="color:var(--c-teal-bright); font-size:0.9em">· ${tags.join(' · ')}</span>` : '';
+            if (pa._note) tags.push(pa._note);
+            const tagStr = tags.length ? ` <span style="color:var(--c-teal-bright); font-size:0.9em">· ${tags.map(escapeHtml).join(' · ')}</span>` : '';
             return `<li>${escapeHtml(pa.sourceActionName)} —
               <span style="color:${pa.kind === 'unparsed' ? '#e77878' : 'var(--c-ink-faint)'}">${pa.kind}</span>${tagStr}</li>`;
           }).join('')}
@@ -2343,10 +2347,12 @@ function renderOverrideFields(pa, pickId, idx) {
         onchange="overrideHealField('${pickId}', ${idx}, 'reviveDowned', this.checked)"> revives downed</label>`;
   } else if (pa.kind === 'multiattack') {
     return `
-      <label>Plan (one per line: count×ActionName)
+      <label>Plan (one per line: count×ActionName; A|B = pick best per swing)
         <textarea rows="3" class="pc-input"
-          oninput="overrideMultiattackPlan('${pickId}', ${idx}, this.value)">${(pa.multiattackPlan||[]).map(p =>
-            `${p.count}×${p.actionName}`).join('\n')}</textarea></label>`;
+          oninput="overrideMultiattackPlan('${pickId}', ${idx}, this.value)">${(pa.multiattackPlan||[]).map(p => {
+            const names = p.options || (p.optionsWeighted && p.optionsWeighted.map(o => o.actionName)) || [p.actionName];
+            return `${p.count}×${names.join('|')}`;
+          }).join('\n')}</textarea></label>`;
   }
   return '<i style="color:var(--c-ink-faint)">No fields for this kind.</i>';
 }
@@ -2438,7 +2444,10 @@ function overrideMultiattackPlan(pickId, idx, raw) {
   pa.multiattackPlan = raw.split('\n').map(line => {
     const m = line.match(/^\s*(\d+)\s*[x×]\s*(.+?)\s*$/i);
     if (!m) return null;
-    return { count: parseInt(m[1]), actionName: m[2] };
+    // "A|B" → dynamic options (engine picks the best usable one per swing).
+    const names = m[2].split('|').map(s => s.trim()).filter(Boolean);
+    if (names.length > 1) return { count: parseInt(m[1]), actionName: names[0], options: names };
+    return { count: parseInt(m[1]), actionName: names[0] || m[2].trim() };
   }).filter(Boolean);
   pa.parsedBy = 'manual';
 }

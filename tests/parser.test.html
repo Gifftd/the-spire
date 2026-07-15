@@ -59,11 +59,11 @@ async function runAll() {
 </script>
 
 <script>
-test('Pass 4: gibberish body → kind:unparsed', () => {
+test('Pass 3.9: mechanics-free body → utility (classified non-combat)', () => {
   const out = CrucibleParser.parseAction('Mystery', 'something undecipherable', null, 2);
-  assertEq(out.kind, 'unparsed');
+  assertEq(out.kind, 'utility');
   assertEq(out.sourceActionName, 'Mystery');
-  assertEq(out._raw, 'something undecipherable');
+  assertTrue(/no simulatable/.test(out._note), 'generic classify note');
 });
 test('Pass 4: empty body still produces ParsedAction shape', () => {
   const out = CrucibleParser.parseAction('Nothing', '', null, 2);
@@ -264,7 +264,7 @@ test('parseAllMonsterActions: writes parsedActions[] keyed by source name', () =
   assertEq(monster.parsedActions.length, 2);
   assertEq(monster.parsedActions[0].sourceActionName, 'Scimitar');
   assertEq(monster.parsedActions[0].kind, 'attack');
-  assertEq(monster.parsedActions[1].kind, 'unparsed');     // disengage isn't a parse target
+  assertEq(monster.parsedActions[1].kind, 'utility');      // "Disengages." → mechanics-free, classified
 });
 // ─────────── v3.6: on-hit rider conditions (attacks only) ───────────
 test('Rider: attack + "grappled (escape DC 14)" → grappled STR rider', () => {
@@ -439,19 +439,20 @@ function bandit(maBody) {
     bonusActions: [], reactions: [], traits: [],
   };
 }
-test('Multiattack: "using X or Y in any combination" → best-damage option', () => {
+test('Multiattack: "using X or Y in any combination" → options kept, best is fallback', () => {
   const ma = parsedByName(bandit('The bandit makes two attacks, using Scimitar or Pistol in any combination.'), 'Multiattack');
   assertEq(ma.kind, 'multiattack');
-  assertEq(ma.multiattackPlan, [{ actionName:'Pistol', count:2 }]);
+  assertEq(ma.multiattackPlan, [{ actionName:'Pistol', count:2, options:['Pistol','Scimitar'] }]);
 });
-test('Multiattack: "makes N X or Y attacks" (shared count) → best option', () => {
+test('Multiattack: "makes N X or Y attacks" (shared count) → options kept', () => {
   const ma = parsedByName(bandit('The bandit makes three Scimitar or Pistol attacks.'), 'Multiattack');
-  assertEq(ma.multiattackPlan, [{ actionName:'Pistol', count:3 }]);
+  assertEq(ma.multiattackPlan, [{ actionName:'Pistol', count:3, options:['Pistol','Scimitar'] }]);
 });
-test('Multiattack: weighted "makes N X attacks or M Y attacks" → best by count×dmg', () => {
-  // 4×Scimitar(5.5)=22 vs 2×Pistol(9)=18 → Scimitar wins.
+test('Multiattack: weighted "makes N X attacks or M Y attacks" → weighted options kept', () => {
+  // 4×Scimitar(5.5)=22 vs 2×Pistol(9)=18 → Scimitar is the fallback.
   const ma = parsedByName(bandit('The bandit makes four Scimitar attacks or two Pistol attacks.'), 'Multiattack');
-  assertEq(ma.multiattackPlan, [{ actionName:'Scimitar', count:4 }]);
+  assertEq(ma.multiattackPlan, [{ actionName:'Scimitar', count:4,
+    optionsWeighted:[{ actionName:'Scimitar', count:4 }, { actionName:'Pistol', count:2 }] }]);
 });
 test('Multiattack: bare "makes two attacks" → monster’s best attack', () => {
   const ma = parsedByName(bandit('The bandit makes two attacks.'), 'Multiattack');
@@ -483,13 +484,24 @@ test('Multiattack: fuzzy singular/plural — "Claw" step matches "Claws" action'
   const ma = parsedByName(monster, 'Multiattack');
   assertEq(ma.multiattackPlan, [{ actionName:'Claws', count:2 }]);
 });
-test('Multiattack: invalid sub-action name (no match) → degrades to unparsed', () => {
+test('Multiattack: invalid sub-action name → falls back to best attack (noted)', () => {
   const monster = {
     name: 'Thing',
     actions: [
       { name:'Multiattack', body:'The thing makes three Zorptacle attacks.' },
       { name:'Bite', body:'Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Piercing damage.' },
     ], bonusActions: [], reactions: [], traits: [],
+  };
+  const ma = parsedByName(monster, 'Multiattack');
+  assertEq(ma.kind, 'multiattack');
+  assertEq(ma.multiattackPlan, [{ actionName:'Bite', count:3 }]);
+  assertTrue(/fell back/.test(ma._note), 'fallback is flagged for Review');
+});
+test('Multiattack: invalid names and NO attacks at all → degrades to unparsed', () => {
+  const monster = {
+    name: 'Thing',
+    actions: [{ name:'Multiattack', body:'The thing makes three Zorptacle attacks.' }],
+    bonusActions: [], reactions: [], traits: [],
   };
   const ma = parsedByName(monster, 'Multiattack');
   assertEq(ma.kind, 'unparsed');
@@ -506,6 +518,123 @@ test('Multiattack guard: attack-header body with a "makes … attacks" tail pars
     'Melee Attack Roll: +9, reach 20 ft. Hit: 12 (2d6 + 5) Piercing damage. Afterward the creature makes two Flail attacks.', null, 5);
   assertEq(out.kind, 'attack');
   assertEq(out.toHit, 9);
+});
+
+// ── v3.9 multiattack phrasings (corpus re-parse pass) ──
+test('Multiattack: colon-or form "two X attacks or two Y attacks" → weighted options', () => {
+  const ma = parsedByName(bandit('The bandit makes two attacks: two Scimitar attacks or two Pistol attacks, or one of each.'), 'Multiattack');
+  assertEq(ma.kind, 'multiattack');
+  assertEq(ma.multiattackPlan, [{ actionName:'Pistol', count:2,
+    optionsWeighted:[{ actionName:'Pistol', count:2 }, { actionName:'Scimitar', count:2 }] }]);
+});
+test('Multiattack: "makes up to three attacks using A, B, or both" → options, count 3', () => {
+  const ma = parsedByName(bandit('The bandit makes up to three attacks using Scimitar, Pistol, or both.'), 'Multiattack');
+  assertEq(ma.multiattackPlan, [{ actionName:'Pistol', count:3, options:['Pistol','Scimitar'] }]);
+});
+test('Multiattack: "makes two attacks with its X and one Y attack" → both steps', () => {
+  const ma = parsedByName(bandit('The bandit makes two attacks with its scimitar and one pistol attack.'), 'Multiattack');
+  assertEq(ma.multiattackPlan, [
+    { actionName:'Scimitar', count:2 },
+    { actionName:'Pistol', count:1 },
+  ]);
+});
+test('Multiattack: "with its X or Y" → dynamic options', () => {
+  const ma = parsedByName(bandit('The bandit makes two attacks with its scimitar or pistol.'), 'Multiattack');
+  assertEq(ma.multiattackPlan, [{ actionName:'Pistol', count:2, options:['Pistol','Scimitar'] }]);
+});
+test('Multiattack: dice count "makes 1d4 + 1 scimitar attacks" → rounded average', () => {
+  const ma = parsedByName(bandit('The bandit makes 1d4 + 1 scimitar attacks.'), 'Multiattack');
+  assertEq(ma.multiattackPlan, [{ actionName:'Scimitar', count:4 }]);   // round(2.5 + 1)
+});
+test('Multiattack: digit count "makes 3 scimitar attacks"', () => {
+  const ma = parsedByName(bandit('The bandit makes 3 scimitar attacks.'), 'Multiattack');
+  assertEq(ma.multiattackPlan, [{ actionName:'Scimitar', count:3 }]);
+});
+test('Multiattack: "as many Bite attacks as it has heads" → count from traits', () => {
+  const monster = {
+    name: 'Hydra',
+    actions: [
+      { name:'Multiattack', body:'The hydra makes as many Bite attacks as it has heads.' },
+      { name:'Bite', body:'Melee Attack Roll: +8, reach 10 ft. Hit: 10 (1d10 + 5) Piercing damage.' },
+    ], bonusActions: [], reactions: [],
+    traits: [{ name:'Multiple Heads', body:'The hydra has five heads.' }],
+  };
+  const ma = parsedByName(monster, 'Multiattack');
+  assertEq(ma.multiattackPlan, [{ actionName:'Bite', count:5 }]);
+});
+test('Multiattack: "as many … as it has heads" with no trait count → default 3', () => {
+  const monster = {
+    name: 'Hydra',
+    actions: [
+      { name:'Multiattack', body:'The hydra makes as many Bite attacks as it has heads.' },
+      { name:'Bite', body:'Melee Attack Roll: +8, reach 10 ft. Hit: 10 (1d10 + 5) Piercing damage.' },
+    ], bonusActions: [], reactions: [], traits: [],
+  };
+  const ma = parsedByName(monster, 'Multiattack');
+  assertEq(ma.multiattackPlan, [{ actionName:'Bite', count:3 }]);
+});
+
+// ── v3.9 temp HP / auto-damage / classifier ──
+test('TempHP: "gains 20 Temporary Hit Points" → self-heal, temp flag', () => {
+  const out = CrucibleParser.parseAction('Fortify', 'The animal lord gains 20 Temporary Hit Points.', null, 4);
+  assertEq(out.kind, 'heal');
+  assertEq(out.heal.flat, 20);
+  assertEq(out.heal.target, 'self');
+  assertTrue(out.heal.temp === true, 'temp flag set');
+});
+test('AutoDamage: "Each creature within … takes 14 (4d6) Lightning damage" → autoHit save', () => {
+  const out = CrucibleParser.parseAction('Witch Strike',
+    'Each creature cursed by the hag and within 60 feet of it takes 14 (4d6) Lightning damage.', null, 4);
+  assertEq(out.kind, 'save');
+  assertTrue(out.autoHit === true, 'autoHit set');
+  assertEq(out.damageOnFail, [{ dice:'4d6', mod:0, type:'lightning' }]);
+  assertTrue(out.aoeTargets >= 2, 'aoe targets');
+});
+test('AutoDamage: triggered reaction damage ("the triggering creature takes …")', () => {
+  const out = CrucibleParser.parseAction('Mind Corrosion',
+    'Trigger: The ooze fails a saving throw against a spell. Response: The triggering creature takes 3 (1d6) Psychic damage.', null, 2);
+  assertEq(out.kind, 'save');
+  assertTrue(out.autoHit === true, 'autoHit set');
+  assertEq(out.aoeTargets, 1);
+});
+test('AutoDamage guard: "If that attack hits, … extra damage" is NOT auto-damage', () => {
+  const out = CrucibleParser.parseAction('Deadly Aim',
+    'The bandit gives itself Advantage on the next attack roll it makes during the current turn. If that attack hits, the target takes an extra 28 (8d6) Poison damage.', null, 3);
+  assertEq(out.kind, 'unparsed');
+});
+test('AutoDamage guard: grapple-gated damage (Swallow) stays unparsed for review', () => {
+  const out = CrucibleParser.parseAction('Swallow',
+    'The frog swallows a Small or smaller target it is grappling. While swallowed, the target takes 2 (2d4) Acid damage at the start of each of the frog’s turns.', null, 2);
+  assertEq(out.kind, 'unparsed');
+});
+test('Classify: Parry-style Trigger/Response → utility (triggered reaction)', () => {
+  const out = CrucibleParser.parseAction('Parry',
+    'Trigger: The bandit is hit by a melee attack roll while holding a weapon. Response: The bandit adds 2 to its AC against that attack, possibly causing it to miss.', null, 2);
+  assertEq(out.kind, 'utility');
+  assertTrue(/triggered reaction/.test(out._note), 'reaction note');
+});
+test('Classify: legendary resistance → utility with note', () => {
+  const out = CrucibleParser.parseAction('Legendary Resistance (3/Day)',
+    'If the dragon fails a saving throw, it can choose to succeed instead.', null, 6);
+  assertEq(out.kind, 'utility');
+  assertTrue(/legendary resistance/.test(out._note), 'LR note');
+  assertEq(out.usesPerDay, 3);
+});
+test('Classify: area control without dice → utility', () => {
+  const out = CrucibleParser.parseAction('Antimagic Cone',
+    'The central eye emits an antimagic wave in a 150-foot Cone. That area acts as an Antimagic Field spell.', null, 6);
+  assertEq(out.kind, 'utility');
+  assertTrue(/area control/.test(out._note), 'area note');
+});
+test('Classify guard: body with a DC stays unparsed for review', () => {
+  const out = CrucibleParser.parseAction('Detach',
+    'A creature within 5 feet of it can take an action to detach the cloaker, doing so by succeeding on a DC 14 Strength (Athletics) check.', null, 2);
+  assertEq(out.kind, 'unparsed');
+});
+test('Classify guard: flat damage without dice stays unparsed for review', () => {
+  const out = CrucibleParser.parseAction('Spines',
+    'A creature that touches the cactusfolk takes 5 Piercing damage.', null, 2);
+  assertEq(out.kind, 'unparsed');
 });
 
 test('Thrown: handaxe "Melee or Ranged … reach 5 ft. or range 20/60 ft." → thrown, both', () => {

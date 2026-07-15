@@ -263,13 +263,24 @@
   // For multiattack actions, the effective range is the max of any sub-action's
   // range. Monster moves to within that range, then resolveMultiattack picks
   // which sub-attacks to fire per-target.
+  // Names a plan step can resolve to: its dynamic options if present, else
+  // the single fixed actionName.
+  function stepOptionNames(step) {
+    if (Array.isArray(step.options) && step.options.length) return step.options;
+    if (Array.isArray(step.optionsWeighted) && step.optionsWeighted.length) {
+      return step.optionsWeighted.map(o => o.actionName);
+    }
+    return [step.actionName];
+  }
+
   function multiattackRange(action, allActions) {
     if (action.kind !== 'multiattack' || !Array.isArray(action.multiattackPlan)) return 1;
     let maxR = 0;
     for (const step of action.multiattackPlan) {
-      const sub = allActions.find(a =>
-        (a.sourceActionName || a.name) === step.actionName);
-      if (sub) maxR = Math.max(maxR, actionRange(sub));
+      for (const nm of stepOptionNames(step)) {
+        const sub = allActions.find(a => (a.sourceActionName || a.name) === nm);
+        if (sub) maxR = Math.max(maxR, actionRange(sub));
+      }
     }
     return Math.max(1, maxR);
   }
@@ -294,7 +305,7 @@
     }
     if (action.kind === 'save') {
       const sb = targetSaveBonus(target, action.saveAbility);
-      const failP = clamp01((action.saveDc - sb - 1) / 20);
+      const failP = action.autoHit ? 1 : clamp01((action.saveDc - sb - 1) / 20);
       const dmgFail = sumDice(action.damageOnFail);
       const dmgSave = action.halfOnSave ? dmgFail / 2 : 0;
       const live = (ctx && ctx.livingEnemyCount) || 1;
@@ -305,8 +316,17 @@
       const subs = action._ownerActions || [];
       let sum = 0;
       for (const step of (action.multiattackPlan || [])) {
-        const sub = subs.find(a => (a.sourceActionName || a.name) === step.actionName);
-        if (sub) sum += (step.count || 1) * actionEv(sub, target, ctx);
+        // Dynamic-option steps score as their best available option.
+        let best = 0;
+        for (const nm of stepOptionNames(step)) {
+          const sub = subs.find(a => (a.sourceActionName || a.name) === nm);
+          if (!sub) continue;
+          const cnt = step.optionsWeighted
+            ? ((step.optionsWeighted.find(o => o.actionName === nm) || {}).count || 1)
+            : (step.count || 1);
+          best = Math.max(best, cnt * actionEv(sub, target, ctx));
+        }
+        sum += best;
       }
       return sum;
     }
@@ -1547,7 +1567,12 @@
       // failure, but draws NO d20 (which shifts the rng stream for later
       // rolls — acceptable, the trial is event-sourced).
       let roll, passed;
-      if (autoFailsSave(t, action)) {
+      if (action.autoHit) {
+        // v3.9: save-less automatic damage ("each creature … takes X damage").
+        // No roll is drawn; damageOnFail applies in full.
+        roll = 0;
+        passed = false;
+      } else if (autoFailsSave(t, action)) {
         roll = 0;
         passed = false;
       } else {
@@ -1589,8 +1614,10 @@
         if (t.side === 'monster' && t.hp === 0 && !t.dead) t.dead = true;
         totalDmg += dmg;
       }
-      events.push({ round, type:'save', actor: me.name, target: t.name,
-                    action: action.sourceActionName, roll, passed, damageDealt: dmg });
+      const saveEvt = { round, type:'save', actor: me.name, target: t.name,
+                        action: action.sourceActionName, roll, passed, damageDealt: dmg };
+      if (action.autoHit) saveEvt.autoHit = true;
+      events.push(saveEvt);
     }
     return { totalDmg };
   }
@@ -1753,23 +1780,69 @@
       pickSubTarget = (subAction) => pickEnemyTarget(me, all, tactics, rng, subAction);
     }
 
+    // v3.9: pick the best usable option for one swing of a dynamic-option
+    // step ("using X or Y in any combination"). Prefer a melee option when
+    // the target is inside its reach (a ranged shot there takes disadvantage
+    // and a thrown one wastes ammo); otherwise any option whose effective
+    // range reaches; ties break toward higher average damage.
+    const chooseOptionSub = (tgt, optionNames) => {
+      const subs = [];
+      for (const nm of optionNames) {
+        const s = myActions.find(a => (a.sourceActionName || a.name) === nm);
+        if (s && s.kind === 'attack') subs.push(s);
+      }
+      if (!subs.length) return null;
+      const avg = s => sumDice(s.damage || []);
+      const spatial = typeof CrucibleSpatial !== 'undefined'
+        && typeof me.x === 'number' && tgt && typeof tgt.x === 'number';
+      if (!spatial) return subs.slice().sort((a, b) => avg(b) - avg(a))[0];
+      const dist = CrucibleSpatial.combatDistance(me, tgt);
+      const usable = subs.filter(s => dist <= effectiveAttackNeed(me, tgt, s));
+      const pool = usable.length ? usable : subs;
+      const meleeHere = pool.filter(s => !resolvesAsRanged(me, tgt, s)
+                                      && dist <= actionMeleeReach(me, s));
+      return (meleeHere.length ? meleeHere : pool)
+        .slice().sort((a, b) => avg(b) - avg(a))[0];
+    };
+
     for (const step of (multiAction.multiattackPlan || [])) {
-      const sub = myActions.find(a =>
+      const hasOptions = (Array.isArray(step.options) && step.options.length)
+        || (Array.isArray(step.optionsWeighted) && step.optionsWeighted.length);
+      const optionNames = hasOptions ? stepOptionNames(step) : null;
+      const fixedSub = myActions.find(a =>
         (a.sourceActionName || a.name) === step.actionName);
-      if (!sub || sub.kind === 'unparsed') {
+      if (!hasOptions && (!fixedSub || fixedSub.kind === 'unparsed')) {
         warnings.push(`Multiattack sub-action '${step.actionName}' not found on ${me.name} — treated as a single attack.`);
         continue;
       }
-      for (let i = 0; i < (step.count || 1); i++) {
-        const tgt = pickSubTarget(sub);
+      let count = step.count || 1;
+      let lockedWeighted = null;   // optionsWeighted: one choice per step; its count applies
+      for (let i = 0; i < count; i++) {
+        const tgt = pickSubTarget(fixedSub || null);
         if (!tgt) break;
+        let sub = fixedSub;
+        if (hasOptions) {
+          sub = lockedWeighted || chooseOptionSub(tgt, optionNames) || fixedSub;
+          if (step.optionsWeighted && !lockedWeighted && sub) {
+            lockedWeighted = sub;
+            const w = step.optionsWeighted.find(o =>
+              o.actionName === (sub.sourceActionName || sub.name));
+            if (w && w.count) count = w.count;
+          }
+        }
+        if (!sub || sub.kind === 'unparsed') {
+          warnings.push(`Multiattack sub-action '${step.actionName}' not found on ${me.name} — treated as a single attack.`);
+          break;
+        }
         // v2 spatial: skip sub-attacks whose own range can't reach this
         // target. Multiattack range is the max across sub-actions so the
         // monster moves close enough for at least one sub-attack; the
         // shorter-ranged sub-attacks are silently dropped per swing.
+        // (effectiveAttackNeed keeps out-of-ammo thrown subs melee-only.)
         if (typeof CrucibleSpatial !== 'undefined'
             && typeof me.x === 'number' && typeof tgt.x === 'number') {
-          const subNeed = actionRange(sub);
+          const subNeed = sub.kind === 'attack'
+            ? effectiveAttackNeed(me, tgt, sub) : actionRange(sub);
           const subDist = CrucibleSpatial.combatDistance(me, tgt);
           if (subDist > subNeed) continue;
         }

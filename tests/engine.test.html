@@ -442,6 +442,84 @@ test('resolveMultiattack: looks up sub-actions by name, fires each count times',
   const atks = ev.filter(e => e.type === 'attack');
   assertEq(atks.length, 2);
 });
+
+// ── v3.9: dynamic option choice for "in any combination" multiattacks ──
+function scoutLike(x, y, tgtX, tgtY) {
+  // Scout-shaped monster: Multiattack with Longbow|Shortsword options
+  // (Longbow = higher avg damage fallback), plus a PC target at (tgtX,tgtY).
+  const me = { side:'monster', name:'Scout', x, y, hp:16, maxHp:16,
+               naturalReach:1,
+               monster:{ name:'Scout',
+                         parsedActions:[
+                           { sourceActionName:'Multiattack', kind:'multiattack',
+                             multiattackPlan:[{ actionName:'Longbow', count:2,
+                                                options:['Longbow','Shortsword'] }] },
+                           { sourceActionName:'Longbow', kind:'attack', toHit:99,
+                             actionRange:'ranged', range:[150, 600],
+                             damage:[{ dice:'1d8', mod:2, type:'piercing' }] },
+                           { sourceActionName:'Shortsword', kind:'attack', toHit:99,
+                             actionRange:'melee', reach:5,
+                             damage:[{ dice:'1d6', mod:2, type:'piercing' }] },
+                         ] } };
+  const target = { side:'pc', name:'PC', x:tgtX, y:tgtY, hp:40, maxHp:40, ac:10,
+                   downed:false, dead:false, damageTypesReceivedThisTurn:new Set() };
+  return { me, target };
+}
+test('resolveMultiattack options: adjacent target → melee option chosen per swing', () => {
+  const { me, target } = scoutLike(5, 5, 6, 5);   // adjacent
+  const ev = [];
+  Crucible.resolveMultiattack(me, [me, target], me.monster.parsedActions[0],
+    { aiHint:'focus' }, () => 0.99, ev, 1);
+  const atks = ev.filter(e => e.type === 'attack');
+  assertEq(atks.length, 2);
+  assertTrue(atks.every(a => a.action === 'Shortsword'),
+    'adjacent swings use the melee option, got ' + atks.map(a => a.action).join(','));
+});
+test('resolveMultiattack options: distant target → ranged option chosen', () => {
+  const { me, target } = scoutLike(5, 5, 15, 5);  // 10 cells away
+  const ev = [];
+  Crucible.resolveMultiattack(me, [me, target], me.monster.parsedActions[0],
+    { aiHint:'focus' }, () => 0.99, ev, 1);
+  const atks = ev.filter(e => e.type === 'attack');
+  assertEq(atks.length, 2);
+  assertTrue(atks.every(a => a.action === 'Longbow'),
+    'distant swings use the ranged option, got ' + atks.map(a => a.action).join(','));
+});
+test('resolveMultiattack optionsWeighted: melee pick locks in its own count', () => {
+  const { me, target } = scoutLike(5, 5, 6, 5);   // adjacent
+  // Weighted form: 2×Longbow OR 3×Shortsword. Adjacent → Shortsword, 3 swings.
+  me.monster.parsedActions[0].multiattackPlan = [{
+    actionName:'Longbow', count:2,
+    optionsWeighted:[{ actionName:'Longbow', count:2 }, { actionName:'Shortsword', count:3 }],
+  }];
+  const ev = [];
+  Crucible.resolveMultiattack(me, [me, target], me.monster.parsedActions[0],
+    { aiHint:'focus' }, () => 0.99, ev, 1);
+  const atks = ev.filter(e => e.type === 'attack');
+  assertEq(atks.length, 3);
+  assertTrue(atks.every(a => a.action === 'Shortsword'),
+    'weighted melee pick, got ' + atks.map(a => a.action).join(','));
+});
+test('resolveSave: autoHit applies damage with no roll, event flagged', () => {
+  const me = { name:'Hag' };
+  const target = { side:'pc', pm:{ identity:{ level:5 },
+                   abilities:{ str:10,dex:8,con:10,int:10,wis:10,cha:10 },
+                   profs:{ saves:{} } },
+                   hp:30, maxHp:30, ac:14, dead:false, downed:false,
+                   conditions:new Map(),
+                   damageTypesReceivedThisTurn:new Set() };
+  const action = { sourceActionName:'Witch Strike', kind:'save', autoHit:true,
+                   saveAbility:null, saveDc:null,
+                   damageOnFail:[{ dice:'4d6', mod:0, type:'lightning' }],
+                   damageOnSave:[], halfOnSave:false, aoeTargets:2 };
+  const ev = [];
+  Crucible.resolveSave(me, [target], action, () => 0.5, ev, 1);
+  assertTrue(target.hp < target.maxHp, 'auto-damage applied');
+  const saves = ev.filter(e => e.type === 'save');
+  assertEq(saves.length, 1);
+  assertEq(saves[0].autoHit, true);
+  assertEq(saves[0].passed, false);
+});
 test('runTrial: PC vs Goblin, seeded → deterministic outcome', () => {
   const pm = { id:'pm1', identity:{ name:'Aria', level:5 },
                abilities:{ str:14,dex:14,con:14,int:10,wis:10,cha:10 },
@@ -1848,6 +1926,16 @@ test('multiattackRange: all melee sub-actions → 1', () => {
                multiattackPlan: [{ actionName: 'Greataxe', count: 1 },
                                  { actionName: 'Slam', count: 1 }] };
   assertEq(Crucible.multiattackRange(ma, subs), 1);
+});
+test('multiattackRange: option steps consider every option\'s range', () => {
+  const subs = [
+    { sourceActionName: 'Shortsword', reach: 5, kind: 'attack' },
+    { sourceActionName: 'Longbow', range: [150, 600], kind: 'attack' },
+  ];
+  const ma = { kind: 'multiattack',
+               multiattackPlan: [{ actionName: 'Shortsword', count: 2,
+                                   options: ['Shortsword', 'Longbow'] }] };
+  assertEq(Crucible.multiattackRange(ma, subs), 30);
 });
 
 test('runTrial: multiattacking monster moves toward distant PC before swinging', () => {

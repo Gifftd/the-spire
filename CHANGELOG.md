@@ -9,6 +9,66 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-07-15
 
+### Crucible parser v3.9: corpus re-parse — 87.4% → 96.8% coverage + dynamic multiattack weapon choice
+
+Full-corpus pass over the local bestiary (1,124 monsters / 3,793 actions):
+unparsed actions drop from 479 to 122. Since monsters are parsed live when
+added to an encounter (nothing pre-parsed is stored in the imported bestiary),
+every existing monster benefits on its next add/stage — remove + re-add any
+monster already sitting in an encounter to pick up the new parses. Saved
+`bestiary_custom` overrides still shadow the parser by design.
+
+**Dynamic choose-from multiattacks (the "Scout multiattack" fix).** Plans like
+"makes two attacks, using Shortsword and Longbow in any combination" used to
+collapse to ONE weapon (best average damage) at parse time — the Scout fired
+its Longbow forever, even at disadvantage with a fighter in its face. The
+choose-options now survive on the plan step (`options` / `optionsWeighted`,
+with `actionName` kept as the best-damage fallback) and the engine picks per
+swing at sim time: a melee option when the target is inside its reach, else
+the longest-reaching usable option; honors thrown ammo. Verified live: Scout
+fires Longbow×2 at range, switches to Shortsword×2 once engaged.
+
+- `crucible-parser.js`: options kept on `_chooseFrom`/`_chooseFromWeighted`
+  steps after validation. New multiattack phrasings: colon-or ("two X attacks
+  or two Y attacks, or one of each" → weighted options), "makes (up to) N
+  attacks using A, B, or C", "makes N attacks with its X (and one Y attack)",
+  dice counts ("makes 1d4 + 1 slam attacks" → rounded average), digit counts
+  ("makes 3 bite attacks"), and "as many X attacks as it has heads" (count
+  pulled from traits — Hydra gets Bite×5 — default 3). A plan whose names all
+  fail validation now falls back to best-attack × stated swings (flagged with
+  a `_note` in Review) instead of degrading to unparsed; degrade only remains
+  when the monster has no parsed attack at all.
+- New parse passes: **temp HP** ("gains 20 Temporary Hit Points" → self-heal
+  with `temp:true`), **save-less auto-damage** ("Each creature within 60 feet
+  takes 14 (4d6) damage", 2024 Trigger/Response damage → `kind:'save'` with
+  `autoHit:true`; guards refuse "if that attack hits … extra damage" riders
+  and grapple-gated damage like Swallow), and a **classification tier**: bodies
+  with NO simulatable mechanics (no attack header/to-hit, no dice, no DC, no
+  HP change, no flat damage) classify as `utility` with a descriptive `_note`
+  (passive traits misfiled as actions, Parry-style triggered reactions,
+  legendary resistance, area control, forced movement, narrative fragments)
+  instead of littering Review with red `unparsed` rows. Anything carrying
+  mechanics we don't model stays `unparsed` for DM review.
+- `crucible-engine.js`: `resolveMultiattack` per-swing option choice
+  (`effectiveAttackNeed`-aware; weighted steps lock one option + its count);
+  sub-attack range gate upgraded from `actionRange` to `effectiveAttackNeed`
+  (out-of-ammo thrown subs are melee-only); `multiattackRange` + `actionEv`
+  consider every option; `resolveSave` handles `autoHit` (no roll, full
+  damage, event flagged `autoHit:true`).
+- `crucible-dm.html`: parsed-actions list shows classifier notes + "picks
+  weapon per swing" tag; Review plan editor round-trips options as
+  `2×Shortsword|Longbow`; crucible module script tags now carry `?v=N`
+  cache-busters (they were unversioned — the repeated "stale sim after
+  deploy" culprit). `crucible-viewer.js`: auto-hit save events read "hits
+  automatically" instead of "save failed".
+- Tests: parser 64 → 82 (options kept, all new phrasings, temp HP,
+  auto-damage + guards, classifier + guards, best-attack fallback); engine
+  211 → 216 (adjacent → melee option, distant → ranged option, weighted lock
+  + count, autoHit save, options-aware multiattackRange). Suites green:
+  parser 82, engine 216, spatial 86, viewer 16, pc-features 126, schema 26.
+- New `tests/run-corpus.mjs` node harness (needs node, not installed here;
+  the browser corpus page remains the working measurement tool).
+
 ### Crucible: creature size (grid footprints) + thrown-weapon melee preference
 
 Two related tactical-engine fixes.

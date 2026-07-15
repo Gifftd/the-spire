@@ -346,7 +346,8 @@
           ' (roll ' + ev.roll + ') → ' + (ev.hit ? 'hit ' + ev.damageDealt : 'miss');
         case 'damage':    return 'R' + ev.round + ' · ' + ev.target + ' takes ' + ev.amount + ' ' + ev.dmgType;
         case 'heal':      return 'R' + ev.round + ' · ' + ev.actor + ' heals ' + ev.target + ' +' + ev.amount + (ev.revived ? ' REVIVED' : '');
-        case 'save':      return 'R' + ev.round + ' · ' + ev.actor + ' → ' + ev.target + ' · ' + ev.action + ' save ' + (ev.passed ? 'passed' : 'failed');
+        case 'save':      return 'R' + ev.round + ' · ' + ev.actor + ' → ' + ev.target + ' · ' + ev.action
+                               + (ev.autoHit ? ' hits automatically' : ' save ' + (ev.passed ? 'passed' : 'failed'));
         case 'aoe':       return 'R' + ev.round + ' · AoE ' + ev.shape + ' @ (' + ev.center.x + ',' + ev.center.y + ') hits ' + ev.targets.length;
         case 'opportunity-attack': return 'R' + ev.round + ' · OoA ' + ev.attackerName + ' on ' + ev.targetName + ' → ' + (ev.hit ? 'hit ' + ev.damageDealt : 'miss');
         case 'feature':   return 'R' + ev.round + ' · ⚡ ' + (ev.what || '');

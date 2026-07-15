@@ -30,7 +30,8 @@
   }
 
   // ─────────── Pass 1 — Multiattack detection ───────────
-  const WORD_NUM   = { a:1, an:1, one:1, two:2, three:3, four:4, five:5, six:6 };
+  const WORD_NUM   = { a:1, an:1, one:1, two:2, three:3, four:4, five:5, six:6,
+                       seven:7, eight:8, nine:9, ten:10, eleven:11, twelve:12 };
   // "attacks twice", "uses X three times" — adverbial / times counts.
   const ADVERB_NUM = { once:1, twice:2, thrice:3 };
 
@@ -38,6 +39,13 @@
     if (!w) return 1;
     const k = w.toLowerCase();
     return ADVERB_NUM[k] || WORD_NUM[k] || 1;
+  }
+
+  // Count token → number: bare digits ("3") or number words ("three").
+  function countOf(w) {
+    if (!w) return 1;
+    if (/^\d+$/.test(w)) return parseInt(w, 10);
+    return WORD_NUM[w.toLowerCase()] || 1;
   }
 
   // ── Multiattack plan resolution helpers (used post-parse) ──
@@ -101,12 +109,26 @@
 
   function extractMultiattackPlan(body) {
     // A) colon form: "makes N attacks: one with its X and one with its Y."
-    const colon = body.match(/makes\s+(?:a|an|one|two|three|four|five|six)\s+attacks?\s*:\s*([^.]+)/i);
+    const colon = body.match(/makes\s+(?:a|an|one|two|three|four|five|six|\d+)\s+attacks?\s*:\s*([^.]+)/i);
     if (colon) {
+      const payload = colon[1];
+      // A1) or-separated options with per-option counts: "two pick attacks or
+      // two slam attacks, or one of each" → weighted choose (dynamic at sim time).
+      if (/\bor\b/i.test(payload)) {
+        const opts = [];
+        const reOpt = /(a|an|one|two|three|four|five|six|\d+)\s+([\w'’ -]+?)\s+attacks?\b/gi;
+        let om;
+        while ((om = reOpt.exec(payload)) !== null) {
+          const nm = cleanOpt(om[2]);
+          if (nm && !GENERIC_ATTACK.test(nm) && !/\battacks?\b/i.test(nm)) opts.push({ name: nm, count: countOf(om[1]) });
+        }
+        if (opts.length >= 2) return [{ _chooseFromWeighted: opts }];
+        if (opts.length === 1) return [{ actionName: opts[0].name, count: opts[0].count }];
+      }
       const plan = [];
-      for (const chunk of colon[1].split(/\s*(?:,|\band\b)\s*/i)) {
-        const m = chunk.match(/(?:(a|an|one|two|three|four|five|six)\s+)?(?:with\s+(?:its|his|her|their)\s+)?([\w'’ -]+)/i);
-        if (m && m[2] && m[2].trim()) plan.push({ actionName: m[2].trim(), count: m[1] ? WORD_NUM[m[1].toLowerCase()] : 1 });
+      for (const chunk of payload.split(/\s*(?:,|\band\b)\s*/i)) {
+        const m = chunk.match(/(?:(a|an|one|two|three|four|five|six|\d+)\s+)?(?:with\s+(?:its|his|her|their)\s+)?([\w'’ -]+)/i);
+        if (m && m[2] && m[2].trim()) plan.push({ actionName: m[2].trim(), count: m[1] ? countOf(m[1]) : 1 });
       }
       if (plan.length) return plan;
     }
@@ -141,16 +163,61 @@
       if (named.length === 1) return [{ actionName: named[0], count }];
       return [{ actionName: null, count }];   // all generic → best attack
     }
+    // B3) "makes (up to) N attacks using A, B, C(, or D / or both)" → choose-best-of.
+    // ("in any combination" phrasing is claimed by B above; this is the looser form.)
+    const usingList = body.match(/makes\s+(?:up\s+to\s+)?(a|an|one|two|three|four|five|six|\d+)\s+attacks?\s+using\s+([^.;]+)/i);
+    if (usingList) {
+      const opts = usingList[2].split(/\s*(?:,|\bor\b|\band\b)\s*/i).map(cleanOpt).filter(Boolean)
+        .filter(o => !GENERIC_ATTACK.test(o)
+                  && !/^(?:both|them|these|each|any\s+combination)$/i.test(o)
+                  && !/\battacks?\b/i.test(o));
+      if (opts.length >= 2) return [{ _chooseFrom: opts, count: countOf(usingList[1]) }];
+      if (opts.length === 1) return [{ actionName: opts[0], count: countOf(usingList[1]) }];
+    }
+    // B4) "makes N attacks with its X (and M Y attack(s))*" — unnamed count
+    // attached to a possessive weapon name, plus optional trailing clauses.
+    const withIts = body.match(/makes\s+(a|an|one|two|three|four|five|six|\d+)\s+attacks?\s+with\s+(?:its|his|her|their)\s+([\w'’ -]+?)(?=\s+and\b|[.,;:]|$)/i);
+    if (withIts) {
+      // "with its longsword or shortbow" → dynamic options, not one name.
+      const first = /\s+or\s+/i.test(withIts[2])
+        ? { _chooseFrom: withIts[2].split(/\s+or\s+/i).map(cleanOpt).filter(Boolean), count: countOf(withIts[1]) }
+        : { actionName: cleanOpt(withIts[2]), count: countOf(withIts[1]) };
+      const plan = [first];
+      const rest = body.slice(withIts.index + withIts[0].length);
+      const reAnd = /\band\s+(a|an|one|two|three|four|five|six|\d+)\s+([\w'’ -]+?)\s+attacks?\b/gi;
+      let am;
+      while ((am = reAnd.exec(rest)) !== null) {
+        const nm = cleanOpt(am[2]);
+        if (nm && !GENERIC_ATTACK.test(nm) && !/\battacks?\b/i.test(nm)) plan.push({ actionName: nm, count: countOf(am[1]) });
+      }
+      return plan;
+    }
+    // B5) dice-count: "makes 1d4 + 1 slam attacks" → average count, rounded.
+    const diceCount = body.match(/makes\s+(\d+)d(\d+)(?:\s*\+\s*(\d+))?\s+([\w'’ -]+?)\s+attacks?\b/i);
+    if (diceCount) {
+      const avg = Math.round(parseInt(diceCount[1], 10) * (parseInt(diceCount[2], 10) + 1) / 2
+                             + (diceCount[3] ? parseInt(diceCount[3], 10) : 0));
+      const nm = cleanOpt(diceCount[4]);
+      if (nm && !GENERIC_ATTACK.test(nm) && !/\battacks?\b/i.test(nm)) return [{ actionName: nm, count: Math.max(1, avg) }];
+    }
+    // B6) "as many X attacks as it has <parts>" / "a number of X attacks equal
+    // to the number of <parts>" — count resolved from the monster's traits in
+    // the post-pass (e.g. Hydra: "has five heads"); defaults there if absent.
+    const asMany = body.match(/makes?\s+as\s+many\s+([\w'’ -]+?)\s+attacks?\s+as\s+(?:it|he|she|they)\s+(?:has|have|currently\s+has|currently\s+have)\s+([\w-]+)/i)
+      || body.match(/(?:can\s+)?makes?\s+a\s+number\s+of\s+([\w'’ -]+?)\s+attacks?\s+equal\s+to\s+the\s+number\s+of\s+([\w-]+)/i);
+    if (asMany) return [{ actionName: cleanOpt(asMany[1]), count: null, _countRef: asMany[2].toLowerCase() }];
     // C) "makes N X attacks (and M Y attacks)*" (explicit named)
     {
-      const re = /(?:makes\s+|and\s+)(a|an|one|two|three|four|five|six)\s+([\w'’ -]+?)\s+attacks?\b/gi;
+      const re = /(?:makes\s+|and\s+)(a|an|one|two|three|four|five|six|\d+)\s+([\w'’ -]+?)\s+attacks?\b/gi;
       const plan = [];
       let m;
       while ((m = re.exec(body)) !== null) {
         const nm = m[2].trim();
-        // skip bare/generic tokens — those are handled by the unnamed fallback.
-        if (nm && !/^(?:more|other|additional|melee|ranged|weapon|spell)$/i.test(nm)) {
-          plan.push({ actionName: nm, count: WORD_NUM[m[1].toLowerCase()] || 1 });
+        // skip bare/generic tokens — those are handled by the unnamed fallback —
+        // and names that swallowed an "attacks…" clause (lazy-match overrun).
+        if (nm && !/^(?:more|other|additional|melee|ranged|weapon|spell)$/i.test(nm)
+               && !/\battacks?\b/i.test(nm)) {
+          plan.push({ actionName: nm, count: countOf(m[1]) });
         }
       }
       if (plan.length) return plan;
@@ -431,6 +498,63 @@
     };
   }
 
+  // ─────────── Pass 3.6a — Temporary hit points (as self-heal) ───────────
+  // "gains 20 Temporary Hit Points" / "gains 10 (3d6) temporary hit points".
+  // Modeled as a self-heal — temp HP ≈ effective HP for sim purposes (capped
+  // at max HP, which slightly undervalues it; better than skipping).
+  const TEMP_HP_RE = /\bgains?\s+(\d+)(?:\s*\((\d+d\d+)(?:\s*\+\s*(\d+))?\))?\s+temporary\s+hit\s+points/i;
+
+  function tryTempHp(actionName, body) {
+    const m = body.match(TEMP_HP_RE);
+    if (!m) return null;
+    return {
+      sourceActionName: actionName,
+      kind: 'heal',
+      heal: { dice: m[2] || null, mod: m[3] ? parseInt(m[3], 10) : 0,
+              flat: m[2] ? 0 : parseInt(m[1], 10),
+              target: 'self', aoeTargets: 0, reviveDowned: false, temp: true },
+      parsedBy: 'auto',
+      parsedAt: today(),
+    };
+  }
+
+  // ─────────── Pass 3.6b — Save-less automatic damage ───────────
+  // "Each creature within 60 feet … takes 14 (4d6) Lightning damage." /
+  // "Response: The triggering creature takes 3 (1d6) Psychic damage."
+  // No attack roll, no save → modeled as a save action with autoHit:true
+  // (the engine skips the roll and applies damageOnFail directly).
+  const AUTODMG_TARGET_RE = /\b(?:each\s+creature|each\s+enemy|the\s+(?:triggering\s+)?(?:creature|target)|creatures?\s+(?:in|within)|all\s+creatures)\b/i;
+
+  function tryAutoDamage(actionName, body) {
+    if (ATTACK_HEADER_RE.test(body) || /DC\s+\d+/i.test(body)) return null;
+    if (!AUTODMG_TARGET_RE.test(body)) return null;
+    // Damage conditional on a future hit ("If that attack hits, … extra …
+    // damage") is a rider on another action, not immediate damage.
+    if (/\bif\s+(?:that|this|the|an?)\s+attack\s+hits\b/i.test(body)) return null;
+    if (/\bextra\b[^.]{0,60}\bdamage\b/i.test(body)) return null;
+    // Damage gated on an existing grapple/swallow state isn't at-will —
+    // leave for DM review rather than modeling it as a free nuke.
+    if (/\b(?:it\s+is\s+grappling|grappled\s+by|swallow(?:s|ed)?)\b/i.test(body)) return null;
+    const dmg = extractDamage(body);
+    if (!dmg.length) return null;
+    const aoe = /\beach\s+creature\b|\ball\s+creatures\b|\bcreatures?\s+(?:in|within)\b/i.test(body);
+    return {
+      sourceActionName: actionName,
+      kind: 'save',
+      autoHit: true,
+      saveAbility: null,
+      saveDc: null,
+      aoeTargets: aoe ? Math.max(2, aoeTargetsFromShape(body)) : 1,
+      effectOnFail: 'damage',
+      damageOnFail: dmg,
+      damageOnSave: [],
+      halfOnSave: false,
+      condition: null,
+      parsedBy: 'auto',
+      parsedAt: today(),
+    };
+  }
+
   // ─────────── Pass 3.7 — Spellcasting (utility) ───────────
   // Innate/prepared spellcasting delegates its effect to named spells the sim
   // doesn't model. Classify as `utility` (not `unparsed`) so it neither blocks
@@ -483,6 +607,44 @@
     return null;
   }
 
+  // ─────────── Pass 3.9 — Recognized non-simulatable text ───────────
+  // Bodies with NO simulatable mechanics (no attack header / to-hit, no damage
+  // or heal dice, no save/check DC, no HP change, no flat damage) are honest
+  // `utility` classifications, not parse failures: passive traits misfiled
+  // into action buckets by the scrape, triggered reactions, area control,
+  // forced movement, narrative fragments. Anything carrying numbers that
+  // matter falls through to `unparsed` so the DM reviews it.
+  function tryClassify(actionName, body) {
+    if (!body || !body.trim()) return null;                            // truly empty → unparsed
+    if (ATTACK_HEADER_RE.test(body)) return null;
+    if (/[+-]\d+\s+to\s+hit/i.test(body)) return null;
+    if (/\(\d+d\d+/.test(body)) return null;                           // damage/heal dice
+    if (/DC\s+\d+/i.test(body)) return null;                           // save/check DCs
+    if (/\bhit\s+points?\b/i.test(body)) return null;                  // HP manipulation
+    if (/\b(?:takes?|taking)\s+\d+\s+[\w\s]*damage/i.test(body)) return null;  // flat damage
+    let note = 'no simulatable combat mechanics (classified non-combat)';
+    if (/\bfails?\s+a\s+saving\s+throw,?\s+(?:it|he|she|they)\s+can\s+choose\s+to\s+succeed/i.test(body)) {
+      note = 'legendary resistance (not simulated)';
+    } else if (/\btrigger\s*:/i.test(body) || /\bresponse\s*:/i.test(body)) {
+      note = 'triggered reaction (not simulated)';
+    } else if (/\bhas\s+advantage\s+on\b[^.]*\b(?:checks?|saving\s+throws?)\b/i.test(body)) {
+      note = 'passive trait (no action effect)';
+    } else if (/\b(?:pulls?|pushes?|drags?)\b[^.]*\b(?:toward|away)/i.test(body)) {
+      note = 'forced movement (not simulated)';
+    } else if (/\bemanation\b|\baura\b|\bantimagic\b|-foot\s+(?:cone|sphere|cube|line|radius)\b/i.test(body)) {
+      note = 'area control (not simulated)';
+    } else if (/\bcondition\b/i.test(body)) {
+      note = 'condition effect without save DC (not simulated)';
+    }
+    return {
+      sourceActionName: actionName,
+      kind: 'utility',
+      _note: note,
+      parsedBy: 'auto',
+      parsedAt: today(),
+    };
+  }
+
   // ─────────── Recharge / uses-per-day ───────────
   // Always runs, attached to whatever Pass 1-3.5 produced.
   const RECHARGE_RE = /\(\s*Recharge\s+(\d)(?:\s*[-–]\s*(\d))?\s*\)/i;
@@ -509,7 +671,10 @@
     const p3 = tryAttack(actionName, body);       if (p3) return attachResourceGating(p3, actionName);
     const p4 = trySave(actionName, body);         if (p4) return attachResourceGating(p4, actionName);
     const p5 = tryHeal(actionName, body);         if (p5) return attachResourceGating(p5, actionName);
+    const p5a = tryTempHp(actionName, body);      if (p5a) return attachResourceGating(p5a, actionName);
+    const p5b = tryAutoDamage(actionName, body);  if (p5b) return attachResourceGating(p5b, actionName);
     const p6 = tryUtility(actionName, body);      if (p6) return attachResourceGating(p6, actionName);
+    const p7 = tryClassify(actionName, body);     if (p7) return attachResourceGating(p7, actionName);
     return unparsed(actionName, body);
   }
 
@@ -538,15 +703,39 @@
     return { amount: parseInt(am[1], 10), suppressedBy: supp, minHpToRegen: 1 };
   }
 
+  // Resolve a `_countRef` ("as many Bite attacks as it has heads") against the
+  // monster's traits/description: find "<number> heads" and use it. Defaults to
+  // 3 when no explicit count is stated anywhere.
+  function countFromTraits(monster, ref) {
+    const singular = String(ref || '').replace(/s$/, '');
+    const texts = [];
+    for (const t of (monster && monster.traits) || []) texts.push((t.name || '') + ' ' + (t.body || ''));
+    if (monster && typeof monster.description === 'string') texts.push(monster.description);
+    const re = new RegExp('(\\w+)\\s+(?:' + singular + 's?)\\b', 'gi');
+    for (const txt of texts) {
+      let m;
+      while ((m = re.exec(txt)) !== null) {
+        const w = m[1].toLowerCase();
+        const n = /^\d+$/.test(w) ? parseInt(w, 10) : WORD_NUM[w];
+        if (n >= 2 && n <= 12) return n;
+      }
+    }
+    return 3;
+  }
+
   // ─────────── Multiattack plan resolution (post-parse) ───────────
   // Runs once all of a monster's actions are parsed, so sibling action names +
   // their damage are available. For each auto-parsed multiattack:
-  //   • `_chooseFrom:[…]` → pick the highest-damage valid option.
+  //   • `_chooseFrom:[…]` → validate options; keep them on the step as
+  //     `options` for dynamic per-swing choice at sim time (melee vs ranged),
+  //     with `actionName` set to the highest-damage option as the fallback.
+  //   • `_chooseFromWeighted` → same, kept as `optionsWeighted` (per-option counts).
   //   • `actionName:null`  → the monster's best (highest-damage) attack.
+  //   • `_countRef`        → count pulled from traits (e.g. Hydra heads).
   //   • explicit names     → fuzzy-validated against real sibling names.
-  // Invalid entries are dropped. Duplicate names are merged (counts summed). If
-  // nothing valid remains, the multiattack degrades to `unparsed` rather than
-  // emitting a plan that references non-existent actions.
+  // Invalid entries are dropped. Duplicate plain names are merged (counts
+  // summed). If nothing valid remains, the multiattack degrades to `unparsed`
+  // rather than emitting a plan that references non-existent actions.
   function resolveMultiattackPlans(monster) {
     const all = Array.isArray(monster.parsedActions) ? monster.parsedActions : [];
     const usable = all.filter(pa => pa.kind !== 'multiattack' && pa.kind !== 'unparsed');
@@ -563,21 +752,30 @@
       const resolved = [];
       for (const step of pa.multiattackPlan) {
         if (step._chooseFromWeighted) {
-          // Pick the option maximizing count × per-attack average damage.
-          const valid = step._chooseFromWeighted
-            .map(o => ({ name: fuzzyMatchName(o.name, names), count: o.count }))
-            .filter(o => o.name);
-          if (valid.length) {
-            valid.sort((a, b) => (b.count * avgOf(b.name)) - (a.count * avgOf(a.name)));
-            resolved.push({ actionName: valid[0].name, count: valid[0].count });
+          // Validate options; sort by count × per-attack average damage.
+          // ≥2 valid → keep them all for dynamic sim-time choice; the best is
+          // the fallback actionName (also what non-spatial consumers see).
+          let valid = step._chooseFromWeighted
+            .map(o => ({ actionName: fuzzyMatchName(o.name, names), count: o.count }))
+            .filter(o => o.actionName);
+          valid = valid.filter((o, i) => valid.findIndex(x => x.actionName === o.actionName) === i);
+          if (valid.length >= 2) {
+            valid.sort((a, b) => (b.count * avgOf(b.actionName)) - (a.count * avgOf(a.actionName)));
+            resolved.push({ actionName: valid[0].actionName, count: valid[0].count, optionsWeighted: valid });
+          } else if (valid.length === 1) {
+            resolved.push({ actionName: valid[0].actionName, count: valid[0].count });
           }
         } else if (step._chooseFrom) {
           let cands = step._chooseFrom.map(o => fuzzyMatchName(o, names)).filter(Boolean);
           cands = cands.filter((v, i) => cands.indexOf(v) === i);
           if (cands.length) {
             cands.sort((a, b) => avgOf(b) - avgOf(a));
-            resolved.push({ actionName: cands[0], count: step.count });
+            if (cands.length >= 2) resolved.push({ actionName: cands[0], count: step.count, options: cands });
+            else resolved.push({ actionName: cands[0], count: step.count });
           }
+        } else if (step._countRef) {
+          const match = fuzzyMatchName(step.actionName, names);
+          if (match) resolved.push({ actionName: match, count: countFromTraits(monster, step._countRef) });
         } else if (step.actionName == null) {
           if (bestAttack) resolved.push({ actionName: bestAttack.sourceActionName, count: step.count });
         } else {
@@ -585,14 +783,27 @@
           if (match) resolved.push({ actionName: match, count: step.count });
         }
       }
-      // Merge duplicate names (sum counts), preserving first-seen order.
+      // Merge duplicate PLAIN names (sum counts), preserving first-seen order.
+      // Steps carrying options stay distinct — their choice is per-swing.
       const merged = [];
       for (const s of resolved) {
-        const ex = merged.find(x => x.actionName === s.actionName);
-        if (ex) ex.count += s.count; else merged.push({ actionName: s.actionName, count: s.count });
+        const ex = !s.options && !s.optionsWeighted
+          && merged.find(x => x.actionName === s.actionName && !x.options && !x.optionsWeighted);
+        if (ex) ex.count += s.count; else merged.push(s);
       }
       if (merged.length) {
         pa.multiattackPlan = merged;
+        delete pa._raw;
+      } else if (bestAttack) {
+        // Every referenced name was unknown (scrape glued the sub-actions into
+        // the Multiattack body, or names drifted) but the monster DOES have a
+        // parsed attack — approximate with its best attack × the stated swing
+        // count instead of dropping the whole action. Flagged for Review.
+        let totalCount = 0;
+        for (const step of pa.multiattackPlan) totalCount += step.count || 1;
+        pa.multiattackPlan = [{ actionName: bestAttack.sourceActionName,
+                                count: Math.max(1, totalCount) }];
+        pa._note = 'plan referenced unknown actions — fell back to best attack';
         delete pa._raw;
       } else {
         // Degrade in place to unparsed (keeps the gate honest + shows in Review).
