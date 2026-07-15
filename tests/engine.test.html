@@ -2322,5 +2322,87 @@ test('runTrial: attack against dodging-flagged monster carries adv=-1 in event',
   assertTrue(typeof atk.adv === 'number', 'attack event carries adv state');
 });
 </script>
+
+<!-- ────── V3.2: action cost field + bonus-action phase ────── -->
+<script>
+test('parser: bonusActions bucket entries get cost=bonus', () => {
+  const m = { abilities: {}, pb: 2,
+    actions: [{ name: 'Bite', body: 'Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) piercing damage.' }],
+    bonusActions: [{ name: 'Quick Nip', body: 'Melee Attack Roll: +4, reach 5 ft. Hit: 3 (1d4 + 1) piercing damage.' }],
+    reactions: [] };
+  CrucibleParser.parseAllMonsterActions(m);
+  const bite = m.parsedActions.find(a => a.sourceActionName === 'Bite');
+  const nip = m.parsedActions.find(a => a.sourceActionName === 'Quick Nip');
+  assertEq(bite.cost, 'action');
+  assertEq(nip.cost, 'bonus');
+});
+
+test('runTrial: PC bonus-action attack fires after the main action', () => {
+  const pm = {
+    id: 'pm1', identity: { name: 'PC', level: 5 },
+    abilities: { dex: 14, str: 14 },
+    combat: { hp: 60, maxHp: 60, ac: 18, initBonus: 20, speed: 6 },
+    actions: [
+      { type: 'attack', name: 'Sword', actionRange: 'melee',
+        atkAbility: 'str', damage: { dice: '1d8', mod: '+atkAbility', type: 'slashing' } },
+      { type: 'attack', name: 'Offhand Dagger', actionRange: 'melee', cost: 'bonus',
+        atkAbility: 'str', damage: { dice: '1d4', mod: '+atkAbility', type: 'piercing' } },
+    ],
+  };
+  const gob = { pickId: 'gob', name: 'Goblin', cr: '1/4', count: 1,
+    monster: { name: 'Goblin', ac: 13, hp: 200, maxHp: 200, initiative: -10,
+               abilities: { str: { mod: 0 } }, speed: { walk: 30 },
+               parsedActions: [{ kind: 'attack', sourceActionName: 'Bite', name: 'Bite',
+                                 actionRange: 'melee', reach: 5, toHit: 4,
+                                 damage: [{ dice: '1d4', mod: 0, type: 'piercing' }] }] } };
+  const party = [pm];
+  party._encounter = { map: { width: 10, height: 10, blocked: null },
+                       placement: [{ id: 'pc:pm1', x: 5, y: 5 }, { id: 'gob:1', x: 6, y: 5 }] };
+  const rng = () => 0.5;
+  const trial = Crucible.runTrial(party, [gob], { aiHint: 'focus' }, rng);
+  const round1 = trial.events.filter(e => e.type === 'attack' && e.actor === 'PC' && e.round === 1);
+  const swordSwings = round1.filter(e => e.action === 'Sword');
+  const daggerSwings = round1.filter(e => e.action === 'Offhand Dagger');
+  assertTrue(swordSwings.length > 0, 'main Sword attack fired');
+  assertEq(daggerSwings.length, 1, 'exactly one bonus Offhand Dagger attack in round 1');
+});
+
+test('pickAction: bonus-cost actions are excluded from main-action selection', () => {
+  const c = { side: 'pc',
+    pm: { identity: { level: 5 }, abilities: { str: 14 },
+          actions: [{ type: 'attack', name: 'OnlyBonus', actionRange: 'melee', cost: 'bonus',
+                      damage: { dice: '1d4', mod: 0, type: 'piercing' } }] },
+    slotsLeft: {}, rechargeReady: {} };
+  const picked = Crucible.pickAction(c);
+  assertEq(picked, null, 'a bonus-only action list yields no main action');
+});
+
+test('runTrial: bonus attack does not fire when target is out of reach', () => {
+  const pm = {
+    id: 'pm1', identity: { name: 'PC', level: 5 },
+    abilities: { dex: 16, str: 10 },
+    combat: { hp: 60, maxHp: 60, ac: 18, initBonus: 20, speed: 6 },
+    actions: [
+      { type: 'attack', name: 'Bow', actionRange: 'ranged', range: 12,
+        atkAbility: 'dex', damage: { dice: '1d8', mod: '+atkAbility', type: 'piercing' } },
+      { type: 'attack', name: 'Offhand Jab', actionRange: 'melee', cost: 'bonus',
+        atkAbility: 'str', damage: { dice: '1d4', mod: '+atkAbility', type: 'bludgeoning' } },
+    ],
+  };
+  const gob = { pickId: 'gob', name: 'Goblin', cr: '1/4', count: 1,
+    monster: { name: 'Goblin', ac: 13, hp: 200, maxHp: 200, initiative: -10,
+               abilities: { str: { mod: 0 } }, speed: { walk: 0 },
+               parsedActions: [{ kind: 'attack', sourceActionName: 'Bite', name: 'Bite',
+                                 actionRange: 'melee', reach: 5, toHit: 4,
+                                 damage: [{ dice: '1d4', mod: 0, type: 'piercing' }] }] } };
+  const party = [pm];
+  party._encounter = { map: { width: 15, height: 10, blocked: null },
+                       placement: [{ id: 'pc:pm1', x: 1, y: 5 }, { id: 'gob:1', x: 9, y: 5 }] };
+  const rng = () => 0.5;
+  const trial = Crucible.runTrial(party, [gob], { aiHint: 'focus' }, rng);
+  const jabs = trial.events.filter(e => e.type === 'attack' && e.action === 'Offhand Jab' && e.round === 1);
+  assertEq(jabs.length, 0, 'melee bonus attack must not fire from 8 cells away');
+});
+</script>
 </body>
 </html>

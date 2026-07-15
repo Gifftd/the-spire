@@ -372,7 +372,11 @@
   // Monster-side here; PC-side keeps its own dispatch path.
   function availableMonsterActions(me) {
     const list = (me.monster && me.monster.parsedActions) || [];
-    return list.filter(a => isAvailable(me, a));
+    // v3.2: bonus/reaction-bucket actions are not eligible as a main action.
+    // (Undefined cost predates the cost field and means 'action' — keep.)
+    // This also fixes a latent bug: reaction-bucket attacks (e.g. a monster's
+    // opportunity-attack-only action) were previously pickable as main actions.
+    return list.filter(a => a.cost !== 'bonus' && a.cost !== 'reaction' && isAvailable(me, a));
   }
 
   // ── Soldier ──
@@ -1388,7 +1392,7 @@
             base.condition     = (a.save && a.save.condition) || null;
           }
           return base;
-        })
+        }).filter(a => a.cost !== 'bonus')
       : ((c.monster && c.monster.parsedActions) || []);
     // Multiattack first.
     const ma = list.find(a => a.kind === 'multiattack' && isAvailable(c, a));
@@ -1402,6 +1406,61 @@
     const atWill = list.find(a =>
       ['attack','save','heal'].includes(a.kind) && isAvailable(c, a));
     return atWill || null;
+  }
+
+  // ─────────── Bonus-action phase (v3.2) ───────────
+  // Pick and fire one bonus-cost action, if any is available and useful.
+  // Supports kinds: attack (requires a target attackable from the current
+  // cell — bonus actions never move), heal (most-injured living ally,
+  // including self). Other kinds are skipped in v3.2.
+  function resolveBonusAction(c, all, tactics, map, rng, events, round, tally) {
+    const raw = c.side === 'pc'
+      ? ((c.pm && c.pm.actions) || []).map(a => ({ ...a, sourceActionName: a.sourceActionName || a.name, kind: a.kind || a.type }))
+      : ((c.monster && c.monster.parsedActions) || []);
+    const candidates = raw.filter(a => a.cost === 'bonus' && a.kind !== 'unparsed' && isAvailable(c, a));
+    if (!candidates.length) return;
+
+    // Heals first when someone is hurt badly (mirror healTriage's spirit).
+    const healAct = candidates.find(a => a.kind === 'heal');
+    if (healAct) {
+      const allies = all.filter(t => t.side === c.side && !t.dead && !t.downed
+                                     && t.maxHp > 0 && t.hp / t.maxHp < 0.5);
+      if (allies.length) {
+        allies.sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp));
+        c.bonusActionAvailable = false;
+        consumeUse(c, healAct);
+        const r = resolveHeal(c, [allies[0]], healAct, rng, events, round);
+        tally(c.side, healAct.sourceActionName || healAct.name, 'heal',
+              false, 0, r.totalHealed, 0, r.revives);
+        return;
+      }
+    }
+
+    const atkAct = candidates.find(a => a.kind === 'attack');
+    if (atkAct) {
+      const tgt = pickEnemyTarget(c, all, tactics, rng, atkAct);
+      if (!tgt) return;
+      if (typeof CrucibleSpatial !== 'undefined'
+          && !CrucibleSpatial.canAttackFrom(c, tgt, atkAct, c._mapRef || map)) return;
+      c.bonusActionAvailable = false;
+      consumeUse(c, atkAct);
+      const r = c.side === 'pc'
+        ? resolveAttackPc(c, tgt, atkAct, rng, events, round, all)
+        : resolveAttackMonster(c, tgt, atkAct, rng, events, round, all);
+      const wasAlive = !tgt.dead && !tgt.downed;
+      let total = 0;
+      // TODO v3.5: bonus attacks bypass the feature-dice pipeline (onAttackHit
+      // bonus dice, onTakeDamage reduction, etc. from the main attack branch
+      // in runTrial). Raw damageByType is applied directly here.
+      for (const [ty, dmg] of Object.entries(r.damageByType || {})) {
+        applyDamage(tgt, dmg, ty, c, events, round, c.name,
+                    atkAct.sourceActionName || atkAct.name);
+        total += dmg;
+      }
+      const killed = wasAlive && (tgt.dead || tgt.downed);
+      tally(c.side, atkAct.sourceActionName || atkAct.name, 'attack',
+            r.hit, total, 0, killed ? 1 : 0, 0);
+    }
   }
 
   // ─────────── runTrial — one fight ───────────
@@ -1802,6 +1861,11 @@
             }
           }
         }
+        }
+        // v3: bonus-action phase. One bonus-cost action may fire per turn if
+        // the combatant is still standing and a useful one is available.
+        if (!winner && !c.dead && !c.downed && c.bonusActionAvailable) {
+          resolveBonusAction(c, all, tactics, map, rng, events, round, tally);
         }
         // v2 terrain: damaging-cell trigger if combatant ends turn standing on it.
         if (typeof CrucibleSpatial !== 'undefined' && map && !c.dead && !c.downed) {

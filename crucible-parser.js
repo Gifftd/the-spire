@@ -280,12 +280,17 @@
     if (!monster) return;
     monster.parsedActions = Array.isArray(monster.parsedActions) ? monster.parsedActions : [];
     const existing = new Set(monster.parsedActions.map(p => p.sourceActionName));
-    const buckets = [monster.actions, monster.bonusActions, monster.reactions];
-    for (const arr of buckets) {
+    const buckets = [
+      ['action', monster.actions],
+      ['bonus', monster.bonusActions],
+      ['reaction', monster.reactions],
+    ];
+    for (const [costLabel, arr] of buckets) {
       if (!Array.isArray(arr)) continue;
       for (const a of arr) {
         if (!a || !a.name || existing.has(a.name)) continue;
         const p = parseAction(a.name, a.body, monster.abilities, monster.pb);
+        p.cost = costLabel;
         monster.parsedActions.push(p);
         existing.add(a.name);
       }

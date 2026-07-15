@@ -270,7 +270,8 @@ function pcSummary(pm) {
 function actionSummary(act) {
   return `${act.name} · ${act.type}` +
     (act.damage ? ` · ${act.damage.dice}+${act.damage.mod === '+atkAbility' ? (act.atkAbility||'str').toUpperCase() : act.damage.mod}` : '') +
-    (act.heal ? ` · heals ${act.heal.dice || act.heal.flat || 0}` : '');
+    (act.heal ? ` · heals ${act.heal.dice || act.heal.flat || 0}` : '') +
+    (act.cost === 'bonus' ? ' · bonus' : '');
 }
 function refreshPCSummary(pmId) {
   const pm = party.find(p => p.id === pmId); if (!pm) return;
@@ -498,6 +499,12 @@ function renderActionEditor(pm, act) {
         oninput="updateAction('${pm.id}','${act.id}','name', this.value)" class="pc-input"></label>
       <label>Attack type
         <select onchange="updateAction('${pm.id}','${act.id}','actionRange', this.value)">${rangeSel}</select>
+      </label>
+      <label>Cost
+        <select onchange="updateAction('${pm.id}','${act.id}','cost', this.value)">
+          <option value="action" ${(!act.cost || act.cost === 'action') ? 'selected' : ''}>action</option>
+          <option value="bonus" ${act.cost === 'bonus' ? 'selected' : ''}>bonus</option>
+        </select>
       </label>
       <label>Range (cells, optional)
         <input type="number" min="1" max="60" value="${typeof act.range === 'number' ? act.range : ''}"
