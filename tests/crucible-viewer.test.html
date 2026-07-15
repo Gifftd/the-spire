@@ -243,6 +243,48 @@ test('mount: replays a stream containing every new v3.3 event type without throw
   assertEq(v.cursor, trial.events.length - 1, 'stepped to the final event');
   assert(host.querySelector('svg.tactical-board'), 'board still rendered after the full stream');
 });
+
+// ═══════════════════ v3.6: status glyphs ═══════════════════
+
+test('renderSVG: condition-applied adds a status glyph above the token', () => {
+  const trial = syntheticTrial();
+  const state = CrucibleViewer.initialState(trial.events[0]);
+  CrucibleViewer.applyEvent(state, {
+    type: 'condition-applied', round: 1, who: 'pc:1', name: 'PC',
+    target: 'mon:0', targetName: 'Goblin', condition: 'poisoned', duration: 1, dc: 12,
+  });
+  const mon = state.combatants.find(c => c.id === 'mon:0');
+  assert(mon.conditions.has('poisoned'), 'condition tracked in viewer state');
+  const host = document.getElementById('host');
+  host.innerHTML = '';
+  CrucibleViewer.renderSVG(host, state);
+  const g = host.querySelector('[data-id="mon:0"] .status-glyphs');
+  assert(g, 'status-glyphs element rendered');
+  assertEq(g.textContent, 'P');   // poisoned → first letter uppercased
+});
+
+test('renderSVG: prone glyph (▼) shows then clears on stand-up', () => {
+  const trial = syntheticTrial();
+  const state = CrucibleViewer.initialState(trial.events[0]);
+  // Knock the goblin prone via a failed shove.
+  CrucibleViewer.applyEvent(state, {
+    type: 'shove', round: 1, who: 'pc:1', name: 'PC',
+    target: 'mon:0', targetName: 'Goblin', mode: 'prone', outcome: 'prone', to: null,
+  });
+  const host = document.getElementById('host');
+  host.innerHTML = '';
+  CrucibleViewer.renderSVG(host, state);
+  let g = host.querySelector('[data-id="mon:0"] .status-glyphs');
+  assert(g && g.textContent.includes('▼'), 'prone glyph rendered after shove-prone');
+  // Stand up → the glyph strip disappears.
+  CrucibleViewer.applyEvent(state, { type: 'stand-up', round: 2, who: 'mon:0', name: 'Goblin' });
+  host.innerHTML = '';
+  CrucibleViewer.renderSVG(host, state);
+  g = host.querySelector('[data-id="mon:0"] .status-glyphs');
+  assert(!g, 'no glyph strip after stand-up clears prone');
+  const mon = state.combatants.find(c => c.id === 'mon:0');
+  assert(!mon.conditions.has('prone'), 'prone cleared from state');
+});
 </script>
 </body>
 </html>

@@ -94,6 +94,10 @@
     .tactical-board .token.dead text { text-decoration: line-through; }
     .tactical-board .token.downed circle { fill: #8b9da3; }
     .tactical-board .hp-bar { fill: #6dd58c; }
+    /* Scoped under .token so this wins over `.tactical-board .token text`
+       (the token-letter rule), which is otherwise more specific and would
+       paint the glyphs the dark board color. */
+    .tactical-board .token .status-glyphs { fill: #ffdd99; font-size: 0.5rem; text-anchor: middle; pointer-events: none; }
     .tactical-board .aoe-cell { fill: #c87cd4; opacity: 0.35; transition: opacity 600ms ease-out; }
     .tactical-board .move-trail { fill: none; stroke: var(--c-accent); stroke-width: 1.5; stroke-dasharray: 3 3; opacity: 0.6; }
     .tactical-board .terrain-wall { fill: var(--c-ink-faint, #4a4a52); }
