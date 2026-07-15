@@ -26,6 +26,23 @@
     return 1 + Math.floor(rng() * sides);
   }
 
+  // Roll a d20 honoring advantage state: +1 = advantage (roll twice, take
+  // higher), -1 = disadvantage (lower), 0/undefined = straight roll.
+  // 5e RAW: any advantage + any disadvantage = straight — callers compute
+  // the NET state via netAdvantage().
+  function rollD20(rng, advState) {
+    const a = rollDie(20, rng);
+    if (!advState) return a;
+    const b = rollDie(20, rng);
+    return advState > 0 ? Math.max(a, b) : Math.min(a, b);
+  }
+
+  // Collapse boolean source lists per 5e RAW.
+  function netAdvantage(hasAdv, hasDis) {
+    if (hasAdv && hasDis) return 0;
+    return hasAdv ? 1 : (hasDis ? -1 : 0);
+  }
+
   // Parse and roll a dice formula. Forms accepted:
   //   '1d8', '2d6+3', '3d8-2', '4d6 + 1', '1d20+0', '3'  (constant)
   // crit=true → roll dice count twice (doubling dice, not modifier).
@@ -589,6 +606,8 @@
         actionsAvailable: 1,
         bonusActionAvailable: true,
         reactionAvailableThisRound: true,
+        // v3 turn-scoped flags (NOT in the conditions duration Map).
+        dodging: false, hidden: false, helped: false, disengagedThisTurn: false,
         speed: typeof pm.combat.speed === 'number' ? pm.combat.speed : 6,
         naturalReach: typeof pm.combat.reach === 'number' ? pm.combat.reach : 1,
         x: 0, y: 0,  // populated by placeCombatants in runTrial
@@ -631,6 +650,8 @@
           naturalReach: monsterReachCells(m),
           x: 0, y: 0,
           reactionAvailableThisRound: true,
+          // v3 turn-scoped flags (NOT in the conditions duration Map).
+          dodging: false, hidden: false, helped: false, disengagedThisTurn: false,
         });
       }
     }
@@ -661,6 +682,14 @@
       if (next <= 0) c.conditions.delete(name);
       else c.conditions.set(name, next);
     }
+  }
+
+  // Effective speed in cells after condition effects. Grappled/restrained → 0.
+  function effectiveSpeed(c) {
+    const base = c.speed || 0;
+    const cc = c.conditions;
+    if (cc && (cc.has('grappled') || cc.has('restrained'))) return 0;
+    return base;
   }
 
   function rollRecharge(c, actions, rng) {
@@ -811,6 +840,30 @@
     return 1;
   }
 
+  // ─────────── Advantage state for an attack roll ───────────
+  // Net advantage state for an attack roll, per the spec's source table.
+  // Melee = chebyshev dist <= 1 when positions exist, else actionRange check.
+  function attackAdvantageState(attacker, target, action) {
+    const isMelee = (typeof attacker.x === 'number' && typeof target.x === 'number'
+                     && typeof CrucibleSpatial !== 'undefined')
+      ? CrucibleSpatial.chebyshev(attacker, target) <= 1
+      : action.actionRange !== 'ranged';
+    let adv = false, dis = false;
+    const tc = target.conditions, ac = attacker.conditions;
+    // Target state.
+    if (tc && tc.has('prone')) { if (isMelee) adv = true; else dis = true; }
+    if (target.dodging) dis = true;
+    if (tc && (tc.has('restrained') || tc.has('blinded') || tc.has('stunned')
+               || tc.has('paralyzed') || tc.has('unconscious'))) adv = true;
+    if (target.hidden) dis = true;
+    // Attacker state.
+    if (ac && (ac.has('prone') || ac.has('poisoned') || ac.has('frightened')
+               || ac.has('restrained') || ac.has('blinded'))) dis = true;
+    if (attacker.hidden) adv = true;
+    if (attacker.helped) adv = true;
+    return netAdvantage(adv, dis);
+  }
+
   // ─────────── Resolve a monster-side attack action ───────────
   // For a PC-side attack, the engine uses resolveAttackPc (next task block).
   function resolveAttackMonster(me, target, action, rng, events, round, combatants) {
@@ -826,7 +879,8 @@
       }
     }
     me.hasAttacked = true;
-    const roll = rollDie(20, rng);
+    const advState = attackAdvantageState(me, target, action);
+    const roll = rollD20(rng, advState);
     const isCrit = roll === 20;
     const isFumble = roll === 1;
     let hit = !isFumble && (isCrit || roll + (action.toHit || 0) >= (target.ac || 10));
@@ -853,7 +907,11 @@
     }
     events.push({ round, type:'attack', actor: me.name, target: target.name,
                   action: action.sourceActionName, roll, crit:isCrit, hit,
-                  damageDealt });
+                  damageDealt, adv: advState });
+    // Consume one-shot flags: Help grants advantage on ONE attack; attacking
+    // from hiding reveals the attacker.
+    if (me.hidden) me.hidden = false;
+    if (me.helped) me.helped = false;
     return { roll, crit:isCrit, hit, damageDealt, damageByType };
   }
 
@@ -878,7 +936,8 @@
     }
     // PC actions store inputs; derive to-hit + damage roll.
     const th = toHit(me.pm, action);
-    const roll = rollDie(20, rng);
+    const advState = attackAdvantageState(me, target, action);
+    const roll = rollD20(rng, advState);
     const isCrit = roll === 20;
     const isFumble = roll === 1;
     let hit = !isFumble && (isCrit || roll + th >= (target.ac || 10));
@@ -916,7 +975,12 @@
       }
     }
     events.push({ round, type:'attack', actor: me.name, target: target.name,
-                  action: action.name, roll, crit:isCrit, hit, damageDealt });
+                  action: action.name, roll, crit:isCrit, hit, damageDealt,
+                  adv: advState });
+    // Consume one-shot flags: Help grants advantage on ONE attack; attacking
+    // from hiding reveals the attacker.
+    if (me.hidden) me.hidden = false;
+    if (me.helped) me.helped = false;
     return { roll, crit:isCrit, hit, damageDealt, damageByType };
   }
 
@@ -1015,6 +1079,27 @@
     return stepped.length;
   }
 
+  // ─────────── Advantage / auto-fail on saving throws ───────────
+  // Net advantage on a saving throw. Dodging grants adv on DEX saves;
+  // restrained gives dis on DEX saves. Stunned/paralyzed/unconscious
+  // auto-fail STR and DEX saves — callers check autoFailsSave() first.
+  function saveAdvantageState(target, action) {
+    const ability = action.saveAbility || 'dex';
+    let adv = false, dis = false;
+    if (ability === 'dex') {
+      if (target.dodging) adv = true;
+      if (target.conditions && target.conditions.has('restrained')) dis = true;
+    }
+    return netAdvantage(adv, dis);
+  }
+
+  function autoFailsSave(target, action) {
+    const ability = action.saveAbility || 'dex';
+    if (ability !== 'str' && ability !== 'dex') return false;
+    const tc = target.conditions;
+    return !!(tc && (tc.has('stunned') || tc.has('paralyzed') || tc.has('unconscious')));
+  }
+
   // ─────────── Resolve a save effect ───────────
   function resolveSave(me, targets, action, rng, events, round, combatants) {
     let totalDmg = 0;
@@ -1027,17 +1112,28 @@
         const ab = t.monster.abilities[action.saveAbility];
         sb = ab ? (ab.save != null ? ab.save : ab.mod) : 0;
       }
-      const roll = rollDie(20, rng);
-      // Broadcast onSaveAttempt: allow any PC's features (e.g., Bardic Inspiration
-      // held by an ally) to add a bonus to this save.
-      let broadcastSaveBonus = 0;
-      if (typeof PCFeatures !== 'undefined' && t && combatants) {
-        const saveRollCtx = { roll, bonus: 0, eventLog: events, round, combatants };
-        PCFeatures.dispatchBroadcastHook(combatants, t, 'onSaveAttempt',
-          action.saveAbility, action.saveDc, saveRollCtx);
-        broadcastSaveBonus = saveRollCtx.bonus || 0;
+      // Stunned/paralyzed/unconscious auto-fail STR/DEX saves. This routes
+      // through the same damage/condition application path as a natural
+      // failure, but draws NO d20 (which shifts the rng stream for later
+      // rolls — acceptable, the trial is event-sourced).
+      let roll, passed;
+      if (autoFailsSave(t, action)) {
+        roll = 0;
+        passed = false;
+      } else {
+        const saveAdv = saveAdvantageState(t, action);
+        roll = rollD20(rng, saveAdv);
+        // Broadcast onSaveAttempt: allow any PC's features (e.g., Bardic
+        // Inspiration held by an ally) to add a bonus to this save.
+        let broadcastSaveBonus = 0;
+        if (typeof PCFeatures !== 'undefined' && t && combatants) {
+          const saveRollCtx = { roll, bonus: 0, eventLog: events, round, combatants };
+          PCFeatures.dispatchBroadcastHook(combatants, t, 'onSaveAttempt',
+            action.saveAbility, action.saveDc, saveRollCtx);
+          broadcastSaveBonus = saveRollCtx.bonus || 0;
+        }
+        passed = (roll + broadcastSaveBonus) + sb >= action.saveDc;
       }
-      const passed = (roll + broadcastSaveBonus) + sb >= action.saveDc;
       let dmgList;
       if (passed && action.halfOnSave) dmgList = action.damageOnFail; // half later
       else if (passed)                 dmgList = action.damageOnSave || [];
@@ -1390,9 +1486,14 @@
         // Reset per-turn action budgets.
         c.actionsAvailable = 1;
         c.bonusActionAvailable = true;
+        // v3 turn-scoped flags. Dodge lasts until the start of your own next
+        // turn; disengaged clears each turn. hidden/helped persist until
+        // consumed (do NOT reset them here).
+        c.dodging = false;
+        c.disengagedThisTurn = false;
         // v2 spatial: free movement budget refreshes each turn. Spending the
-        // action on Dash later in the loop refills it with another c.speed.
-        c.movementBudgetThisTurn = c.speed || 0;
+        // action on Dash later in the loop refills it with another effectiveSpeed.
+        c.movementBudgetThisTurn = effectiveSpeed(c);
         // reactionAvailableThisRound resets at onRoundEnd, not per turn.
 
         // Fire onTurnStart for PC features.
@@ -1486,7 +1587,7 @@
                   dist = CrucibleSpatial.chebyshev(c, tgtCandidate);
                 }
                 if (dist > need) {
-                  const dashed = executeMove(c, tgtCandidate, c.speed || 0, 'dash',
+                  const dashed = executeMove(c, tgtCandidate, effectiveSpeed(c), 'dash',
                     combatants, map, rng, events, round);
                   if (dashed > 0) {
                     events.push({ type: 'dash', round, who: c.id, name: c.name, cells: dashed });
@@ -1524,7 +1625,7 @@
                   if (!CrucibleSpatial.canAttackFrom(c, tgtCandidate, action, map)) {
                     const dashResult = CrucibleSpatial.findShootingCell(
                       { x: c.x, y: c.y }, tgtCandidate, action, map,
-                      { maxSteps: c.speed || 0, occupied });
+                      { maxSteps: effectiveSpeed(c), occupied });
                     if (dashResult && dashResult.path.length > 0) {
                       const dashed = executePath(c, dashResult.path, 'dash',
                         combatants, rng, events, round);
@@ -1928,8 +2029,9 @@
 
   // ─────────── Public exports ───────────
   const Crucible = {
-    makeRng, rollDie, rollDice,
+    makeRng, rollDie, rollDice, rollD20, netAdvantage,
     mod, pb, saveBonus, toHit, saveDc, pcDamageMod,
+    attackAdvantageState, saveAdvantageState, autoFailsSave, effectiveSpeed,
     buildCombatants, rollInitiative, initOrder,
     tickConditions, rollRecharge, applyRegen, turnStart,
     pickEnemyTarget, isAvailable, consumeUse, healTriage,
