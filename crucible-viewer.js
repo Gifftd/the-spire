@@ -106,10 +106,17 @@
         }
         break;
       }
+      case 'push': {
+        if (ev.to) {
+          const t = state.combatants.find(cc => cc.id === ev.target);
+          if (t) { t.x = ev.to.x; t.y = ev.to.y; }
+        }
+        break;
+      }
       // attack/save/feature events don't change state — they're informational.
-      // v3.3 dodge/disengage/help/hide/grapple/stand-up/condition-ended and
-      // the v3.4 decision (AI trace) event are log-only here; token status
-      // glyphs arrive in V3.6.
+      // v3.3 dodge/disengage/help/hide/grapple/stand-up/condition-ended, the
+      // v3.4 decision (AI trace) event, and the v3.5 condition-applied/buff
+      // events are log-only here; token status glyphs arrive in V3.6.
     }
   }
   CrucibleViewer.applyEvent = applyEvent;
@@ -304,6 +311,9 @@
         case 'decision':   return 'R' + ev.round + ' · 🧠 ' + ev.name + ': ' + ev.choice + (ev.reason ? ' — ' + ev.reason : '');
         case 'condition-ended': return 'R' + ev.round + ' · ' + ev.name + ' is no longer ' + ev.condition + (ev.reason ? ' (' + ev.reason + ')' : '');
         case 'grapple-escape-failed': return 'R' + ev.round + ' · ' + ev.name + ' fails to escape the grapple';
+        case 'condition-applied': return 'R' + ev.round + ' · ' + ev.targetName + ' is ' + ev.condition + ' (DC ' + ev.dc + ', ' + ev.duration + ' rd)';
+        case 'push':      return 'R' + ev.round + ' · ' + ev.name + ' pushes ' + ev.targetName + ' ' + ev.cells + ' cell' + (ev.cells === 1 ? '' : 's');
+        case 'buff':       return 'R' + ev.round + ' · ' + ev.name + ' grants ' + ev.grants + ' to ' + (ev.target === ev.who ? 'self' : ev.targetName);
         default:          return ev.type;
       }
     }

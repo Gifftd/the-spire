@@ -273,7 +273,10 @@ function actionSummary(act) {
   return `${act.name} · ${act.type}` +
     (act.damage ? ` · ${act.damage.dice}+${act.damage.mod === '+atkAbility' ? (act.atkAbility||'str').toUpperCase() : act.damage.mod}` : '') +
     (act.heal ? ` · heals ${act.heal.dice || act.heal.flat || 0}` : '') +
-    (act.cost === 'bonus' ? ' · bonus' : '');
+    (act.cost === 'bonus' ? ' · bonus' : '') +
+    (act.push ? ` · push ${act.push}` : '') +
+    (act.rider && act.rider.condition ? ` · rider: ${act.rider.condition}` : '') +
+    (act.type === 'buff' ? ` · ${act.grants || ''} (${act.buffTarget || 'self'})` : '');
 }
 function refreshPCSummary(pmId) {
   const pm = party.find(p => p.id === pmId); if (!pm) return;
@@ -449,13 +452,17 @@ function renderActionRow(pm, act) {
 }
 
 function renderActionEditor(pm, act) {
-  const typeSel = ['attack','save','heal','utility'].map(t =>
+  const typeSel = ['attack','save','heal','buff','utility'].map(t =>
     `<option value="${t}" ${act.type===t?'selected':''}>${t}</option>`).join('');
   const abSel = ['str','dex','con','int','wis','cha'].map(t =>
     `<option value="${t}" ${act.atkAbility===t?'selected':''}>${t.toUpperCase()}</option>`).join('');
   let body = '';
   if (act.type === 'attack') {
     const d = act.damage || {};
+    const r = act.rider || {};
+    const riderConditions = ['', 'prone','poisoned','frightened','restrained','blinded','grappled','stunned'];
+    const riderAbSel = ['str','dex','con','int','wis','cha'].map(t =>
+      `<option value="${t}" ${(r.saveAbility||'con')===t?'selected':''}>${t.toUpperCase()}</option>`).join('');
     body = `
       <label>Atk ability <select onchange="updateAction('${pm.id}','${act.id}','atkAbility',this.value)">${abSel}</select></label>
       <label>Override to-hit (blank = derived) <input type="number" value="${act.atkBonusOverride ?? ''}"
@@ -469,9 +476,24 @@ function renderActionEditor(pm, act) {
       <label>Rider dice (optional) <input type="text" value="${escapeHtml(d.riderDice||'')}"
         oninput="updateActionDamage('${pm.id}','${act.id}','riderDice', this.value||null)" class="pc-input"></label>
       <label>Rider type (optional) <input type="text" value="${escapeHtml(d.riderType||'')}"
-        oninput="updateActionDamage('${pm.id}','${act.id}','riderType', this.value||null)" class="pc-input"></label>`;
+        oninput="updateActionDamage('${pm.id}','${act.id}','riderType', this.value||null)" class="pc-input"></label>
+      <label>Push (cells, 0=none) <input type="number" min="0" max="10" value="${act.push||0}"
+        oninput="updateAction('${pm.id}','${act.id}','push', parseInt(this.value)||0)" class="pc-input" style="width:4rem"></label>
+      <div style="margin-top:0.35rem; padding-top:0.35rem; border-top:1px dotted var(--c-border);">
+        <label>On-hit rider condition
+          <select onchange="updateActionRider('${pm.id}','${act.id}','condition', this.value)">
+            ${riderConditions.map(cnd => `<option value="${cnd}" ${(r.condition||'')===cnd?'selected':''}>${cnd || '(none)'}</option>`).join('')}
+          </select></label>
+        ${r.condition ? `
+        <label>Rider save ability <select onchange="updateActionRider('${pm.id}','${act.id}','saveAbility',this.value)">${riderAbSel}</select></label>
+        <label>Rider DC (blank = derived) <input type="number" value="${r.saveDc ?? ''}"
+          oninput="updateActionRider('${pm.id}','${act.id}','saveDc', this.value === '' ? null : parseInt(this.value))" class="pc-input" style="width:4rem"></label>
+        <label>Duration (rounds) <input type="number" min="1" max="10" value="${r.duration||1}"
+          oninput="updateActionRider('${pm.id}','${act.id}','duration', parseInt(this.value)||1)" class="pc-input" style="width:4rem"></label>` : ''}
+      </div>`;
   } else if (act.type === 'save') {
     const s = act.save || {};
+    const shapeVal = act.shape || 'single';
     body = `
       <label>Save ability <select onchange="updateActionSave('${pm.id}','${act.id}','ability',this.value)">${abSel}</select></label>
       <label>DC override (blank = derived) <input type="number" value="${s.dcOverride ?? ''}"
@@ -483,7 +505,13 @@ function renderActionEditor(pm, act) {
       <label><input type="checkbox" ${s.halfOnSave?'checked':''}
         onchange="updateActionSave('${pm.id}','${act.id}','halfOnSave', this.checked)"> half on save</label>
       <label>AoE targets <input type="number" value="${act.aoeTargets||0}" min="0" max="20"
-        oninput="updateAction('${pm.id}','${act.id}','aoeTargets', parseInt(this.value)||0)" class="pc-input"></label>`;
+        oninput="updateAction('${pm.id}','${act.id}','aoeTargets', parseInt(this.value)||0)" class="pc-input"></label>
+      <label>Shape
+        <select onchange="updateAction('${pm.id}','${act.id}','shape', this.value === 'single' ? null : this.value)">
+          ${['single','sphere','cube','cone','line'].map(sh => `<option value="${sh}" ${shapeVal===sh?'selected':''}>${sh}</option>`).join('')}
+        </select></label>
+      <label>Size (cells) <input type="number" min="1" max="30" value="${act.size||0}"
+        oninput="updateAction('${pm.id}','${act.id}','size', parseInt(this.value)||0)" class="pc-input" style="width:4rem"></label>`;
   } else if (act.type === 'heal') {
     const h = act.heal || {};
     body = `
@@ -499,6 +527,16 @@ function renderActionEditor(pm, act) {
         </select></label>
       <label><input type="checkbox" ${h.reviveDowned?'checked':''}
         onchange="updateActionHeal('${pm.id}','${act.id}','reviveDowned', this.checked)"> revives downed</label>`;
+  } else if (act.type === 'buff') {
+    body = `
+      <label>Grants
+        <select onchange="updateAction('${pm.id}','${act.id}','grants', this.value)">
+          ${['dodging','helped'].map(g => `<option value="${g}" ${act.grants===g?'selected':''}>${g}</option>`).join('')}
+        </select></label>
+      <label>Target
+        <select onchange="updateAction('${pm.id}','${act.id}','buffTarget', this.value)">
+          ${['self','ally'].map(t => `<option value="${t}" ${act.buffTarget===t?'selected':''}>${t}</option>`).join('')}
+        </select></label>`;
   }
   const rangeSel = ['melee','ranged','both'].map(t =>
     `<option value="${t}" ${act.actionRange===t?'selected':''}>${t}</option>`).join('');
@@ -936,6 +974,21 @@ function updateActionHeal(pmId, aId, field, value) {
   act.heal[field] = value; saveParty();
   refreshActionSummary(pmId, aId); refreshGate();
 }
+// v3.5: on-hit attack rider (condition + save to resist). Setting condition
+// to '' clears the whole rider block; any other field lazily creates it.
+function updateActionRider(pmId, aId, field, value) {
+  const pm = party.find(p => p.id === pmId); if (!pm) return;
+  const act = pm.actions.find(a => a.id === aId); if (!act) return;
+  if (field === 'condition' && !value) {
+    act.rider = null;
+  } else {
+    act.rider = act.rider || { condition:'', saveAbility:'con', saveDc:null, duration:1 };
+    act.rider[field] = value;
+  }
+  saveParty();
+  refreshActionSummary(pmId, aId); refreshGate();
+  renderParty();   // rider sub-fields appear/disappear based on condition
+}
 function changeActionType(pmId, aId, newType) {
   const pm = party.find(p => p.id === pmId); if (!pm) return;
   const act = pm.actions.find(a => a.id === aId); if (!act) return;
@@ -953,6 +1006,10 @@ function changeActionType(pmId, aId, newType) {
     act.damage = act.damage || { dice:'1d8', mod:'+atkAbility', type:'slashing',
                                   riderDice:null, riderType:null };
     act.heal = null;
+  } else if (newType === 'buff') {
+    if (!act.grants) act.grants = 'dodging';
+    if (!act.buffTarget) act.buffTarget = 'self';
+    act.damage = null; act.save = null; act.heal = null;
   } else {
     act.damage = null; act.save = null; act.heal = null;
   }

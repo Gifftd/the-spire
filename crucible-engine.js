@@ -934,6 +934,9 @@
     events.push({ round, type:'attack', actor: me.name, target: target.name,
                   action: action.sourceActionName, roll, crit:isCrit, hit,
                   damageDealt, adv: advState });
+    // v3.5: on-hit rider condition + forced movement.
+    if (hit) applyAttackRider(me, target, action, rng, events, round);
+    if (hit && action.push > 0) pushTarget(me, target, action.push, me._mapRef, combatants, events, round);
     // Consume one-shot flags: Help grants advantage on ONE attack; attacking
     // from hiding reveals the attacker.
     if (me.hidden) me.hidden = false;
@@ -1003,6 +1006,9 @@
     events.push({ round, type:'attack', actor: me.name, target: target.name,
                   action: action.name, roll, crit:isCrit, hit, damageDealt,
                   adv: advState });
+    // v3.5: on-hit rider condition + forced movement.
+    if (hit) applyAttackRider(me, target, action, rng, events, round);
+    if (hit && action.push > 0) pushTarget(me, target, action.push, me._mapRef, combatants, events, round);
     // Consume one-shot flags: Help grants advantage on ONE attack; attacking
     // from hiding reveals the attacker.
     if (me.hidden) me.hidden = false;
@@ -1040,6 +1046,86 @@
                     'opportunity ' + (action.sourceActionName || action.name));
       }
     }
+  }
+
+  // ─────────── v3.5: attack riders, forced movement, buff actions ───────────
+
+  // On-hit rider condition. Target saves vs the rider DC; on a failure the
+  // condition lands with a round-based duration ticked by tickConditions.
+  // saveDc: null means derive (PC: 8 + atkAbility mod + PB; monster:
+  // maneuverDc(attacker)). Called from inside resolveAttackPc/Monster
+  // immediately after the attack event, guarded by `if (hit)`.
+  function applyAttackRider(attacker, target, action, rng, events, round) {
+    const r = action.rider;
+    if (!r || !r.condition || target.dead) return;
+    let dc = r.saveDc;
+    if (dc == null) {
+      dc = attacker.side === 'pc'
+        ? 8 + mod((attacker.pm && attacker.pm.abilities && attacker.pm.abilities[action.atkAbility]) || 10)
+            + pb((attacker.pm && attacker.pm.identity && attacker.pm.identity.level) || 1)
+        : maneuverDc(attacker);
+    }
+    const saveAction = { saveAbility: r.saveAbility || 'con', saveDc: dc };
+    let failed;
+    if (autoFailsSave(target, saveAction)) {
+      failed = true;
+    } else {
+      const roll = rollD20(rng, saveAdvantageState(target, saveAction))
+                 + targetSaveBonus(target, saveAction.saveAbility);
+      failed = roll < dc;
+    }
+    if (failed) {
+      target.conditions.set(r.condition, Math.max(1, r.duration || 1));
+      events.push({ type: 'condition-applied', round,
+                    who: attacker.id, name: attacker.name,
+                    target: target.id, targetName: target.name,
+                    condition: r.condition, duration: r.duration || 1, dc });
+    }
+  }
+
+  // Forced movement on hit. Push target up to `cells` straight away from the
+  // attacker, stopping at map edge, wall, or another combatant. No save
+  // (weapon property semantics, e.g. 2024 Push mastery). `map` comes from
+  // the attacker's `_mapRef` (set on every combatant in runTrial); unit-test
+  // call sites without it simply skip (no push, no crash).
+  function pushTarget(attacker, target, cells, map, combatants, events, round) {
+    if (!map || typeof CrucibleSpatial === 'undefined' || target.dead) return 0;
+    const dx = Math.sign(target.x - attacker.x), dy = Math.sign(target.y - attacker.y);
+    if (dx === 0 && dy === 0) return 0;
+    const others = combatants || [];
+    let moved = 0;
+    for (let i = 0; i < cells; i++) {
+      const nx = target.x + dx, ny = target.y + dy;
+      const inB = nx >= 0 && nx < map.width && ny >= 0 && ny < map.height;
+      if (!inB || CrucibleSpatial.isWall(map, nx, ny)) break;
+      if (others.some(d => d !== target && !d.dead && !d.downed && d.x === nx && d.y === ny)) break;
+      target.x = nx; target.y = ny; moved++;
+    }
+    if (moved > 0) {
+      events.push({ type: 'push', round, who: attacker.id, name: attacker.name,
+                    target: target.id, targetName: target.name,
+                    cells: moved, to: { x: target.x, y: target.y } });
+    }
+    return moved;
+  }
+
+  // Buff action — grant a v3 flag to self or an adjacent ally. Returns true
+  // if applied (so callers only consume resources / tally on success).
+  function resolveBuff(c, all, action, events, round) {
+    let recipient = c;
+    if (action.buffTarget === 'ally') {
+      recipient = (all || []).find(a => a.side === c.side && a !== c && !a.dead && !a.downed
+        && typeof CrucibleSpatial !== 'undefined'
+        && CrucibleSpatial.chebyshev(c, a) <= 1) || null;
+      if (!recipient) return false;
+    }
+    if (action.grants === 'dodging') recipient.dodging = true;
+    else if (action.grants === 'helped') recipient.helped = true;
+    else return false;
+    events.push({ type: 'buff', round, who: c.id, name: c.name,
+                  target: recipient.id, targetName: recipient.name,
+                  grants: action.grants });
+    return true;
   }
 
   // ─────────── v3.3: standard 5.5e actions ───────────
@@ -1596,10 +1682,12 @@
       (a.usesPerDay != null || a.recharge) && a.kind !== 'unparsed' && a.kind !== 'utility' &&
       isAvailable(c, a));
     if (limited.length) return limited[0];
-    // At-will attack/save/heal.
+    // At-will attack/save/heal; a buff action is only picked as a last
+    // resort main action (v3.5) when nothing else is available.
     const atWill = list.find(a =>
       ['attack','save','heal'].includes(a.kind) && isAvailable(c, a));
-    return atWill || null;
+    if (atWill) return atWill;
+    return list.find(a => a.kind === 'buff' && isAvailable(c, a)) || null;
   }
 
   // v3.4: set of "x,y" cells occupied by living combatants (excluding one).
@@ -1679,11 +1767,11 @@
     return null;
   }
 
-  // ─────────── Bonus-action phase (v3.2) ───────────
+  // ─────────── Bonus-action phase (v3.2, buff added v3.5) ───────────
   // Pick and fire one bonus-cost action, if any is available and useful.
   // Supports kinds: attack (requires a target attackable from the current
   // cell — bonus actions never move), heal (most-injured living ally,
-  // including self). Other kinds are skipped in v3.2.
+  // including self), buff (self or adjacent ally). Other kinds are skipped.
   function resolveBonusAction(c, all, tactics, map, rng, events, round, tally) {
     const raw = c.side === 'pc'
       ? ((c.pm && c.pm.actions) || []).map(a => ({ ...a, sourceActionName: a.sourceActionName || a.name, kind: a.kind || a.type }))
@@ -1705,6 +1793,18 @@
               false, 0, r.totalHealed, 0, r.revives);
         return;
       }
+    }
+
+    // v3.5: bonus-action buff. Always fire if present — self-target is
+    // always valid, ally-target requires adjacency (checked by resolveBuff).
+    const buffAct = candidates.find(a => a.kind === 'buff');
+    if (buffAct) {
+      c.bonusActionAvailable = false;
+      consumeUse(c, buffAct);
+      if (resolveBuff(c, all, buffAct, events, round)) {
+        tally(c.side, buffAct.sourceActionName || buffAct.name, 'buff', false, 0, 0, 0, 0);
+      }
+      return;
     }
 
     const atkAct = candidates.find(a => a.kind === 'attack');
@@ -1963,7 +2063,7 @@
           // For single-target attacks, gate on canAttackFrom (range AND LOS),
           // and reposition via findShootingCell so a ranged PC walks around
           // a wall rather than wasting the action with no line of sight.
-          if (action && (!action.shape || action.shape === 'single')
+          if (action && action.kind !== 'buff' && (!action.shape || action.shape === 'single')
               && typeof CrucibleSpatial !== 'undefined') {
             const tgtCandidate = (c.side === 'monster' && targets && targets[0])
               ? targets[0]
@@ -2198,6 +2298,11 @@
               const r = resolveHeal(c, [c], action, rng, events, round);
               tally(c.side, action.sourceActionName || action.name, 'heal',
                     false, 0, r.totalHealed, 0, r.revives);
+            }
+          } else if (action.kind === 'buff') {
+            consumeUse(c, action);
+            if (resolveBuff(c, all, action, events, round)) {
+              tally(c.side, action.sourceActionName || action.name, 'buff', false, 0, 0, 0, 0);
             }
           }
         }
@@ -2488,6 +2593,8 @@
     ROLE_POLICIES,
     // v3.4 tactical AI
     resolvePcRole, chooseManeuver,
+    // v3.5 custom action builder: riders, forced movement, buffs
+    applyAttackRider, pushTarget, resolveBuff,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Crucible;
