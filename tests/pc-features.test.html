@@ -1227,6 +1227,247 @@
         PCFeatures.resolve = origResolve;
       }
     });
+
+    // ────────────────────────────────────────────────────────────────
+    // Class-feature library expansion (feature/crucible-class-features)
+    // ────────────────────────────────────────────────────────────────
+
+    group('Second Wind (Fighter)');
+
+    test('Second Wind: uses scale with level (1 at L1, 2 at L4, 3 at L10)', () => {
+      const sw = PCFeatures.LIBRARY.secondWind;
+      assert(sw, 'secondWind exists');
+      assertEq(sw.deriveParams({ identity: { level: 1  } }).maxUses, 1);
+      assertEq(sw.deriveParams({ identity: { level: 4  } }).maxUses, 2);
+      assertEq(sw.deriveParams({ identity: { level: 10 } }).maxUses, 3);
+    });
+
+    test('Second Wind: onCombatStart seeds usesLeft', () => {
+      const sw = PCFeatures.LIBRARY.secondWind;
+      const self = {
+        pm: { features: [{id:'secondWind', params:{maxUses:2, level:5}}], tactics:{mode:'sustained'} },
+        featureState: { secondWind: sw.initialState() },
+      };
+      sw.hooks.onCombatStart.call(sw, self, { round:1, combatants: [] });
+      assertEq(self.featureState.secondWind.usesLeft, 2);
+    });
+
+    test('Second Wind: heals when bloodied and consumes the bonus action', () => {
+      const sw = PCFeatures.LIBRARY.secondWind;
+      const self = {
+        id: 'pc:fighter',
+        pm: { features: [{id:'secondWind', params:{maxUses:2, level:5}}], tactics:{mode:'sustained'}, identity:{level:5} },
+        featureState: { secondWind: { usesLeft: 2 } },
+        hp: 10, maxHp: 40, bonusActionAvailable: true,  // 25% < 50%
+      };
+      sw.hooks.onTurnStart.call(sw, self, { round: 2, combatants: [], eventLog: [] });
+      assertEq(self.hp, 21);  // 1d10 (avg-floor 6) + level 5 = 11 → 10 + 11
+      assertEq(self.bonusActionAvailable, false);
+      assertEq(self.featureState.secondWind.usesLeft, 1);
+    });
+
+    test('Second Wind: does NOT fire above the HP threshold', () => {
+      const sw = PCFeatures.LIBRARY.secondWind;
+      const self = {
+        pm: { features: [{id:'secondWind', params:{maxUses:2, level:5}}], tactics:{mode:'sustained'}, identity:{level:5} },
+        featureState: { secondWind: { usesLeft: 2 } },
+        hp: 30, maxHp: 40, bonusActionAvailable: true,  // 75% > 50%
+      };
+      sw.hooks.onTurnStart.call(sw, self, { round: 2, combatants: [], eventLog: [] });
+      assertEq(self.hp, 30);
+      assertEq(self.featureState.secondWind.usesLeft, 2);
+    });
+
+    group('Reckless Attack (Barbarian)');
+
+    test('Reckless Attack: grants advantage (helped) on a melee swing', () => {
+      const ra = PCFeatures.LIBRARY.recklessAttack;
+      assert(ra, 'recklessAttack exists');
+      const self = {
+        id: 'pc:barb',
+        pm: { features: [{id:'recklessAttack'}], tactics: {mode:'nova'} },
+        featureState: { recklessAttack: ra.initialState() },
+      };
+      const attackCtx = { round:1, combatants:[self, {side:'monster', dead:false}], eventLog: [] };
+      ra.hooks.onBeforeOwnAttack.call(ra, self, {kind:'attack', actionRange:'melee'}, {}, attackCtx);
+      assertEq(self.helped, true);
+      assertEq(self._reckless, true);
+    });
+
+    test('Reckless Attack: does NOT trigger on a ranged attack', () => {
+      const ra = PCFeatures.LIBRARY.recklessAttack;
+      const self = {
+        id: 'pc:barb',
+        pm: { features: [{id:'recklessAttack'}], tactics: {mode:'nova'} },
+        featureState: { recklessAttack: ra.initialState() },
+      };
+      const attackCtx = { round:1, combatants:[self, {side:'monster', dead:false}], eventLog: [] };
+      ra.hooks.onBeforeOwnAttack.call(ra, self, {kind:'attack', actionRange:'ranged'}, {}, attackCtx);
+      assertEq(self.helped, undefined);
+    });
+
+    group('Flurry of Blows (Monk)');
+
+    test('Flurry of Blows: ki pool = max(2, ceil(level/2))', () => {
+      const fb = PCFeatures.LIBRARY.flurryOfBlows;
+      assert(fb, 'flurryOfBlows exists');
+      assertEq(fb.deriveParams({ identity: { level: 1  } }).maxUses, 2);
+      assertEq(fb.deriveParams({ identity: { level: 2  } }).maxUses, 2);
+      assertEq(fb.deriveParams({ identity: { level: 10 } }).maxUses, 5);
+    });
+
+    test('Flurry of Blows: first swing grants +1 action, spends 1 ki, once per turn', () => {
+      const fb = PCFeatures.LIBRARY.flurryOfBlows;
+      const self = {
+        id: 'pc:monk',
+        pm: { features: [{id:'flurryOfBlows'}], tactics: {mode:'nova'} },
+        featureState: { flurryOfBlows: { usesLeft: 3, _firedThisTurn: false } },
+        actionsAvailable: 1,
+      };
+      const attackCtx = { round:1, combatants:[{side:'monster', dead:false}], eventLog: [] };
+      fb.hooks.onBeforeOwnAttack.call(fb, self, {kind:'attack', actionRange:'melee'}, {}, attackCtx);
+      fb.hooks.onBeforeOwnAttack.call(fb, self, {kind:'attack', actionRange:'melee'}, {}, attackCtx);
+      assertEq(self.actionsAvailable, 2);                     // only +1
+      assertEq(self.featureState.flurryOfBlows.usesLeft, 2);  // only 1 ki spent
+    });
+
+    test('Flurry of Blows: onTurnStart resets so next turn can flurry again', () => {
+      const fb = PCFeatures.LIBRARY.flurryOfBlows;
+      const self = {
+        pm: { features: [{id:'flurryOfBlows'}], tactics: {mode:'nova'} },
+        featureState: { flurryOfBlows: { usesLeft: 1, _firedThisTurn: true } },
+        actionsAvailable: 1,
+      };
+      fb.hooks.onTurnStart.call(fb, self, { round: 2, combatants: [] });
+      assertEq(self.featureState.flurryOfBlows._firedThisTurn, false);
+    });
+
+    group('Patient Defense (Monk)');
+
+    test('Patient Defense: Dodges (bonus action) when badly hurt with enemies present', () => {
+      const pd = PCFeatures.LIBRARY.patientDefense;
+      assert(pd, 'patientDefense exists');
+      const self = {
+        id:'pc:monk',
+        pm: { features: [{id:'patientDefense'}], tactics: {mode:'sustained'} },  // threshold 0.35
+        featureState: { patientDefense: {} },
+        hp: 8, maxHp: 30, bonusActionAvailable: true,  // 27% < 35%
+      };
+      pd.hooks.onTurnStart.call(pd, self, { round: 2, combatants: [self, {side:'monster', dead:false}], eventLog: [] });
+      assertEq(self.dodging, true);
+      assertEq(self.bonusActionAvailable, false);
+    });
+
+    test('Patient Defense: does NOT Dodge when healthy', () => {
+      const pd = PCFeatures.LIBRARY.patientDefense;
+      const self = {
+        pm: { features: [{id:'patientDefense'}], tactics: {mode:'sustained'} },
+        featureState: { patientDefense: {} },
+        hp: 25, maxHp: 30, bonusActionAvailable: true,  // 83%
+      };
+      pd.hooks.onTurnStart.call(pd, self, { round: 2, combatants: [self, {side:'monster', dead:false}], eventLog: [] });
+      assertEq(!!self.dodging, false);
+      assertEq(self.bonusActionAvailable, true);
+    });
+
+    group('Cunning Action (Rogue)');
+
+    test('Cunning Action: Disengages when hurt and an enemy is adjacent', () => {
+      const ca = PCFeatures.LIBRARY.cunningAction;
+      assert(ca, 'cunningAction exists');
+      const self = {
+        id:'pc:rogue',
+        pm: { features: [{id:'cunningAction'}], tactics: {mode:'sustained'} },  // threshold 0.50
+        featureState: { cunningAction: {} },
+        hp: 10, maxHp: 30, bonusActionAvailable: true,  // 33% < 50%
+      };
+      ca.hooks.onTurnStart.call(ca, self, { round: 2, combatants: [self, {side:'monster', dead:false}], eventLog: [] });
+      assertEq(self.disengagedThisTurn, true);
+      assertEq(self.bonusActionAvailable, false);
+    });
+
+    test('Cunning Action: does NOT fire with no enemy in reach', () => {
+      const ca = PCFeatures.LIBRARY.cunningAction;
+      const self = {
+        pm: { features: [{id:'cunningAction'}], tactics: {mode:'sustained'} },
+        featureState: { cunningAction: {} },
+        hp: 10, maxHp: 30, bonusActionAvailable: true,
+      };
+      ca.hooks.onTurnStart.call(ca, self, { round: 2, combatants: [self], eventLog: [] });  // no monsters
+      assertEq(!!self.disengagedThisTurn, false);
+      assertEq(self.bonusActionAvailable, true);
+    });
+
+    group("Hunter's Mark (Ranger)");
+
+    test("Hunter's Mark: onCombatStart marks the highest-HP enemy", () => {
+      const hm = PCFeatures.LIBRARY.huntersMark;
+      assert(hm, 'huntersMark exists');
+      const self = {
+        pm: { features: [{id:'huntersMark'}], tactics: {mode:'sustained'} },
+        featureState: { huntersMark: hm.initialState() },
+      };
+      const weak = { id:'m:weak', side:'monster', dead:false, maxHp: 10, hp: 10 };
+      const boss = { id:'m:boss', side:'monster', dead:false, maxHp: 80, hp: 80 };
+      hm.hooks.onCombatStart.call(hm, self, { round:1, combatants:[self, weak, boss], eventLog: [] });
+      assertEq(self.featureState.huntersMark.targetId, 'm:boss');
+    });
+
+    test("Hunter's Mark: onAttackHit adds 1d6 force vs the marked target", () => {
+      const hm = PCFeatures.LIBRARY.huntersMark;
+      const self = { pm: { features: [{id:'huntersMark'}] }, featureState: { huntersMark: { targetId: 'm:boss' } } };
+      const dmgCtx = { amount: 8, type: 'piercing', bonusDice: [] };
+      hm.hooks.onAttackHit.call(hm, self, {kind:'attack'}, { id:'m:boss' }, dmgCtx);
+      assertEq(dmgCtx.bonusDice.length, 1);
+      assertEq(dmgCtx.bonusDice[0].dice, '1d6');
+      assertEq(dmgCtx.bonusDice[0].type, 'force');
+    });
+
+    test("Hunter's Mark: re-marks the next highest-HP enemy on a kill (Sustained)", () => {
+      const hm = PCFeatures.LIBRARY.huntersMark;
+      const self = {
+        pm: { features: [{id:'huntersMark'}], tactics: {mode:'sustained'} },
+        featureState: { huntersMark: { targetId: 'm:boss', recastsLeft: 3 } },
+      };
+      const dead = { id:'m:boss' };
+      const next = { id:'m:2', side:'monster', dead:false, maxHp: 40, hp: 40 };
+      hm.hooks.onMonsterDowned.call(hm, self, dead, { round:3, combatants:[self, dead, next], eventLog: [] });
+      assertEq(self.featureState.huntersMark.targetId, 'm:2');
+      assertEq(self.featureState.huntersMark.recastsLeft, 2);
+    });
+
+    group('Lay on Hands (Paladin)');
+
+    test('Lay on Hands: pool = 5 × level', () => {
+      const loh = PCFeatures.LIBRARY.layOnHands;
+      assert(loh, 'layOnHands exists');
+      assertEq(loh.deriveParams({ identity: { level: 6 } }).pool, 30);
+    });
+
+    test('Lay on Hands: onCombatStart seeds the pool', () => {
+      const loh = PCFeatures.LIBRARY.layOnHands;
+      const self = {
+        pm: { features: [{id:'layOnHands', params:{pool:30}}], tactics:{mode:'sustained'} },
+        featureState: { layOnHands: loh.initialState() },
+      };
+      loh.hooks.onCombatStart.call(loh, self, { round:1, combatants: [] });
+      assertEq(self.featureState.layOnHands.poolLeft, 30);
+    });
+
+    test('Lay on Hands: tops up the most-hurt nearby ally and drains the pool', () => {
+      const loh = PCFeatures.LIBRARY.layOnHands;
+      const self = {
+        id:'pc:pal',
+        pm: { features: [{id:'layOnHands', params:{pool:30}}], tactics:{mode:'sustained'} },  // threshold 0.30
+        featureState: { layOnHands: { poolLeft: 30, _firedThisTurn: false } },
+        hp: 40, maxHp: 40,
+      };
+      const ally = { id:'pc:rogue', side:'pc', hp: 5, maxHp: 30 };  // 17% < 30%
+      loh.hooks.onTurnStart.call(loh, self, { round: 2, combatants: [self, ally], eventLog: [] });
+      assertEq(ally.hp, 30);  // healed 25 of 25 missing (pool 30 ≥ 25)
+      assertEq(self.featureState.layOnHands.poolLeft, 5);
+      assertEq(self.featureState.layOnHands._firedThisTurn, true);
+    });
   </script>
 </body>
 </html>

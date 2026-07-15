@@ -804,6 +804,428 @@
     },
   };
 
+  // ── Shared spatial helpers for the class features below ──
+  // Count living combatants on `side` adjacent (Chebyshev ≤ 1) to `self`. When
+  // grid positions are absent (unit-test fixtures without x/y), degrade to
+  // counting every living combatant on that side — features then behave as if
+  // everyone is in reach, which is the sensible non-spatial default.
+  function countAdjacent(self, combatants, side) {
+    if (!Array.isArray(combatants)) return 0;
+    const living = combatants.filter(c => c && c.side === side && c !== self && !c.dead && !c.downed);
+    if (typeof self.x !== 'number') return living.length;
+    return living.filter(c => typeof c.x === 'number' &&
+      Math.max(Math.abs(self.x - c.x), Math.abs(self.y - c.y)) <= 1).length;
+  }
+  // Return the most-hurt living ally (below `threshold` HP fraction) within
+  // reach of `self`, optionally including `self`. Same graceful degradation:
+  // no grid → all allies on that side are considered "in reach".
+  function lowestHpBelow(self, combatants, side, threshold, includeSelf) {
+    const haveGrid = typeof self.x === 'number';
+    const pool = [];
+    if (includeSelf) pool.push(self);
+    for (const c of (combatants || [])) {
+      if (!c || c.side !== side || c === self || c.dead) continue;
+      if (haveGrid && typeof c.x === 'number' &&
+          Math.max(Math.abs(self.x - c.x), Math.abs(self.y - c.y)) > 1) continue;
+      pool.push(c);
+    }
+    const hurt = pool.filter(c => c.maxHp > 0 && (c.hp / c.maxHp) < threshold);
+    hurt.sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp));
+    return hurt[0] || null;
+  }
+
+  // ── Class features: martials (Fighter, Barbarian, Monk, Rogue, Ranger, Paladin) ──
+
+  const SECOND_WIND = {
+    id: 'secondWind',
+    name: 'Second Wind',
+    source: 'builtin',
+    category: ['healing'],
+    classHint: 'fighter',
+    summary: 'Bonus-action self-heal (1d10 + level); uses/encounter scale with level; fires when bloodied.',
+
+    deriveParams(identityOrPm) {
+      const level = (identityOrPm && identityOrPm.level) || (identityOrPm && identityOrPm.identity && identityOrPm.identity.level) || 1;
+      let maxUses = 1;
+      if (level >= 4)  maxUses = 2;
+      if (level >= 10) maxUses = 3;
+      return { maxUses, level };
+    },
+
+    paramSchema: [
+      { name: 'maxUses', type: 'int', label: 'Uses per encounter', default: 1, min: 1, max: 4 },
+      { name: 'level', type: 'int', label: 'Fighter level (heal = 1d10 + level)', default: 1, min: 1, max: 20 },
+    ],
+
+    // hpThreshold: how hurt before spending. Defensive spends earlier; nova hoards.
+    modePolicy: {
+      nova:      { hpThreshold: 0.30 },
+      sustained: { hpThreshold: 0.50 },
+      defensive: { hpThreshold: 0.60 },
+    },
+
+    initialState() { return { usesLeft: 0 }; },
+
+    hooks: {
+      onCombatStart(self, ctx) {
+        const ref = self.pm.features.find(f => f.id === 'secondWind');
+        const params = (ref && ref.params) || this.deriveParams(self.pm);
+        self.featureState.secondWind.usesLeft = params.maxUses || 1;
+      },
+
+      onTurnStart(self, ctx) {
+        const state = self.featureState.secondWind;
+        if (!state || state.usesLeft <= 0 || !self.bonusActionAvailable || !(self.maxHp > 0)) return;
+        const mode = (self.pm.tactics && self.pm.tactics.mode) || 'sustained';
+        const policy = this.modePolicy[mode] || this.modePolicy.sustained;
+        if ((self.hp / self.maxHp) >= (policy.hpThreshold || 0.5)) return;
+        const ref = self.pm.features.find(f => f.id === 'secondWind');
+        const params = (ref && ref.params) || this.deriveParams(self.pm);
+        const level = params.level || (self.pm.identity && self.pm.identity.level) || 1;
+        const healing = rollDice('1d10', ctx.rng) + level;
+        const before = self.hp;
+        self.hp = Math.min(self.maxHp, self.hp + healing);
+        const gained = self.hp - before;
+        self.bonusActionAvailable = false;
+        state.usesLeft -= 1;
+        if (ctx.eventLog) ctx.eventLog.push({
+          round: ctx.round, type: 'feature', who: self.id,
+          what: 'Second Wind (+' + gained + ' HP)',
+          featureName: 'Second Wind', source: 'secondWind', hpRestored: gained,
+        });
+      },
+    },
+  };
+
+  const RECKLESS_ATTACK = {
+    id: 'recklessAttack',
+    name: 'Reckless Attack',
+    source: 'builtin',
+    category: ['damage'],
+    classHint: 'barbarian',
+    summary: 'Melee attacks gain advantage (offense modeled). Defensive downside is a documented TODO.',
+
+    deriveParams() { return {}; },
+    paramSchema: [],
+
+    modePolicy: {
+      nova:      { conditionFn: 'always' },
+      sustained: { conditionFn: 'whenAnyEnemyAlive' },
+      defensive: { conditionFn: 'whenTargetIsBloodied' },
+    },
+
+    initialState() { return { _firedThisTurn: false }; },
+
+    hooks: {
+      onBeforeOwnAttack(self, action, target, attackCtx) {
+        if (!action || action.actionRange === 'ranged') return;  // melee only
+        const mode = (self.pm.tactics && self.pm.tactics.mode) || 'sustained';
+        const policy = this.modePolicy[mode] || this.modePolicy.sustained;
+        const pred = MODE_PREDICATES[policy.conditionFn] || MODE_PREDICATES.always;
+        if (!pred(self, attackCtx, 'recklessAttack', { target })) return;
+        // Offense half: grant advantage on this melee swing. `helped` is
+        // consumed by the engine after every attack, so re-setting it per swing
+        // keeps advantage for the whole turn (matches Reckless Attack).
+        self.helped = true;
+        // TODO (defensive half): Reckless Attack also gives attackers advantage
+        // AGAINST the barbarian until the start of their next turn.
+        // attackAdvantageState() in crucible-engine.js has no attacker-facing
+        // self flag to honor, and this task must not edit the engine, so only
+        // the offense half is modeled. `_reckless` is set for a future engine
+        // integration to read.
+        self._reckless = true;
+        const state = self.featureState.recklessAttack;
+        if (state && !state._firedThisTurn) {
+          state._firedThisTurn = true;
+          if (attackCtx && attackCtx.eventLog) attackCtx.eventLog.push({
+            round: attackCtx.round, type: 'feature', who: self.id,
+            what: 'Reckless Attack (advantage on melee)',
+            featureName: 'Reckless Attack', source: 'recklessAttack',
+          });
+        }
+      },
+
+      onTurnStart(self, ctx) {
+        const state = self.featureState.recklessAttack;
+        if (state) state._firedThisTurn = false;
+        self._reckless = false;  // clears at the start of the barbarian's own turn
+      },
+    },
+  };
+
+  const FLURRY_OF_BLOWS = {
+    id: 'flurryOfBlows',
+    name: 'Flurry of Blows',
+    source: 'builtin',
+    category: ['action-economy'],
+    classHint: 'monk',
+    summary: 'Spend a ki/Focus point for an extra attack action on the turn you attack.',
+
+    deriveParams(identityOrPm) {
+      const level = (identityOrPm && identityOrPm.level) || (identityOrPm && identityOrPm.identity && identityOrPm.identity.level) || 1;
+      return { maxUses: Math.max(2, Math.ceil(level / 2)) };
+    },
+
+    paramSchema: [
+      { name: 'maxUses', type: 'int', label: 'Ki points per encounter', default: 2, min: 1, max: 20 },
+    ],
+
+    modePolicy: {
+      nova:      { conditionFn: 'always' },
+      sustained: { conditionFn: 'whenAnyEnemyAlive' },
+      defensive: { conditionFn: 'whenAllyDowned' },
+    },
+
+    initialState() { return { usesLeft: 0, _firedThisTurn: false }; },
+
+    hooks: {
+      onCombatStart(self, ctx) {
+        const ref = self.pm.features.find(f => f.id === 'flurryOfBlows');
+        const params = (ref && ref.params) || this.deriveParams(self.pm);
+        self.featureState.flurryOfBlows.usesLeft = params.maxUses || 2;
+      },
+
+      // Mirrors Action Surge: fire on the first swing of the turn (so ki is only
+      // spent when actually attacking), then block re-firing until next turn.
+      onBeforeOwnAttack(self, action, target, attackCtx) {
+        const state = self.featureState.flurryOfBlows;
+        if (!state || state.usesLeft <= 0 || state._firedThisTurn) return;
+        const mode = (self.pm.tactics && self.pm.tactics.mode) || 'sustained';
+        const policy = this.modePolicy[mode] || this.modePolicy.sustained;
+        const pred = MODE_PREDICATES[policy.conditionFn] || MODE_PREDICATES.always;
+        if (!pred(self, attackCtx, 'flurryOfBlows')) return;
+        if (typeof self.actionsAvailable !== 'number') self.actionsAvailable = 1;
+        self.actionsAvailable += 1;
+        state.usesLeft -= 1;
+        state._firedThisTurn = true;
+        if (attackCtx && attackCtx.eventLog) attackCtx.eventLog.push({
+          round: attackCtx.round, type: 'feature', who: self.id,
+          what: 'Flurry of Blows (+1 attack, ' + state.usesLeft + ' ki left)',
+          featureName: 'Flurry of Blows', source: 'flurryOfBlows',
+        });
+      },
+
+      onTurnStart(self, ctx) {
+        const state = self.featureState.flurryOfBlows;
+        if (state) state._firedThisTurn = false;
+      },
+    },
+  };
+
+  const PATIENT_DEFENSE = {
+    id: 'patientDefense',
+    name: 'Patient Defense',
+    source: 'builtin',
+    category: ['defense'],
+    classHint: 'monk',
+    summary: 'Bonus-action Dodge when badly hurt (attacks against you have disadvantage this round).',
+
+    deriveParams() { return {}; },
+    paramSchema: [],
+
+    modePolicy: {
+      nova:      { hpThreshold: 0.25 },
+      sustained: { hpThreshold: 0.35 },
+      defensive: { hpThreshold: 0.50 },
+    },
+
+    initialState() { return {}; },
+
+    hooks: {
+      onTurnStart(self, ctx) {
+        if (!self.bonusActionAvailable || !(self.maxHp > 0)) return;
+        const mode = (self.pm.tactics && self.pm.tactics.mode) || 'sustained';
+        const policy = this.modePolicy[mode] || this.modePolicy.sustained;
+        if ((self.hp / self.maxHp) >= (policy.hpThreshold || 0.35)) return;
+        if (!MODE_PREDICATES.whenAnyEnemyAlive(self, ctx)) return;  // no point dodging with no threat
+        self.dodging = true;
+        self.bonusActionAvailable = false;
+        if (ctx.eventLog) ctx.eventLog.push({
+          round: ctx.round, type: 'feature', who: self.id,
+          what: 'Patient Defense (Dodge)',
+          featureName: 'Patient Defense', source: 'patientDefense',
+        });
+      },
+    },
+  };
+
+  const CUNNING_ACTION = {
+    id: 'cunningAction',
+    name: 'Cunning Action',
+    source: 'builtin',
+    category: ['action-economy', 'defense'],
+    classHint: 'rogue',
+    summary: 'Bonus-action Disengage when hurt and threatened in melee (avoids opportunity attacks).',
+
+    deriveParams() { return {}; },
+    paramSchema: [],
+
+    modePolicy: {
+      nova:      { hpThreshold: 0.35 },
+      sustained: { hpThreshold: 0.50 },
+      defensive: { hpThreshold: 0.60 },
+    },
+
+    initialState() { return {}; },
+
+    hooks: {
+      onTurnStart(self, ctx) {
+        if (!self.bonusActionAvailable || !(self.maxHp > 0)) return;
+        const mode = (self.pm.tactics && self.pm.tactics.mode) || 'sustained';
+        const policy = this.modePolicy[mode] || this.modePolicy.sustained;
+        if ((self.hp / self.maxHp) >= (policy.hpThreshold || 0.5)) return;
+        if (countAdjacent(self, ctx.combatants, 'monster') < 1) return;
+        self.disengagedThisTurn = true;
+        self.bonusActionAvailable = false;
+        if (ctx.eventLog) ctx.eventLog.push({
+          round: ctx.round, type: 'feature', who: self.id,
+          what: 'Cunning Action (Disengage)',
+          featureName: 'Cunning Action', source: 'cunningAction',
+        });
+      },
+    },
+  };
+
+  const HUNTERS_MARK = {
+    id: 'huntersMark',
+    name: "Hunter's Mark",
+    source: 'builtin',
+    category: ['damage'],
+    classHint: 'ranger',
+    summary: '+damage dice on hits against the marked (highest-HP) enemy; re-marks on a kill.',
+
+    deriveParams(identityOrPm) {
+      const level = (identityOrPm && identityOrPm.level) || (identityOrPm && identityOrPm.identity && identityOrPm.identity.level) || 1;
+      return { damageDice: '1d6', recasts: level >= 5 ? 3 : 2 };
+    },
+
+    paramSchema: [
+      { name: 'damageDice', type: 'string', label: 'Damage dice', default: '1d6', placeholder: '1d6' },
+      { name: 'recasts', type: 'int', label: 'Re-marks available', default: 2, min: 0, max: 9 },
+    ],
+
+    modePolicy: {
+      nova:      { recastOnKill: true },
+      sustained: { recastOnKill: true },
+      defensive: { recastOnKill: false },
+    },
+
+    initialState() { return { targetId: null, recastsLeft: 0 }; },
+
+    hooks: {
+      onCombatStart(self, ctx) {
+        const ref = self.pm.features.find(f => f.id === 'huntersMark');
+        const params = (ref && ref.params) || this.deriveParams(self.pm);
+        self.featureState.huntersMark.recastsLeft = params.recasts || 2;
+        // Mark the highest-HP (highest-threat) living enemy.
+        const target = (ctx.combatants || [])
+          .filter(c => c.side === 'monster' && !c.dead)
+          .sort((a, b) => (b.maxHp || 0) - (a.maxHp || 0))[0];
+        if (target) {
+          self.featureState.huntersMark.targetId = target.id;
+          if (ctx.eventLog) ctx.eventLog.push({
+            round: ctx.round, type: 'feature', who: self.id,
+            what: "Hunter's Mark on " + target.id,
+            featureName: "Hunter's Mark", source: 'huntersMark',
+          });
+        }
+      },
+
+      onAttackHit(self, action, target, dmgCtx) {
+        const state = self.featureState.huntersMark;
+        if (!state || !state.targetId || !target || target.id !== state.targetId) return;
+        const ref = self.pm.features.find(f => f.id === 'huntersMark');
+        const params = (ref && ref.params) || this.deriveParams(self.pm);
+        if (!Array.isArray(dmgCtx.bonusDice)) dmgCtx.bonusDice = [];
+        dmgCtx.bonusDice.push({ dice: params.damageDice || '1d6', type: 'force', source: 'huntersMark', featureName: "Hunter's Mark" });
+      },
+
+      onMonsterDowned(self, monster, ctx) {
+        const state = self.featureState.huntersMark;
+        if (!state || state.targetId !== monster.id) return;
+        const mode = (self.pm.tactics && self.pm.tactics.mode) || 'sustained';
+        const policy = this.modePolicy[mode] || this.modePolicy.sustained;
+        if (!policy.recastOnKill || state.recastsLeft <= 0) { state.targetId = null; return; }
+        const next = (ctx.combatants || [])
+          .filter(c => c.side === 'monster' && !c.dead && c.id !== monster.id)
+          .sort((a, b) => (b.maxHp || 0) - (a.maxHp || 0))[0];
+        if (next) {
+          state.targetId = next.id;
+          state.recastsLeft -= 1;
+          if (ctx.eventLog) ctx.eventLog.push({
+            round: ctx.round, type: 'feature', who: self.id,
+            what: "Hunter's Mark moved to " + next.id,
+            featureName: "Hunter's Mark", source: 'huntersMark',
+          });
+        } else {
+          state.targetId = null;
+        }
+      },
+    },
+  };
+
+  const LAY_ON_HANDS = {
+    id: 'layOnHands',
+    name: 'Lay on Hands',
+    source: 'builtin',
+    category: ['healing'],
+    classHint: 'paladin',
+    summary: 'Healing pool of 5×level HP per encounter; tops up the most-hurt nearby ally (or self) once per turn.',
+
+    deriveParams(identityOrPm) {
+      const level = (identityOrPm && identityOrPm.level) || (identityOrPm && identityOrPm.identity && identityOrPm.identity.level) || 1;
+      return { pool: 5 * level };
+    },
+
+    paramSchema: [
+      { name: 'pool', type: 'int', label: 'Healing pool (HP)', default: 5, min: 0, max: 200 },
+    ],
+
+    modePolicy: {
+      nova:      { hpThreshold: 0.25 },
+      sustained: { hpThreshold: 0.30 },
+      defensive: { hpThreshold: 0.50 },
+    },
+
+    initialState() { return { poolLeft: 0, _firedThisTurn: false }; },
+
+    hooks: {
+      onCombatStart(self, ctx) {
+        const ref = self.pm.features.find(f => f.id === 'layOnHands');
+        const params = (ref && ref.params) || this.deriveParams(self.pm);
+        self.featureState.layOnHands.poolLeft = params.pool || 0;
+      },
+
+      onTurnStart(self, ctx) {
+        // Simplification: 2024 Lay on Hands costs an Action; we model it as a
+        // free once-per-turn top-up. The encounter pool (poolLeft) is the real
+        // cap on total healing, which keeps the sim honest.
+        const state = self.featureState.layOnHands;
+        if (!state || state.poolLeft <= 0 || state._firedThisTurn) return;
+        const mode = (self.pm.tactics && self.pm.tactics.mode) || 'sustained';
+        const policy = this.modePolicy[mode] || this.modePolicy.sustained;
+        const patient = lowestHpBelow(self, ctx.combatants, 'pc', policy.hpThreshold || 0.3, true);
+        if (!patient || !(patient.maxHp > 0)) return;
+        const healing = Math.min(state.poolLeft, patient.maxHp - patient.hp);
+        if (healing <= 0) return;
+        patient.hp += healing;
+        if (patient.downed && patient.hp > 0) patient.downed = false;
+        state.poolLeft -= healing;
+        state._firedThisTurn = true;
+        if (ctx.eventLog) ctx.eventLog.push({
+          round: ctx.round, type: 'feature', who: self.id,
+          what: 'Lay on Hands on ' + patient.id + ' (+' + healing + ' HP, ' + state.poolLeft + ' pool left)',
+          featureName: 'Lay on Hands', source: 'layOnHands', hpRestored: healing,
+        });
+      },
+
+      onRoundEnd(self, round, ctx) {
+        const state = self.featureState.layOnHands;
+        if (state) state._firedThisTurn = false;  // one top-up per round
+      },
+    },
+  };
+
   const LIBRARY = {
     rage: RAGE,
     sneakAttack: SNEAK_ATTACK,
@@ -813,6 +1235,14 @@
     shield: SHIELD,
     hexMark: HEX_MARK,
     bardicInspiration: BARDIC_INSPIRATION,
+    // Martials
+    secondWind: SECOND_WIND,
+    recklessAttack: RECKLESS_ATTACK,
+    flurryOfBlows: FLURRY_OF_BLOWS,
+    patientDefense: PATIENT_DEFENSE,
+    cunningAction: CUNNING_ACTION,
+    huntersMark: HUNTERS_MARK,
+    layOnHands: LAY_ON_HANDS,
   };
 
   // ── DSL primitives ──
