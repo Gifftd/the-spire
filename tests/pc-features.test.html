@@ -575,7 +575,7 @@
       };
       const action = { kind: 'attack', actionRange: 'melee' };
       const dmgCtx = { amount: 8, type: 'slashing', bonusDice: [], crit: false };
-      sm.hooks.onAttackHit(self, action, {}, dmgCtx);
+      sm.hooks.onAttackHit.call(sm, self, action, {}, dmgCtx);
       assertEq(self.featureState.divineSmite.slotsLeft, { 1: 2, 2: 0 });
       assertEq(dmgCtx.bonusDice.length, 1);
       assertEq(dmgCtx.bonusDice[0].dice, '3d8');
@@ -590,10 +590,10 @@
       };
       const action = { kind: 'attack', actionRange: 'melee' };
       const dmgCtxNoCrit = { amount: 8, type: 'slashing', bonusDice: [], crit: false };
-      sm.hooks.onAttackHit(self, action, {}, dmgCtxNoCrit);
+      sm.hooks.onAttackHit.call(sm, self, action, {}, dmgCtxNoCrit);
       assertEq(dmgCtxNoCrit.bonusDice.length, 0);
       const dmgCtxCrit = { amount: 8, type: 'slashing', bonusDice: [], crit: true };
-      sm.hooks.onAttackHit(self, action, {}, dmgCtxCrit);
+      sm.hooks.onAttackHit.call(sm, self, action, {}, dmgCtxCrit);
       assertEq(dmgCtxCrit.bonusDice.length, 1);
     });
 
@@ -627,7 +627,7 @@
       };
       const ally = { id: 'pc:fighter', side: 'pc', hp: 0, maxHp: 30, downed: true };
       const ctx = { round: 3, combatants: [self, ally], eventLog: [] };
-      hw.hooks.onAllyDowned(self, ally, ctx);
+      hw.hooks.onAllyDowned.call(hw, self, ally, ctx);
       assert(ally.hp > 0, 'ally should be healed above 0');
       assertEq(ally.downed, false);
       assertEq(self.featureState.healingWord.slotsLeft[1], 2);
@@ -671,7 +671,7 @@
         ac: 12,
       };
       const rollCtx = { roll: 15, hits: true, missedBy: 0 };
-      const result = sh.hooks.onAttackAttempt(self, {kind:'attack'}, self, rollCtx);
+      const result = sh.hooks.onAttackAttempt.call(sh, self, {kind:'attack'}, self, rollCtx);
       assertEq(rollCtx.hits, false);
       assertEq(self.reactionAvailableThisRound, false);
       assertEq(self.featureState.shield.slotsLeft[1], 3);
@@ -687,7 +687,7 @@
         ac: 12,
       };
       const rollCtx = { roll: 20, hits: true, missedBy: 0 };
-      sh.hooks.onAttackAttempt(self, {kind:'attack'}, self, rollCtx);
+      sh.hooks.onAttackAttempt.call(sh, self, {kind:'attack'}, self, rollCtx);
       assertEq(rollCtx.hits, true);
       assertEq(self.reactionAvailableThisRound, true);
       assertEq(self.featureState.shield.slotsLeft[1], 4);
@@ -723,17 +723,17 @@
       };
       const monster = { id: 'm:1', side: 'monster', dead: false };
       const ctx = { round: 1, combatants: [self, monster], eventLog: [] };
-      hex.hooks.onCombatStart(self, ctx);
+      hex.hooks.onCombatStart.call(hex, self, ctx);
       assertEq(self.featureState.hexMark.targetId, 'm:1');
     });
 
     test('Hex: onAttackHit adds 1d6 damage when target matches', () => {
       const hex = PCFeatures.LIBRARY.hexMark;
-      const self = { featureState: { hexMark: { targetId: 'm:1' } } };
+      const self = { pm: { features: [{id:'hexMark'}] }, featureState: { hexMark: { targetId: 'm:1' } } };
       const action = { kind: 'attack' };
       const target = { id: 'm:1' };
       const dmgCtx = { amount: 8, type: 'piercing', bonusDice: [] };
-      hex.hooks.onAttackHit(self, action, target, dmgCtx);
+      hex.hooks.onAttackHit.call(hex, self, action, target, dmgCtx);
       assertEq(dmgCtx.bonusDice.length, 1);
       assertEq(dmgCtx.bonusDice[0].dice, '1d6');
       assertEq(dmgCtx.bonusDice[0].type, 'necrotic');
@@ -758,7 +758,7 @@
       const dead = { id: 'm:1' };
       const alive = { id: 'm:2', side: 'monster', dead: false };
       const ctx = { round: 3, combatants: [self, dead, alive], eventLog: [] };
-      hex.hooks.onMonsterDowned(self, dead, ctx);
+      hex.hooks.onMonsterDowned.call(hex, self, dead, ctx);
       assertEq(self.featureState.hexMark.targetId, 'm:2');
     });
 
@@ -770,7 +770,7 @@
       };
       const dead = { id: 'm:1' };
       const alive = { id: 'm:2', side: 'monster', dead: false };
-      hex.hooks.onMonsterDowned(self, dead, { round: 3, combatants: [self, dead, alive] });
+      hex.hooks.onMonsterDowned.call(hex, self, dead, { round: 3, combatants: [self, dead, alive] });
       assertEq(self.featureState.hexMark.targetId, null);
     });
 
@@ -796,7 +796,7 @@
       const ally3 = { id: 'pc:cleric',  side: 'pc' };
       const ally4 = { id: 'pc:wizard',  side: 'pc' };
       const ctx = { round: 1, combatants: [self, ally1, ally2, ally3, ally4], eventLog: [] };
-      bi.hooks.onCombatStart(self, ctx);
+      bi.hooks.onCombatStart.call(bi, self, ctx);
       const diceCount = Object.keys(self.featureState.bardicInspiration.diceHeldBy || {}).length;
       assertEq(diceCount, 4);
     });
