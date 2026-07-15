@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Crucible parser — corpus coverage</title>
+  <style>
+    body { font: 14px monospace; background:#0e1418; color:#dde7e9; padding:1rem; max-width:70rem; }
+    h1 { color:#7ec5c5; }
+    button { padding:0.5rem 1rem; background:#1d3a4a; color:#dde7e9;
+             border:1px solid #2c5566; cursor:pointer; }
+    .metric { padding:0.15rem 0; }
+    .big { font-size:1.4em; color:#7fd49a; }
+    .warn { color:#e0a860; }
+    .fail { color:#e77878; }
+    table { border-collapse:collapse; margin:0.5rem 0; }
+    td, th { border:1px solid #1c2429; padding:0.2rem 0.7rem; text-align:left; }
+    th { color:#7ec5c5; }
+    #note { padding:0.75rem; margin:1rem 0; background:#152028; border-left:3px solid #7ec5c5; }
+    details { margin:0.3rem 0; }
+    summary { cursor:pointer; color:#a0adb2; }
+    pre { white-space:pre-wrap; color:#8895a0; margin:0.25rem 0 0 1rem; font-size:0.9em; }
+  </style>
+</head>
+<body>
+<h1>Crucible parser — corpus coverage</h1>
+<p>Measures <code>parseAllMonsterActions</code> over the local bestiary JSON
+   (gitignored third-party data). If none is present it falls back to an
+   embedded synthetic corpus of representative 2014 + 2024 SRD phrasings.</p>
+<button onclick="run()">Run corpus measurement</button>
+<div id="out"></div>
+
+<script src="../crucible-parser.js"></script>
+<script>
+// Candidate local corpus files (gitignored; live at the repo root, one level
+// up from tests/; served by `python3 -m http.server`).
+const CORPUS_FILES = ['../bestiary.json', '../fm.json', '../tob.json', '../mm2024.json'];
+
+// Embedded fallback — a small representative set spanning both rulebooks.
+const SYNTHETIC = [{
+  name: 'Synthetic Brute',
+  actions: [
+    { name:'Multiattack', body:'The brute makes two attacks, using Greatclub or Javelin in any combination.' },
+    { name:'Greatclub', body:'Melee Attack Roll: +6, reach 5 ft. Hit: 11 (2d8 + 2) Bludgeoning damage.' },
+    { name:'Javelin', body:'Melee or Ranged Attack Roll: +6, reach 5 ft. or range 30/120 ft. Hit: 9 (2d6 + 2) Piercing damage.' },
+    { name:'Fire Breath (Recharge 5–6)', body:'Constitution Saving Throw: DC 15, each creature in a 30-foot Cone. Failure: 24 (7d6) Fire damage. Success: Half damage.' },
+    { name:'Spellcasting', body:'The brute casts one of the following spells (spell save DC 13): At Will: Fire Bolt.' },
+    { name:'Teleport', body:'The brute teleports up to 30 feet to an unoccupied space it can see.' },
+  ], bonusActions: [], reactions: [], traits: [],
+}, {
+  name: 'Synthetic Knight (2014)',
+  actions: [
+    { name:'Multiattack', body:'The knight makes three Longsword attacks.' },
+    { name:'Longsword', body:'Melee Weapon Attack. +7 to hit, reach 5 ft. Hit: 8 (1d8 + 4) slashing damage, or 9 (1d10 + 4) slashing damage if used with two hands.' },
+    { name:'Heavy Crossbow', body:'+5 to hit, range 100/400 ft. Hit: 6 (1d10 + 1) piercing damage.' },
+  ], bonusActions: [], reactions: [], traits: [],
+}];
+
+function pct(n, d) { return d ? (100 * n / d).toFixed(1) + '%' : 'n/a'; }
+
+async function loadCorpus() {
+  const monsters = [];
+  const seen = new Set();
+  const loaded = [];
+  for (const f of CORPUS_FILES) {
+    try {
+      const res = await fetch(f, { cache: 'no-store' });
+      if (!res.ok) continue;
+      const j = await res.json();
+      const arr = Array.isArray(j) ? j : (j.monsters || j.creatures || j.data || []);
+      let added = 0;
+      for (const m of arr) {
+        const key = (m.name || '') + '|' + (m.source || '') + '|' + (m.cr || '');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        monsters.push(m);
+        added++;
+      }
+      loaded.push(`${f} (+${added})`);
+    } catch (e) { /* missing / unparseable — skip */ }
+  }
+  return { monsters, loaded };
+}
+
+function measure(monsters) {
+  const stats = { monsters: 0, actions: 0, unparsed: 0, attacks: 0,
+                  attacksWithDmg: 0, attacksWithToHit: 0, byKind: {} };
+  const fails = [];
+  for (const raw of monsters) {
+    const m = JSON.parse(JSON.stringify(raw));
+    m.parsedActions = [];
+    CrucibleParser.parseAllMonsterActions(m);
+    stats.monsters++;
+    for (const a of (m.parsedActions || [])) {
+      stats.actions++;
+      stats.byKind[a.kind] = (stats.byKind[a.kind] || 0) + 1;
+      if (a.kind === 'unparsed') { stats.unparsed++; fails.push({ name:a.sourceActionName, body:a._raw || '' }); }
+      if (a.kind === 'attack') {
+        stats.attacks++;
+        if (a.damage && a.damage.length) stats.attacksWithDmg++;
+        if (a.toHit) stats.attacksWithToHit++;
+      }
+    }
+  }
+  // Group failures by heuristic pattern.
+  const groups = {};
+  const bump = g => groups[g] = (groups[g] || 0) + 1;
+  for (const f of fails) {
+    const b = f.body || '', n = f.name || '';
+    if (/\b[Cc]asts\b/.test(b) || /spellcasting/i.test(n))          bump('spellcasting-ish');
+    else if (/Trigger:|Response:/.test(b))                          bump('trigger/response reaction');
+    else if (/saving throw|Saving Throw/.test(b))                   bump('mentions saving throw');
+    else if (/Attack Roll|to hit/i.test(b))                         bump('mentions attack/to-hit');
+    else if (/\bmakes\b/.test(b))                                   bump('multiattack-ish');
+    else if (/\bdamage\b/.test(b))                                  bump('mentions damage');
+    else if (b.trim() === '')                                       bump('empty body');
+    else                                                            bump('other (traits/utility/prose)');
+  }
+  return { stats, groups, fails };
+}
+
+async function run() {
+  const out = document.getElementById('out');
+  out.innerHTML = 'Loading…';
+  const { monsters, loaded } = await loadCorpus();
+  const usingSynthetic = monsters.length === 0;
+  const corpus = usingSynthetic ? SYNTHETIC : monsters;
+  const { stats, groups, fails } = measure(corpus);
+
+  const parsedOk = stats.actions - stats.unparsed;
+  const kindRows = Object.keys(stats.byKind).sort((a, b) => stats.byKind[b] - stats.byKind[a])
+    .map(k => `<tr><td>${k}</td><td>${stats.byKind[k]}</td></tr>`).join('');
+  const groupRows = Object.keys(groups).sort((a, b) => groups[b] - groups[a])
+    .map(k => `<tr><td>${k}</td><td>${groups[k]}</td><td>${pct(groups[k], stats.unparsed)}</td></tr>`).join('');
+  const sampleRows = fails.slice(0, 40).map(f =>
+    `<pre>[${f.name}] ${(f.body || '').slice(0, 160).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</pre>`).join('');
+
+  out.innerHTML = `
+    <div id="note">
+      ${usingSynthetic
+        ? '<span class="warn">No local bestiary JSON found — using embedded synthetic corpus.</span>'
+        : 'Corpus: <b>' + loaded.join(', ') + '</b>'}
+    </div>
+    <div class="metric big">Parsed OK: ${pct(parsedOk, stats.actions)} &nbsp; (${parsedOk}/${stats.actions})</div>
+    <div class="metric">Monsters: ${stats.monsters} &nbsp;·&nbsp; Unparsed: ${stats.unparsed} (${pct(stats.unparsed, stats.actions)})</div>
+    <div class="metric">Attacks with damage: ${pct(stats.attacksWithDmg, stats.attacks)} &nbsp;·&nbsp; Attacks with to-hit: ${pct(stats.attacksWithToHit, stats.attacks)} &nbsp; (of ${stats.attacks} attacks)</div>
+    <h3>By kind</h3><table><tr><th>kind</th><th>count</th></tr>${kindRows}</table>
+    <h3>Unparsed, grouped</h3><table><tr><th>pattern</th><th>count</th><th>share</th></tr>${groupRows}</table>
+    <details><summary>First 40 unparsed samples</summary>${sampleRows}</details>
+  `;
+}
+</script>
+</body>
+</html>

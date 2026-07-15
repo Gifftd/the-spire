@@ -306,6 +306,207 @@ test('parseAllMonsterActions: respects pre-existing parsedActions (override)', (
   assertEq(monster.parsedActions[0].toHit, 99);
   assertEq(monster.parsedActions[0].parsedBy, 'manual');
 });
+
+// ═══════════════════════════════════════════════════════════════════
+//  v3.7 robustness — corpus-driven regression tests
+// ═══════════════════════════════════════════════════════════════════
+
+// helper: parse a monster and return the parsed action by (fuzzy) name
+function parsedByName(monster, name) {
+  CrucibleParser.parseAllMonsterActions(monster);
+  return monster.parsedActions.find(p => p.sourceActionName === name);
+}
+
+// ── Attack header / to-hit gaps ──
+test('Attack: "Melee Weapon Attack." (period terminator) parses', () => {
+  const out = CrucibleParser.parseAction('Claws',
+    'Melee Weapon Attack. +5 to hit, reach 5 ft. Hit: 12 (2d8 + 3) Slashing damage.', null, 2);
+  assertEq(out.kind, 'attack');
+  assertEq(out.toHit, 5);
+  assertEq(out.actionRange, 'melee');
+  assertEq(out.damage, [{ dice:'2d8', mod:3, type:'slashing' }]);
+});
+test('Attack: "Melee or Ranged Spell Attack:" → actionRange both', () => {
+  const out = CrucibleParser.parseAction('Lightning Jolt',
+    'Melee or Ranged Spell Attack: +6 to hit, reach 5 ft. or range 30 ft. Hit: 3 (1d6) Lightning damage.', null, 3);
+  assertEq(out.kind, 'attack');
+  assertEq(out.toHit, 6);
+  assertEq(out.actionRange, 'both');
+  assertEq(out.damage, [{ dice:'1d6', mod:0, type:'lightning' }]);
+});
+test('Attack: headerless "+8 to hit, reach 5 ft." (2014 short form)', () => {
+  const out = CrucibleParser.parseAction('Slam',
+    '+8 to hit, reach 5 ft. Hit: 15 (2d8 + 6) Bludgeoning damage.', null, 3);
+  assertEq(out.kind, 'attack');
+  assertEq(out.toHit, 8);
+  assertEq(out.actionRange, 'melee');
+});
+test('Attack: headerless "+N to hit" without reach/range does NOT parse as attack', () => {
+  const out = CrucibleParser.parseAction('Deadly Aim',
+    'The bandit gives itself Advantage on the next attack roll it makes (+2 to hit) this turn.', null, 3);
+  assertTrue(out.kind !== 'attack', 'buff prose must not be read as an attack');
+});
+test('Attack: versatile "or … if used with two hands" → single clause (no double-count)', () => {
+  const out = CrucibleParser.parseAction('Greatsword',
+    'Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Slashing damage, or 8 (1d10 + 3) Slashing damage if used with two hands.', null, 2);
+  assertEq(out.kind, 'attack');
+  assertEq(out.damage, [{ dice:'1d8', mod:3, type:'slashing' }]);
+});
+test('Attack: untyped first clause "7 (1d8 + 3) damage plus 28 (8d6) Fire damage"', () => {
+  const out = CrucibleParser.parseAction('Slam',
+    '+8 to hit, reach 5 ft. Hit: 7 (1d8 + 3) damage plus 28 (8d6) Fire damage.', null, 3);
+  assertEq(out.kind, 'attack');
+  assertEq(out.damage, [
+    { dice:'1d8', mod:3, type:'untyped' },
+    { dice:'8d6', mod:0, type:'fire' },
+  ]);
+});
+
+// ── Save: 2024 outcome clauses + 2014 "half on a success" ──
+test('Save: 2024 "Success: Half damage." → halfOnSave true', () => {
+  const out = CrucibleParser.parseAction('Cold Breath',
+    'Constitution Saving Throw: DC 13, each creature in a 20-foot Cone. Failure: 22 (4d10) Cold damage. Success: Half damage.', null, 4);
+  assertEq(out.kind, 'save');
+  assertEq(out.saveAbility, 'con');
+  assertEq(out.saveDc, 13);
+  assertEq(out.aoeTargets, 3);
+  assertEq(out.halfOnSave, true);
+  assertEq(out.damageOnFail, [{ dice:'4d10', mod:0, type:'cold' }]);
+});
+test('Save: 2014 short "or half on a success" → halfOnSave true', () => {
+  const out = CrucibleParser.parseAction('Bolt',
+    'Creatures in a 60-foot line must make a DC 16 Dexterity saving throw, taking 22 (4d10) Lightning damage on a failed save, or half on a success.', null, 4);
+  assertEq(out.kind, 'save');
+  assertEq(out.halfOnSave, true);
+});
+
+// ── Spellcasting → utility (does not block the gate) ──
+test('Spellcasting: "casts one of the following spells" → utility', () => {
+  const out = CrucibleParser.parseAction('Spellcasting',
+    'The mage casts one of the following spells, using Intelligence as the spellcasting ability (spell save DC 15, +7 to hit with spell attacks): At Will: Fire Bolt, Mage Hand.', null, 3);
+  assertEq(out.kind, 'utility');
+  assertTrue(!!out._note, 'utility spellcasting carries a _note');
+});
+test('Spellcasting: reaction "casts Counterspell in response" → utility', () => {
+  const out = CrucibleParser.parseAction('Counterspell',
+    'The arcanaloth casts Counterspell in response to that spell’s trigger, using the same spellcasting ability as Spellcasting.', null, 3);
+  assertEq(out.kind, 'utility');
+});
+test('Spellcasting: single-spell "casts the Entangle spell" → utility', () => {
+  const out = CrucibleParser.parseAction('Entangling Plants',
+    'The blight casts the Entangle spell, using Constitution as the spellcasting ability (spell save DC 12).', null, 3);
+  assertEq(out.kind, 'utility');
+});
+
+// ── Non-combat utility (movement) → utility, unless it deals dice damage ──
+test('Utility: teleport → utility', () => {
+  const out = CrucibleParser.parseAction('Teleport',
+    'The arcanaloth teleports up to 30 feet to an unoccupied space it can see.', null, 3);
+  assertEq(out.kind, 'utility');
+});
+test('Utility: "takes the Dash, Disengage, or Hide action" → utility', () => {
+  const out = CrucibleParser.parseAction('Cunning Action',
+    'The assassin takes the Dash, Disengage, or Hide action.', null, 3);
+  assertEq(out.kind, 'utility');
+});
+test('Utility: movement that deals dice damage stays unparsed (kept for review)', () => {
+  const out = CrucibleParser.parseAction('Blazing Movement',
+    'The salamander moves up to its Speed. When it enters a creature’s space, that creature takes 7 (2d6) Fire damage.', null, 3);
+  assertEq(out.kind, 'unparsed');
+});
+
+// ── Recharge / uses name variants ──
+test('Recharge: en-dash "(Recharge 5–6)" in name → minRoll 5', () => {
+  const out = CrucibleParser.parseAction('Fire Breath (Recharge 5–6)',
+    'Each creature in a 30-foot Cone must make a DC 15 Dexterity saving throw, taking 24 (7d6) Fire damage on a failed save, or half on a success.', null, 4);
+  assertEq(out.recharge, { dice:'d6', minRoll:5 });
+});
+test('UsesPerDay: lowercase "(3/day)" → usesPerDay 3', () => {
+  const out = CrucibleParser.parseAction('Web (3/day)',
+    'Ranged Attack Roll: +4, range 30 ft. Hit: 3 (1d6) Piercing damage.', null, 2);
+  assertEq(out.usesPerDay, 3);
+});
+
+// ── Multiattack phrasings (resolved against sibling actions) ──
+function bandit(maBody) {
+  return {
+    name: 'Bandit',
+    actions: [
+      { name:'Multiattack', body: maBody },
+      { name:'Scimitar', body:'Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Slashing damage.' },  // avg 5.5
+      { name:'Pistol',   body:'Ranged Attack Roll: +5, range 30 ft. Hit: 9 (2d6 + 2) Piercing damage.' }, // avg 9.0
+    ],
+    bonusActions: [], reactions: [], traits: [],
+  };
+}
+test('Multiattack: "using X or Y in any combination" → best-damage option', () => {
+  const ma = parsedByName(bandit('The bandit makes two attacks, using Scimitar or Pistol in any combination.'), 'Multiattack');
+  assertEq(ma.kind, 'multiattack');
+  assertEq(ma.multiattackPlan, [{ actionName:'Pistol', count:2 }]);
+});
+test('Multiattack: "makes N X or Y attacks" (shared count) → best option', () => {
+  const ma = parsedByName(bandit('The bandit makes three Scimitar or Pistol attacks.'), 'Multiattack');
+  assertEq(ma.multiattackPlan, [{ actionName:'Pistol', count:3 }]);
+});
+test('Multiattack: weighted "makes N X attacks or M Y attacks" → best by count×dmg', () => {
+  // 4×Scimitar(5.5)=22 vs 2×Pistol(9)=18 → Scimitar wins.
+  const ma = parsedByName(bandit('The bandit makes four Scimitar attacks or two Pistol attacks.'), 'Multiattack');
+  assertEq(ma.multiattackPlan, [{ actionName:'Scimitar', count:4 }]);
+});
+test('Multiattack: bare "makes two attacks" → monster’s best attack', () => {
+  const ma = parsedByName(bandit('The bandit makes two attacks.'), 'Multiattack');
+  assertEq(ma.multiattackPlan, [{ actionName:'Pistol', count:2 }]);
+});
+test('Multiattack: generic "makes two melee attacks" → best attack', () => {
+  const ma = parsedByName(bandit('The bandit makes two melee attacks.'), 'Multiattack');
+  assertEq(ma.multiattackPlan, [{ actionName:'Pistol', count:2 }]);
+});
+test('Multiattack: "uses X three times" (beholder-style)', () => {
+  const monster = {
+    name: 'Beholder',
+    actions: [
+      { name:'Multiattack', body:'The beholder uses Eye Rays three times.' },
+      { name:'Eye Rays', body:'Ranged Attack Roll: +5, range 120 ft. Hit: 10 (3d6) Force damage.' },
+    ], bonusActions: [], reactions: [], traits: [],
+  };
+  const ma = parsedByName(monster, 'Multiattack');
+  assertEq(ma.multiattackPlan, [{ actionName:'Eye Rays', count:3 }]);
+});
+test('Multiattack: fuzzy singular/plural — "Claw" step matches "Claws" action', () => {
+  const monster = {
+    name: 'Bear',
+    actions: [
+      { name:'Multiattack', body:'The bear makes two Claw attacks.' },
+      { name:'Claws', body:'Melee Attack Roll: +6, reach 5 ft. Hit: 11 (2d6 + 4) Slashing damage.' },
+    ], bonusActions: [], reactions: [], traits: [],
+  };
+  const ma = parsedByName(monster, 'Multiattack');
+  assertEq(ma.multiattackPlan, [{ actionName:'Claws', count:2 }]);
+});
+test('Multiattack: invalid sub-action name (no match) → degrades to unparsed', () => {
+  const monster = {
+    name: 'Thing',
+    actions: [
+      { name:'Multiattack', body:'The thing makes three Zorptacle attacks.' },
+      { name:'Bite', body:'Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Piercing damage.' },
+    ], bonusActions: [], reactions: [], traits: [],
+  };
+  const ma = parsedByName(monster, 'Multiattack');
+  assertEq(ma.kind, 'unparsed');
+  assertTrue(!('multiattackPlan' in ma), 'broken plan removed');
+});
+test('Multiattack guard: save-primary body mentioning an attack is NOT hijacked', () => {
+  const out = CrucibleParser.parseAction('Bloodcurdling Shriek',
+    'The deathhawk shrieks, and each enemy within 30 feet must make a DC 14 Wisdom saving throw. On a failure it makes one Beak attack against them.', null, 4);
+  assertEq(out.kind, 'save');
+  assertEq(out.saveDc, 14);
+});
+test('Multiattack guard: attack-header body with a "makes … attacks" tail parses as attack', () => {
+  const out = CrucibleParser.parseAction('Devolving Tentacle',
+    'Melee Attack Roll: +9, reach 20 ft. Hit: 12 (2d6 + 5) Piercing damage. Afterward the creature makes two Flail attacks.', null, 5);
+  assertEq(out.kind, 'attack');
+  assertEq(out.toHit, 9);
+});
 </script>
 </body>
 </html>
