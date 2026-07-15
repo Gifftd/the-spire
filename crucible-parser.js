@@ -109,7 +109,7 @@
     if (/Melee\s+or\s+Ranged/i.test(header))      actionRange = 'both';
     else if (/Ranged/i.test(header))              actionRange = 'ranged';
     else if (/Melee/i.test(header))               actionRange = 'melee';
-    return {
+    const parsed = {
       sourceActionName: actionName,
       kind: 'attack',
       actionRange,
@@ -120,6 +120,11 @@
       parsedBy: 'auto',
       parsedAt: today(),
     };
+    // v3.6: on-hit rider condition (attacks only). Only attached when detected,
+    // so pure attacks stay byte-identical (rider stays undefined).
+    const rider = detectRider(body);
+    if (rider) parsed.rider = rider;
+    return parsed;
   }
 
   // ─────────── Pass 3 — Save effect ───────────
@@ -132,6 +137,63 @@
                       'deafened','poisoned','charmed'];
   const ABILITY_3 = { strength:'str', dexterity:'dex', constitution:'con',
                       intelligence:'int', wisdom:'wis', charisma:'cha' };
+
+  // ─────────── v3.6 — on-hit rider condition (attacks only) ───────────
+  // Detected inside tryAttack after damage extraction. Produces the v3.5
+  // `rider` field { condition, saveAbility, saveDc, duration } consumed by
+  // the engine's applyAttackRider on a hit. Checked in a fixed order; the
+  // first pattern that matches wins.
+  //   1. "the target is grappled (escape DC 14)"      → grappled, STR, DC 14
+  //   2. "must succeed on a DC 13 Strength saving      → save-or-be-<cond>
+  //       throw or be [knocked] <condition>"
+  //   3. "the target has the <condition> condition"    → 2024 phrasing;
+  //       DC (and save ability) pulled from a save clause elsewhere in the
+  //       body, else saveDc:null so the engine derives it.
+  const RIDER_GRAPPLE_RE = /\bgrappled\b[^.]*?\(\s*escape\s+DC\s+(\d+)\s*\)/i;
+  const RIDER_SAVE_OR_RE = /DC\s+(\d+)\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+saving\s+throw[^.]*?\bor\s+be\s+(?:knocked\s+)?(\w+)/i;
+  const RIDER_HAS_RE     = /has\s+the\s+(\w+)\s+condition\b/i;
+
+  // prone/grappled persist until actively cleared (stand-up / escape); other
+  // rider conditions default to a single round.
+  function riderDuration(cond) {
+    return (cond === 'prone' || cond === 'grappled') ? 99 : 1;
+  }
+
+  function detectRider(body) {
+    // 1. Escape-DC grapple phrasing.
+    const g = body.match(RIDER_GRAPPLE_RE);
+    if (g) {
+      return { condition:'grappled', saveAbility:'str',
+               saveDc: parseInt(g[1], 10), duration: 99 };
+    }
+    // 2. "…saving throw or be [knocked] <condition>".
+    const s = body.match(RIDER_SAVE_OR_RE);
+    if (s) {
+      const cond = s[3].toLowerCase();
+      if (CONDITIONS.includes(cond)) {
+        return { condition: cond, saveAbility: ABILITY_3[s[2].toLowerCase()],
+                 saveDc: parseInt(s[1], 10), duration: riderDuration(cond) };
+      }
+    }
+    // 3. 2024 "the target has the <condition> condition".
+    const h = body.match(RIDER_HAS_RE);
+    if (h) {
+      const cond = h[1].toLowerCase();
+      if (CONDITIONS.includes(cond)) {
+        // Pull DC + save ability from a save clause anywhere in the body.
+        let dc = null, ability = 'con';
+        const a = body.match(SAVE_RE_A);
+        if (a) { dc = parseInt(a[1], 10); ability = ABILITY_3[a[2].toLowerCase()]; }
+        else {
+          const b = body.match(SAVE_RE_B);
+          if (b) { ability = ABILITY_3[b[1].toLowerCase()]; dc = parseInt(b[2], 10); }
+        }
+        return { condition: cond, saveAbility: ability,
+                 saveDc: dc, duration: riderDuration(cond) };
+      }
+    }
+    return null;
+  }
 
   function aoeTargetsFromShape(body) {
     const m = body.match(SHAPE_RE);

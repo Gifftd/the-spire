@@ -266,6 +266,33 @@ test('parseAllMonsterActions: writes parsedActions[] keyed by source name', () =
   assertEq(monster.parsedActions[0].kind, 'attack');
   assertEq(monster.parsedActions[1].kind, 'unparsed');     // disengage isn't a parse target
 });
+// ─────────── v3.6: on-hit rider conditions (attacks only) ───────────
+test('Rider: attack + "grappled (escape DC 14)" → grappled STR rider', () => {
+  const body = 'Melee Attack Roll: +7, reach 5 ft. Hit: 10 (2d6 + 3) Bludgeoning damage. The target is grappled (escape DC 14).';
+  const out = CrucibleParser.parseAction('Tentacle', body, null, 3);
+  assertEq(out.kind, 'attack');
+  assertEq(out.rider, { condition:'grappled', saveAbility:'str', saveDc:14, duration:99 });
+});
+test('Rider: attack + "or be knocked prone" → prone STR rider (dur 99)', () => {
+  const body = 'Melee Attack Roll: +6, reach 10 ft. Hit: 8 (1d10 + 3) Bludgeoning damage, and the target must succeed on a DC 13 Strength saving throw or be knocked prone.';
+  const out = CrucibleParser.parseAction('Maul', body, null, 3);
+  assertEq(out.kind, 'attack');
+  assertEq(out.rider, { condition:'prone', saveAbility:'str', saveDc:13, duration:99 });
+});
+test('Rider: 2024 "has the poisoned condition" with a save clause DC', () => {
+  const body = 'Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Piercing damage. The target has the Poisoned condition until it succeeds on a DC 12 Constitution saving throw at the end of its turns.';
+  const out = CrucibleParser.parseAction('Stinger', body, null, 3);
+  assertEq(out.kind, 'attack');
+  assertEq(out.rider, { condition:'poisoned', saveAbility:'con', saveDc:12, duration:1 });
+});
+test('Rider: plain attack has no rider (undefined/null, output unchanged)', () => {
+  const body = 'Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Bludgeoning damage.';
+  const out = CrucibleParser.parseAction('Club', body, null, 2);
+  assertEq(out.kind, 'attack');
+  assertEq(out.toHit, 5);
+  assertEq(out.damage, [{ dice:'1d8', mod:3, type:'bludgeoning' }]);
+  assertTrue(out.rider == null, 'no-rider attack keeps rider undefined/null');
+});
 test('parseAllMonsterActions: respects pre-existing parsedActions (override)', () => {
   const monster = {
     name: 'Goblin',
