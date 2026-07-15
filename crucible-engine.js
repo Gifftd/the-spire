@@ -169,6 +169,21 @@
     return m.reach >= 5 ? Math.max(1, Math.floor(m.reach / 5)) : Math.max(1, m.reach);
   }
 
+  // v3.8: creature size → grid footprint side length (cells).
+  //   Tiny/Small/Medium → 1, Large → 2, Huge → 3, Gargantuan → 4.
+  // Reads the bestiary `size` string (falls back to sizes[0]); unknown → 1.
+  const SIZE_CELLS = { tiny: 1, small: 1, medium: 1, large: 2, huge: 3, gargantuan: 4 };
+  function sizeToCells(size) {
+    if (typeof size === 'number') return Math.max(1, Math.floor(size));
+    const key = String(size || '').trim().toLowerCase();
+    return SIZE_CELLS[key] || 1;
+  }
+  function monsterSizeCells(m) {
+    if (!m) return 1;
+    const s = m.size || (Array.isArray(m.sizes) && m.sizes[0]);
+    return sizeToCells(s);
+  }
+
   // For multiattack actions, the effective range is the max of any sub-action's
   // range. Monster moves to within that range, then resolveMultiattack picks
   // which sub-attacks to fire per-target.
@@ -631,6 +646,9 @@
         _grappledBy: null,
         speed: typeof pm.combat.speed === 'number' ? pm.combat.speed : 6,
         naturalReach: typeof pm.combat.reach === 'number' ? pm.combat.reach : 1,
+        // v3.8: grid footprint (cells per side). PCs default to 1×1 unless the
+        // sheet carries an explicit sizeCells override.
+        sizeCells: sizeToCells(pm.combat.sizeCells || pm.combat.size || 1),
         x: 0, y: 0,  // populated by placeCombatants in runTrial
       });
       // Initialize feature state for any PC class features on this PC.
@@ -669,6 +687,8 @@
           regeneration: m.regeneration || null,
           speed: monsterSpeedCells(m),
           naturalReach: monsterReachCells(m),
+          // v3.8: grid footprint derived from the bestiary size string.
+          sizeCells: monsterSizeCells(m),
           x: 0, y: 0,
           reactionAvailableThisRound: true,
           // v3 turn-scoped flags (NOT in the conditions duration Map).
@@ -872,7 +892,7 @@
   function attackAdvantageState(attacker, target, action) {
     const isMelee = (typeof attacker.x === 'number' && typeof target.x === 'number'
                      && typeof CrucibleSpatial !== 'undefined')
-      ? CrucibleSpatial.chebyshev(attacker, target) <= 1
+      ? CrucibleSpatial.combatDistance(attacker, target) <= 1
       : action.actionRange !== 'ranged';
     let adv = false, dis = false;
     const tc = target.conditions, ac = attacker.conditions;
@@ -900,7 +920,7 @@
     if (typeof CrucibleSpatial !== 'undefined'
         && typeof me.x === 'number' && typeof target.x === 'number') {
       const need = actionRange(action);
-      if (CrucibleSpatial.chebyshev(me, target) > need) {
+      if (CrucibleSpatial.combatDistance(me, target) > need) {
         return { roll: 0, crit: false, hit: false, damageDealt: 0, damageByType: {} };
       }
     }
@@ -952,7 +972,7 @@
     if (typeof CrucibleSpatial !== 'undefined'
         && typeof me.x === 'number' && typeof target.x === 'number') {
       const need = actionRange(action);
-      if (CrucibleSpatial.chebyshev(me, target) > need) {
+      if (CrucibleSpatial.combatDistance(me, target) > need) {
         return { roll: 0, crit: false, hit: false, damageDealt: 0, damageByType: {} };
       }
     }
@@ -1088,17 +1108,35 @@
   // (weapon property semantics, e.g. 2024 Push mastery). `map` comes from
   // the attacker's `_mapRef` (set on every combatant in runTrial); unit-test
   // call sites without it simply skip (no push, no crash).
+  // v3.8: does target's N×N footprint fit at anchor (ax, ay) — in-bounds,
+  // no wall, and not overlapping any other living combatant's footprint?
+  function footprintFits(map, ax, ay, target, combatants) {
+    const n = Math.max(1, (target && target.sizeCells) || 1);
+    const occupied = new Set();
+    for (const d of (combatants || [])) {
+      if (d === target || d.dead || d.downed || typeof d.x !== 'number') continue;
+      for (const cell of CrucibleSpatial.footprintCells(d)) occupied.add(cell.x + ',' + cell.y);
+    }
+    for (let dy = 0; dy < n; dy++) {
+      for (let dx = 0; dx < n; dx++) {
+        const cx = ax + dx, cy = ay + dy;
+        if (cx < 0 || cx >= map.width || cy < 0 || cy >= map.height) return false;
+        if (CrucibleSpatial.isWall(map, cx, cy)) return false;
+        if (occupied.has(cx + ',' + cy)) return false;
+      }
+    }
+    return true;
+  }
+
   function pushTarget(attacker, target, cells, map, combatants, events, round) {
     if (!map || typeof CrucibleSpatial === 'undefined' || target.dead) return 0;
     const dx = Math.sign(target.x - attacker.x), dy = Math.sign(target.y - attacker.y);
     if (dx === 0 && dy === 0) return 0;
-    const others = combatants || [];
     let moved = 0;
     for (let i = 0; i < cells; i++) {
       const nx = target.x + dx, ny = target.y + dy;
-      const inB = nx >= 0 && nx < map.width && ny >= 0 && ny < map.height;
-      if (!inB || CrucibleSpatial.isWall(map, nx, ny)) break;
-      if (others.some(d => d !== target && !d.dead && !d.downed && d.x === nx && d.y === ny)) break;
+      // Move the anchor only if the whole footprint clears at the new anchor.
+      if (!footprintFits(map, nx, ny, target, combatants)) break;
       target.x = nx; target.y = ny; moved++;
     }
     if (moved > 0) {
@@ -1116,7 +1154,7 @@
     if (action.buffTarget === 'ally') {
       recipient = (all || []).find(a => a.side === c.side && a !== c && !a.dead && !a.downed
         && typeof CrucibleSpatial !== 'undefined'
-        && CrucibleSpatial.chebyshev(c, a) <= 1) || null;
+        && CrucibleSpatial.combatDistance(c, a) <= 1) || null;
       if (!recipient) return false;
     }
     if (action.grants === 'dodging') recipient.dodging = true;
@@ -1235,11 +1273,10 @@
         const dx = Math.sign(target.x - attacker.x);
         const dy = Math.sign(target.y - attacker.y);
         const nx = target.x + dx, ny = target.y + dy;
-        const occupied = combatants.some(d => d !== target && !d.dead && !d.downed
-                                              && d.x === nx && d.y === ny);
-        const inB = map && nx >= 0 && nx < map.width && ny >= 0 && ny < map.height;
-        const wall = typeof CrucibleSpatial !== 'undefined' && CrucibleSpatial.isWall(map, nx, ny);
-        if (inB && !wall && !occupied && (dx !== 0 || dy !== 0)) {
+        // v3.8: move the anchor only if the target's whole footprint fits.
+        const fits = map && typeof CrucibleSpatial !== 'undefined'
+          && footprintFits(map, nx, ny, target, combatants);
+        if (fits && (dx !== 0 || dy !== 0)) {
           target.x = nx; target.y = ny;
           outcome = 'pushed';
         } else {
@@ -1312,13 +1349,14 @@
     for (const d of combatants) {
       if (d === c || d.dead || d.downed) continue;
       if (typeof d.x !== 'number' || typeof d.y !== 'number') continue;
-      occupied.add(d.x + ',' + d.y);
+      // v3.8: block every cell of the other combatant's footprint.
+      for (const cell of CrucibleSpatial.footprintCells(d)) occupied.add(cell.x + ',' + cell.y);
     }
     const path = CrucibleSpatial.findPath(
       { x: c.x, y: c.y },
       { x: target.x, y: target.y },
       map,
-      { maxSteps, stopWhenAdjacent: target, occupied }
+      { maxSteps, stopWhenAdjacent: target, occupied, sizeCells: c.sizeCells }
     );
     return executePath(c, path, reason, combatants, rng, events, round);
   }
@@ -1340,8 +1378,10 @@
           if (d.side === c.side || d.dead || d.downed) continue;
           if (!d.reactionAvailableThisRound) continue;
           const reach = d.naturalReach || 1;
-          const dPrev = CrucibleSpatial.chebyshev(d, prev);
-          const dCur  = CrucibleSpatial.chebyshev(d, cell);
+          // Footprint-aware: measure the defender against the mover's whole
+          // footprint at the previous and current anchor.
+          const dPrev = CrucibleSpatial.combatDistance(d, { x: prev.x, y: prev.y, sizeCells: c.sizeCells });
+          const dCur  = CrucibleSpatial.combatDistance(d, { x: cell.x, y: cell.y, sizeCells: c.sizeCells });
           if (dPrev > 0 && dPrev <= reach && dCur > reach) {
             resolveOpportunityAttack(d, c, rng, events, round, combatants);
             d.reactionAvailableThisRound = false;
@@ -1624,7 +1664,7 @@
         if (typeof CrucibleSpatial !== 'undefined'
             && typeof me.x === 'number' && typeof tgt.x === 'number') {
           const subNeed = actionRange(sub);
-          const subDist = CrucibleSpatial.chebyshev(me, tgt);
+          const subDist = CrucibleSpatial.combatDistance(me, tgt);
           if (subDist > subNeed) continue;
         }
         if (sub.kind === 'attack') {
@@ -1691,11 +1731,13 @@
   }
 
   // v3.4: set of "x,y" cells occupied by living combatants (excluding one).
+  // v3.8: includes every cell of each combatant's N×N footprint.
   function occupiedSet(all, exclude) {
     const s = new Set();
     for (const d of all) {
       if (d === exclude || d.dead || d.downed) continue;
-      if (typeof d.x === 'number') s.add(d.x + ',' + d.y);
+      if (typeof d.x !== 'number') continue;
+      for (const cell of CrucibleSpatial.footprintCells(d)) s.add(cell.x + ',' + cell.y);
     }
     return s;
   }
@@ -1713,7 +1755,7 @@
     const enemies = all.filter(t => t.side !== c.side && !t.dead && !t.downed);
     if (!enemies.length) return null;
     const adjacentEnemies = enemies.filter(e =>
-      CrucibleSpatial.chebyshev(c, e) <= (e.naturalReach || 1));
+      CrucibleSpatial.combatDistance(c, e) <= (e.naturalReach || 1));
     const hpFrac = c.maxHp > 0 ? c.hp / c.maxHp : 1;
 
     // 1. Disengage + retreat: ranged/caster/support pinned in melee.
@@ -1722,7 +1764,7 @@
       const occupied = occupiedSet(all, c);
       const retreat = CrucibleSpatial.findRetreatCell(
         { x: c.x, y: c.y }, enemies, map,
-        { maxSteps: c.movementBudgetThisTurn, occupied });
+        { maxSteps: c.movementBudgetThisTurn, occupied, sizeCells: c.sizeCells });
       if (retreat && retreat.minEnemyDist >= 2) {
         return { kind: 'disengage-retreat', path: retreat.path,
                  reason: role + ' pinned by ' + adjacentEnemies.length + ' melee' };
@@ -1747,7 +1789,7 @@
       const tgt = adjacentEnemies[0];
       const allyAlsoAdjacent = all.some(a => a.side === c.side && a !== c
         && !a.dead && !a.downed
-        && CrucibleSpatial.chebyshev(a, tgt) <= 1);
+        && CrucibleSpatial.combatDistance(a, tgt) <= 1);
       if (allyAlsoAdjacent && !tgt._shoveProneUsed && !tgt.conditions.has('prone')) {
         return { kind: 'shove', target: tgt, mode: 'prone',
                  reason: 'prone sets up ally advantage' };
@@ -1759,7 +1801,7 @@
       const hasAttack = (c.pm.actions || []).some(a => a.type === 'attack' || a.type === 'save');
       if (!hasAttack) {
         const ally = all.find(a => a.side === c.side && a !== c && !a.dead && !a.downed
-          && CrucibleSpatial.chebyshev(c, a) <= 1);
+          && CrucibleSpatial.combatDistance(c, a) <= 1);
         if (ally) return { kind: 'help', ally, reason: 'support with no attack' };
       }
     }
@@ -1867,6 +1909,7 @@
         id: c.id, name: c.name, side: c.side,
         pos: { x: c.x, y: c.y },
         hp: c.hp, maxHp: c.maxHp, ac: c.ac, speed: c.speed,
+        sizeCells: c.sizeCells || 1,
       })),
     });
     rollInitiative(combatants, rng);
@@ -1995,14 +2038,14 @@
             if (typeof CrucibleSpatial !== 'undefined') {
               const monRole = resolveRole(c.monster);
               const pcsAdj = all.filter(t => t.side === 'pc' && !t.dead && !t.downed
-                && CrucibleSpatial.chebyshev(c, t) <= 1);
+                && CrucibleSpatial.combatDistance(c, t) <= 1);
               // Artillery engaged in melee → retreat if there's an escape, else Dodge.
               if (monRole === 'artillery' && pcsAdj.length >= 1) {
                 const pcEnemies = all.filter(t => t.side === 'pc' && !t.dead && !t.downed);
                 const occ = occupiedSet(all, c);
                 const retreat = CrucibleSpatial.findRetreatCell(
                   { x: c.x, y: c.y }, pcEnemies, map,
-                  { maxSteps: c.movementBudgetThisTurn, occupied: occ });
+                  { maxSteps: c.movementBudgetThisTurn, occupied: occ, sizeCells: c.sizeCells });
                 if (retreat && retreat.minEnemyDist >= 2) {
                   events.push({ type: 'decision', round, who: c.id, name: c.name,
                                 choice: 'disengage-retreat', reason: 'artillery escaping melee' });
@@ -2077,13 +2120,13 @@
               // (via resolveAttackPc/Monster's range guard).
               if (action.kind === 'multiattack') {
                 const need = multiattackRange(action, myActions);
-                let dist = CrucibleSpatial.chebyshev(c, tgtCandidate);
+                let dist = CrucibleSpatial.combatDistance(c, tgtCandidate);
                 if (dist > need && c.movementBudgetThisTurn > 0) {
                   const stepped = executeMove(c, tgtCandidate, c.movementBudgetThisTurn, 'engage',
                     combatants, map, rng, events, round);
                   c.movementBudgetThisTurn = Math.max(0, c.movementBudgetThisTurn - stepped);
                   if (c.dead || c.downed) continue;
-                  dist = CrucibleSpatial.chebyshev(c, tgtCandidate);
+                  dist = CrucibleSpatial.combatDistance(c, tgtCandidate);
                 }
                 if (dist > need) {
                   const dashed = executeMove(c, tgtCandidate, effectiveSpeed(c), 'dash',
@@ -2103,7 +2146,7 @@
                   for (const d of combatants) {
                     if (d === c || d.dead || d.downed) continue;
                     if (typeof d.x !== 'number' || typeof d.y !== 'number') continue;
-                    occupied.add(d.x + ',' + d.y);
+                    for (const cell of CrucibleSpatial.footprintCells(d)) occupied.add(cell.x + ',' + cell.y);
                   }
                   // Step 1: try with free-move budget. findShootingCell
                   // returns a path that ends exactly on the shooting cell,
@@ -2112,7 +2155,7 @@
                   let result = c.movementBudgetThisTurn > 0
                     ? CrucibleSpatial.findShootingCell(
                         { x: c.x, y: c.y }, tgtCandidate, action, map,
-                        { maxSteps: c.movementBudgetThisTurn, occupied })
+                        { maxSteps: c.movementBudgetThisTurn, occupied, sizeCells: c.sizeCells })
                     : null;
                   if (result && result.path.length > 0) {
                     const stepped = executePath(c, result.path, 'engage',
@@ -2124,7 +2167,7 @@
                   if (!CrucibleSpatial.canAttackFrom(c, tgtCandidate, action, map)) {
                     const dashResult = CrucibleSpatial.findShootingCell(
                       { x: c.x, y: c.y }, tgtCandidate, action, map,
-                      { maxSteps: effectiveSpeed(c), occupied });
+                      { maxSteps: effectiveSpeed(c), occupied, sizeCells: c.sizeCells });
                     if (dashResult && dashResult.path.length > 0) {
                       const dashed = executePath(c, dashResult.path, 'dash',
                         combatants, rng, events, round);
@@ -2319,13 +2362,13 @@
             const enemies = combatants.filter(t => t.side !== c.side && !t.dead && !t.downed);
             const wouldProvoke = !c.disengagedThisTurn && enemies.some(e =>
               e.reactionAvailableThisRound
-              && CrucibleSpatial.chebyshev(c, e) <= (e.naturalReach || 1));
+              && CrucibleSpatial.combatDistance(c, e) <= (e.naturalReach || 1));
             if (enemies.length && !wouldProvoke) {
-              const nearest = Math.min(...enemies.map(e => CrucibleSpatial.chebyshev(c, e)));
+              const nearest = Math.min(...enemies.map(e => CrucibleSpatial.combatDistance(c, e)));
               if (nearest <= 3) {   // only bother when someone is closing in
                 const retreat = CrucibleSpatial.findRetreatCell(
                   { x: c.x, y: c.y }, enemies, map,
-                  { maxSteps: c.movementBudgetThisTurn, occupied: occupiedSet(combatants, c) });
+                  { maxSteps: c.movementBudgetThisTurn, occupied: occupiedSet(combatants, c), sizeCells: c.sizeCells });
                 if (retreat && retreat.path.length) {
                   events.push({ type: 'decision', round, who: c.id, name: c.name,
                                 choice: 'kite', reason: 'open distance (nearest ' + nearest + 'c)' });
@@ -2585,7 +2628,7 @@
     runTrial, runSim,
     // Role-policy helpers
     clamp01, sumDice, actionIsMelee, actionIsRanged, actionRange, multiattackRange,
-    monsterSpeedCells, monsterReachCells,
+    monsterSpeedCells, monsterReachCells, sizeToCells, monsterSizeCells,
     targetSaveBonus, actionEv,
     tagActions, bestEvAction, lowestPick, targetsInBucket,
     rangedness, bucket, position, positionOf,
