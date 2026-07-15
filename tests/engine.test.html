@@ -2615,5 +2615,197 @@ test('Disengage OoA skip: a disengaged mover provokes no opportunity attack; a n
            'a disengaged mover provokes no OoA');
 });
 </script>
+
+<!-- ═══════════════════ v3.4: tactical AI (roles, maneuvers, kiting) ═══════════════════ -->
+<script>
+test('resolvePcRole: explicit role wins; heal → support; melee → frontline; ranged → archer', () => {
+  // Explicit tactics.role overrides derivation.
+  const explicit = { tactics: { role: 'caster' }, actions: [{ type: 'attack', actionRange: 'melee' }] };
+  assertEq(Crucible.resolvePcRole(explicit), 'caster', 'explicit role wins');
+  // A heal action derives to support even with a ranged attack present.
+  const healer = { actions: [{ type: 'heal' }, { type: 'attack', actionRange: 'ranged' }] };
+  assertEq(Crucible.resolvePcRole(healer), 'support', 'heal action → support');
+  // Pure melee statline → frontline.
+  const meleeGuy = { actions: [{ type: 'attack', actionRange: 'melee' }] };
+  assertEq(Crucible.resolvePcRole(meleeGuy), 'frontline', 'melee → frontline');
+  // Pure ranged statline (no heal, no AoE) → archer.
+  const bowGuy = { actions: [{ type: 'attack', actionRange: 'ranged' }] };
+  assertEq(Crucible.resolvePcRole(bowGuy), 'archer', 'ranged → archer');
+});
+
+test('runTrial: pinned archer PC disengages and retreats (no attack, no OoA)', () => {
+  const pm = {
+    id: 'pm1', identity: { name: 'Archer', level: 5 },
+    abilities: { dex: 16, str: 10 },
+    combat: { hp: 40, maxHp: 40, ac: 14, initBonus: 20, speed: 6 },
+    actions: [{ type: 'attack', name: 'Bow', actionRange: 'ranged', range: 12,
+                atkAbility: 'dex', damage: { dice: '1d8', mod: '+atkAbility', type: 'piercing' } }],
+  };
+  const goblin = { pickId: 'gob', name: 'Goblin', cr: '1/4', count: 1,
+    monster: { name: 'Goblin', ac: 13, hp: 30, maxHp: 30, initiative: -10,
+               abilities: { str: { mod: 0 }, dex: { mod: 0 } }, speed: { walk: 30 },
+               parsedActions: [{ kind: 'attack', sourceActionName: 'Bite', name: 'Bite',
+                                 actionRange: 'melee', reach: 5, toHit: 2,
+                                 damage: [{ dice: '1d4', mod: 0, type: 'piercing' }] }] } };
+  const party = [pm];
+  party._encounter = { map: { width: 20, height: 20, blocked: null },
+                       placement: [{ id: 'pc:pm1', x: 15, y: 10 }, { id: 'gob:1', x: 16, y: 10 }] };
+  const rng = () => 0.5;
+  const trial = Crucible.runTrial(party, [goblin], { aiHint: 'focus' }, rng);
+  const decision = trial.events.find(e => e.type === 'decision' && e.who === 'pc:pm1' && e.round === 1);
+  assertTrue(decision, 'expected a decision event from the archer in round 1');
+  assertEq(decision.choice, 'disengage-retreat', 'archer should disengage-retreat when pinned');
+  assertTrue(trial.events.some(e => e.type === 'disengage' && e.who === 'pc:pm1' && e.round === 1),
+             'a disengage event should fire');
+  assertTrue(trial.events.some(e => e.type === 'move' && e.who === 'pc:pm1' && e.reason === 'retreat' && e.round === 1),
+             'a retreat move should fire');
+  const pcAttacks = trial.events.filter(e => e.type === 'attack' && e.actor === 'Archer' && e.round === 1);
+  assertEq(pcAttacks.length, 0, 'the archer should not attack in the round it disengages');
+  const ooa = trial.events.filter(e => e.type === 'opportunity-attack' && e.round === 1);
+  assertEq(ooa.length, 0, 'a disengaging archer provokes no opportunity attack');
+});
+
+test('runTrial: hurt frontline PC Dodges vs 2 melee; attackers roll with disadvantage', () => {
+  const pm = {
+    id: 'pm1', identity: { name: 'Tank', level: 5 },
+    abilities: { dex: 12, str: 16 },
+    combat: { hp: 30, maxHp: 100, ac: 16, initBonus: 20, speed: 6 },   // 30% HP
+    actions: [{ type: 'attack', name: 'Sword', actionRange: 'melee',
+                atkAbility: 'str', damage: { dice: '1d8', mod: '+atkAbility', type: 'slashing' } }],
+  };
+  function gob(pickId) {
+    return { pickId, name: 'Goblin', cr: '1/4', count: 1,
+      monster: { name: 'Goblin', ac: 13, hp: 30, maxHp: 30, initiative: -10,
+                 abilities: { str: { mod: 0 }, dex: { mod: 0 } }, speed: { walk: 30 },
+                 parsedActions: [{ kind: 'attack', sourceActionName: 'Bite', name: 'Bite',
+                                   actionRange: 'melee', reach: 5, toHit: 4,
+                                   damage: [{ dice: '1d4', mod: 0, type: 'piercing' }] }] } };
+  }
+  const party = [pm];
+  party._encounter = { map: { width: 20, height: 20, blocked: null },
+                       placement: [{ id: 'pc:pm1', x: 10, y: 10 },
+                                   { id: 'g1:1', x: 9, y: 10 }, { id: 'g2:1', x: 11, y: 10 }] };
+  const rng = () => 0.5;
+  const trial = Crucible.runTrial(party, [gob('g1'), gob('g2')], { aiHint: 'focus' }, rng);
+  const decision = trial.events.find(e => e.type === 'decision' && e.who === 'pc:pm1' && e.round === 1);
+  assertTrue(decision && decision.choice === 'dodge', 'hurt frontline vs 2 melee should Dodge');
+  assertTrue(trial.events.some(e => e.type === 'dodge' && e.who === 'pc:pm1' && e.round === 1),
+             'a dodge event should fire');
+  const gobAttacks = trial.events.filter(e => e.type === 'attack' && e.actor === 'Goblin' && e.round === 1);
+  assertTrue(gobAttacks.length > 0, 'at least one goblin attack in round 1');
+  for (const a of gobAttacks) assertEq(a.adv, -1, 'attacks vs a dodger roll with disadvantage');
+});
+
+test('runTrial: frontline PC shoves prone to set up an ally advantage', () => {
+  function tank(id, name, initBonus) {
+    return { id, identity: { name, level: 5 },
+      abilities: { dex: 12, str: 16 },
+      combat: { hp: 40, maxHp: 40, ac: 16, initBonus, speed: 6 },
+      actions: [{ type: 'attack', name: 'Sword', actionRange: 'melee',
+                  atkAbility: 'str', damage: { dice: '1d8', mod: '+atkAbility', type: 'slashing' } }] };
+  }
+  const a = tank('pmA', 'Aria', 20);
+  const b = tank('pmB', 'Borin', 15);
+  const goblin = { pickId: 'gob', name: 'Goblin', cr: '1/4', count: 1,
+    monster: { name: 'Goblin', ac: 13, hp: 60, maxHp: 60, initiative: -10,
+               abilities: { str: { mod: 0 }, dex: { mod: 0 } }, speed: { walk: 30 },
+               parsedActions: [{ kind: 'attack', sourceActionName: 'Bite', name: 'Bite',
+                                 actionRange: 'melee', reach: 5, toHit: 4,
+                                 damage: [{ dice: '1d4', mod: 0, type: 'piercing' }] }] } };
+  const party = [a, b];
+  party._encounter = { map: { width: 20, height: 20, blocked: null },
+                       placement: [{ id: 'pc:pmA', x: 9, y: 10 },
+                                   { id: 'pc:pmB', x: 11, y: 10 },
+                                   { id: 'gob:1', x: 10, y: 10 }] };
+  const rng = () => 0.01;  // forced-low: the shove save fails, prone lands
+  const trial = Crucible.runTrial(party, [goblin], { aiHint: 'focus' }, rng);
+  const aDecision = trial.events.find(e => e.type === 'decision' && e.who === 'pc:pmA' && e.round === 1);
+  assertTrue(aDecision && aDecision.choice === 'shove', 'PC Aria should choose Shove');
+  const shove = trial.events.find(e => e.type === 'shove' && e.who === 'pc:pmA' && e.round === 1);
+  assertTrue(shove && shove.outcome === 'prone', 'the shove knocks the goblin prone');
+  const bAttack = trial.events.find(e => e.type === 'attack' && e.actor === 'Borin' && e.round === 1);
+  assertTrue(bAttack, 'ally Borin should attack in round 1');
+  assertEq(bAttack.adv, 1, "Borin's attack vs the prone goblin rolls with advantage");
+});
+
+test('runTrial: archer PC kites away after attacking a closing melee enemy', () => {
+  const pm = {
+    id: 'pm1', identity: { name: 'Archer', level: 5 },
+    abilities: { dex: 16, str: 10 },
+    combat: { hp: 40, maxHp: 40, ac: 14, initBonus: 20, speed: 6 },
+    actions: [{ type: 'attack', name: 'Bow', actionRange: 'ranged', range: 12,
+                atkAbility: 'dex', damage: { dice: '1d8', mod: '+atkAbility', type: 'piercing' } }],
+  };
+  const goblin = { pickId: 'gob', name: 'Goblin', cr: '1/4', count: 1,
+    monster: { name: 'Goblin', ac: 13, hp: 50, maxHp: 50, initiative: -10,
+               abilities: { str: { mod: 0 }, dex: { mod: 0 } }, speed: { walk: 5 },
+               parsedActions: [{ kind: 'attack', sourceActionName: 'Bite', name: 'Bite',
+                                 actionRange: 'melee', reach: 5, toHit: 4,
+                                 damage: [{ dice: '1d4', mod: 0, type: 'piercing' }] }] } };
+  const party = [pm];
+  party._encounter = { map: { width: 20, height: 20, blocked: null },
+                       placement: [{ id: 'pc:pm1', x: 10, y: 10 }, { id: 'gob:1', x: 13, y: 10 }] };
+  const rng = () => 0.5;
+  const trial = Crucible.runTrial(party, [goblin], { aiHint: 'focus' }, rng);
+  const kiteDecision = trial.events.find(e => e.type === 'decision' && e.who === 'pc:pm1' && e.choice === 'kite' && e.round === 1);
+  assertTrue(kiteDecision, 'the archer should kite after attacking');
+  const kiteMove = trial.events.find(e => e.type === 'move' && e.who === 'pc:pm1' && e.reason === 'kite' && e.round === 1);
+  assertTrue(kiteMove, 'a kite move should fire');
+  const distAfter = Math.max(Math.abs(kiteMove.to.x - 13), Math.abs(kiteMove.to.y - 10));
+  assertTrue(distAfter > 3, 'kiting increases distance from the enemy (was 3, now ' + distAfter + ')');
+  const attacks = trial.events.filter(e => e.type === 'attack' && e.actor === 'Archer' && e.round === 1);
+  assertTrue(attacks.length > 0, 'the archer attacks before kiting');
+});
+
+test('runTrial: artillery monster pinned in melee takes a maneuver (disengage or dodge)', () => {
+  const pm = {
+    id: 'pm1', identity: { name: 'Fighter', level: 5 },
+    abilities: { dex: 12, str: 16 },
+    combat: { hp: 40, maxHp: 40, ac: 16, initBonus: 0, speed: 6 },
+    actions: [{ type: 'attack', name: 'Sword', actionRange: 'melee',
+                atkAbility: 'str', damage: { dice: '1d8', mod: '+atkAbility', type: 'slashing' } }],
+  };
+  const mage = { pickId: 'mage', name: 'Mage', cr: '3', count: 1,
+    monster: { name: 'Mage', ac: 12, hp: 60, maxHp: 60, initiative: 20, roleOverride: 'artillery',
+               abilities: { str: { mod: -1 }, dex: { mod: 2 } }, speed: { walk: 30 },
+               parsedActions: [{ kind: 'attack', sourceActionName: 'Bolt', name: 'Bolt',
+                                 actionRange: 'ranged', range: [120, 120], toHit: 6,
+                                 damage: [{ dice: '2d8', mod: 3, type: 'fire' }] }] } };
+  const party = [pm];
+  party._encounter = { map: { width: 20, height: 20, blocked: null },
+                       placement: [{ id: 'pc:pm1', x: 10, y: 10 }, { id: 'mage:1', x: 11, y: 10 }] };
+  const rng = () => 0.5;
+  const trial = Crucible.runTrial(party, [mage], { aiHint: 'focus' }, rng);
+  const decision = trial.events.find(e => e.type === 'decision' && e.who === 'mage:1' && e.round === 1);
+  assertTrue(decision, 'artillery monster should emit a decision when pinned in melee');
+  assertTrue(decision.choice === 'disengage-retreat' || decision.choice === 'dodge',
+             'artillery maneuver is disengage-retreat or dodge, got ' + decision.choice);
+});
+
+test('runTrial: plain frontline PC vs one goblin emits no decision events', () => {
+  const pm = {
+    id: 'pm1', identity: { name: 'Fighter', level: 5 },
+    abilities: { dex: 12, str: 16 },
+    combat: { hp: 40, maxHp: 40, ac: 16, initBonus: 20, speed: 6 },
+    actions: [{ type: 'attack', name: 'Sword', actionRange: 'melee',
+                atkAbility: 'str', damage: { dice: '1d8', mod: '+atkAbility', type: 'slashing' } }],
+  };
+  const goblin = { pickId: 'gob', name: 'Goblin', cr: '1/4', count: 1,
+    monster: { name: 'Goblin', ac: 13, hp: 30, maxHp: 30, initiative: -10,
+               abilities: { str: { mod: 0 }, dex: { mod: 0 } }, speed: { walk: 30 },
+               parsedActions: [{ kind: 'attack', sourceActionName: 'Bite', name: 'Bite',
+                                 actionRange: 'melee', reach: 5, toHit: 4,
+                                 damage: [{ dice: '1d4', mod: 0, type: 'piercing' }] }] } };
+  const party = [pm];
+  party._encounter = { map: { width: 20, height: 20, blocked: null },
+                       placement: [{ id: 'pc:pm1', x: 10, y: 10 }, { id: 'gob:1', x: 11, y: 10 }] };
+  const rng = () => 0.5;
+  const trial = Crucible.runTrial(party, [goblin], { aiHint: 'focus' }, rng);
+  const pcDecisions = trial.events.filter(e => e.type === 'decision' && e.who === 'pc:pm1' && e.round === 1);
+  assertEq(pcDecisions.length, 0, 'a healthy frontline PC in melee should not divert from attacking');
+  const attacks = trial.events.filter(e => e.type === 'attack' && e.actor === 'Fighter' && e.round === 1);
+  assertTrue(attacks.length > 0, 'the frontline PC attacks normally');
+});
+</script>
 </body>
 </html>

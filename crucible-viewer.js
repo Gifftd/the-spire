@@ -107,8 +107,9 @@
         break;
       }
       // attack/save/feature events don't change state — they're informational.
-      // v3.3 dodge/disengage/help/hide/grapple/stand-up/condition-ended are
-      // log-only here; token status glyphs arrive in V3.6.
+      // v3.3 dodge/disengage/help/hide/grapple/stand-up/condition-ended and
+      // the v3.4 decision (AI trace) event are log-only here; token status
+      // glyphs arrive in V3.6.
     }
   }
   CrucibleViewer.applyEvent = applyEvent;
@@ -300,6 +301,7 @@
         case 'grapple':    return 'R' + ev.round + ' · ' + ev.name + (ev.success ? ' grapples ' : ' fails to grapple ') + ev.targetName;
         case 'shove':      return 'R' + ev.round + ' · ' + ev.name + ' shoves ' + ev.targetName + ' → ' + ev.outcome;
         case 'stand-up':   return 'R' + ev.round + ' · ' + ev.name + ' stands up';
+        case 'decision':   return 'R' + ev.round + ' · 🧠 ' + ev.name + ': ' + ev.choice + (ev.reason ? ' — ' + ev.reason : '');
         case 'condition-ended': return 'R' + ev.round + ' · ' + ev.name + ' is no longer ' + ev.condition + (ev.reason ? ' (' + ev.reason + ')' : '');
         case 'grapple-escape-failed': return 'R' + ev.round + ' · ' + ev.name + ' fails to escape the grapple';
         default:          return ev.type;

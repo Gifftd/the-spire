@@ -219,6 +219,8 @@ function migratePCRecord(pm) {
     else if (pm.tactics.resources === 'sustained') pm.tactics.mode = 'sustained';
     else pm.tactics.mode = 'sustained';
   }
+  // v3.4: tactical role. null = auto (derived per-trial from position/rangedness).
+  if (!pm.tactics.role) pm.tactics.role = null;
   if (!Array.isArray(pm.features)) pm.features = [];
   // v2 spatial: speed/reach defaults (in cells, where 1 cell = 5 ft).
   // Legacy records may have speed stored in feet (e.g. 30 ft); convert.
@@ -414,6 +416,15 @@ function renderPCEditor(pm) {
           <option value="nova"      ${pm.tactics.mode === 'nova' ? 'selected' : ''}>Nova</option>
           <option value="sustained" ${pm.tactics.mode === 'sustained' ? 'selected' : ''}>Sustained</option>
           <option value="defensive" ${pm.tactics.mode === 'defensive' ? 'selected' : ''}>Defensive</option>
+        </select>
+        <span class="tactics-label" style="font-family:'Cinzel',serif; font-size:0.75rem; color:var(--c-brass);">Role</span>
+        <select onchange="updatePCRole('${pm.id}', this.value)">
+          <option value=""           ${!pm.tactics.role ? 'selected' : ''}>Auto</option>
+          <option value="frontline"  ${pm.tactics.role === 'frontline' ? 'selected' : ''}>Frontline</option>
+          <option value="skirmisher" ${pm.tactics.role === 'skirmisher' ? 'selected' : ''}>Skirmisher</option>
+          <option value="archer"     ${pm.tactics.role === 'archer' ? 'selected' : ''}>Archer</option>
+          <option value="caster"     ${pm.tactics.role === 'caster' ? 'selected' : ''}>Caster</option>
+          <option value="support"    ${pm.tactics.role === 'support' ? 'selected' : ''}>Support</option>
         </select>
       </div>
 
@@ -888,6 +899,14 @@ function updatePCMode(pmId, mode) {
   if (!pm) return;
   if (!pm.tactics) pm.tactics = {};
   pm.tactics.mode = mode;
+  saveParty();
+}
+function updatePCRole(pmId, role) {
+  const pm = party.find(p => p.id === pmId);
+  if (!pm) return;
+  if (!pm.tactics) pm.tactics = {};
+  // Empty string ('Auto') → null so the engine derives the role per-trial.
+  pm.tactics.role = role || null;
   saveParty();
 }
 function updateAction(pmId, aId, field, value) {

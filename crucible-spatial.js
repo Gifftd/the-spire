@@ -264,6 +264,100 @@
   }
   CrucibleSpatial.findShootingCell = findShootingCell;
 
+  // v3.4: Find the best retreat cell reachable within maxSteps — the cell that
+  // maximizes the minimum Chebyshev distance to any living enemy. Bounded
+  // Dijkstra flood from start (cost = stepCost, walls/occupied excluded),
+  // then pick the reachable cell with the best score.
+  //   options.requireLosTo — a combatant the retreater still needs to see
+  //     (e.g. a ranged attacker's target); cells without LOS to it are excluded.
+  //   options.occupied — Set of "x,y" strings the flood may not enter.
+  //   options.maxSteps — movement budget (defaults to Infinity).
+  // Deterministic tiebreak: larger min-dist, then lower cost, then lower y,
+  // then lower x. Returns { path, cell, minEnemyDist } or null when nothing
+  // reachable strictly improves on staying put.
+  function findRetreatCell(start, enemies, map, options) {
+    options = options || {};
+    const maxSteps = options.maxSteps != null ? options.maxSteps : Infinity;
+    const occupied = options.occupied || null;
+    const requireLosTo = options.requireLosTo || null;
+    const living = (enemies || []).filter(e => e && !e.dead && !e.downed
+                                               && typeof e.x === 'number');
+    if (maxSteps <= 0 || !living.length) return null;
+
+    const w = map.width, h = map.height;
+    function inBounds(x, y) { return x >= 0 && x < w && y >= 0 && y < h; }
+    function key(x, y) { return y * w + x; }
+    function minEnemyDist(x, y) {
+      let m = Infinity;
+      for (const e of living) m = Math.min(m, chebyshev({ x, y }, e));
+      return m;
+    }
+
+    const startMin = minEnemyDist(start.x, start.y);
+
+    // Dijkstra flood. Each node stores accumulated cost g and parent for path
+    // reconstruction. Start cell is g=0 (never a candidate — retreating must
+    // actually move).
+    const startNode = { x: start.x, y: start.y, g: 0, parent: null };
+    const open = [startNode];
+    const bestG = new Map();
+    bestG.set(key(start.x, start.y), 0);
+
+    function reconstruct(node) {
+      const path = [];
+      let n = node;
+      while (n.parent) { path.unshift({ x: n.x, y: n.y }); n = n.parent; }
+      return path;
+    }
+
+    let best = null;  // { node, min, g }
+    function consider(node) {
+      if (node.g <= 0) return;  // staying put is not a retreat
+      const min = minEnemyDist(node.x, node.y);
+      if (min <= startMin) return;  // must strictly improve safety
+      if (requireLosTo && !hasLineOfSight(map, { x: node.x, y: node.y }, requireLosTo)) return;
+      if (!best) { best = { node, min, g: node.g }; return; }
+      // Tiebreak: larger min-dist, then lower cost, then lower y, then lower x.
+      if (min > best.min
+          || (min === best.min && node.g < best.g)
+          || (min === best.min && node.g === best.g && node.y < best.node.y)
+          || (min === best.min && node.g === best.g && node.y === best.node.y && node.x < best.node.x)) {
+        best = { node, min, g: node.g };
+      }
+    }
+
+    while (open.length > 0) {
+      // Pop the lowest-g node (Dijkstra). Linear scan — fine at our grid sizes.
+      let bestIdx = 0;
+      for (let i = 1; i < open.length; i++) if (open[i].g < open[bestIdx].g) bestIdx = i;
+      const cur = open.splice(bestIdx, 1)[0];
+      // Stale-entry guard: skip if a cheaper path to this cell was already found.
+      if (cur.g > (bestG.get(key(cur.x, cur.y)) != null ? bestG.get(key(cur.x, cur.y)) : Infinity)) continue;
+      consider(cur);
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = cur.x + dx, ny = cur.y + dy;
+          if (!inBounds(nx, ny)) continue;
+          if (isWall(map, nx, ny)) continue;
+          if (occupied && occupied.has(nx + ',' + ny)) continue;
+          const ng = cur.g + stepCost(map, nx, ny);
+          if (ng > maxSteps) continue;
+          const k = key(nx, ny);
+          const prev = bestG.get(k);
+          if (prev != null && prev <= ng) continue;
+          bestG.set(k, ng);
+          open.push({ x: nx, y: ny, g: ng, parent: cur });
+        }
+      }
+    }
+
+    if (!best) return null;
+    return { path: reconstruct(best.node), cell: { x: best.node.x, y: best.node.y },
+             minEnemyDist: best.min };
+  }
+  CrucibleSpatial.findRetreatCell = findRetreatCell;
+
   // Default layout: place combatants on the map.
   // If override is provided, use explicit positions from it.
   // Otherwise, PCs at y=1, monsters at y=height-2, spread evenly across width.

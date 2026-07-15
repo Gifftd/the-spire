@@ -655,6 +655,73 @@ test('findShootingCell: fully walled off goal → null', () => {
   const result = CrucibleSpatial.findShootingCell(c, t, action, map, { maxSteps: 3 });
   assertEq(result, null);  // can't reach a shooting cell within 3 steps
 });
+
+group('findRetreatCell (v3.4)');
+
+test('findRetreatCell: open map, adjacent enemy → moves away, minEnemyDist increases', () => {
+  const map = { width: 20, height: 20, blocked: null };
+  const start = { x: 5, y: 5 };
+  const enemy = { x: 6, y: 5, dead: false, downed: false };
+  const r = CrucibleSpatial.findRetreatCell(start, [enemy], map, { maxSteps: 6 });
+  assert(r, 'should find a retreat cell on an open map');
+  assert(r.path.length > 0, 'retreat requires movement');
+  // Start's min-enemy distance is 1; the chosen cell must be strictly safer.
+  assert(r.minEnemyDist > 1, 'minEnemyDist should improve on the starting distance (was 1): ' + r.minEnemyDist);
+  // And the retreat cell must actually be farther than start.
+  assert(CrucibleSpatial.chebyshev(r.cell, enemy) > CrucibleSpatial.chebyshev(start, enemy),
+         'retreat cell is farther from the enemy than the start');
+});
+
+test('findRetreatCell: requireLosTo keeps line of sight to the specified target past a wall', () => {
+  const map = { width: 20, height: 20, terrain: Array.from({length: 20}, () => new Array(20).fill(null)) };
+  // A short wall segment near the retreater that some retreat cells would hide behind.
+  map.terrain[5][8] = { type: 'wall' };
+  map.terrain[6][8] = { type: 'wall' };
+  map.terrain[4][8] = { type: 'wall' };
+  const start = { x: 7, y: 5 };
+  const enemy = { x: 6, y: 5, dead: false, downed: false };   // the melee threat, west
+  const shotTarget = { x: 12, y: 5 };                          // must keep LOS to this, east
+  const r = CrucibleSpatial.findRetreatCell(start, [enemy], map,
+    { maxSteps: 6, requireLosTo: shotTarget });
+  assert(r, 'should find a retreat cell that still sees the shot target');
+  // The chosen cell must have LOS to the shot target despite the wall.
+  assertEq(CrucibleSpatial.hasLineOfSight(map, r.cell, shotTarget), true);
+  assert(r.minEnemyDist > CrucibleSpatial.chebyshev(start, enemy),
+         'retreat improved distance from the melee enemy');
+});
+
+test('findRetreatCell: boxed in by enemies + walls → null', () => {
+  const map = { width: 9, height: 9, terrain: Array.from({length: 9}, () => new Array(9).fill(null)) };
+  // Wall ring around a 3x3 pocket centered on (4,4): walls at radius 2.
+  for (let d = 2; d <= 2; d++) {
+    for (let x = 4 - d; x <= 4 + d; x++) { map.terrain[4 - d][x] = { type: 'wall' }; map.terrain[4 + d][x] = { type: 'wall' }; }
+    for (let y = 4 - d; y <= 4 + d; y++) { map.terrain[y][4 - d] = { type: 'wall' }; map.terrain[y][4 + d] = { type: 'wall' }; }
+  }
+  const start = { x: 4, y: 4 };
+  // Enemies fill every open neighbor so no reachable cell improves min-dist.
+  const enemies = [
+    { x: 3, y: 3, dead: false, downed: false }, { x: 4, y: 3, dead: false, downed: false }, { x: 5, y: 3, dead: false, downed: false },
+    { x: 3, y: 4, dead: false, downed: false },                                             { x: 5, y: 4, dead: false, downed: false },
+    { x: 3, y: 5, dead: false, downed: false }, { x: 4, y: 5, dead: false, downed: false }, { x: 5, y: 5, dead: false, downed: false },
+  ];
+  const occupied = new Set(enemies.map(e => e.x + ',' + e.y));
+  const r = CrucibleSpatial.findRetreatCell(start, enemies, map, { maxSteps: 6, occupied });
+  assertEq(r, null);  // nowhere to go, and nowhere would be safer anyway
+});
+
+test('findRetreatCell: occupied cells are excluded from candidates', () => {
+  const map = { width: 20, height: 20, blocked: null };
+  const start = { x: 5, y: 5 };
+  const enemy = { x: 6, y: 5, dead: false, downed: false };
+  // Occupy a broad wall of cells to the west so the flood must route around them.
+  const occupied = new Set();
+  for (let y = 0; y < 20; y++) occupied.add('3,' + y);
+  const r = CrucibleSpatial.findRetreatCell(start, [enemy], map, { maxSteps: 6, occupied });
+  assert(r, 'should still find a retreat cell routing around occupied cells');
+  // The chosen retreat cell must not be an occupied cell, nor any path step.
+  assert(!occupied.has(r.cell.x + ',' + r.cell.y), 'retreat cell must not be occupied');
+  for (const step of r.path) assert(!occupied.has(step.x + ',' + step.y), 'no path step may enter an occupied cell');
+});
 </script>
 </body>
 </html>

@@ -299,6 +299,21 @@
     return bucket(rangedness(pm));
   }
 
+  // v3.4: resolve a PC's tactical role for the maneuver layer. Explicit
+  // tactics.role wins; else derive from the existing position/rangedness
+  // heuristics. position() returns 'frontline' | 'midline' | 'backline';
+  // rangedness() returns a 0..1 fraction of ranged actions.
+  function resolvePcRole(pm) {
+    if (pm && pm.tactics && pm.tactics.role) return pm.tactics.role;
+    const acts = (pm && pm.actions) || [];
+    const hasHeal = acts.some(a => a.type === 'heal');
+    const hasAoE  = acts.some(a => a.shape && a.shape !== 'single');
+    if (hasHeal) return 'support';
+    if (position(pm) === 'frontline') return 'frontline';
+    if (hasAoE) return 'caster';
+    return rangedness(pm) >= 0.5 ? 'archer' : 'skirmisher';
+  }
+
   // ─────────── Role inference ───────────
   // Median HP per CR — sourced from the 2024 DMG monster table. Fractional
   // CRs covered for low-tier creatures. Lookups beyond CR 20 cap at CR 20.
@@ -1587,6 +1602,83 @@
     return atWill || null;
   }
 
+  // v3.4: set of "x,y" cells occupied by living combatants (excluding one).
+  function occupiedSet(all, exclude) {
+    const s = new Set();
+    for (const d of all) {
+      if (d === exclude || d.dead || d.downed) continue;
+      if (typeof d.x === 'number') s.add(d.x + ',' + d.y);
+    }
+    return s;
+  }
+
+  // v3.4: decide whether this turn's ACTION should be something other than the
+  // default attack. Returns null (proceed with the normal attack flow) or a
+  // plan object { kind, ...args, reason } that the turn loop executes. Rules
+  // are deliberately conservative — diverting from attacking must clearly beat
+  // it. Evaluated at TURN START (before any movement), so melee-adjacency
+  // rules only fire for combatants already engaged.
+  function chooseManeuver(c, all, tactics, map, rng) {
+    if (c.side !== 'pc') return null;                       // monsters: separate pre-pass
+    if (typeof CrucibleSpatial === 'undefined') return null;
+    const role = resolvePcRole(c.pm);
+    const enemies = all.filter(t => t.side !== c.side && !t.dead && !t.downed);
+    if (!enemies.length) return null;
+    const adjacentEnemies = enemies.filter(e =>
+      CrucibleSpatial.chebyshev(c, e) <= (e.naturalReach || 1));
+    const hpFrac = c.maxHp > 0 ? c.hp / c.maxHp : 1;
+
+    // 1. Disengage + retreat: ranged/caster/support pinned in melee.
+    if ((role === 'archer' || role === 'caster' || role === 'support')
+        && adjacentEnemies.length >= 1) {
+      const occupied = occupiedSet(all, c);
+      const retreat = CrucibleSpatial.findRetreatCell(
+        { x: c.x, y: c.y }, enemies, map,
+        { maxSteps: c.movementBudgetThisTurn, occupied });
+      if (retreat && retreat.minEnemyDist >= 2) {
+        return { kind: 'disengage-retreat', path: retreat.path,
+                 reason: role + ' pinned by ' + adjacentEnemies.length + ' melee' };
+      }
+      // No escape route → Dodge instead (fight defensively).
+      return { kind: 'dodge', reason: role + ' pinned, no retreat path' };
+    }
+
+    // 2. Dodge: badly hurt frontline holding a chokepoint.
+    if (role === 'frontline' && hpFrac < 0.35 && adjacentEnemies.length >= 2) {
+      return { kind: 'dodge',
+               reason: 'frontline at ' + Math.round(hpFrac * 100) + '% HP vs ' + adjacentEnemies.length + ' melee' };
+    }
+
+    // 3. Shove-prone: frontline + an adjacent ally also in melee with the same
+    //    target → prone gives the whole melee train advantage. Conservative:
+    //    a target is proned by the party only ONCE per combat (tgt._shoveProneUsed)
+    //    — a control setup, not a spam. Without this cap the melee line re-prones
+    //    the same target every round (it stands at its turn start) and burns an
+    //    action each round for degenerate, unrealistic advantage uptime.
+    if (role === 'frontline' && adjacentEnemies.length >= 1) {
+      const tgt = adjacentEnemies[0];
+      const allyAlsoAdjacent = all.some(a => a.side === c.side && a !== c
+        && !a.dead && !a.downed
+        && CrucibleSpatial.chebyshev(a, tgt) <= 1);
+      if (allyAlsoAdjacent && !tgt._shoveProneUsed && !tgt.conditions.has('prone')) {
+        return { kind: 'shove', target: tgt, mode: 'prone',
+                 reason: 'prone sets up ally advantage' };
+      }
+    }
+
+    // 4. Help: support with no useful attack of its own.
+    if (role === 'support' && adjacentEnemies.length === 0) {
+      const hasAttack = (c.pm.actions || []).some(a => a.type === 'attack' || a.type === 'save');
+      if (!hasAttack) {
+        const ally = all.find(a => a.side === c.side && a !== c && !a.dead && !a.downed
+          && CrucibleSpatial.chebyshev(c, a) <= 1);
+        if (ally) return { kind: 'help', ally, reason: 'support with no attack' };
+      }
+    }
+
+    return null;
+  }
+
   // ─────────── Bonus-action phase (v3.2) ───────────
   // Pick and fire one bonus-cost action, if any is available and useful.
   // Supports kinds: attack (requires a target attackable from the current
@@ -1797,10 +1889,75 @@
             targets = Array.isArray(tgt) ? tgt : [tgt];
             action = policy.pickAction(c, targets[0], policyCtx);
             if (!action) break;
+            // v3.4: role-flavored maneuvers for monsters (thin pre-pass; the
+            // role policy is otherwise untouched). Skirmisher disengage is
+            // deferred — its hit-and-run policy already repositions. TODO v3.6+.
+            if (typeof CrucibleSpatial !== 'undefined') {
+              const monRole = resolveRole(c.monster);
+              const pcsAdj = all.filter(t => t.side === 'pc' && !t.dead && !t.downed
+                && CrucibleSpatial.chebyshev(c, t) <= 1);
+              // Artillery engaged in melee → retreat if there's an escape, else Dodge.
+              if (monRole === 'artillery' && pcsAdj.length >= 1) {
+                const pcEnemies = all.filter(t => t.side === 'pc' && !t.dead && !t.downed);
+                const occ = occupiedSet(all, c);
+                const retreat = CrucibleSpatial.findRetreatCell(
+                  { x: c.x, y: c.y }, pcEnemies, map,
+                  { maxSteps: c.movementBudgetThisTurn, occupied: occ });
+                if (retreat && retreat.minEnemyDist >= 2) {
+                  events.push({ type: 'decision', round, who: c.id, name: c.name,
+                                choice: 'disengage-retreat', reason: 'artillery escaping melee' });
+                  resolveDisengage(c, events, round);
+                  const stepped = executePath(c, retreat.path, 'retreat', combatants, rng, events, round);
+                  c.movementBudgetThisTurn = Math.max(0, c.movementBudgetThisTurn - stepped);
+                  continue;
+                }
+                events.push({ type: 'decision', round, who: c.id, name: c.name,
+                              choice: 'dodge', reason: 'artillery pinned in melee' });
+                resolveDodge(c, events, round);
+                continue;
+              }
+              // Brute: shove a PC into adjacent damaging terrain when available.
+              if (monRole === 'brute' && pcsAdj.length >= 1) {
+                const tgtPc = pcsAdj[0];
+                const dx = Math.sign(tgtPc.x - c.x), dy = Math.sign(tgtPc.y - c.y);
+                const behind = CrucibleSpatial.terrainAt(map, tgtPc.x + dx, tgtPc.y + dy);
+                if (behind && behind.type === 'damaging') {
+                  events.push({ type: 'decision', round, who: c.id, name: c.name,
+                                choice: 'shove', reason: 'push into ' + (behind.dmgType || 'hazard') });
+                  resolveShove(c, tgtPc, rng, events, round, map, combatants, 'push');
+                  continue;
+                }
+              }
+            }
           } else {
             // PC branch.
             action = pickAction(c);
             if (!action) break;
+            // v3.4 decision pre-pass: a maneuver may beat attacking.
+            const plan = (typeof CrucibleSpatial !== 'undefined')
+              ? chooseManeuver(c, all, tactics, map, rng) : null;
+            if (plan) {
+              events.push({ type: 'decision', round, who: c.id, name: c.name,
+                            choice: plan.kind, reason: plan.reason });
+              if (plan.kind === 'dodge') {
+                resolveDodge(c, events, round);
+                tally(c.side, 'Dodge', 'dodge', false, 0, 0, 0, 0);
+              } else if (plan.kind === 'disengage-retreat') {
+                resolveDisengage(c, events, round);
+                const stepped = executePath(c, plan.path, 'retreat', combatants, rng, events, round);
+                c.movementBudgetThisTurn = Math.max(0, c.movementBudgetThisTurn - stepped);
+                tally(c.side, 'Disengage', 'disengage', false, 0, 0, 0, 0);
+              } else if (plan.kind === 'shove') {
+                // Mark the target so no ally re-prones it later this combat.
+                if (plan.mode === 'prone') plan.target._shoveProneUsed = true;
+                const outcome = resolveShove(c, plan.target, rng, events, round, map, combatants, plan.mode);
+                tally(c.side, 'Shove', 'shove', outcome !== 'resisted', 0, 0, 0, 0);
+              } else if (plan.kind === 'help') {
+                resolveHelp(c, plan.ally, events, round);
+                tally(c.side, 'Help', 'help', false, 0, 0, 0, 0);
+              }
+              continue;   // action spent on the maneuver
+            }
           }
           // v2 spatial: range + LOS check + movement, with Dash + reposition.
           // For single-target attacks, gate on canAttackFrom (range AND LOS),
@@ -2044,6 +2201,35 @@
             }
           }
         }
+        }
+        // v3.4 kiting: ranged roles spend leftover movement opening distance
+        // after their action. Only when it doesn't provoke: skip if any
+        // adjacent enemy still has a reaction (stepping away would eat an OoA)
+        // unless the PC disengaged this turn.
+        if (c.side === 'pc' && !c.dead && !c.downed
+            && typeof CrucibleSpatial !== 'undefined'
+            && c.movementBudgetThisTurn > 0) {
+          const role = resolvePcRole(c.pm);
+          if (role === 'archer' || role === 'caster' || role === 'skirmisher') {
+            const enemies = combatants.filter(t => t.side !== c.side && !t.dead && !t.downed);
+            const wouldProvoke = !c.disengagedThisTurn && enemies.some(e =>
+              e.reactionAvailableThisRound
+              && CrucibleSpatial.chebyshev(c, e) <= (e.naturalReach || 1));
+            if (enemies.length && !wouldProvoke) {
+              const nearest = Math.min(...enemies.map(e => CrucibleSpatial.chebyshev(c, e)));
+              if (nearest <= 3) {   // only bother when someone is closing in
+                const retreat = CrucibleSpatial.findRetreatCell(
+                  { x: c.x, y: c.y }, enemies, map,
+                  { maxSteps: c.movementBudgetThisTurn, occupied: occupiedSet(combatants, c) });
+                if (retreat && retreat.path.length) {
+                  events.push({ type: 'decision', round, who: c.id, name: c.name,
+                                choice: 'kite', reason: 'open distance (nearest ' + nearest + 'c)' });
+                  const stepped = executePath(c, retreat.path, 'kite', combatants, rng, events, round);
+                  c.movementBudgetThisTurn = Math.max(0, c.movementBudgetThisTurn - stepped);
+                }
+              }
+            }
+          }
         }
         // v3: bonus-action phase. One bonus-cost action may fire per turn if
         // the combatant is still standing and a useful one is available.
@@ -2300,6 +2486,8 @@
     rangedness, bucket, position, positionOf,
     crHpMedian, inferRole, resolveRole, normalizeRole,
     ROLE_POLICIES,
+    // v3.4 tactical AI
+    resolvePcRole, chooseManeuver,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Crucible;
