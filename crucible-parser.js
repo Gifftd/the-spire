@@ -254,6 +254,12 @@
       parsedBy: 'auto',
       parsedAt: today(),
     };
+    // v3.8: thrown weapon detection. A 'both' (Melee or Ranged) weapon with a
+    // range profile is thrown (handaxe, javelin, spear, dagger, trident), as is
+    // any body carrying the explicit "thrown" keyword. Pure ranged weapons
+    // (bows/crossbows) are NOT thrown. Attached only when true so non-thrown
+    // attacks stay byte-identical.
+    if ((actionRange === 'both' && rangeM) || /\bthrown\b/i.test(body)) parsed.thrown = true;
     // v3.6: on-hit rider condition (attacks only). Only attached when detected,
     // so pure attacks stay byte-identical (rider stays undefined).
     const rider = detectRider(body);
