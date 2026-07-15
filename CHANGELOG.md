@@ -9,6 +9,31 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-07-15
 
+### Crucible: "↻ Re-parse saved customs" — refresh frozen bestiary_custom parses
+
+Saved `bestiary_custom` override records freeze a full `parsedActions`
+snapshot that deliberately shadows the live parser — so parser upgrades
+(like today's v3.9) never reached them. New button in the encounter pane
+(`crucible-dm.html`, next to "+ Add from Bestiary") re-runs the CURRENT
+parser over every saved record:
+
+- Entries the DM hand-edited (`parsedBy:'manual'`) are kept **verbatim**;
+  auto-parsed entries are regenerated from the imported base's action text.
+- An override record left with no manual edits (and no regeneration/role
+  override) is **pruned** — a frozen copy of pure parser output only rots;
+  removing it lets every future parser upgrade flow to that monster live.
+- Homebrew records with stored `parsedActions` are refreshed from their own
+  `actions[]` text (never pruned — they are the data). Orphan overrides and
+  records without source text are left untouched.
+- Confirm dialog reports the diff before anything is written (records
+  re-parsed, unparsed before → after, manual edits kept, pruned, skipped);
+  saves back as a bare array via the normal DM-gated POST.
+
+Verified in-browser against a stubbed worker: manual toHit override kept,
+stale unparsed Multiattack re-parsed into a dynamic-options plan, redundant
+all-auto override pruned, homebrew temp-HP action upgraded unparsed → heal,
+orphan skipped.
+
 ### Crucible parser v3.9: corpus re-parse — 87.4% → 96.8% coverage + dynamic multiattack weapon choice
 
 Full-corpus pass over the local bestiary (1,124 monsters / 3,793 actions):

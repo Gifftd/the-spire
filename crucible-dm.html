@@ -198,6 +198,8 @@
     <div id="battlefield-panel"></div>
     <div id="encounter-list" class="empty-state">No monsters yet. (Pane B under construction.)</div>
     <button class="btn" id="btn-add-monster" style="margin-top:0.5rem">+ Add from Bestiary</button>
+    <button class="btn btn--ghost" id="btn-reparse-customs" style="margin-top:0.5rem"
+            title="Re-run the current parser over saved bestiary_custom records. Keeps your manual edits; regenerates stale auto-parses.">↻ Re-parse saved customs</button>
     <div id="fm-budget" style="margin-top:1rem; padding:0.5rem; background:var(--c-surface);
          border-left:3px solid var(--c-teal); font-size:0.85rem;"></div>
   </section>
@@ -2518,6 +2520,95 @@ async function saveOverride(pickId) {
   }
 }
 
+// ─────────── Re-parse saved bestiary_custom records ───────────
+// Override records freeze a full parsedActions snapshot at save time, which
+// deliberately shadows the live parser — so parser upgrades never reach them.
+// This re-runs the CURRENT parser over every saved record's source action
+// text: entries the DM hand-edited (parsedBy:'manual') are kept verbatim,
+// everything else is regenerated. An override record left with NO manual
+// edits (and no regeneration/role override) is pruned entirely — the live
+// parser output is strictly better than a frozen copy of it. Homebrew
+// records with stored parsedActions get the same refresh from their own
+// action text (never pruned — they ARE the data).
+async function reparseCustomOverrides() {
+  const btn = document.getElementById('btn-reparse-customs');
+  if (btn) btn.disabled = true;
+  try {
+    const headers = Auth.dmHeaders ? Auth.dmHeaders() : {};
+    const [ri, rc] = await Promise.all([
+      fetch(WORKER_URL + '?type=bestiary',        { cache:'no-store', headers }),
+      fetch(WORKER_URL + '?type=bestiary_custom', { cache:'no-store', headers }),
+    ]);
+    if (ri.status === 401 || rc.status === 401) { UI.toast('DM session expired — sign in again.', 'error'); return; }
+    if (!rc.ok) { UI.toast('Could not load bestiary_custom (HTTP ' + rc.status + ').', 'error'); return; }
+    const importedArr = BestiaryMerge.arrayOf(ri.ok ? await ri.json() : []);
+    const list = BestiaryMerge.arrayOf(await rc.json());
+    if (!list.length) { UI.toast('No saved bestiary_custom records to re-parse.', 'info'); return; }
+
+    const baseByKey = new Map(importedArr.map(m => [BestiaryMerge.recordKey(m), m]));
+    const keep = [];
+    let reparsed = 0, manualKept = 0, pruned = 0, skipped = 0;
+    let unparsedBefore = 0, unparsedAfter = 0;
+    const stripOwner = pa => { const { _ownerActions, ...rest } = pa; return rest; };
+
+    for (const rec of list) {
+      if (!Array.isArray(rec.parsedActions)) { keep.push(rec); skipped++; continue; }
+      const isOverride = BestiaryMerge.isOverrideRecord(rec);
+      // Source of action text: the imported base for overrides; the record
+      // itself for homebrew (it carries its own actions[]).
+      const base = isOverride ? baseByKey.get(BestiaryMerge.recordKey(rec)) : rec;
+      if (!base || !Array.isArray(base.actions) || !base.actions.length) {
+        keep.push(rec); skipped++; continue;   // orphan override / no source text
+      }
+      const manual = rec.parsedActions
+        .filter(pa => pa && pa.parsedBy === 'manual')
+        .map(stripOwner);
+      unparsedBefore += rec.parsedActions.filter(pa => pa && pa.kind === 'unparsed').length;
+      // Seed the clone with only the manual entries — parseAllMonsterActions
+      // keeps existing entries by sourceActionName and re-parses the rest.
+      const clone = JSON.parse(JSON.stringify(base));
+      clone.parsedActions = JSON.parse(JSON.stringify(manual));
+      CrucibleParser.parseAllMonsterActions(clone);
+      const fresh = clone.parsedActions.map(stripOwner);
+      unparsedAfter += fresh.filter(pa => pa && pa.kind === 'unparsed').length;
+      manualKept += manual.length;
+      reparsed++;
+      if (isOverride && !manual.length && rec.regeneration == null && rec.roleOverride == null) {
+        pruned++;               // nothing DM-authored left — let the live parser own it
+        continue;
+      }
+      rec.parsedActions = fresh;
+      if (isOverride) rec.overriddenAt = new Date().toISOString();
+      keep.push(rec);
+    }
+
+    if (!reparsed) { UI.toast('Nothing to re-parse (' + skipped + ' record(s) have no source text).', 'info'); return; }
+    const ok = await UI.confirmDialog(
+      `Re-parsed ${reparsed} record(s): unparsed actions ${unparsedBefore} → ${unparsedAfter}, ` +
+      `${manualKept} manual edit(s) kept, ${pruned} redundant override(s) removed` +
+      (skipped ? `, ${skipped} skipped (no source text)` : '') +
+      `. Save to bestiary_custom?`,
+      { confirmLabel: 'Save', danger: false });
+    if (!ok) return;
+
+    const saveR = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', ...headers },
+      body: JSON.stringify({ type:'bestiary_custom', payload: keep }),
+    });
+    if (saveR.ok) {
+      delete window._CRUCIBLE_BESTIARY;
+      UI.toast('bestiary_custom re-parsed. Re-add monsters in this encounter to pick up the changes.', 'success');
+    } else {
+      UI.toast('Save failed: HTTP ' + saveR.status, 'error');
+    }
+  } catch (e) {
+    UI.toast('Re-parse failed: ' + (e.message || e), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  FM CR-budget math (copied from War Table; keep in sync if FM changes)
 // ═══════════════════════════════════════════════════════════════════════
@@ -2608,6 +2699,7 @@ function renderFmBudget() {
 
 // Wire the Add button.
 document.getElementById('btn-add-monster').onclick = openPickerModal;
+document.getElementById('btn-reparse-customs').onclick = reparseCustomOverrides;
 
 renderParty();
 renderBattlefieldPanel();
