@@ -1226,6 +1226,254 @@
     },
   };
 
+  // ── Class features: casters & support (Cleric, Wizard/Sorcerer, Warlock, Druid, Bard) ──
+
+  const DIVINE_STRIKE = {
+    id: 'divineStrike',
+    name: 'Divine Strike',
+    source: 'builtin',
+    category: ['damage'],
+    classHint: 'cleric',
+    summary: 'Once per turn, a weapon hit deals extra radiant dice (from level 8; 2d8 at 14+).',
+
+    deriveParams(identityOrPm) {
+      const level = (identityOrPm && identityOrPm.level) || (identityOrPm && identityOrPm.identity && identityOrPm.identity.level) || 8;
+      return { dice: level >= 14 ? '2d8' : '1d8', minLevel: 8, level };
+    },
+
+    paramSchema: [
+      { name: 'dice', type: 'string', label: 'Extra dice', default: '1d8', placeholder: '1d8' },
+      { name: 'minLevel', type: 'int', label: 'Active from level', default: 8, min: 1, max: 20 },
+      { name: 'level', type: 'int', label: 'Cleric level', default: 8, min: 1, max: 20 },
+    ],
+
+    modePolicy: {
+      nova:      { conditionFn: 'always' },
+      sustained: { conditionFn: 'always' },
+      defensive: { conditionFn: 'always' },
+    },
+
+    initialState() { return { usedThisTurn: false }; },
+
+    hooks: {
+      onTurnStart(self, ctx) {
+        if (self.featureState.divineStrike) self.featureState.divineStrike.usedThisTurn = false;
+      },
+
+      onAttackHit(self, action, target, dmgCtx) {
+        const state = self.featureState.divineStrike;
+        if (!state || state.usedThisTurn) return;
+        if (!action || action.kind !== 'attack' || action.actionRange === 'ranged') return;
+        const ref = self.pm.features.find(f => f.id === 'divineStrike');
+        const params = (ref && ref.params) || this.deriveParams(self.pm);
+        const level = params.level || (self.pm.identity && self.pm.identity.level) || 0;
+        if (level < (params.minLevel || 8)) return;  // Divine Strike is a level-8 feature
+        if (!Array.isArray(dmgCtx.bonusDice)) dmgCtx.bonusDice = [];
+        dmgCtx.bonusDice.push({ dice: params.dice || '1d8', type: 'radiant', source: 'divineStrike', featureName: 'Divine Strike' });
+        state.usedThisTurn = true;
+      },
+    },
+  };
+
+  const MAGE_ARMOR = {
+    id: 'mageArmor',
+    name: 'Mage Armor',
+    source: 'builtin',
+    category: ['defense'],
+    classHint: 'wizard',
+    summary: 'At combat start, raise AC to base (13) + Dex mod if that beats current AC.',
+
+    deriveParams(identityOrPm) {
+      const abilities = (identityOrPm && identityOrPm.abilities) || (identityOrPm && identityOrPm.pm && identityOrPm.pm.abilities);
+      return { baseAc: 13, dex: (abilities && abilities.dex) || 10 };
+    },
+
+    paramSchema: [
+      { name: 'baseAc', type: 'int', label: 'Base AC', default: 13, min: 10, max: 18 },
+    ],
+
+    modePolicy: {
+      nova:      { conditionFn: 'always' },
+      sustained: { conditionFn: 'always' },
+      defensive: { conditionFn: 'always' },
+    },
+
+    initialState() { return { applied: false, priorAc: null }; },
+
+    hooks: {
+      onCombatStart(self, ctx) {
+        const ref = self.pm.features.find(f => f.id === 'mageArmor');
+        const params = (ref && ref.params) || this.deriveParams(self.pm);
+        const dex = (self.pm.abilities && self.pm.abilities.dex);
+        const dexMod = typeof dex === 'number' ? mod(dex) : mod(params.dex || 10);
+        const target = (params.baseAc || 13) + dexMod;
+        if (typeof self.ac !== 'number' || self.ac >= target) return;
+        self.featureState.mageArmor.priorAc = self.ac;
+        self.featureState.mageArmor.applied = true;
+        self.ac = target;
+        if (ctx.eventLog) ctx.eventLog.push({
+          round: ctx.round, type: 'feature', who: self.id,
+          what: 'Mage Armor (AC ' + target + ')',
+          featureName: 'Mage Armor', source: 'mageArmor',
+        });
+      },
+    },
+  };
+
+  const AGONIZING_BLAST = {
+    id: 'agonizingBlast',
+    name: 'Agonizing Blast',
+    source: 'builtin',
+    category: ['damage'],
+    classHint: 'warlock',
+    summary: 'Adds your Charisma modifier to every ranged (Eldritch Blast) hit.',
+
+    deriveParams(identityOrPm) {
+      const abilities = (identityOrPm && identityOrPm.abilities) || (identityOrPm && identityOrPm.pm && identityOrPm.pm.abilities);
+      const cha = (abilities && abilities.cha) || 10;
+      return { bonus: Math.max(0, mod(cha)) };
+    },
+
+    paramSchema: [
+      { name: 'bonus', type: 'int', label: 'Bonus damage (CHA mod)', default: 3, min: 0, max: 10 },
+    ],
+
+    modePolicy: {
+      nova:      { conditionFn: 'always' },
+      sustained: { conditionFn: 'always' },
+      defensive: { conditionFn: 'always' },
+    },
+
+    initialState() { return {}; },
+
+    hooks: {
+      onAttackHit(self, action, target, dmgCtx) {
+        if (!action || action.actionRange !== 'ranged') return;  // Eldritch Blast is ranged
+        const ref = self.pm.features.find(f => f.id === 'agonizingBlast');
+        let bonus = (ref && ref.params && typeof ref.params.bonus === 'number') ? ref.params.bonus : null;
+        if (bonus === null) {
+          const cha = (self.pm.abilities && self.pm.abilities.cha) || 10;
+          bonus = Math.max(0, mod(cha));
+        }
+        if (bonus <= 0) return;
+        if (!Array.isArray(dmgCtx.bonusDice)) dmgCtx.bonusDice = [];
+        // Flat CHA-mod damage: pre-rolled bonus die (Rage-style) so it lands on HP.
+        dmgCtx.bonusDice.push({ dice: String(bonus), type: dmgCtx.type || 'force', source: 'agonizingBlast', featureName: 'Agonizing Blast', _rolled: bonus });
+      },
+    },
+  };
+
+  const PRIMAL_STRIKE = {
+    id: 'primalStrike',
+    name: 'Primal Strike (Shillelagh)',
+    source: 'builtin',
+    category: ['damage'],
+    classHint: 'druid',
+    summary: 'Adds a small extra die of damage to every melee hit (druidic weapon boon).',
+
+    deriveParams() { return { dice: '1d4' }; },
+
+    paramSchema: [
+      { name: 'dice', type: 'string', label: 'Extra dice', default: '1d4', placeholder: '1d4' },
+    ],
+
+    modePolicy: {
+      nova:      { conditionFn: 'always' },
+      sustained: { conditionFn: 'always' },
+      defensive: { conditionFn: 'always' },
+    },
+
+    initialState() { return {}; },
+
+    hooks: {
+      onAttackHit(self, action, target, dmgCtx) {
+        if (!action || action.kind !== 'attack' || action.actionRange === 'ranged') return;
+        const ref = self.pm.features.find(f => f.id === 'primalStrike');
+        const params = (ref && ref.params) || this.deriveParams(self.pm);
+        if (!Array.isArray(dmgCtx.bonusDice)) dmgCtx.bonusDice = [];
+        dmgCtx.bonusDice.push({ dice: params.dice || '1d4', type: dmgCtx.type || 'bludgeoning', source: 'primalStrike', featureName: 'Primal Strike' });
+      },
+    },
+  };
+
+  const CUTTING_WORDS = {
+    id: 'cuttingWords',
+    name: 'Cutting Words',
+    source: 'builtin',
+    category: ['defense', 'support'],
+    classHint: 'bard',
+    summary: "Reaction: spend a Bardic die to subtract from an enemy's attack roll against the bard, turning a marginal hit into a miss.",
+
+    deriveParams(identityOrPm) {
+      const level = (identityOrPm && identityOrPm.level) || (identityOrPm && identityOrPm.identity && identityOrPm.identity.level) || 1;
+      const abilities = (identityOrPm && identityOrPm.abilities) || (identityOrPm && identityOrPm.pm && identityOrPm.pm.abilities);
+      const cha = (abilities && abilities.cha) || 12;
+      let die = 'd6';
+      if (level >= 5)  die = 'd8';
+      if (level >= 10) die = 'd10';
+      if (level >= 15) die = 'd12';
+      return { die, uses: Math.max(1, mod(cha)) };
+    },
+
+    paramSchema: [
+      { name: 'die', type: 'enum', label: 'Die size', default: 'd6', options: ['d6','d8','d10','d12'] },
+      { name: 'uses', type: 'int', label: 'Uses per encounter (Bardic dice)', default: 1, min: 1, max: 6 },
+    ],
+
+    // reserve: hold dice until the bard is personally threatened (nova hoards).
+    modePolicy: {
+      nova:      { reserve: true },
+      sustained: { reserve: false },
+      defensive: { reserve: false },
+    },
+
+    initialState() { return { usesLeft: 0, die: 'd6' }; },
+
+    hooks: {
+      onCombatStart(self, ctx) {
+        const ref = self.pm.features.find(f => f.id === 'cuttingWords');
+        const params = (ref && ref.params) || this.deriveParams(self.pm);
+        self.featureState.cuttingWords.usesLeft = params.uses || 1;
+        self.featureState.cuttingWords.die = params.die || 'd6';
+      },
+
+      // Dispatched Shield-style: the engine calls onAttackAttempt on the
+      // combatant BEING attacked (resolveAttackMonster → dispatchHook(target,...)),
+      // so Cutting Words here only protects the bard themselves.
+      // TODO: Cutting Words' real range covers any creature the bard can see.
+      // Protecting *other* allies would need the engine to broadcast
+      // onAttackAttempt to all PCs on a monster attack; that path currently
+      // dispatches to the target only, and this task must not edit
+      // crucible-engine.js.
+      onAttackAttempt(self, action, target, rollCtx) {
+        if (!self.reactionAvailableThisRound) return;
+        const state = self.featureState.cuttingWords;
+        if (!state || state.usesLeft <= 0 || !rollCtx.hits) return;
+        const die = state.die || 'd6';
+        const sides = parseInt(die.replace('d', ''), 10);
+        const avg = Math.round((sides + 1) / 2);
+        const wouldMiss = ((rollCtx.roll || 0) - avg) < (self.ac || 10);
+        if (!wouldMiss) return;  // never waste a die on a hit it can't negate
+        const mode = (self.pm.tactics && self.pm.tactics.mode) || 'sustained';
+        const policy = this.modePolicy[mode] || this.modePolicy.sustained;
+        if (policy.reserve && self.maxHp > 0 && (self.hp / self.maxHp) >= 0.5) return;
+        rollCtx.hits = false;
+        state.usesLeft -= 1;
+        self.reactionAvailableThisRound = false;
+        if (rollCtx.eventLog) rollCtx.eventLog.push({
+          round: rollCtx.round || 0, type: 'feature', who: self.id,
+          what: 'Cutting Words (-' + avg + ', avg ' + die + ') turned a hit into a miss',
+          featureName: 'Cutting Words', source: 'cuttingWords',
+        });
+        return 'consume';
+      },
+
+      onRoundEnd(self, round, ctx) {
+        self.reactionAvailableThisRound = true;
+      },
+    },
+  };
+
   const LIBRARY = {
     rage: RAGE,
     sneakAttack: SNEAK_ATTACK,
@@ -1243,6 +1491,12 @@
     cunningAction: CUNNING_ACTION,
     huntersMark: HUNTERS_MARK,
     layOnHands: LAY_ON_HANDS,
+    // Casters & support
+    divineStrike: DIVINE_STRIKE,
+    mageArmor: MAGE_ARMOR,
+    agonizingBlast: AGONIZING_BLAST,
+    primalStrike: PRIMAL_STRIKE,
+    cuttingWords: CUTTING_WORDS,
   };
 
   // ── DSL primitives ──

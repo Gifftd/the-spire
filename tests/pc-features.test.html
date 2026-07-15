@@ -1468,6 +1468,169 @@
       assertEq(self.featureState.layOnHands.poolLeft, 5);
       assertEq(self.featureState.layOnHands._firedThisTurn, true);
     });
+
+    group('Divine Strike (Cleric)');
+
+    test('Divine Strike: 1d8 at L8, 2d8 at L14+', () => {
+      const ds = PCFeatures.LIBRARY.divineStrike;
+      assert(ds, 'divineStrike exists');
+      assertEq(ds.deriveParams({ identity: { level: 8  } }).dice, '1d8');
+      assertEq(ds.deriveParams({ identity: { level: 14 } }).dice, '2d8');
+    });
+
+    test('Divine Strike: adds radiant dice once per turn on a melee hit at L8+', () => {
+      const ds = PCFeatures.LIBRARY.divineStrike;
+      const self = {
+        pm: { features: [{id:'divineStrike', params:{dice:'1d8', minLevel:8, level:8}}], tactics:{mode:'sustained'} },
+        featureState: { divineStrike: { usedThisTurn: false } },
+      };
+      const action = { kind:'attack', actionRange:'melee' };
+      const dmg1 = { amount: 6, type: 'bludgeoning', bonusDice: [] };
+      ds.hooks.onAttackHit.call(ds, self, action, {id:'m:1'}, dmg1);
+      assertEq(dmg1.bonusDice.length, 1);
+      assertEq(dmg1.bonusDice[0].dice, '1d8');
+      assertEq(dmg1.bonusDice[0].type, 'radiant');
+      const dmg2 = { amount: 6, type: 'bludgeoning', bonusDice: [] };
+      ds.hooks.onAttackHit.call(ds, self, action, {id:'m:1'}, dmg2);  // second hit same turn
+      assertEq(dmg2.bonusDice.length, 0);
+    });
+
+    test('Divine Strike: does NOT fire below level 8', () => {
+      const ds = PCFeatures.LIBRARY.divineStrike;
+      const self = {
+        pm: { features: [{id:'divineStrike', params:{dice:'1d8', minLevel:8, level:5}}], tactics:{mode:'sustained'} },
+        featureState: { divineStrike: { usedThisTurn: false } },
+      };
+      const dmg = { amount: 6, type: 'bludgeoning', bonusDice: [] };
+      ds.hooks.onAttackHit.call(ds, self, {kind:'attack', actionRange:'melee'}, {id:'m:1'}, dmg);
+      assertEq(dmg.bonusDice.length, 0);
+    });
+
+    group('Mage Armor (Wizard / Sorcerer)');
+
+    test('Mage Armor: raises AC to 13 + Dex mod when current AC is lower', () => {
+      const ma = PCFeatures.LIBRARY.mageArmor;
+      assert(ma, 'mageArmor exists');
+      const self = {
+        pm: { features: [{id:'mageArmor'}], abilities: { dex: 16 }, tactics:{mode:'sustained'} },
+        featureState: { mageArmor: ma.initialState() },
+        ac: 12,
+      };
+      ma.hooks.onCombatStart.call(ma, self, { round:1, combatants: [], eventLog: [] });
+      assertEq(self.ac, 16);  // 13 + 3 (Dex 16)
+      assertEq(self.featureState.mageArmor.priorAc, 12);
+    });
+
+    test('Mage Armor: leaves a higher AC unchanged', () => {
+      const ma = PCFeatures.LIBRARY.mageArmor;
+      const self = {
+        pm: { features: [{id:'mageArmor'}], abilities: { dex: 10 }, tactics:{mode:'sustained'} },
+        featureState: { mageArmor: ma.initialState() },
+        ac: 17,  // already better than 13 + 0
+      };
+      ma.hooks.onCombatStart.call(ma, self, { round:1, combatants: [], eventLog: [] });
+      assertEq(self.ac, 17);
+      assertEq(self.featureState.mageArmor.applied, false);
+    });
+
+    group('Agonizing Blast (Warlock)');
+
+    test('Agonizing Blast: bonus = CHA modifier', () => {
+      const ab = PCFeatures.LIBRARY.agonizingBlast;
+      assert(ab, 'agonizingBlast exists');
+      assertEq(ab.deriveParams({ abilities: { cha: 18 } }).bonus, 4);
+    });
+
+    test('Agonizing Blast: adds flat CHA-mod damage to a ranged hit (pre-rolled)', () => {
+      const ab = PCFeatures.LIBRARY.agonizingBlast;
+      const self = {
+        pm: { features: [{id:'agonizingBlast', params:{bonus:4}}], abilities: { cha: 18 } },
+        featureState: { agonizingBlast: {} },
+      };
+      const dmg = { amount: 5, type: 'force', bonusDice: [] };
+      ab.hooks.onAttackHit.call(ab, self, {kind:'attack', actionRange:'ranged'}, {id:'m:1'}, dmg);
+      assertEq(dmg.bonusDice.length, 1);
+      assertEq(dmg.bonusDice[0]._rolled, 4);
+      assertEq(dmg.bonusDice[0].source, 'agonizingBlast');
+    });
+
+    test('Agonizing Blast: does NOT add to a melee hit', () => {
+      const ab = PCFeatures.LIBRARY.agonizingBlast;
+      const self = {
+        pm: { features: [{id:'agonizingBlast', params:{bonus:4}}], abilities: { cha: 18 } },
+        featureState: { agonizingBlast: {} },
+      };
+      const dmg = { amount: 5, type: 'slashing', bonusDice: [] };
+      ab.hooks.onAttackHit.call(ab, self, {kind:'attack', actionRange:'melee'}, {id:'m:1'}, dmg);
+      assertEq(dmg.bonusDice.length, 0);
+    });
+
+    group('Primal Strike (Druid)');
+
+    test('Primal Strike: adds 1d4 to a melee hit', () => {
+      const ps = PCFeatures.LIBRARY.primalStrike;
+      assert(ps, 'primalStrike exists');
+      const self = { pm: { features: [{id:'primalStrike'}] }, featureState: { primalStrike: {} } };
+      const dmg = { amount: 7, type: 'bludgeoning', bonusDice: [] };
+      ps.hooks.onAttackHit.call(ps, self, {kind:'attack', actionRange:'melee'}, {id:'m:1'}, dmg);
+      assertEq(dmg.bonusDice.length, 1);
+      assertEq(dmg.bonusDice[0].dice, '1d4');
+    });
+
+    test('Primal Strike: does NOT add to a ranged hit', () => {
+      const ps = PCFeatures.LIBRARY.primalStrike;
+      const self = { pm: { features: [{id:'primalStrike'}] }, featureState: { primalStrike: {} } };
+      const dmg = { amount: 7, type: 'piercing', bonusDice: [] };
+      ps.hooks.onAttackHit.call(ps, self, {kind:'attack', actionRange:'ranged'}, {id:'m:1'}, dmg);
+      assertEq(dmg.bonusDice.length, 0);
+    });
+
+    group('Cutting Words (Bard)');
+
+    test('Cutting Words: onCombatStart seeds uses + die', () => {
+      const cw = PCFeatures.LIBRARY.cuttingWords;
+      assert(cw, 'cuttingWords exists');
+      const self = {
+        pm: { features: [{id:'cuttingWords', params:{die:'d8', uses:3}}], abilities:{cha:16}, tactics:{mode:'sustained'} },
+        featureState: { cuttingWords: cw.initialState() },
+      };
+      cw.hooks.onCombatStart.call(cw, self, { round:1, combatants: [] });
+      assertEq(self.featureState.cuttingWords.usesLeft, 3);
+      assertEq(self.featureState.cuttingWords.die, 'd8');
+    });
+
+    test('Cutting Words: turns a marginal hit into a miss, consuming a die + reaction', () => {
+      const cw = PCFeatures.LIBRARY.cuttingWords;
+      const self = {
+        id:'pc:bard',
+        pm: { features: [{id:'cuttingWords'}], tactics:{mode:'sustained'} },
+        featureState: { cuttingWords: { usesLeft: 2, die: 'd8' } },
+        reactionAvailableThisRound: true,
+        ac: 15, hp: 20, maxHp: 30,
+      };
+      // roll 16 beats AC 15 by 1; d8 avg 5 → 16-5=11 < 15 → would miss
+      const rollCtx = { roll: 16, hits: true, eventLog: [] };
+      const result = cw.hooks.onAttackAttempt.call(cw, self, {kind:'attack'}, self, rollCtx);
+      assertEq(rollCtx.hits, false);
+      assertEq(self.featureState.cuttingWords.usesLeft, 1);
+      assertEq(self.reactionAvailableThisRound, false);
+      assertEq(result, 'consume');
+    });
+
+    test('Cutting Words: does NOT fire when the die cannot negate the hit', () => {
+      const cw = PCFeatures.LIBRARY.cuttingWords;
+      const self = {
+        pm: { features: [{id:'cuttingWords'}], tactics:{mode:'sustained'} },
+        featureState: { cuttingWords: { usesLeft: 2, die: 'd8' } },
+        reactionAvailableThisRound: true,
+        ac: 15, hp: 20, maxHp: 30,
+      };
+      // roll 25 beats AC 15 by 10; d8 avg 5 can't drop it below 15 → no fire
+      const rollCtx = { roll: 25, hits: true, eventLog: [] };
+      cw.hooks.onAttackAttempt.call(cw, self, {kind:'attack'}, self, rollCtx);
+      assertEq(rollCtx.hits, true);
+      assertEq(self.featureState.cuttingWords.usesLeft, 2);
+    });
   </script>
 </body>
 </html>
