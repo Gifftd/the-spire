@@ -7,6 +7,58 @@ Dates are YYYY-MM-DD.
 
 ---
 
+## [Unreleased] — 2026-07-15
+
+### Crucible: PC class-feature library expanded to all 12 classes (pc-features.js)
+
+The Crucible combat sim now ships a combat-relevant basic feature for every
+5.5e (D&D 2024) class, all following the existing rage/actionSurge house style
+(`deriveParams` from level, `paramSchema`, `modePolicy`, `initialState`, hooks,
+feature events into the event log). They register in `PCFeatures.LIBRARY`; the
+DM feature picker in `crucible-dm.html` lists builtins dynamically, so they
+appear with no UI change.
+
+**Martials (12 new ids across both batches):**
+- `secondWind` (Fighter) — bonus-action self-heal 1d10 + level, uses/encounter
+  scale with level (1 / 2 / 3 at L1 / L4 / L10); fires when bloodied.
+- `recklessAttack` (Barbarian) — advantage on melee swings (sets `helped`).
+  Only the offense half is modeled; the defensive downside (attackers gain
+  advantage vs the barbarian) is a documented TODO — `attackAdvantageState()`
+  has no attacker-facing self flag and the engine was out of scope to edit.
+- `flurryOfBlows` (Monk) — spends a ki point on the first swing for +1 attack
+  action, once per turn (Action Surge `_firedThisTurn` pattern).
+- `patientDefense` (Monk) — bonus-action Dodge when badly hurt.
+- `cunningAction` (Rogue) — bonus-action Disengage when hurt and threatened in
+  melee.
+- `huntersMark` (Ranger) — +1d6 force vs the marked (highest-HP) enemy; re-marks
+  a new target on a kill.
+- `layOnHands` (Paladin) — 5 × level HP pool per encounter, tops up the
+  most-hurt nearby ally (or self) once per turn.
+
+**Casters & support:**
+- `divineStrike` (Cleric) — once/turn +1d8 radiant on a weapon hit (2d8 at 14+).
+- `mageArmor` (Wizard / Sorcerer) — raises AC to 13 + Dex mod at combat start.
+- `agonizingBlast` (Warlock) — +CHA mod flat damage on each ranged hit.
+- `primalStrike` (Druid) — +1d4 on each melee hit (Shillelagh-style rider).
+- `cuttingWords` (Bard) — reaction that spends a Bardic die to negate a marginal
+  hit **against the bard**. Protecting other allies would need the engine to
+  broadcast `onAttackAttempt` on the monster-attack path (currently target-only)
+  — noted as a TODO.
+
+Two shared spatial helpers (`countAdjacent`, `lowestHpBelow`) degrade gracefully
+to non-spatial counting when combatants lack x/y. Sorcerer "Quickened Strike"
+was intentionally skipped as redundant with Action Surge / Flurry.
+
+### Crucible: fixed 10 pre-existing pc-features test failures (tests/pc-features.test.html)
+
+Ten tests invoked feature hooks as `feature.hooks.hook(self, …)`, binding `this`
+to the hooks object instead of the feature def; the hooks read
+`this.deriveParams()` / `this.modePolicy[mode]` and threw. Real dispatch
+(`crucible-engine.js`) uses `def.hooks[hook].call(def, …)`, so the library was
+correct — the tests weren't mirroring it. Added `.call(feature, …)` to the 10
+(and a missing `pm` on one Hex fixture). Adds `tests/run-pc-features.mjs`, a node
+harness mirroring `run-engine.mjs`. Suite: 94 → 126 tests, all green.
+
 ## [Unreleased] — 2026-07-10 (later)
 
 ### Dramatis Personae — dedicated NPC workshop (npcs-dm.html)
