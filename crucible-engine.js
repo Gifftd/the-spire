@@ -26,6 +26,23 @@
     return 1 + Math.floor(rng() * sides);
   }
 
+  // Roll a d20 honoring advantage state: +1 = advantage (roll twice, take
+  // higher), -1 = disadvantage (lower), 0/undefined = straight roll.
+  // 5e RAW: any advantage + any disadvantage = straight — callers compute
+  // the NET state via netAdvantage().
+  function rollD20(rng, advState) {
+    const a = rollDie(20, rng);
+    if (!advState) return a;
+    const b = rollDie(20, rng);
+    return advState > 0 ? Math.max(a, b) : Math.min(a, b);
+  }
+
+  // Collapse boolean source lists per 5e RAW.
+  function netAdvantage(hasAdv, hasDis) {
+    if (hasAdv && hasDis) return 0;
+    return hasAdv ? 1 : (hasDis ? -1 : 0);
+  }
+
   // Parse and roll a dice formula. Forms accepted:
   //   '1d8', '2d6+3', '3d8-2', '4d6 + 1', '1d20+0', '3'  (constant)
   // crit=true → roll dice count twice (doubling dice, not modifier).
@@ -282,6 +299,21 @@
     return bucket(rangedness(pm));
   }
 
+  // v3.4: resolve a PC's tactical role for the maneuver layer. Explicit
+  // tactics.role wins; else derive from the existing position/rangedness
+  // heuristics. position() returns 'frontline' | 'midline' | 'backline';
+  // rangedness() returns a 0..1 fraction of ranged actions.
+  function resolvePcRole(pm) {
+    if (pm && pm.tactics && pm.tactics.role) return pm.tactics.role;
+    const acts = (pm && pm.actions) || [];
+    const hasHeal = acts.some(a => a.type === 'heal');
+    const hasAoE  = acts.some(a => a.shape && a.shape !== 'single');
+    if (hasHeal) return 'support';
+    if (position(pm) === 'frontline') return 'frontline';
+    if (hasAoE) return 'caster';
+    return rangedness(pm) >= 0.5 ? 'archer' : 'skirmisher';
+  }
+
   // ─────────── Role inference ───────────
   // Median HP per CR — sourced from the 2024 DMG monster table. Fractional
   // CRs covered for low-tier creatures. Lookups beyond CR 20 cap at CR 20.
@@ -355,7 +387,11 @@
   // Monster-side here; PC-side keeps its own dispatch path.
   function availableMonsterActions(me) {
     const list = (me.monster && me.monster.parsedActions) || [];
-    return list.filter(a => isAvailable(me, a));
+    // v3.2: bonus/reaction-bucket actions are not eligible as a main action.
+    // (Undefined cost predates the cost field and means 'action' — keep.)
+    // This also fixes a latent bug: reaction-bucket attacks (e.g. a monster's
+    // opportunity-attack-only action) were previously pickable as main actions.
+    return list.filter(a => a.cost !== 'bonus' && a.cost !== 'reaction' && isAvailable(me, a));
   }
 
   // ── Soldier ──
@@ -589,6 +625,10 @@
         actionsAvailable: 1,
         bonusActionAvailable: true,
         reactionAvailableThisRound: true,
+        // v3 turn-scoped flags (NOT in the conditions duration Map).
+        dodging: false, hidden: false, helped: false, disengagedThisTurn: false,
+        // v3.3 grapple bookkeeping: id of the combatant grappling this one.
+        _grappledBy: null,
         speed: typeof pm.combat.speed === 'number' ? pm.combat.speed : 6,
         naturalReach: typeof pm.combat.reach === 'number' ? pm.combat.reach : 1,
         x: 0, y: 0,  // populated by placeCombatants in runTrial
@@ -631,6 +671,10 @@
           naturalReach: monsterReachCells(m),
           x: 0, y: 0,
           reactionAvailableThisRound: true,
+          // v3 turn-scoped flags (NOT in the conditions duration Map).
+          dodging: false, hidden: false, helped: false, disengagedThisTurn: false,
+          // v3.3 grapple bookkeeping: id of the combatant grappling this one.
+          _grappledBy: null,
         });
       }
     }
@@ -661,6 +705,14 @@
       if (next <= 0) c.conditions.delete(name);
       else c.conditions.set(name, next);
     }
+  }
+
+  // Effective speed in cells after condition effects. Grappled/restrained → 0.
+  function effectiveSpeed(c) {
+    const base = c.speed || 0;
+    const cc = c.conditions;
+    if (cc && (cc.has('grappled') || cc.has('restrained'))) return 0;
+    return base;
   }
 
   function rollRecharge(c, actions, rng) {
@@ -733,8 +785,11 @@
       }
       return best;
     }
-    // v1 fallback: lowest-HP heuristic.
-    return enemies.slice().sort((a, b) => a.hp - b.hp)[0];
+    // v1 fallback: lowest HP, ties broken by lowest AC (matches the Brute /
+    // Ambusher role-policy pickers — the AC tiebreak was lost when Phase 6
+    // rewrote this as an HP-only sort).
+    return enemies.slice().sort((a, b) =>
+      a.hp - b.hp || (a.ac || 10) - (b.ac || 10))[0];
   }
 
   // ─────────── Action availability ───────────
@@ -811,6 +866,30 @@
     return 1;
   }
 
+  // ─────────── Advantage state for an attack roll ───────────
+  // Net advantage state for an attack roll, per the spec's source table.
+  // Melee = chebyshev dist <= 1 when positions exist, else actionRange check.
+  function attackAdvantageState(attacker, target, action) {
+    const isMelee = (typeof attacker.x === 'number' && typeof target.x === 'number'
+                     && typeof CrucibleSpatial !== 'undefined')
+      ? CrucibleSpatial.chebyshev(attacker, target) <= 1
+      : action.actionRange !== 'ranged';
+    let adv = false, dis = false;
+    const tc = target.conditions, ac = attacker.conditions;
+    // Target state.
+    if (tc && tc.has('prone')) { if (isMelee) adv = true; else dis = true; }
+    if (target.dodging) dis = true;
+    if (tc && (tc.has('restrained') || tc.has('blinded') || tc.has('stunned')
+               || tc.has('paralyzed') || tc.has('unconscious'))) adv = true;
+    if (target.hidden) dis = true;
+    // Attacker state.
+    if (ac && (ac.has('prone') || ac.has('poisoned') || ac.has('frightened')
+               || ac.has('restrained') || ac.has('blinded'))) dis = true;
+    if (attacker.hidden) adv = true;
+    if (attacker.helped) adv = true;
+    return netAdvantage(adv, dis);
+  }
+
   // ─────────── Resolve a monster-side attack action ───────────
   // For a PC-side attack, the engine uses resolveAttackPc (next task block).
   function resolveAttackMonster(me, target, action, rng, events, round, combatants) {
@@ -826,7 +905,8 @@
       }
     }
     me.hasAttacked = true;
-    const roll = rollDie(20, rng);
+    const advState = attackAdvantageState(me, target, action);
+    const roll = rollD20(rng, advState);
     const isCrit = roll === 20;
     const isFumble = roll === 1;
     let hit = !isFumble && (isCrit || roll + (action.toHit || 0) >= (target.ac || 10));
@@ -853,7 +933,14 @@
     }
     events.push({ round, type:'attack', actor: me.name, target: target.name,
                   action: action.sourceActionName, roll, crit:isCrit, hit,
-                  damageDealt });
+                  damageDealt, adv: advState });
+    // v3.5: on-hit rider condition + forced movement.
+    if (hit) applyAttackRider(me, target, action, rng, events, round);
+    if (hit && action.push > 0) pushTarget(me, target, action.push, me._mapRef, combatants, events, round);
+    // Consume one-shot flags: Help grants advantage on ONE attack; attacking
+    // from hiding reveals the attacker.
+    if (me.hidden) me.hidden = false;
+    if (me.helped) me.helped = false;
     return { roll, crit:isCrit, hit, damageDealt, damageByType };
   }
 
@@ -878,7 +965,8 @@
     }
     // PC actions store inputs; derive to-hit + damage roll.
     const th = toHit(me.pm, action);
-    const roll = rollDie(20, rng);
+    const advState = attackAdvantageState(me, target, action);
+    const roll = rollD20(rng, advState);
     const isCrit = roll === 20;
     const isFumble = roll === 1;
     let hit = !isFumble && (isCrit || roll + th >= (target.ac || 10));
@@ -916,7 +1004,15 @@
       }
     }
     events.push({ round, type:'attack', actor: me.name, target: target.name,
-                  action: action.name, roll, crit:isCrit, hit, damageDealt });
+                  action: action.name, roll, crit:isCrit, hit, damageDealt,
+                  adv: advState });
+    // v3.5: on-hit rider condition + forced movement.
+    if (hit) applyAttackRider(me, target, action, rng, events, round);
+    if (hit && action.push > 0) pushTarget(me, target, action.push, me._mapRef, combatants, events, round);
+    // Consume one-shot flags: Help grants advantage on ONE attack; attacking
+    // from hiding reveals the attacker.
+    if (me.hidden) me.hidden = false;
+    if (me.helped) me.helped = false;
     return { roll, crit:isCrit, hit, damageDealt, damageByType };
   }
 
@@ -948,6 +1044,254 @@
       for (const [t, dmg] of Object.entries(r.damageByType || {})) {
         applyDamage(leaver, dmg, t, defender, events, round, defender.name,
                     'opportunity ' + (action.sourceActionName || action.name));
+      }
+    }
+  }
+
+  // ─────────── v3.5: attack riders, forced movement, buff actions ───────────
+
+  // On-hit rider condition. Target saves vs the rider DC; on a failure the
+  // condition lands with a round-based duration ticked by tickConditions.
+  // saveDc: null means derive (PC: 8 + atkAbility mod + PB; monster:
+  // maneuverDc(attacker)). Called from inside resolveAttackPc/Monster
+  // immediately after the attack event, guarded by `if (hit)`.
+  function applyAttackRider(attacker, target, action, rng, events, round) {
+    const r = action.rider;
+    if (!r || !r.condition || target.dead) return;
+    let dc = r.saveDc;
+    if (dc == null) {
+      dc = attacker.side === 'pc'
+        ? 8 + mod((attacker.pm && attacker.pm.abilities && attacker.pm.abilities[action.atkAbility]) || 10)
+            + pb((attacker.pm && attacker.pm.identity && attacker.pm.identity.level) || 1)
+        : maneuverDc(attacker);
+    }
+    const saveAction = { saveAbility: r.saveAbility || 'con', saveDc: dc };
+    let failed;
+    if (autoFailsSave(target, saveAction)) {
+      failed = true;
+    } else {
+      const roll = rollD20(rng, saveAdvantageState(target, saveAction))
+                 + targetSaveBonus(target, saveAction.saveAbility);
+      failed = roll < dc;
+    }
+    if (failed) {
+      target.conditions.set(r.condition, Math.max(1, r.duration || 1));
+      events.push({ type: 'condition-applied', round,
+                    who: attacker.id, name: attacker.name,
+                    target: target.id, targetName: target.name,
+                    condition: r.condition, duration: r.duration || 1, dc });
+    }
+  }
+
+  // Forced movement on hit. Push target up to `cells` straight away from the
+  // attacker, stopping at map edge, wall, or another combatant. No save
+  // (weapon property semantics, e.g. 2024 Push mastery). `map` comes from
+  // the attacker's `_mapRef` (set on every combatant in runTrial); unit-test
+  // call sites without it simply skip (no push, no crash).
+  function pushTarget(attacker, target, cells, map, combatants, events, round) {
+    if (!map || typeof CrucibleSpatial === 'undefined' || target.dead) return 0;
+    const dx = Math.sign(target.x - attacker.x), dy = Math.sign(target.y - attacker.y);
+    if (dx === 0 && dy === 0) return 0;
+    const others = combatants || [];
+    let moved = 0;
+    for (let i = 0; i < cells; i++) {
+      const nx = target.x + dx, ny = target.y + dy;
+      const inB = nx >= 0 && nx < map.width && ny >= 0 && ny < map.height;
+      if (!inB || CrucibleSpatial.isWall(map, nx, ny)) break;
+      if (others.some(d => d !== target && !d.dead && !d.downed && d.x === nx && d.y === ny)) break;
+      target.x = nx; target.y = ny; moved++;
+    }
+    if (moved > 0) {
+      events.push({ type: 'push', round, who: attacker.id, name: attacker.name,
+                    target: target.id, targetName: target.name,
+                    cells: moved, to: { x: target.x, y: target.y } });
+    }
+    return moved;
+  }
+
+  // Buff action — grant a v3 flag to self or an adjacent ally. Returns true
+  // if applied (so callers only consume resources / tally on success).
+  function resolveBuff(c, all, action, events, round) {
+    let recipient = c;
+    if (action.buffTarget === 'ally') {
+      recipient = (all || []).find(a => a.side === c.side && a !== c && !a.dead && !a.downed
+        && typeof CrucibleSpatial !== 'undefined'
+        && CrucibleSpatial.chebyshev(c, a) <= 1) || null;
+      if (!recipient) return false;
+    }
+    if (action.grants === 'dodging') recipient.dodging = true;
+    else if (action.grants === 'helped') recipient.helped = true;
+    else return false;
+    events.push({ type: 'buff', round, who: c.id, name: c.name,
+                  target: recipient.id, targetName: recipient.name,
+                  grants: action.grants });
+    return true;
+  }
+
+  // ─────────── v3.3: standard 5.5e actions ───────────
+
+  // Dodge: until the start of its next turn, attacks vs c have disadvantage
+  // and c makes DEX saves with advantage (both already honored by
+  // attackAdvantageState / saveAdvantageState via the dodging flag).
+  function resolveDodge(c, events, round) {
+    c.dodging = true;
+    events.push({ type: 'dodge', round, who: c.id, name: c.name });
+  }
+
+  // Disengage: c's movement this turn does not provoke opportunity attacks.
+  function resolveDisengage(c, events, round) {
+    c.disengagedThisTurn = true;
+    events.push({ type: 'disengage', round, who: c.id, name: c.name });
+  }
+
+  // Help: grant an adjacent ally advantage on its next attack roll.
+  function resolveHelp(c, ally, events, round) {
+    ally.helped = true;
+    events.push({ type: 'help', round, who: c.id, name: c.name,
+                  target: ally.id, targetName: ally.name });
+  }
+
+  // Hide: only possible when no living enemy has line of sight to c.
+  // Contest: d20 + DEX mod vs the highest enemy passive perception
+  // (10 + WIS mod). Success sets the hidden flag (adv on next attack,
+  // attacks vs c at dis; broken when c attacks).
+  function resolveHide(c, all, map, rng, events, round) {
+    const enemies = all.filter(t => t.side !== c.side && !t.dead && !t.downed);
+    const seen = typeof CrucibleSpatial !== 'undefined'
+      && enemies.some(e => CrucibleSpatial.hasLineOfSight(map, e, c));
+    if (seen) {
+      events.push({ type: 'hide', round, who: c.id, name: c.name, success: false, reason: 'seen' });
+      return false;
+    }
+    const dexMod = combatantAbilityMod(c, 'dex');
+    const stealth = rollDie(20, rng) + dexMod;
+    let bestPP = 10;
+    for (const e of enemies) bestPP = Math.max(bestPP, 10 + combatantAbilityMod(e, 'wis'));
+    const success = stealth >= bestPP;
+    if (success) c.hidden = true;
+    events.push({ type: 'hide', round, who: c.id, name: c.name, success, roll: stealth, dc: bestPP });
+    return success;
+  }
+
+  // Shared ability-mod accessor for either side's data shape.
+  // PCs store raw ability scores (mod() derives the modifier); monsters carry
+  // pre-computed { mod, save } objects from the parser.
+  function combatantAbilityMod(c, ability) {
+    if (c.side === 'pc' && c.pm && c.pm.abilities) return mod(c.pm.abilities[ability] || 10);
+    if (c.monster && c.monster.abilities && c.monster.abilities[ability]) {
+      const a = c.monster.abilities[ability];
+      return typeof a.mod === 'number' ? a.mod : 0;
+    }
+    return 0;
+  }
+
+  // Grapple/Shove DC per 5.5e unarmed strike: 8 + STR mod + PB.
+  // Monster PB comes from monster.pb when present (the parser already reads it
+  // at crucible-parser.js:292); bestiary monsters lacking the field default to
+  // 2 (CR ≤ 4).
+  function maneuverDc(attacker) {
+    const str = combatantAbilityMod(attacker, 'str');
+    const prof = attacker.side === 'pc'
+      ? pb((attacker.pm && attacker.pm.identity && attacker.pm.identity.level) || 1)
+      : ((attacker.monster && attacker.monster.pb) || 2);
+    return 8 + str + prof;
+  }
+
+  // Target's maneuver save: best of STR/DEX (2024: target's choice).
+  function maneuverSaveBonus(target) {
+    return Math.max(combatantAbilityMod(target, 'str'), combatantAbilityMod(target, 'dex'));
+  }
+
+  // Grapple: save-based. Fail → grappled (speed 0), tracked with the
+  // grappler's id so release/escape work. Requires melee adjacency.
+  function resolveGrapple(attacker, target, rng, events, round) {
+    const dc = maneuverDc(attacker);
+    const roll = rollD20(rng, 0) + maneuverSaveBonus(target);
+    const success = roll < dc;
+    if (success) {
+      target.conditions.set('grappled', 99);   // duration managed by escape/release, not ticking
+      target._grappledBy = attacker.id;
+    }
+    events.push({ type: 'grapple', round, who: attacker.id, name: attacker.name,
+                  target: target.id, targetName: target.name,
+                  success, roll, dc });
+    return success;
+  }
+
+  // Shove: save-based. mode 'push' → 1 cell straight away from attacker
+  // (only if the destination is in bounds, not a wall, not occupied);
+  // mode 'prone' → knocked prone. Fail-safe: an invalid push cell degrades
+  // to no effect (the save still happened).
+  function resolveShove(attacker, target, rng, events, round, map, combatants, mode) {
+    const dc = maneuverDc(attacker);
+    const roll = rollD20(rng, 0) + maneuverSaveBonus(target);
+    const failed = roll < dc;
+    let outcome = 'resisted';
+    if (failed) {
+      if (mode === 'prone') {
+        target.conditions.set('prone', 99);    // cleared by stand-up
+        outcome = 'prone';
+      } else {
+        const dx = Math.sign(target.x - attacker.x);
+        const dy = Math.sign(target.y - attacker.y);
+        const nx = target.x + dx, ny = target.y + dy;
+        const occupied = combatants.some(d => d !== target && !d.dead && !d.downed
+                                              && d.x === nx && d.y === ny);
+        const inB = map && nx >= 0 && nx < map.width && ny >= 0 && ny < map.height;
+        const wall = typeof CrucibleSpatial !== 'undefined' && CrucibleSpatial.isWall(map, nx, ny);
+        if (inB && !wall && !occupied && (dx !== 0 || dy !== 0)) {
+          target.x = nx; target.y = ny;
+          outcome = 'pushed';
+        } else {
+          outcome = 'blocked';
+        }
+      }
+    }
+    events.push({ type: 'shove', round, who: attacker.id, name: attacker.name,
+                  target: target.id, targetName: target.name, mode,
+                  outcome, roll, dc,
+                  to: outcome === 'pushed' ? { x: target.x, y: target.y } : null });
+    return outcome;
+  }
+
+  // v3.3: turn-start automatic recovery — stand up from prone, then attempt to
+  // escape a grapple (or auto-release if the grappler is gone). Extracted from
+  // the turn loop so it's unit-testable with hand-built combatants. Must be
+  // called AFTER c.movementBudgetThisTurn has been set to effectiveSpeed(c).
+  function applyTurnStartRecovery(c, combatants, rng, events, round) {
+    // Stand-up: prone combatants stand at turn start if they can move,
+    // spending half the turn's movement budget.
+    if (c.conditions.has('prone') && c.movementBudgetThisTurn > 0) {
+      c.conditions.delete('prone');
+      c.movementBudgetThisTurn = Math.floor(c.movementBudgetThisTurn / 2);
+      events.push({ type: 'stand-up', round, who: c.id, name: c.name });
+    }
+    // Grapple escape: one free attempt at turn start (RAW it's an action; the
+    // sim simplifies to keep fights moving). Escape DC = grappler's maneuver DC.
+    // ORDERING NOTE: a grappled+prone combatant has a 0 movement budget
+    // (effectiveSpeed → 0 while grappled), so the stand-up guard above fails
+    // and it stays prone this turn, then escapes the grapple here. Accepted
+    // simplification — it takes two turns to fully recover from prone+grapple.
+    if (c.conditions.has('grappled')) {
+      const grappler = combatants.find(d => d.id === c._grappledBy);
+      if (!grappler || grappler.dead || grappler.downed) {
+        c.conditions.delete('grappled');
+        c._grappledBy = null;
+        events.push({ type: 'condition-ended', round, who: c.id, name: c.name,
+                      condition: 'grappled', reason: 'grappler-down' });
+        c.movementBudgetThisTurn = effectiveSpeed(c);  // recompute now that grapple is gone
+      } else {
+        const dc = maneuverDc(grappler);
+        const roll = rollD20(rng, 0) + maneuverSaveBonus(c);
+        if (roll >= dc) {
+          c.conditions.delete('grappled');
+          c._grappledBy = null;
+          events.push({ type: 'condition-ended', round, who: c.id, name: c.name,
+                        condition: 'grappled', reason: 'escaped', roll, dc });
+          c.movementBudgetThisTurn = effectiveSpeed(c);  // recompute now that grapple is gone
+        } else {
+          events.push({ type: 'grapple-escape-failed', round, who: c.id, name: c.name, roll, dc });
+        }
       }
     }
   }
@@ -989,16 +1333,20 @@
     for (const cell of path) {
       const prev = { x: c.x, y: c.y };
       // OoA detection: any enemy adjacent before step, not after.
-      for (const d of combatants) {
-        if (d.side === c.side || d.dead || d.downed) continue;
-        if (!d.reactionAvailableThisRound) continue;
-        const reach = d.naturalReach || 1;
-        const dPrev = CrucibleSpatial.chebyshev(d, prev);
-        const dCur  = CrucibleSpatial.chebyshev(d, cell);
-        if (dPrev > 0 && dPrev <= reach && dCur > reach) {
-          resolveOpportunityAttack(d, c, rng, events, round, combatants);
-          d.reactionAvailableThisRound = false;
-          if (c.dead || c.downed) break;
+      // v3.3 Disengage: a disengaged mover provokes no opportunity attacks
+      // this turn — skip the entire enemy scan.
+      if (!c.disengagedThisTurn) {
+        for (const d of combatants) {
+          if (d.side === c.side || d.dead || d.downed) continue;
+          if (!d.reactionAvailableThisRound) continue;
+          const reach = d.naturalReach || 1;
+          const dPrev = CrucibleSpatial.chebyshev(d, prev);
+          const dCur  = CrucibleSpatial.chebyshev(d, cell);
+          if (dPrev > 0 && dPrev <= reach && dCur > reach) {
+            resolveOpportunityAttack(d, c, rng, events, round, combatants);
+            d.reactionAvailableThisRound = false;
+            if (c.dead || c.downed) break;
+          }
         }
       }
       if (c.dead || c.downed) break;
@@ -1015,6 +1363,27 @@
     return stepped.length;
   }
 
+  // ─────────── Advantage / auto-fail on saving throws ───────────
+  // Net advantage on a saving throw. Dodging grants adv on DEX saves;
+  // restrained gives dis on DEX saves. Stunned/paralyzed/unconscious
+  // auto-fail STR and DEX saves — callers check autoFailsSave() first.
+  function saveAdvantageState(target, action) {
+    const ability = action.saveAbility || 'dex';
+    let adv = false, dis = false;
+    if (ability === 'dex') {
+      if (target.dodging) adv = true;
+      if (target.conditions && target.conditions.has('restrained')) dis = true;
+    }
+    return netAdvantage(adv, dis);
+  }
+
+  function autoFailsSave(target, action) {
+    const ability = action.saveAbility || 'dex';
+    if (ability !== 'str' && ability !== 'dex') return false;
+    const tc = target.conditions;
+    return !!(tc && (tc.has('stunned') || tc.has('paralyzed') || tc.has('unconscious')));
+  }
+
   // ─────────── Resolve a save effect ───────────
   function resolveSave(me, targets, action, rng, events, round, combatants) {
     let totalDmg = 0;
@@ -1027,17 +1396,28 @@
         const ab = t.monster.abilities[action.saveAbility];
         sb = ab ? (ab.save != null ? ab.save : ab.mod) : 0;
       }
-      const roll = rollDie(20, rng);
-      // Broadcast onSaveAttempt: allow any PC's features (e.g., Bardic Inspiration
-      // held by an ally) to add a bonus to this save.
-      let broadcastSaveBonus = 0;
-      if (typeof PCFeatures !== 'undefined' && t && combatants) {
-        const saveRollCtx = { roll, bonus: 0, eventLog: events, round, combatants };
-        PCFeatures.dispatchBroadcastHook(combatants, t, 'onSaveAttempt',
-          action.saveAbility, action.saveDc, saveRollCtx);
-        broadcastSaveBonus = saveRollCtx.bonus || 0;
+      // Stunned/paralyzed/unconscious auto-fail STR/DEX saves. This routes
+      // through the same damage/condition application path as a natural
+      // failure, but draws NO d20 (which shifts the rng stream for later
+      // rolls — acceptable, the trial is event-sourced).
+      let roll, passed;
+      if (autoFailsSave(t, action)) {
+        roll = 0;
+        passed = false;
+      } else {
+        const saveAdv = saveAdvantageState(t, action);
+        roll = rollD20(rng, saveAdv);
+        // Broadcast onSaveAttempt: allow any PC's features (e.g., Bardic
+        // Inspiration held by an ally) to add a bonus to this save.
+        let broadcastSaveBonus = 0;
+        if (typeof PCFeatures !== 'undefined' && t && combatants) {
+          const saveRollCtx = { roll, bonus: 0, eventLog: events, round, combatants };
+          PCFeatures.dispatchBroadcastHook(combatants, t, 'onSaveAttempt',
+            action.saveAbility, action.saveDc, saveRollCtx);
+          broadcastSaveBonus = saveRollCtx.bonus || 0;
+        }
+        passed = (roll + broadcastSaveBonus) + sb >= action.saveDc;
       }
-      const passed = (roll + broadcastSaveBonus) + sb >= action.saveDc;
       let dmgList;
       if (passed && action.halfOnSave) dmgList = action.damageOnFail; // half later
       else if (passed)                 dmgList = action.damageOnSave || [];
@@ -1292,7 +1672,7 @@
             base.condition     = (a.save && a.save.condition) || null;
           }
           return base;
-        })
+        }).filter(a => a.cost !== 'bonus')
       : ((c.monster && c.monster.parsedActions) || []);
     // Multiattack first.
     const ma = list.find(a => a.kind === 'multiattack' && isAvailable(c, a));
@@ -1302,10 +1682,156 @@
       (a.usesPerDay != null || a.recharge) && a.kind !== 'unparsed' && a.kind !== 'utility' &&
       isAvailable(c, a));
     if (limited.length) return limited[0];
-    // At-will attack/save/heal.
+    // At-will attack/save/heal; a buff action is only picked as a last
+    // resort main action (v3.5) when nothing else is available.
     const atWill = list.find(a =>
       ['attack','save','heal'].includes(a.kind) && isAvailable(c, a));
-    return atWill || null;
+    if (atWill) return atWill;
+    return list.find(a => a.kind === 'buff' && isAvailable(c, a)) || null;
+  }
+
+  // v3.4: set of "x,y" cells occupied by living combatants (excluding one).
+  function occupiedSet(all, exclude) {
+    const s = new Set();
+    for (const d of all) {
+      if (d === exclude || d.dead || d.downed) continue;
+      if (typeof d.x === 'number') s.add(d.x + ',' + d.y);
+    }
+    return s;
+  }
+
+  // v3.4: decide whether this turn's ACTION should be something other than the
+  // default attack. Returns null (proceed with the normal attack flow) or a
+  // plan object { kind, ...args, reason } that the turn loop executes. Rules
+  // are deliberately conservative — diverting from attacking must clearly beat
+  // it. Evaluated at TURN START (before any movement), so melee-adjacency
+  // rules only fire for combatants already engaged.
+  function chooseManeuver(c, all, tactics, map, rng) {
+    if (c.side !== 'pc') return null;                       // monsters: separate pre-pass
+    if (typeof CrucibleSpatial === 'undefined') return null;
+    const role = resolvePcRole(c.pm);
+    const enemies = all.filter(t => t.side !== c.side && !t.dead && !t.downed);
+    if (!enemies.length) return null;
+    const adjacentEnemies = enemies.filter(e =>
+      CrucibleSpatial.chebyshev(c, e) <= (e.naturalReach || 1));
+    const hpFrac = c.maxHp > 0 ? c.hp / c.maxHp : 1;
+
+    // 1. Disengage + retreat: ranged/caster/support pinned in melee.
+    if ((role === 'archer' || role === 'caster' || role === 'support')
+        && adjacentEnemies.length >= 1) {
+      const occupied = occupiedSet(all, c);
+      const retreat = CrucibleSpatial.findRetreatCell(
+        { x: c.x, y: c.y }, enemies, map,
+        { maxSteps: c.movementBudgetThisTurn, occupied });
+      if (retreat && retreat.minEnemyDist >= 2) {
+        return { kind: 'disengage-retreat', path: retreat.path,
+                 reason: role + ' pinned by ' + adjacentEnemies.length + ' melee' };
+      }
+      // No escape route → Dodge instead (fight defensively).
+      return { kind: 'dodge', reason: role + ' pinned, no retreat path' };
+    }
+
+    // 2. Dodge: badly hurt frontline holding a chokepoint.
+    if (role === 'frontline' && hpFrac < 0.35 && adjacentEnemies.length >= 2) {
+      return { kind: 'dodge',
+               reason: 'frontline at ' + Math.round(hpFrac * 100) + '% HP vs ' + adjacentEnemies.length + ' melee' };
+    }
+
+    // 3. Shove-prone: frontline + an adjacent ally also in melee with the same
+    //    target → prone gives the whole melee train advantage. Conservative:
+    //    a target is proned by the party only ONCE per combat (tgt._shoveProneUsed)
+    //    — a control setup, not a spam. Without this cap the melee line re-prones
+    //    the same target every round (it stands at its turn start) and burns an
+    //    action each round for degenerate, unrealistic advantage uptime.
+    if (role === 'frontline' && adjacentEnemies.length >= 1) {
+      const tgt = adjacentEnemies[0];
+      const allyAlsoAdjacent = all.some(a => a.side === c.side && a !== c
+        && !a.dead && !a.downed
+        && CrucibleSpatial.chebyshev(a, tgt) <= 1);
+      if (allyAlsoAdjacent && !tgt._shoveProneUsed && !tgt.conditions.has('prone')) {
+        return { kind: 'shove', target: tgt, mode: 'prone',
+                 reason: 'prone sets up ally advantage' };
+      }
+    }
+
+    // 4. Help: support with no useful attack of its own.
+    if (role === 'support' && adjacentEnemies.length === 0) {
+      const hasAttack = (c.pm.actions || []).some(a => a.type === 'attack' || a.type === 'save');
+      if (!hasAttack) {
+        const ally = all.find(a => a.side === c.side && a !== c && !a.dead && !a.downed
+          && CrucibleSpatial.chebyshev(c, a) <= 1);
+        if (ally) return { kind: 'help', ally, reason: 'support with no attack' };
+      }
+    }
+
+    return null;
+  }
+
+  // ─────────── Bonus-action phase (v3.2, buff added v3.5) ───────────
+  // Pick and fire one bonus-cost action, if any is available and useful.
+  // Supports kinds: attack (requires a target attackable from the current
+  // cell — bonus actions never move), heal (most-injured living ally,
+  // including self), buff (self or adjacent ally). Other kinds are skipped.
+  function resolveBonusAction(c, all, tactics, map, rng, events, round, tally) {
+    const raw = c.side === 'pc'
+      ? ((c.pm && c.pm.actions) || []).map(a => ({ ...a, sourceActionName: a.sourceActionName || a.name, kind: a.kind || a.type }))
+      : ((c.monster && c.monster.parsedActions) || []);
+    const candidates = raw.filter(a => a.cost === 'bonus' && a.kind !== 'unparsed' && isAvailable(c, a));
+    if (!candidates.length) return;
+
+    // Heals first when someone is hurt badly (mirror healTriage's spirit).
+    const healAct = candidates.find(a => a.kind === 'heal');
+    if (healAct) {
+      const allies = all.filter(t => t.side === c.side && !t.dead && !t.downed
+                                     && t.maxHp > 0 && t.hp / t.maxHp < 0.5);
+      if (allies.length) {
+        allies.sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp));
+        c.bonusActionAvailable = false;
+        consumeUse(c, healAct);
+        const r = resolveHeal(c, [allies[0]], healAct, rng, events, round);
+        tally(c.side, healAct.sourceActionName || healAct.name, 'heal',
+              false, 0, r.totalHealed, 0, r.revives);
+        return;
+      }
+    }
+
+    // v3.5: bonus-action buff. Always fire if present — self-target is
+    // always valid, ally-target requires adjacency (checked by resolveBuff).
+    const buffAct = candidates.find(a => a.kind === 'buff');
+    if (buffAct) {
+      c.bonusActionAvailable = false;
+      consumeUse(c, buffAct);
+      if (resolveBuff(c, all, buffAct, events, round)) {
+        tally(c.side, buffAct.sourceActionName || buffAct.name, 'buff', false, 0, 0, 0, 0);
+      }
+      return;
+    }
+
+    const atkAct = candidates.find(a => a.kind === 'attack');
+    if (atkAct) {
+      const tgt = pickEnemyTarget(c, all, tactics, rng, atkAct);
+      if (!tgt) return;
+      if (typeof CrucibleSpatial !== 'undefined'
+          && !CrucibleSpatial.canAttackFrom(c, tgt, atkAct, c._mapRef || map)) return;
+      c.bonusActionAvailable = false;
+      consumeUse(c, atkAct);
+      const r = c.side === 'pc'
+        ? resolveAttackPc(c, tgt, atkAct, rng, events, round, all)
+        : resolveAttackMonster(c, tgt, atkAct, rng, events, round, all);
+      const wasAlive = !tgt.dead && !tgt.downed;
+      let total = 0;
+      // TODO v3.5: bonus attacks bypass the feature-dice pipeline (onAttackHit
+      // bonus dice, onTakeDamage reduction, etc. from the main attack branch
+      // in runTrial). Raw damageByType is applied directly here.
+      for (const [ty, dmg] of Object.entries(r.damageByType || {})) {
+        applyDamage(tgt, dmg, ty, c, events, round, c.name,
+                    atkAct.sourceActionName || atkAct.name);
+        total += dmg;
+      }
+      const killed = wasAlive && (tgt.dead || tgt.downed);
+      tally(c.side, atkAct.sourceActionName || atkAct.name, 'attack',
+            r.hit, total, 0, killed ? 1 : 0, 0);
+    }
   }
 
   // ─────────── runTrial — one fight ───────────
@@ -1390,10 +1916,19 @@
         // Reset per-turn action budgets.
         c.actionsAvailable = 1;
         c.bonusActionAvailable = true;
+        // v3 turn-scoped flags. Dodge lasts until the start of your own next
+        // turn; disengaged clears each turn. hidden/helped persist until
+        // consumed (do NOT reset them here).
+        c.dodging = false;
+        c.disengagedThisTurn = false;
         // v2 spatial: free movement budget refreshes each turn. Spending the
-        // action on Dash later in the loop refills it with another c.speed.
-        c.movementBudgetThisTurn = c.speed || 0;
+        // action on Dash later in the loop refills it with another effectiveSpeed.
+        c.movementBudgetThisTurn = effectiveSpeed(c);
         // reactionAvailableThisRound resets at onRoundEnd, not per turn.
+
+        // v3.3 automatic turn-start recovery: stand up from prone, attempt to
+        // escape a grapple, or auto-release if the grappler is gone.
+        applyTurnStartRecovery(c, combatants, rng, events, round);
 
         // Fire onTurnStart for PC features.
         if (c.side === 'pc' && typeof PCFeatures !== 'undefined') {
@@ -1454,16 +1989,81 @@
             targets = Array.isArray(tgt) ? tgt : [tgt];
             action = policy.pickAction(c, targets[0], policyCtx);
             if (!action) break;
+            // v3.4: role-flavored maneuvers for monsters (thin pre-pass; the
+            // role policy is otherwise untouched). Skirmisher disengage is
+            // deferred — its hit-and-run policy already repositions. TODO v3.6+.
+            if (typeof CrucibleSpatial !== 'undefined') {
+              const monRole = resolveRole(c.monster);
+              const pcsAdj = all.filter(t => t.side === 'pc' && !t.dead && !t.downed
+                && CrucibleSpatial.chebyshev(c, t) <= 1);
+              // Artillery engaged in melee → retreat if there's an escape, else Dodge.
+              if (monRole === 'artillery' && pcsAdj.length >= 1) {
+                const pcEnemies = all.filter(t => t.side === 'pc' && !t.dead && !t.downed);
+                const occ = occupiedSet(all, c);
+                const retreat = CrucibleSpatial.findRetreatCell(
+                  { x: c.x, y: c.y }, pcEnemies, map,
+                  { maxSteps: c.movementBudgetThisTurn, occupied: occ });
+                if (retreat && retreat.minEnemyDist >= 2) {
+                  events.push({ type: 'decision', round, who: c.id, name: c.name,
+                                choice: 'disengage-retreat', reason: 'artillery escaping melee' });
+                  resolveDisengage(c, events, round);
+                  const stepped = executePath(c, retreat.path, 'retreat', combatants, rng, events, round);
+                  c.movementBudgetThisTurn = Math.max(0, c.movementBudgetThisTurn - stepped);
+                  continue;
+                }
+                events.push({ type: 'decision', round, who: c.id, name: c.name,
+                              choice: 'dodge', reason: 'artillery pinned in melee' });
+                resolveDodge(c, events, round);
+                continue;
+              }
+              // Brute: shove a PC into adjacent damaging terrain when available.
+              if (monRole === 'brute' && pcsAdj.length >= 1) {
+                const tgtPc = pcsAdj[0];
+                const dx = Math.sign(tgtPc.x - c.x), dy = Math.sign(tgtPc.y - c.y);
+                const behind = CrucibleSpatial.terrainAt(map, tgtPc.x + dx, tgtPc.y + dy);
+                if (behind && behind.type === 'damaging') {
+                  events.push({ type: 'decision', round, who: c.id, name: c.name,
+                                choice: 'shove', reason: 'push into ' + (behind.dmgType || 'hazard') });
+                  resolveShove(c, tgtPc, rng, events, round, map, combatants, 'push');
+                  continue;
+                }
+              }
+            }
           } else {
             // PC branch.
             action = pickAction(c);
             if (!action) break;
+            // v3.4 decision pre-pass: a maneuver may beat attacking.
+            const plan = (typeof CrucibleSpatial !== 'undefined')
+              ? chooseManeuver(c, all, tactics, map, rng) : null;
+            if (plan) {
+              events.push({ type: 'decision', round, who: c.id, name: c.name,
+                            choice: plan.kind, reason: plan.reason });
+              if (plan.kind === 'dodge') {
+                resolveDodge(c, events, round);
+                tally(c.side, 'Dodge', 'dodge', false, 0, 0, 0, 0);
+              } else if (plan.kind === 'disengage-retreat') {
+                resolveDisengage(c, events, round);
+                const stepped = executePath(c, plan.path, 'retreat', combatants, rng, events, round);
+                c.movementBudgetThisTurn = Math.max(0, c.movementBudgetThisTurn - stepped);
+                tally(c.side, 'Disengage', 'disengage', false, 0, 0, 0, 0);
+              } else if (plan.kind === 'shove') {
+                // Mark the target so no ally re-prones it later this combat.
+                if (plan.mode === 'prone') plan.target._shoveProneUsed = true;
+                const outcome = resolveShove(c, plan.target, rng, events, round, map, combatants, plan.mode);
+                tally(c.side, 'Shove', 'shove', outcome !== 'resisted', 0, 0, 0, 0);
+              } else if (plan.kind === 'help') {
+                resolveHelp(c, plan.ally, events, round);
+                tally(c.side, 'Help', 'help', false, 0, 0, 0, 0);
+              }
+              continue;   // action spent on the maneuver
+            }
           }
           // v2 spatial: range + LOS check + movement, with Dash + reposition.
           // For single-target attacks, gate on canAttackFrom (range AND LOS),
           // and reposition via findShootingCell so a ranged PC walks around
           // a wall rather than wasting the action with no line of sight.
-          if (action && (!action.shape || action.shape === 'single')
+          if (action && action.kind !== 'buff' && (!action.shape || action.shape === 'single')
               && typeof CrucibleSpatial !== 'undefined') {
             const tgtCandidate = (c.side === 'monster' && targets && targets[0])
               ? targets[0]
@@ -1486,7 +2086,7 @@
                   dist = CrucibleSpatial.chebyshev(c, tgtCandidate);
                 }
                 if (dist > need) {
-                  const dashed = executeMove(c, tgtCandidate, c.speed || 0, 'dash',
+                  const dashed = executeMove(c, tgtCandidate, effectiveSpeed(c), 'dash',
                     combatants, map, rng, events, round);
                   if (dashed > 0) {
                     events.push({ type: 'dash', round, who: c.id, name: c.name, cells: dashed });
@@ -1524,7 +2124,7 @@
                   if (!CrucibleSpatial.canAttackFrom(c, tgtCandidate, action, map)) {
                     const dashResult = CrucibleSpatial.findShootingCell(
                       { x: c.x, y: c.y }, tgtCandidate, action, map,
-                      { maxSteps: c.speed || 0, occupied });
+                      { maxSteps: effectiveSpeed(c), occupied });
                     if (dashResult && dashResult.path.length > 0) {
                       const dashed = executePath(c, dashResult.path, 'dash',
                         combatants, rng, events, round);
@@ -1699,8 +2299,47 @@
               tally(c.side, action.sourceActionName || action.name, 'heal',
                     false, 0, r.totalHealed, 0, r.revives);
             }
+          } else if (action.kind === 'buff') {
+            consumeUse(c, action);
+            if (resolveBuff(c, all, action, events, round)) {
+              tally(c.side, action.sourceActionName || action.name, 'buff', false, 0, 0, 0, 0);
+            }
           }
         }
+        }
+        // v3.4 kiting: ranged roles spend leftover movement opening distance
+        // after their action. Only when it doesn't provoke: skip if any
+        // adjacent enemy still has a reaction (stepping away would eat an OoA)
+        // unless the PC disengaged this turn.
+        if (c.side === 'pc' && !c.dead && !c.downed
+            && typeof CrucibleSpatial !== 'undefined'
+            && c.movementBudgetThisTurn > 0) {
+          const role = resolvePcRole(c.pm);
+          if (role === 'archer' || role === 'caster' || role === 'skirmisher') {
+            const enemies = combatants.filter(t => t.side !== c.side && !t.dead && !t.downed);
+            const wouldProvoke = !c.disengagedThisTurn && enemies.some(e =>
+              e.reactionAvailableThisRound
+              && CrucibleSpatial.chebyshev(c, e) <= (e.naturalReach || 1));
+            if (enemies.length && !wouldProvoke) {
+              const nearest = Math.min(...enemies.map(e => CrucibleSpatial.chebyshev(c, e)));
+              if (nearest <= 3) {   // only bother when someone is closing in
+                const retreat = CrucibleSpatial.findRetreatCell(
+                  { x: c.x, y: c.y }, enemies, map,
+                  { maxSteps: c.movementBudgetThisTurn, occupied: occupiedSet(combatants, c) });
+                if (retreat && retreat.path.length) {
+                  events.push({ type: 'decision', round, who: c.id, name: c.name,
+                                choice: 'kite', reason: 'open distance (nearest ' + nearest + 'c)' });
+                  const stepped = executePath(c, retreat.path, 'kite', combatants, rng, events, round);
+                  c.movementBudgetThisTurn = Math.max(0, c.movementBudgetThisTurn - stepped);
+                }
+              }
+            }
+          }
+        }
+        // v3: bonus-action phase. One bonus-cost action may fire per turn if
+        // the combatant is still standing and a useful one is available.
+        if (!winner && !c.dead && !c.downed && c.bonusActionAvailable) {
+          resolveBonusAction(c, all, tactics, map, rng, events, round, tally);
         }
         // v2 terrain: damaging-cell trigger if combatant ends turn standing on it.
         if (typeof CrucibleSpatial !== 'undefined' && map && !c.dead && !c.downed) {
@@ -1928,14 +2567,19 @@
 
   // ─────────── Public exports ───────────
   const Crucible = {
-    makeRng, rollDie, rollDice,
+    makeRng, rollDie, rollDice, rollD20, netAdvantage,
     mod, pb, saveBonus, toHit, saveDc, pcDamageMod,
+    attackAdvantageState, saveAdvantageState, autoFailsSave, effectiveSpeed,
     buildCombatants, rollInitiative, initOrder,
     tickConditions, rollRecharge, applyRegen, turnStart,
     pickEnemyTarget, isAvailable, consumeUse, healTriage,
     aliveEnemies, aliveAllies,
     damageMultiplier, resolveAttackMonster, resolveAttackPc,
-    resolveOpportunityAttack,
+    resolveOpportunityAttack, executeMove, executePath,
+    // v3.3 standard actions + turn-start recovery
+    resolveDodge, resolveDisengage, resolveHelp, resolveHide,
+    resolveGrapple, resolveShove, maneuverDc, maneuverSaveBonus,
+    combatantAbilityMod, applyTurnStartRecovery,
     resolveSave, resolveAoE, resolveHeal,
     applyDamage, resolveMultiattack, pickAction,
     runTrial, runSim,
@@ -1947,6 +2591,10 @@
     rangedness, bucket, position, positionOf,
     crHpMedian, inferRole, resolveRole, normalizeRole,
     ROLE_POLICIES,
+    // v3.4 tactical AI
+    resolvePcRole, chooseManeuver,
+    // v3.5 custom action builder: riders, forced movement, buffs
+    applyAttackRider, pushTarget, resolveBuff,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Crucible;

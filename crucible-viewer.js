@@ -50,6 +50,9 @@
       hp: p.hp, maxHp: p.maxHp, ac: p.ac, speed: p.speed,
       color: p.side === 'pc' ? pcColor(p.id) : null,
       dead: false, downed: false,
+      // v3.6: viewer-side, name-only condition markers driven by the event
+      // stream (condition-applied/ended, grapple, shove-prone, stand-up).
+      conditions: new Set(),
     }));
     return { map: placementEvent.map, combatants, lastMove: null, lastAoE: null };
   }
@@ -99,7 +102,48 @@
         if (c) c.hp = Math.max(0, c.hp - (ev.amount || 0));
         break;
       }
+      case 'shove': {
+        const t = state.combatants.find(cc => cc.id === ev.target);
+        if (t) {
+          if (ev.outcome === 'pushed' && ev.to) { t.x = ev.to.x; t.y = ev.to.y; }
+          else if (ev.outcome === 'prone' && t.conditions) t.conditions.add('prone');
+        }
+        break;
+      }
+      case 'push': {
+        if (ev.to) {
+          const t = state.combatants.find(cc => cc.id === ev.target);
+          if (t) { t.x = ev.to.x; t.y = ev.to.y; }
+        }
+        break;
+      }
+      // v3.6: token status-glyph bookkeeping (name-only Sets).
+      case 'condition-applied': {
+        const t = state.combatants.find(cc => cc.id === ev.target);
+        if (t && t.conditions && ev.condition) t.conditions.add(ev.condition);
+        break;
+      }
+      case 'condition-ended': {
+        const c = state.combatants.find(cc => cc.id === ev.who);
+        if (c && c.conditions && ev.condition) c.conditions.delete(ev.condition);
+        break;
+      }
+      case 'grapple': {
+        if (ev.success) {
+          const t = state.combatants.find(cc => cc.id === ev.target);
+          if (t && t.conditions) t.conditions.add('grappled');
+        }
+        break;
+      }
+      case 'stand-up': {
+        const c = state.combatants.find(cc => cc.id === ev.who);
+        if (c && c.conditions) c.conditions.delete('prone');
+        break;
+      }
       // attack/save/feature events don't change state — they're informational.
+      // Turn-scoped flags (dodging/hidden) have no turn-boundary events in the
+      // stream, so the viewer doesn't track them. The v3.4 decision (AI trace)
+      // and buff events remain log-only.
     }
   }
   CrucibleViewer.applyEvent = applyEvent;
@@ -110,6 +154,17 @@
     return state;
   }
   CrucibleViewer.renderTo = renderTo;
+
+  // v3.6: compact status-glyph strip for a combatant's conditions. Special
+  // glyphs for the two most common tactical states; every other condition
+  // shows its first letter uppercased. Returns '' when there's nothing to show.
+  const CONDITION_GLYPHS = { prone: '▼', grappled: '✕' };
+  function statusGlyphs(c) {
+    if (!c.conditions || !c.conditions.size) return '';
+    return Array.from(c.conditions)
+      .map(cond => CONDITION_GLYPHS[cond] || String(cond).charAt(0).toUpperCase())
+      .join(' ');
+  }
 
   function renderSVG(host, state) {
     const w = state.map.width * CELL;
@@ -126,10 +181,14 @@
       // their CSS-driven red. Downed PCs fall back to the grey downed style.
       const fillStyle = (c.side === 'pc' && c.color && !c.downed)
         ? ` style="fill:${c.color}"` : '';
+      const glyphs = statusGlyphs(c);
+      const glyphHtml = glyphs
+        ? `<text class="status-glyphs" y="${-r - 9}">${glyphs}</text>` : '';
       return `<g class="${cls}${dead}${downed}" data-id="${c.id}" transform="translate(${cx}, ${cy})">
         <circle r="${r}"${fillStyle} />
         <text dy="0.35em" text-anchor="middle">${(c.name || '?').charAt(0)}</text>
         <rect class="hp-bar" x="${-r}" y="${-r - 6}" width="${2*r*hpFrac}" height="3" />
+        ${glyphHtml}
       </g>`;
     }).join('');
     const gridLines = [];
@@ -284,6 +343,19 @@
         case 'opportunity-attack': return 'R' + ev.round + ' · OoA ' + ev.attackerName + ' on ' + ev.targetName + ' → ' + (ev.hit ? 'hit ' + ev.damageDealt : 'miss');
         case 'feature':   return 'R' + ev.round + ' · ⚡ ' + (ev.what || '');
         case 'terrain-damage': return 'R' + ev.round + ' · ' + ev.name + ' takes ' + ev.amount + ' ' + ev.dmgType + ' (terrain)';
+        case 'dodge':      return 'R' + ev.round + ' · ' + ev.name + ' takes the Dodge action';
+        case 'disengage':  return 'R' + ev.round + ' · ' + ev.name + ' Disengages';
+        case 'help':       return 'R' + ev.round + ' · ' + ev.name + ' Helps ' + ev.targetName;
+        case 'hide':       return 'R' + ev.round + ' · ' + ev.name + (ev.success ? ' Hides (stealth ' + ev.roll + ' vs ' + ev.dc + ')' : ' fails to Hide' + (ev.reason === 'seen' ? ' (seen)' : ''));
+        case 'grapple':    return 'R' + ev.round + ' · ' + ev.name + (ev.success ? ' grapples ' : ' fails to grapple ') + ev.targetName;
+        case 'shove':      return 'R' + ev.round + ' · ' + ev.name + ' shoves ' + ev.targetName + ' → ' + ev.outcome;
+        case 'stand-up':   return 'R' + ev.round + ' · ' + ev.name + ' stands up';
+        case 'decision':   return 'R' + ev.round + ' · 🧠 ' + ev.name + ': ' + ev.choice + (ev.reason ? ' — ' + ev.reason : '');
+        case 'condition-ended': return 'R' + ev.round + ' · ' + ev.name + ' is no longer ' + ev.condition + (ev.reason ? ' (' + ev.reason + ')' : '');
+        case 'grapple-escape-failed': return 'R' + ev.round + ' · ' + ev.name + ' fails to escape the grapple';
+        case 'condition-applied': return 'R' + ev.round + ' · ' + ev.targetName + ' is ' + ev.condition + ' (DC ' + ev.dc + ', ' + ev.duration + ' rd)';
+        case 'push':      return 'R' + ev.round + ' · ' + ev.name + ' pushes ' + ev.targetName + ' ' + ev.cells + ' cell' + (ev.cells === 1 ? '' : 's');
+        case 'buff':       return 'R' + ev.round + ' · ' + ev.name + ' grants ' + ev.grants + ' to ' + (ev.target === ev.who ? 'self' : ev.targetName);
         default:          return ev.type;
       }
     }
