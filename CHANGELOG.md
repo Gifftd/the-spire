@@ -9,6 +9,53 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-07-15
 
+### Crucible: monster action parser robustness (crucible-parser.js) — v3.7
+
+Monster stat-block actions were failing to parse a large fraction of the time.
+Measured against the full local bestiary corpus (1,124 monsters / 3,793 actions),
+auto-parse coverage rose from **73.3% → 87.4%** (unparsed 26.7% → 12.6%). New
+harness `tests/parser-corpus.test.html` reports the numbers (falls back to an
+embedded synthetic corpus when the gitignored bestiary JSON isn't on disk).
+
+**Patterns fixed (verified against the corpus, then locked with regression tests):**
+- **Spellcasting → `utility`.** `casts …` / `Spellcasting` actions now classify
+  as `utility` (with a `_note`) instead of `unparsed`, so they neither block the
+  validation gate nor fill Review with red (~190 actions). Runs *after*
+  multiattack so "…makes two X attacks and uses Spellcasting…" stays a multiattack.
+- **Multiattack phrasings.** Added: "using X or Y in any combination",
+  "makes N X or Y attacks" (shared count), "makes N X attacks or M Y attacks"
+  (per-side weighted, best by count × avg damage), bare "makes N attacks",
+  generic "makes N melee/ranged attacks", and "uses X N times" (Eye Rays).
+  Plans are now **validated post-parse** against the monster's real sibling
+  action names (fuzzy: case-insensitive, singular/plural, prefix, word-subset).
+  Unnamed steps resolve to the monster's best (highest-damage) attack. Invalid
+  entries are dropped; an empty plan degrades to `unparsed` rather than emitting
+  a plan that references non-existent actions.
+- **Multiattack guard.** A non-"Multiattack"-named action that carries its own
+  attack header or save DC is no longer hijacked as a multiattack when its prose
+  merely mentions making an attack (fixes save-primary actions and a cascade
+  where an attack was stolen and its multiattack then couldn't resolve it).
+- **Attack headers.** Header regex now covers 2014 "Melee/Ranged Weapon Attack",
+  Spell Attack variants, and a `.` terminator (some scrapes render
+  "Melee Weapon Attack. +7 to hit"). Added "+N to hit" to-hit extraction and a
+  headerless 2014 short-form fallback ("+8 to hit, reach 5 ft.").
+- **Versatile damage double-count fixed.** "…or 8 (1d10 + 3) slashing damage if
+  used with two hands" is one weapon, not extra damage — the two-handed clause is
+  stripped before extraction (previously both profiles were summed).
+- **Untyped damage.** "7 (1d8 + 3) damage plus 28 (8d6) Fire damage" now captures
+  the untyped first clause (type `untyped`) instead of dropping it.
+- **Half-on-save.** `halfOnSave` now recognizes the 2024 "Success: Half damage."
+  outcome clause and the terse 2014 "…or half on a success" (previously missed).
+
+**Tests:** `tests/parser.test.html` grew from 34 → 60 (26 new regression tests
+covering every pattern above). All suites green in-browser: parser 60/60,
+engine 205/205, bestiary-merge 14/14.
+
+Residual unparsed (~12.6%) is dominated by genuinely non-simulated content
+(defensive/trigger-response reactions, condition-only or forced-move effects,
+traits mis-placed into action arrays by the scraper, and stat-block prose bleed) —
+left as `unparsed` on purpose so the DM sees them in Review.
+
 ### Crucible: PC class-feature library expanded to all 12 classes (pc-features.js)
 
 The Crucible combat sim now ships a combat-relevant basic feature for every
