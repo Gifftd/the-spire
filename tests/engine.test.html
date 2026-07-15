@@ -3041,6 +3041,119 @@ test('runTrial: attack action with push:2 shoves an adjacent goblin 2 cells away
   assertTrue(push, 'a push event fires when the attack hits');
   assertEq(push.cells, 2, 'the goblin is pushed the full 2 cells on an open map');
 });
+
+// ─────────── v3.8: creature size + thrown weapons ───────────
+
+// A handaxe-wielding "tough": thrown weapon, single attack, brute role.
+function makeThrownTough(name, hp, ac, size) {
+  return { name, cr:1, hp, ac, initiative:0, isMinion:false, isSolo:false,
+    fmRole:'brute', size: size || 'Medium',
+    parsedActions:[
+      { sourceActionName:'Handaxe', kind:'attack', actionRange:'both', thrown:true,
+        toHit:4, reach:5, range:[20,60],
+        damage:[{ dice:'1d6', mod:2, type:'slashing' }],
+        recharge:null, usesPerDay:null },
+    ] };
+}
+
+test('buildCombatants: sizeCells derived from the monster size string', () => {
+  const pm = makePcMelee(5, 30, 16, 'Hero');
+  const picks = [
+    { pickId:'l', count:1, monster: makeThrownTough('Ogre', 60, 14, 'Large') },
+    { pickId:'g', count:1, monster: makeThrownTough('Titan', 90, 18, 'Gargantuan') },
+  ];
+  const cs = Crucible.buildCombatants([pm], picks, () => 0.5, false);
+  const byName = {}; cs.forEach(c => byName[c.name] = c);
+  assertEq(byName['Hero'].sizeCells, 1, 'PC defaults to 1×1');
+  assertEq(byName['Ogre'].sizeCells, 2, 'Large → 2');
+  assertEq(byName['Titan'].sizeCells, 4, 'Gargantuan → 4');
+});
+
+test('buildCombatants: thrown weapons start with 2 ammo; bows unlimited', () => {
+  const tough = makeThrownTough('Tough', 40, 12);
+  const cs = Crucible.buildCombatants([], [{ pickId:'m', count:1, monster: tough }], () => 0.5, false);
+  const c = cs[0];
+  assertEq(c.ammoLeft['Handaxe'], 2, 'thrown handaxe defaults to 2 throws');
+  assertEq(Crucible.ammoRemaining(c, { sourceActionName:'Handaxe' }), 2);
+  // A pure-ranged action is untracked (unlimited).
+  assertEq(Crucible.ammoRemaining(c, { sourceActionName:'Bow', actionRange:'ranged', range:[80,320] }), Infinity);
+});
+
+test('MONEY TEST: thrown tough closes to melee, throws ≤ ammo, then fights in melee', () => {
+  // Rooted PC (speed 0) so the TOUGH must do the closing — isolates its own
+  // movement/attack policy. Tough placed 8 cells east on an open 20×20 board.
+  const pm = makePcMelee(5, 200, 18, 'Hero'); pm.combat.speed = 0;
+  pm.id = 'hero';
+  const party = [pm];
+  const tough = makeThrownTough('Tough', 200, 25);   // high AC/HP → the fight lasts to the round cap
+  party._encounter = { map:{ width:20, height:20, blocked:null },
+    placement:[ { id:'pc:hero', x:2, y:2 }, { id:'m1:1', x:10, y:2 } ] };
+  const trial = Crucible.runTrial(party, [{ pickId:'m1', count:1, monster: tough }],
+    { aiHint:'focus' }, Crucible.makeRng(42));
+
+  const toughAttacks = trial.events.filter(e => e.type === 'attack' && e.actor === 'Tough');
+  const thrown = toughAttacks.filter(e => e.thrown);
+  const melee  = toughAttacks.filter(e => !e.thrown);
+  const r1Moves = trial.events.filter(e => e.type === 'move' && e.name === 'Tough' && e.round === 1);
+
+  assertTrue(r1Moves.length >= 1, 'the tough moves toward the PC on round 1');
+  assertTrue(r1Moves[0].to.x < r1Moves[0].from.x, 'round-1 move closes the gap (moves west toward the PC)');
+  assertTrue(thrown.length <= 2, `thrown events must not exceed ammo (2); got ${thrown.length}`);
+  assertTrue(melee.length > thrown.length, `should fight predominantly in melee; melee=${melee.length} thrown=${thrown.length}`);
+  // Once it reaches melee it never reverts to throwing: the final attack is melee.
+  assertTrue(!toughAttacks[toughAttacks.length - 1].thrown, 'the last attack is a melee swing, not a throw');
+});
+
+test('Ranged attack made with an enemy adjacent to the attacker → disadvantage (adv -1)', () => {
+  const attacker = { name:'Archer', side:'monster', x:5, y:5, sizeCells:1,
+    hp:20, maxHp:20, ac:12, conditions:new Map(), ammoLeft:{} };
+  const target = { name:'Foe', side:'pc', x:6, y:5, sizeCells:1,   // adjacent → pins the shooter
+    hp:20, maxHp:20, ac:10, conditions:new Map(), damageTypesReceivedThisTurn:new Set() };
+  const bow = { sourceActionName:'Bow', kind:'attack', actionRange:'ranged', toHit:5,
+    range:[80,320], damage:[{ dice:'1d8', mod:2, type:'piercing' }] };
+  const events = [];
+  Crucible.resolveAttackMonster(attacker, target, bow, Crucible.makeRng(1), events, 1, [attacker, target]);
+  const atk = events.find(e => e.type === 'attack');
+  assertTrue(atk, 'an attack event fires (target in range)');
+  assertEq(atk.adv, -1, 'ranged attack while an enemy is adjacent → disadvantage');
+});
+
+test('Thrown weapon swung in melee is NOT penalized and spends no ammo', () => {
+  const attacker = { name:'Bandit', side:'monster', x:5, y:5, sizeCells:1, naturalReach:1,
+    hp:20, maxHp:20, ac:12, conditions:new Map(), ammoLeft:{ Handaxe:2 } };
+  const target = { name:'Foe', side:'pc', x:6, y:5, sizeCells:1,   // adjacent → melee swing
+    hp:20, maxHp:20, ac:10, conditions:new Map(), damageTypesReceivedThisTurn:new Set() };
+  const handaxe = { sourceActionName:'Handaxe', kind:'attack', actionRange:'both', thrown:true,
+    toHit:4, reach:5, range:[20,60], damage:[{ dice:'1d6', mod:2, type:'slashing' }] };
+  const events = [];
+  Crucible.resolveAttackMonster(attacker, target, handaxe, Crucible.makeRng(1), events, 1, [attacker, target]);
+  const atk = events.find(e => e.type === 'attack');
+  assertTrue(atk && !atk.thrown, 'adjacent → resolves as a melee swing (not thrown)');
+  assertEq(atk.adv, 0, 'a melee swing is not penalized even with the target adjacent');
+  assertEq(attacker.ammoLeft['Handaxe'], 2, 'a melee swing spends no ammo');
+});
+
+test('Thrown weapon fired at range spends one ammo; out of ammo → melee-only', () => {
+  const attacker = { name:'Bandit', side:'monster', x:0, y:0, sizeCells:1, naturalReach:1,
+    hp:20, maxHp:20, ac:12, conditions:new Map(), ammoLeft:{ Handaxe:1 } };
+  const target = { name:'Foe', side:'pc', x:3, y:0, sizeCells:1,   // 3 cells → out of melee, within thrown range
+    hp:20, maxHp:20, ac:10, conditions:new Map(), damageTypesReceivedThisTurn:new Set() };
+  const handaxe = { sourceActionName:'Handaxe', kind:'attack', actionRange:'both', thrown:true,
+    toHit:4, reach:5, range:[20,60], damage:[{ dice:'1d6', mod:2, type:'slashing' }] };
+  // First throw at range fires and decrements ammo.
+  const e1 = [];
+  Crucible.resolveAttackMonster(attacker, target, handaxe, Crucible.makeRng(1), e1, 1, [attacker, target]);
+  const a1 = e1.find(e => e.type === 'attack');
+  assertEq(a1.thrown, true, 'thrown at range');
+  assertEq(attacker.ammoLeft['Handaxe'], 0, 'one weapon spent');
+  // Now out of ammo: it can no longer throw, and at range 3 it is melee-only →
+  // the shot cannot connect (deterministic miss, no damage roll).
+  assertEq(Crucible.resolvesAsRanged(attacker, target, handaxe), false, 'no ammo → cannot throw');
+  assertEq(Crucible.effectiveAttackNeed(attacker, target, handaxe), 1, 'out of ammo → melee reach only');
+  const e2 = [];
+  const r2 = Crucible.resolveAttackMonster(attacker, target, handaxe, Crucible.makeRng(2), e2, 2, [attacker, target]);
+  assertEq(r2.hit, false, 'out-of-ammo thrown weapon cannot hit at range (melee-only)');
+});
 </script>
 </body>
 </html>

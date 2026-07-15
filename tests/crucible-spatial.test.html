@@ -722,6 +722,99 @@ test('findRetreatCell: occupied cells are excluded from candidates', () => {
   assert(!occupied.has(r.cell.x + ',' + r.cell.y), 'retreat cell must not be occupied');
   for (const step of r.path) assert(!occupied.has(step.x + ',' + step.y), 'no path step may enter an occupied cell');
 });
+
+group('v3.8 creature size — footprints + combatDistance');
+
+test('combatDistance: two 1×1 reduces to chebyshev', () => {
+  assertEq(CrucibleSpatial.combatDistance({x:5,y:5}, {x:5,y:5}), 0);
+  assertEq(CrucibleSpatial.combatDistance({x:5,y:5}, {x:6,y:5}), 1);
+  assertEq(CrucibleSpatial.combatDistance({x:0,y:0}, {x:3,y:4}), 4);
+});
+
+test('combatDistance: Large (2×2) adjacent to a Medium → 1 (edge-to-edge)', () => {
+  const large = { x:0, y:0, sizeCells:2 };   // occupies (0,0),(1,0),(0,1),(1,1)
+  assertEq(CrucibleSpatial.combatDistance(large, { x:2, y:0, sizeCells:1 }), 1, 'east edge adjacency');
+  assertEq(CrucibleSpatial.combatDistance(large, { x:2, y:2, sizeCells:1 }), 1, 'diagonal corner adjacency');
+  assertEq(CrucibleSpatial.combatDistance(large, { x:3, y:0, sizeCells:1 }), 2, 'one cell further → 2');
+});
+
+test('combatDistance: overlapping footprints → 0', () => {
+  const large = { x:0, y:0, sizeCells:2 };
+  assertEq(CrucibleSpatial.combatDistance(large, { x:1, y:1, sizeCells:1 }), 0, 'inside the footprint');
+});
+
+test('combatDistance: Large vs Large gap measured edge-to-edge', () => {
+  const a = { x:0, y:0, sizeCells:2 };   // occupies x[0,1]
+  const b = { x:4, y:0, sizeCells:2 };   // occupies x[4,5]
+  // Nearest edges are at x=1 and x=4 → Chebyshev step distance 4-1 = 3.
+  assertEq(CrucibleSpatial.combatDistance(a, b), 3, 'nearest edges x=1..x=4 → 3');
+  const c = { x:2, y:0, sizeCells:2 };   // occupies x[2,3] → touches a's edge
+  assertEq(CrucibleSpatial.combatDistance(a, c), 1, 'edges at x=1 and x=2 → adjacent');
+});
+
+test('footprintCells: Large enumerates 4 cells, Gargantuan 16', () => {
+  assertEq(CrucibleSpatial.footprintCells({ x:0, y:0, sizeCells:2 }).length, 4);
+  assertEq(CrucibleSpatial.footprintCells({ x:0, y:0, sizeCells:4 }).length, 16);
+  assertEq(CrucibleSpatial.footprintCells({ x:3, y:7 }).length, 1, 'default 1×1');
+});
+
+test('findPath: a 2×2 mover cannot squeeze a 1-cell gap in a wall', () => {
+  // Vertical wall at x=4 with a single open cell at (4,5). A 1×1 mover slips
+  // through; a 2×2 mover needs two vertically-adjacent open cells and cannot.
+  const blocked = [];
+  for (let y = 0; y < 10; y++) if (y !== 5) blocked.push([4, y]);
+  const map = mkMap(10, 10, blocked);
+  const start = { x:1, y:5 }, goal = { x:8, y:5 };
+  const small = CrucibleSpatial.findPath(start, goal, map, { sizeCells:1 });
+  assert(small.length > 0, '1×1 mover should find a path through the gap');
+  const large = CrucibleSpatial.findPath(start, goal, map, { sizeCells:2 });
+  assertEq(large.length, 0, '2×2 mover cannot pass a 1-cell gap');
+});
+
+test('findPath: 2×2 footprint occupancy blocks a route another combatant clears', () => {
+  // A 2×2 mover from (0,0) to (7,0); occupy a 2-tall column at x=3 (y=0..1) and
+  // walls fill the rest of that column so the 2×2 mover has no clearance.
+  const blocked = [];
+  for (let y = 2; y < 8; y++) blocked.push([3, y]);
+  const map = mkMap(8, 8, blocked);
+  const occupied = new Set(['3,0','3,1']);
+  const large = CrucibleSpatial.findPath({x:0,y:0}, {x:6,y:0}, map, { sizeCells:2, occupied });
+  assertEq(large.length, 0, 'no 2×2-clear route past the occupied+walled column');
+});
+
+test('placeCombatants: large footprints do not overlap at spawn', () => {
+  const map = { width: 20, height: 20, blocked: null };
+  const combatants = [
+    { id:'a', side:'monster', sizeCells:2 },
+    { id:'b', side:'monster', sizeCells:2 },
+    { id:'c', side:'monster', sizeCells:3 },
+    { id:'d', side:'pc', sizeCells:1 },
+    { id:'e', side:'pc', sizeCells:1 },
+  ];
+  CrucibleSpatial.placeCombatants(combatants, map);
+  const claimed = new Set();
+  for (const c of combatants) {
+    for (const cell of CrucibleSpatial.footprintCells(c)) {
+      const k = cell.x + ',' + cell.y;
+      assert(!claimed.has(k), `footprint overlap at ${k} for ${c.id}`);
+      assert(cell.x >= 0 && cell.x < map.width && cell.y >= 0 && cell.y < map.height,
+        `footprint cell ${k} out of bounds for ${c.id}`);
+      claimed.add(k);
+    }
+  }
+});
+
+test('canAttackFrom: uses footprint edge distance for a Large attacker', () => {
+  const map = { width: 20, height: 20, blocked: null };
+  const large = { x:0, y:0, sizeCells:2 };            // reach-1 melee occupies x[0,1]
+  const meleeAction = { actionRange:'melee', reach:5 };
+  // Medium at (2,0) is edge-adjacent to the Large → in melee reach.
+  assert(CrucibleSpatial.canAttackFrom(large, { x:2, y:0, sizeCells:1 }, meleeAction, map),
+    'Large should reach an edge-adjacent Medium');
+  // Medium at (3,0) is 2 away → out of reach 1.
+  assert(!CrucibleSpatial.canAttackFrom(large, { x:3, y:0, sizeCells:1 }, meleeAction, map),
+    'Large should NOT reach a Medium two cells off its edge');
+});
 </script>
 </body>
 </html>

@@ -507,6 +507,37 @@ test('Multiattack guard: attack-header body with a "makes … attacks" tail pars
   assertEq(out.kind, 'attack');
   assertEq(out.toHit, 9);
 });
+
+test('Thrown: handaxe "Melee or Ranged … reach 5 ft. or range 20/60 ft." → thrown, both', () => {
+  const out = CrucibleParser.parseAction('Handaxe',
+    'Melee or Ranged Attack Roll: +4, reach 5 ft. or range 20/60 ft. Hit: 7 (1d6 + 4) Slashing damage.');
+  assertEq(out.kind, 'attack');
+  assertEq(out.actionRange, 'both');
+  assertEq(out.thrown, true);
+  assertEq(out.reach, 5);
+  assertEq(out.range, [20, 60]);
+});
+
+test('Thrown: pure ranged weapon (bow) is NOT thrown', () => {
+  const out = CrucibleParser.parseAction('Longbow',
+    'Ranged Attack Roll: +5, range 150/600 ft. Hit: 6 (1d8 + 2) Piercing damage.');
+  assertEq(out.actionRange, 'ranged');
+  assertTrue(!('thrown' in out) || out.thrown === undefined, 'bow must not be flagged thrown');
+});
+
+test('Thrown: explicit "thrown" keyword flags a melee-header spear', () => {
+  const out = CrucibleParser.parseAction('Spear',
+    'Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d8 + 2) Piercing damage. This is a thrown weapon (range 20/60).');
+  assertEq(out.kind, 'attack');
+  assertEq(out.thrown, true);
+});
+
+test('Thrown: pure melee weapon (no range, no keyword) is NOT thrown', () => {
+  const out = CrucibleParser.parseAction('Slam',
+    'Melee Attack Roll: +7, reach 10 ft. Hit: 15 (2d8 + 6) Bludgeoning damage.');
+  assertEq(out.actionRange, 'melee');
+  assertTrue(!('thrown' in out) || out.thrown === undefined, 'pure melee must not be flagged thrown');
+});
 </script>
 </body>
 </html>

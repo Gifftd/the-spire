@@ -9,6 +9,57 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-07-15
 
+### Crucible: creature size (grid footprints) + thrown-weapon melee preference
+
+Two related tactical-engine fixes.
+
+**Creature size (footprints).** Monsters now occupy an N×N block of cells
+derived from their bestiary `size` string — Tiny/Small/Medium → 1, Large → 2,
+Huge → 3, Gargantuan → 4 (`Crucible.sizeToCells`/`monsterSizeCells`). PCs are
+1×1 unless the sheet sets an override. A combatant's `(x,y)` is the top-left
+anchor of its footprint.
+
+- `crucible-spatial.js`: new `footprintCells(c)` and `combatDistance(a,b)`
+  (edge-to-edge Chebyshev between two footprints; 0 = overlapping, 1 = adjacent;
+  reduces to `chebyshev` for 1×1). `findPath`/`findShootingCell`/
+  `findRetreatCell` take `options.sizeCells` and only enter a cell whose whole
+  N×N footprint is in-bounds / non-wall / non-occupied (a 2×2 mover can't squeeze
+  a 1-cell gap). `canAttackFrom` uses `combatDistance`. `placeCombatants` nudges
+  large anchors so footprints don't overlap at spawn.
+- `crucible-engine.js`: `buildCombatants` sets `c.sizeCells`. **Every**
+  combatant-vs-combatant `chebyshev` call is now `combatDistance` — adjacency,
+  range gates, OoA reach, buff/maneuver adjacency, multiattack range, kiting
+  (cell-to-cell math like paths/AoE stays `chebyshev`). Occupancy builders
+  (`executeMove`, `occupiedSet`, single-target reposition) block the whole
+  footprint; movement calls thread `sizeCells`. Push/shove move the anchor only
+  when the whole footprint fits.
+- `crucible-viewer.js`: tokens scale radius + center to the footprint (a Large
+  fills its 2×2 block); placement event carries `sizeCells`.
+- `crucible-dm.html`: encounter picker spatial line shows size (e.g.
+  "Large 2×2").
+
+**Thrown weapons + ammo (fixes "toughs throw handaxes forever").** A `both`
+(Melee or Ranged) weapon with a range profile — or a body with the "thrown"
+keyword — is now flagged `thrown:true` by the parser. In combat a thrown weapon
+**prefers melee**: the monster closes to melee reach with its free movement and
+only hurls the weapon when it can't reach melee this turn *and* ammo remains;
+otherwise it Dashes to engage. Ammo is tracked per-combatant (`c.ammoLeft`):
+thrown weapons default to **2** throws, bows/pure-melee are unlimited, and a DM
+override sets the count (Ammo input in the monster override panel; `null` =
+unlimited). A throw at range spends one weapon; once out, the weapon stays usable
+in **melee only** (the range gate drops to melee reach). Attack events carry
+`thrown:true` when hurled, and the viewer logs "X throws Y at Z".
+
+Also adds the missing **ranged-in-melee disadvantage** (5e RAW): a ranged or
+thrown-at-range attack made while an enemy is adjacent to the *attacker* rolls at
+disadvantage; a thrown weapon *swung* in melee is not penalized.
+
+Tests: +9 spatial (footprint/combatDistance/placement), +4 parser (thrown
+detection), +6 engine (size derivation, ammo init, the bandit integration
+"money" test, ranged-in-melee disadvantage, melee-swing-no-penalty, out-of-ammo
+melee-only). Full spatial (86), parser (64), engine (211), viewer (16) suites
+green; parser corpus coverage unchanged at 87.4%.
+
 ### Crucible: PC character sheet modal (crucible-dm.html)
 
 Added a **⛨ SHEET** button on every PC card that opens a roomy, organized
