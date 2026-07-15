@@ -9,6 +9,26 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-07-15
 
+### Crucible: Reset edits / Revert to base — the undo path for overrides
+
+The Review parsed actions panel (`crucible-dm.html`) gains two footer
+buttons beside "Save to bestiary_custom":
+
+- **Reset edits** (local only): discards this pick's unsaved in-session
+  tweaks by re-cloning + re-parsing from the merged bestiary record — the
+  canonical state, saved override included. Verified: an unsaved toHit
+  tweak resets while the saved override's manual edit survives.
+- **Revert to base…** (KV write, confirm-gated danger dialog): deletes this
+  monster's OVERRIDE record from `bestiary_custom` so the imported stat
+  block + live parser own it again. Homebrew records are never touched
+  (deleting one would destroy DM-authored content, not revert it); orphan
+  overrides can be deleted and report that the pick keeps its current data.
+  Every pick of that monster in the current encounter refreshes in place.
+  The button only renders for monsters that have an imported base (or are
+  orphan overrides). Verified end-to-end against a stubbed worker: POST
+  payload dropped only the override, the pick came back with base toHit and
+  a dynamic-options Multiattack, homebrew passed through untouched.
+
 ### Crucible: "↻ Re-parse saved customs" — refresh frozen bestiary_custom parses
 
 Saved `bestiary_custom` override records freeze a full `parsedActions`

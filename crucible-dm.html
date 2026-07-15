@@ -2254,12 +2254,96 @@ function openOverridePanel(pickId) {
                 oninput="overrideRegen('${pickId}', 'suppressedBy', this.value.split(',').map(s=>s.trim()).filter(Boolean))"></label>
           </div>` : ''}
       </div>
-      <div style="padding:0.5rem 1rem; border-top:1px solid var(--c-border); text-align:right">
+      <div style="padding:0.5rem 1rem; border-top:1px solid var(--c-border); display:flex; justify-content:space-between; align-items:center; gap:0.5rem;">
+        <span>
+          <button class="btn btn--ghost btn--sm" onclick="resetPickParses('${pickId}')"
+            title="Discard unsaved edits on this pick — re-parse fresh from the bestiary record (saved override included, if any)">Reset edits</button>
+          ${(!m._custom || m._orphanOverride) ? `<button class="btn btn--ghost btn--sm" style="color:#e77878;" onclick="revertOverrideToBase('${pickId}')"
+            title="Delete this monster's saved override from bestiary_custom — the imported stat block + live parser own it again">Revert to base…</button>` : ''}
+        </span>
         <button class="btn btn--primary" onclick="saveOverride('${pickId}')">Save to bestiary_custom</button>
       </div>
     </div>`;
   document.body.appendChild(modal);
   renderOverrideList(pick, modal.querySelector('#override-list'));
+}
+
+// ─────────── Reset / revert (the undo path for overrides) ───────────
+// Reset = local only: throw away this pick's in-session edits and re-clone +
+// re-parse from the merged bestiary record (which still includes any SAVED
+// override — that's the canonical state).
+async function resetPickParses(pickId) {
+  const pick = picks.find(p => p.pickId === pickId); if (!pick) return;
+  const bestiary = await loadBestiary();
+  const src = bestiary.find(x => x.name === pick.monster.name
+    && (x._source || '') === (pick.monster._source || pick.monster.source || ''));
+  if (!src) { UI.toast('Could not find this monster in the bestiary.', 'error'); return; }
+  const fresh = JSON.parse(JSON.stringify(src));
+  CrucibleParser.parseAllMonsterActions(fresh);
+  pick.monster = fresh;
+  closeTopModal();
+  openOverridePanel(pickId);
+  renderEncounter();
+  UI.toast('Local edits discarded — re-parsed from the bestiary record.', 'success');
+}
+
+// Revert = KV write: delete this monster's OVERRIDE record from
+// bestiary_custom so the imported stat block + live parser own it again.
+// Homebrew records (no overriddenAt) are never touched — deleting one would
+// destroy DM-authored content, not revert it. Every pick of this monster in
+// the current encounter is refreshed from the override-free bestiary.
+async function revertOverrideToBase(pickId) {
+  const pick = picks.find(p => p.pickId === pickId); if (!pick) return;
+  const m = pick.monster;
+  const srcKey = m._source || m.source || '';
+  const ok = await UI.confirmDialog(
+    `Delete the saved override for “${m.name}” from bestiary_custom? ` +
+    `The imported stat block and the live parser will own it again; ` +
+    `manual edits stored in that override are lost. (Homebrew monsters are never touched.)`,
+    { confirmLabel: 'Delete override', danger: true });
+  if (!ok) return;
+  try {
+    const headers = Auth.dmHeaders ? Auth.dmHeaders() : {};
+    const r = await fetch(WORKER_URL + '?type=bestiary_custom', { cache:'no-store', headers });
+    if (r.status === 401) { UI.toast('DM session expired — sign in again.', 'error'); return; }
+    if (!r.ok) { UI.toast('Could not load bestiary_custom (HTTP ' + r.status + ').', 'error'); return; }
+    const list = BestiaryMerge.arrayOf(await r.json());
+    const key = BestiaryMerge.recordKey({ name: m.name, _source: srcKey });
+    const keep = list.filter(rec =>
+      !(BestiaryMerge.isOverrideRecord(rec) && BestiaryMerge.recordKey(rec) === key));
+    if (keep.length === list.length) {
+      UI.toast('No saved override found for this monster — nothing to revert.', 'info');
+      return;
+    }
+    const saveR = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', ...headers },
+      body: JSON.stringify({ type:'bestiary_custom', payload: keep }),
+    });
+    if (!saveR.ok) { UI.toast('Save failed: HTTP ' + saveR.status, 'error'); return; }
+    delete window._CRUCIBLE_BESTIARY;
+    const bestiary = await loadBestiary();
+    const src = bestiary.find(x => x.name === m.name && (x._source || '') === srcKey);
+    if (src) {
+      for (const p of picks) {
+        if (p.monster.name === m.name
+            && (p.monster._source || p.monster.source || '') === srcKey) {
+          const fresh = JSON.parse(JSON.stringify(src));
+          CrucibleParser.parseAllMonsterActions(fresh);
+          p.monster = fresh;
+        }
+      }
+    }
+    closeTopModal();
+    if (src) openOverridePanel(pickId);
+    renderEncounter();
+    UI.toast(src
+      ? `Override deleted — “${m.name}” reverted to the imported stat block.`
+      : `Orphan override deleted — “${m.name}” has no imported base; this pick keeps its current data.`,
+      'success');
+  } catch (e) {
+    UI.toast('Revert failed: ' + (e.message || e), 'error');
+  }
 }
 
 function renderOverrideList(pick, root) {
