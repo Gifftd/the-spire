@@ -195,8 +195,15 @@
     return null;
   }
 
+  // Shape nouns win over a bare "radius": 2024 phrasing is
+  // "20-foot-radius sphere", where "radius" is part of the measurement, not
+  // the shape. Match the noun (optionally preceded by "radius") first; fall
+  // back to SHAPE_RE so radius-only bodies ("within a 30-foot radius") still
+  // classify as radius.
+  const SHAPE_NOUN_RE = /(\d+)-foot[- ](?:radius[- ]\s*)?(sphere|cube|cone|line)/i;
+
   function aoeTargetsFromShape(body) {
-    const m = body.match(SHAPE_RE);
+    const m = body.match(SHAPE_NOUN_RE) || body.match(SHAPE_RE);
     if (!m) return 1;
     const shape = m[2].toLowerCase();
     if (shape === 'sphere' || shape === 'cube')   return 4;

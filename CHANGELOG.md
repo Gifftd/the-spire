@@ -9,6 +9,13 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-06-16
 
+### Crucible parser: "20-foot-radius sphere" classifies as sphere, not radius
+
+`aoeTargetsFromShape` matched "radius" before "sphere" in 2024-style AoE
+phrasing ("20-foot-radius sphere"), classifying Fireball-like saves as
+radius (2 targets) instead of sphere (4). Shape nouns (sphere/cube/cone/
+line) now win; a bare "radius" remains the fallback. Parser suite 34/34.
+
 ### Crucible v3 — full 5.5e action set + tactical AI
 
 The Crucible combat simulator gains the combat-relevant D&D 2024 action set,
