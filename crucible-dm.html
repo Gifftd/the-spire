@@ -2155,7 +2155,8 @@ function renderEncounter() {
       </div>
       <div style="margin-top:0.25rem; font-size:0.78em; color:var(--c-ink-faint);">
         <b style="color:var(--c-teal-bright);">Spatial:</b>
-        speed ${Crucible.monsterSpeedCells(p.monster)} cells
+        ${(() => { const n = Crucible.monsterSizeCells(p.monster); return `size ${escapeHtml(p.monster.size || 'Medium')} ${n}×${n}`; })()}
+        · speed ${Crucible.monsterSpeedCells(p.monster)} cells
         (${p.monster.speedText || (p.monster.speed && p.monster.speed.walk ? p.monster.speed.walk + ' ft.' : '30 ft. default')})
         · reach ${Crucible.monsterReachCells(p.monster)} cell${Crucible.monsterReachCells(p.monster) > 1 ? 's' : ''}
       </div>
@@ -2296,7 +2297,11 @@ function renderOverrideFields(pa, pickId, idx) {
         <label>Range far (ft)
           <input type="number" min="0" step="5" value="${rangeFar}" class="pc-input"
             oninput="overrideRangeFar('${pickId}', ${idx}, this.value)"></label>
-        <span style="color:var(--c-teal-bright); font-size:0.85em">→ engine reads ${cells} cell${cells === 1 ? '' : 's'}</span>
+        <label title="Thrown weapons only. Blank = default (2 for thrown, unlimited otherwise). Once spent, the weapon stays usable in melee.">Ammo (thrown)
+          <input type="number" min="0" value="${typeof pa.ammo === 'number' ? pa.ammo : ''}" class="pc-input"
+            placeholder="${Crucible.actionIsThrown(pa) ? '2' : '∞'}"
+            oninput="overrideField('${pickId}', ${idx}, 'ammo', this.value === '' ? undefined : parseInt(this.value))"></label>
+        <span style="color:var(--c-teal-bright); font-size:0.85em">→ engine reads ${cells} cell${cells === 1 ? '' : 's'}${Crucible.actionIsThrown(pa) ? ' · thrown' : ''}</span>
       </div>
       <label>To-hit <input type="number" value="${pa.toHit ?? 0}" class="pc-input"
         oninput="overrideField('${pickId}', ${idx}, 'toHit', parseInt(this.value)||0)"></label>

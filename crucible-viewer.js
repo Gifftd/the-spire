@@ -48,6 +48,8 @@
       id: p.id, name: p.name, side: p.side,
       x: p.pos.x, y: p.pos.y,
       hp: p.hp, maxHp: p.maxHp, ac: p.ac, speed: p.speed,
+      // v3.8: grid footprint (cells per side) for size-scaled token rendering.
+      sizeCells: p.sizeCells || 1,
       color: p.side === 'pc' ? pcColor(p.id) : null,
       dead: false, downed: false,
       // v3.6: viewer-side, name-only condition markers driven by the event
@@ -170,9 +172,12 @@
     const w = state.map.width * CELL;
     const h = state.map.height * CELL;
     const tokensHtml = state.combatants.map(c => {
-      const cx = c.x * CELL + CELL / 2;
-      const cy = c.y * CELL + CELL / 2;
-      const r  = CELL * 0.4;
+      // v3.8: an N×N creature anchors at its top-left cell; center + radius
+      // scale with the footprint so a Large token fills its 2×2 block, etc.
+      const n = c.sizeCells || 1;
+      const cx = c.x * CELL + CELL * n / 2;
+      const cy = c.y * CELL + CELL * n / 2;
+      const r  = CELL * 0.4 * n;
       const cls = c.side === 'pc' ? 'token pc' : 'token monster';
       const dead = c.dead ? ' dead' : '';
       const downed = c.downed ? ' downed' : '';
@@ -335,7 +340,10 @@
         case 'placement': return 'Placement: ' + ev.placements.length + ' combatants on ' + ev.map.width + '×' + ev.map.height;
         case 'move':      return 'R' + ev.round + ' · ' + ev.name + ' ' + (ev.reason === 'dash' ? 'dashes' : 'walks') + ' to (' + ev.to.x + ',' + ev.to.y + ')';
         case 'dash':      return 'R' + ev.round + ' · ' + ev.name + ' uses Dash (+' + ev.cells + ' cells)';
-        case 'attack':    return 'R' + ev.round + ' · ' + ev.actor + ' → ' + ev.target + ' · ' + ev.action + ' (roll ' + ev.roll + ') → ' + (ev.hit ? 'hit ' + ev.damageDealt : 'miss');
+        case 'attack':    return 'R' + ev.round + ' · ' + ev.actor +
+          (ev.thrown ? ' throws ' + ev.action + ' at ' + ev.target
+                     : ' → ' + ev.target + ' · ' + ev.action) +
+          ' (roll ' + ev.roll + ') → ' + (ev.hit ? 'hit ' + ev.damageDealt : 'miss');
         case 'damage':    return 'R' + ev.round + ' · ' + ev.target + ' takes ' + ev.amount + ' ' + ev.dmgType;
         case 'heal':      return 'R' + ev.round + ' · ' + ev.actor + ' heals ' + ev.target + ' +' + ev.amount + (ev.revived ? ' REVIVED' : '');
         case 'save':      return 'R' + ev.round + ' · ' + ev.actor + ' → ' + ev.target + ' · ' + ev.action + ' save ' + (ev.passed ? 'passed' : 'failed');
