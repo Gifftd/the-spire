@@ -121,6 +121,9 @@
     .tactical-board .terrain-damaging rect { fill: #c43838; opacity: 0.35; }
     .tactical-board .terrain-damaging text { fill: #ffdd99; font-family: var(--font-display);
                                               font-size: 0.55rem; pointer-events: none; }
+    .tactical-board .terrain-cover rect { fill: #8a7a52; opacity: 0.55; }
+    .tactical-board .terrain-cover text { fill: #f0e6c8; font-family: var(--font-display);
+                                           font-size: 0.55rem; pointer-events: none; }
 
     .terrain-paint { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.5rem;
                      background: var(--c-bg); border: 1px solid var(--c-border); border-radius: 4px;
@@ -141,6 +144,7 @@
     .terrain-paint-grid .cell:hover { fill: rgba(126, 197, 197, 0.15); }
     .terrain-paint-grid .terrain-wall { fill: var(--c-ink-faint); }
     .terrain-paint-grid .terrain-difficult { fill: #806c3a; opacity: 0.5; }
+    .terrain-paint-grid .terrain-cover rect { fill: #8a7a52; opacity: 0.7; }
     .terrain-paint-grid .terrain-damaging rect { fill: #c43838; opacity: 0.5; }
     .terrain-paint-grid .terrain-damaging text { fill: #ffdd99; font-family: var(--font-display);
                                                   font-size: 0.55rem; pointer-events: none; }
@@ -171,7 +175,7 @@
 <script src="auth.js?v=2"></script>
 <script src="spire-api.js?v=2"></script>
 <script src="spire-ui.js?v=1"></script>
-<script src="encounter-schema.js"></script>
+<script src="encounter-schema.js?v=2"></script>
 
 <header class="topbar">
   <h1 class="topbar-title topbar-title--brass">⚔ The Crucible</h1>
@@ -214,9 +218,9 @@
 <script src="bestiary-merge.js?v=1"></script>
 <script src="crucible-parser.js?v=2"></script>
 <script src="pc-features.js?v=1"></script>
-<script src="crucible-spatial.js?v=1"></script>
-<script src="crucible-engine.js?v=2"></script>
-<script src="crucible-viewer.js?v=2"></script>
+<script src="crucible-spatial.js?v=2"></script>
+<script src="crucible-engine.js?v=3"></script>
+<script src="crucible-viewer.js?v=3"></script>
 <script>
 // ─────────── DM auth gate ───────────
 Auth.requireRole('dm', { redirect: 'home.html?notice=dm-only' });
@@ -1896,7 +1900,7 @@ function saveBattlefield() {
 }
 
 let battlefield = loadBattlefield();
-let currentBrush = 'erase';            // 'erase' | 'wall' | 'difficult' | 'damaging'
+let currentBrush = 'erase';            // 'erase' | 'wall' | 'difficult' | 'damaging' | 'cover-half' | 'cover-34'
 let damagingBrushSpec = { dice: '1d6', mod: 0, dmgType: 'fire' };
 let isPainting = false;
 
@@ -1927,6 +1931,8 @@ function paintCell(x, y) {
   let cell = null;
   if (currentBrush === 'wall') cell = { type: 'wall' };
   else if (currentBrush === 'difficult') cell = { type: 'difficult' };
+  else if (currentBrush === 'cover-half') cell = { type: 'cover-half' };
+  else if (currentBrush === 'cover-34') cell = { type: 'cover-34' };
   else if (currentBrush === 'damaging') {
     cell = { type: 'damaging',
              dice: damagingBrushSpec.dice || '1d6',
@@ -1958,6 +1964,10 @@ function renderBattlefieldPanel() {
       else if (t && t.type === 'difficult') overlay = `<rect x="${px}" y="${py}" width="${CELL}" height="${CELL}" class="terrain-difficult" />`;
       else if (t && t.type === 'damaging') {
         overlay = `<g class="terrain-damaging"><rect x="${px}" y="${py}" width="${CELL}" height="${CELL}" /></g>`;
+      }
+      else if (t && (t.type === 'cover-half' || t.type === 'cover-34')) {
+        const ch = Math.round(CELL * (t.type === 'cover-34' ? 0.72 : 0.45));
+        overlay = `<g class="terrain-cover"><rect x="${px}" y="${py + CELL - ch}" width="${CELL}" height="${ch}" /></g>`;
       }
       cellsHtml.push(
         overlay +
@@ -1999,8 +2009,10 @@ function renderBattlefieldPanel() {
       <div class="terrain-paint-row">
         <span style="color:var(--c-ink-faint); font-size:0.8rem">Brush:</span>
         <div class="terrain-paint-brushes">
-          ${['erase','wall','difficult','damaging'].map(b =>
-            `<button class="${currentBrush === b ? 'active' : ''}" onclick="setBrush('${b}')">${b}</button>`
+          ${[['erase','erase'],['wall','wall'],['difficult','difficult'],['damaging','damaging'],
+             ['cover-half','cover ½'],['cover-34','cover ¾']].map(([b, label]) =>
+            `<button class="${currentBrush === b ? 'active' : ''}" onclick="setBrush('${b}')"
+                     title="${b.startsWith('cover') ? 'Low obstacle: grants ' + (b === 'cover-34' ? '+5' : '+2') + ' AC and DEX saves to targets behind it; does not block movement or sight' : ''}">${label}</button>`
           ).join('')}
         </div>
       </div>

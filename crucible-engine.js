@@ -285,6 +285,23 @@
     return Math.max(1, maxR);
   }
 
+  // The longest-range sub-action of a multiattack plan — used as the
+  // representative action for LOS/shooting-cell repositioning (v4.0).
+  function multiattackRepAction(action, allActions) {
+    if (action.kind !== 'multiattack' || !Array.isArray(action.multiattackPlan)) return null;
+    let best = null, bestR = -1;
+    for (const step of action.multiattackPlan) {
+      for (const nm of stepOptionNames(step)) {
+        const sub = allActions.find(a => (a.sourceActionName || a.name) === nm);
+        if (sub && sub.kind !== 'unparsed' && actionRange(sub) > bestR) {
+          bestR = actionRange(sub);
+          best = sub;
+        }
+      }
+    }
+    return best;
+  }
+
   function targetSaveBonus(target, ability) {
     if (!target || !ability) return 0;
     if (target.side === 'pc' && target.pm) return saveBonus(target.pm, ability);
@@ -1032,11 +1049,18 @@
     // target's onAttackAttempt hooks (Shield etc.) from a position that
     // could never have hit. Returns a deterministic miss so callers that
     // tally results still get a sensible object back.
+    let cover = null;
     if (typeof CrucibleSpatial !== 'undefined'
         && typeof me.x === 'number' && typeof target.x === 'number') {
       const need = effectiveAttackNeed(me, target, action);
       if (CrucibleSpatial.combatDistance(me, target) > need) {
         return { roll: 0, crit: false, hit: false, damageDealt: 0, damageByType: {} };
+      }
+      // v4.0 cover: total cover (wall across the sight line) → the attack
+      // cannot be made at all; half/¾ raise the target's effective AC below.
+      cover = CrucibleSpatial.coverBetween(me._mapRef || null, me, target, combatants);
+      if (cover === 'total') {
+        return { roll: 0, crit: false, hit: false, damageDealt: 0, damageByType: {}, blockedBy: 'total-cover' };
       }
     }
     me.hasAttacked = true;
@@ -1046,10 +1070,12 @@
     const isThrownThrow = firedAsRanged && actionIsThrown(action);
     if (isThrownThrow) consumeAmmo(me, action);
     const advState = attackAdvantageState(me, target, action, combatants);
+    const coverAc = (cover && typeof CrucibleSpatial !== 'undefined')
+      ? CrucibleSpatial.coverAcBonus(cover) : 0;
     const roll = rollD20(rng, advState);
     const isCrit = roll === 20;
     const isFumble = roll === 1;
-    let hit = !isFumble && (isCrit || roll + (action.toHit || 0) >= (target.ac || 10));
+    let hit = !isFumble && (isCrit || roll + (action.toHit || 0) >= (target.ac || 10) + coverAc);
 
     // Allow target's reaction features (Shield) to modify the hit.
     if (target.side === 'pc' && typeof PCFeatures !== 'undefined') {
@@ -1074,6 +1100,7 @@
     events.push({ round, type:'attack', actor: me.name, target: target.name,
                   action: action.sourceActionName, roll, crit:isCrit, hit,
                   damageDealt, adv: advState,
+                  ...(cover ? { cover } : {}),
                   ...(isThrownThrow ? { thrown: true } : {}) });
     // v3.5: on-hit rider condition + forced movement.
     if (hit) applyAttackRider(me, target, action, rng, events, round);
@@ -1090,11 +1117,17 @@
   // hook (Bardic Inspiration etc.). Tests call without it.
   function resolveAttackPc(me, target, action, rng, events, round, combatants) {
     // v2 spatial: refuse out-of-range, same as resolveAttackMonster.
+    let cover = null;
     if (typeof CrucibleSpatial !== 'undefined'
         && typeof me.x === 'number' && typeof target.x === 'number') {
       const need = effectiveAttackNeed(me, target, action);
       if (CrucibleSpatial.combatDistance(me, target) > need) {
         return { roll: 0, crit: false, hit: false, damageDealt: 0, damageByType: {} };
+      }
+      // v4.0 cover: same as resolveAttackMonster.
+      cover = CrucibleSpatial.coverBetween(me._mapRef || null, me, target, combatants);
+      if (cover === 'total') {
+        return { roll: 0, crit: false, hit: false, damageDealt: 0, damageByType: {}, blockedBy: 'total-cover' };
       }
     }
     // Pre-attack hook — fires only when the attack will actually proceed (i.e.
@@ -1111,10 +1144,12 @@
     // PC actions store inputs; derive to-hit + damage roll.
     const th = toHit(me.pm, action);
     const advState = attackAdvantageState(me, target, action, combatants);
+    const coverAc = (cover && typeof CrucibleSpatial !== 'undefined')
+      ? CrucibleSpatial.coverAcBonus(cover) : 0;
     const roll = rollD20(rng, advState);
     const isCrit = roll === 20;
     const isFumble = roll === 1;
-    let hit = !isFumble && (isCrit || roll + th >= (target.ac || 10));
+    let hit = !isFumble && (isCrit || roll + th >= (target.ac || 10) + coverAc);
     // Broadcast onAttackAttempt: allow any PC's features (e.g., Bardic Inspiration
     // held by an ally) to boost this PC's attack roll.
     // me is the attacking PC; broadcast so the bard (or any other PC) can spend a die.
@@ -1151,6 +1186,7 @@
     events.push({ round, type:'attack', actor: me.name, target: target.name,
                   action: action.name, roll, crit:isCrit, hit, damageDealt,
                   adv: advState,
+                  ...(cover ? { cover } : {}),
                   ...(isThrownThrow ? { thrown: true } : {}) });
     // v3.5: on-hit rider condition + forced movement.
     if (hit) applyAttackRider(me, target, action, rng, events, round);
@@ -1551,10 +1587,28 @@
   }
 
   // ─────────── Resolve a save effect ───────────
-  function resolveSave(me, targets, action, rng, events, round, combatants) {
+  // coverOrigin (optional): the point cover is measured from — the AoE cast
+  // point when called from resolveAoE, else the caster's own cell.
+  function resolveSave(me, targets, action, rng, events, round, combatants, coverOrigin) {
     let totalDmg = 0;
+    const originPt = coverOrigin || me;
     for (const t of targets) {
       if (t.dead || t.downed) continue;
+      // v4.0 cover. Total cover from the effect's origin → unaffected (the
+      // wall takes the blast). Half/¾ grant +2/+5 on DEX saving throws only.
+      let coverName = null;
+      if (typeof CrucibleSpatial !== 'undefined'
+          && originPt && typeof originPt.x === 'number' && typeof t.x === 'number') {
+        coverName = CrucibleSpatial.coverBetween(me._mapRef || null, originPt, t, combatants);
+        if (coverName === 'total') {
+          events.push({ round, type:'save', actor: me.name, target: t.name,
+                        action: action.sourceActionName, roll: null, passed: true,
+                        damageDealt: 0, cover: 'total' });
+          continue;
+        }
+      }
+      const coverSaveBonus = (action.saveAbility === 'dex' && coverName)
+        ? CrucibleSpatial.coverAcBonus(coverName) : 0;
       // saveBonus uses PC math; for monster targets, fall back to monster.abilities.
       let sb = 0;
       if (t.side === 'pc' && t.pm) sb = saveBonus(t.pm, action.saveAbility);
@@ -1587,7 +1641,7 @@
             action.saveAbility, action.saveDc, saveRollCtx);
           broadcastSaveBonus = saveRollCtx.bonus || 0;
         }
-        passed = (roll + broadcastSaveBonus) + sb >= action.saveDc;
+        passed = (roll + broadcastSaveBonus) + sb + coverSaveBonus >= action.saveDc;
       }
       let dmgList;
       if (passed && action.halfOnSave) dmgList = action.damageOnFail; // half later
@@ -1617,6 +1671,7 @@
       const saveEvt = { round, type:'save', actor: me.name, target: t.name,
                         action: action.sourceActionName, roll, passed, damageDealt: dmg };
       if (action.autoHit) saveEvt.autoHit = true;
+      if (coverName) saveEvt.cover = coverName;
       events.push(saveEvt);
     }
     return { totalDmg };
@@ -1668,7 +1723,8 @@
       // event into `events`. Snapshot length before so we can find this
       // target's save event for the `saved` flag.
       const evBefore = events.length;
-      const saveResult = resolveSave(c, [t], action, rng, events, round, combatants);
+      // v4.0: cover is measured from the AoE's cast point, not the caster.
+      const saveResult = resolveSave(c, [t], action, rng, events, round, combatants, best.point);
       const tDmg = (saveResult && saveResult.totalDmg) || 0;
       let saved = false;
       for (let i = evBefore; i < events.length; i++) {
@@ -2315,6 +2371,45 @@
                     tally(c.side, 'Dash', 'dash', false, 0, 0, 0, 0);
                   }
                   continue;
+                }
+                // v4.0: in range but a wall blocks the sight line → reposition
+                // to a shooting cell, exactly like the single-target path,
+                // using the longest-range sub-attack as the representative.
+                // (Without this, a multiattacking archer whiffs into the wall.)
+                const rep = multiattackRepAction(action, myActions);
+                if (rep && !CrucibleSpatial.canAttackFrom(c, tgtCandidate, rep, map)) {
+                  const occupied = new Set();
+                  for (const d of combatants) {
+                    if (d === c || d.dead || d.downed) continue;
+                    if (typeof d.x !== 'number' || typeof d.y !== 'number') continue;
+                    for (const cell of CrucibleSpatial.footprintCells(d)) occupied.add(cell.x + ',' + cell.y);
+                  }
+                  let result = c.movementBudgetThisTurn > 0
+                    ? CrucibleSpatial.findShootingCell(
+                        { x: c.x, y: c.y }, tgtCandidate, rep, map,
+                        { maxSteps: c.movementBudgetThisTurn, occupied, sizeCells: c.sizeCells })
+                    : null;
+                  if (result && result.path.length > 0) {
+                    const stepped = executePath(c, result.path, 'engage',
+                      combatants, rng, events, round);
+                    c.movementBudgetThisTurn = Math.max(0, c.movementBudgetThisTurn - stepped);
+                    if (c.dead || c.downed) continue;
+                  }
+                  if (!CrucibleSpatial.canAttackFrom(c, tgtCandidate, rep, map)) {
+                    const dashResult = CrucibleSpatial.findShootingCell(
+                      { x: c.x, y: c.y }, tgtCandidate, rep, map,
+                      { maxSteps: effectiveSpeed(c), occupied, sizeCells: c.sizeCells });
+                    if (dashResult && dashResult.path.length > 0) {
+                      const dashed = executePath(c, dashResult.path, 'dash',
+                        combatants, rng, events, round);
+                      if (dashed > 0) {
+                        events.push({ type: 'dash', round, who: c.id, name: c.name, cells: dashed });
+                        tally(c.side, 'Dash', 'dash', false, 0, 0, 0, 0);
+                      }
+                    }
+                    // Dash consumed the action — no attack this turn.
+                    continue;
+                  }
                 }
               } else if (actionIsThrown(action)) {
                 // v3.8: thrown/'both' weapon — PREFER MELEE. Close to melee

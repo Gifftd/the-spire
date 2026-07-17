@@ -290,6 +290,23 @@
       assertEq(r.ok, false);
       assert(r.errors.some(x => x.field === 'tactical.waves[0].pickKey'), 'orphan wave detected');
     });
+
+    test('validateEncounter accepts cover terrain types, rejects unknown ones', () => {
+      const e = EncounterSchema.newEncounter('CoverMap');
+      const mk = type => {
+        const terrain = Array.from({ length: 4 }, () => new Array(4).fill(null));
+        terrain[1][1] = { type };
+        return { width: 4, height: 4, terrain };
+      };
+      e.map = mk('cover-half');
+      assertEq(EncounterSchema.validateEncounter(e).ok, true);
+      e.map = mk('cover-34');
+      assertEq(EncounterSchema.validateEncounter(e).ok, true);
+      e.map = mk('lava-moat');
+      const r = EncounterSchema.validateEncounter(e);
+      assertEq(r.ok, false);
+      assert(r.errors.some(x => /unknown terrain/.test(x.message || '')), 'unknown type flagged');
+    });
   </script>
 </body>
 </html>

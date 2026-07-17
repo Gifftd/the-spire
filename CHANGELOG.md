@@ -9,6 +9,47 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-07-15
 
+### Crucible v4.0: attacks respect line of sight + 5.5e cover rules
+
+**Bugfix — ranged attacks ignored walls.** The attack resolvers gated only on
+distance, and the multiattack movement path gated only on range — so an
+archer already in range fired straight through walls (the single-target path
+repositioned correctly; multiattackers like the Scout did not). Both
+`resolveAttackPc`/`resolveAttackMonster` now refuse the attack outright when
+a wall blocks the sight line, and the multiattack movement branch repositions
+via `findShootingCell` (free move, then Dash) using its longest-range
+sub-attack — verified live: a Scout in longbow range behind a wall now walks
+to the gap before firing instead of shooting through it.
+
+**5.5e cover (2024 PHB), most-protective-source-applies:**
+
+- **Total** (a wall across the line): can't be targeted at all — attacks
+  return a blocked no-op, save/AoE effects skip the target ("the wall takes
+  the blast"), with a `cover:'total'` save event so the log explains it.
+- **Three-quarters** (+5 AC and +5 DEX saves) and **half** (+2/+2) from two
+  new paintable battlefield brushes — `cover ½` and `cover ¾` low obstacles
+  (sandbags, furniture, arrow slits) that do NOT block movement or sight.
+- **Creatures**: any other combatant standing on the firing line grants half
+  cover (downed/dead bodies don't). Sources never stack — the most
+  protective one applies.
+- AoE cover is measured from the **cast point**, not the caster
+  (`resolveSave` gained an optional `coverOrigin` param; `resolveAoE` passes
+  its chosen origin). Cover bonuses apply to DEX saves only, per RAW.
+- Approximation note: sight lines are cell-center Bresenham (same as all
+  existing LOS); the DMG corner-tracing method (partial cover from wall
+  edges) is not modeled — paint cover cells where peeking matters.
+
+Wiring: `crucible-spatial.js` `coverBetween`/`coverAcBonus`;
+`crucible-engine.js` resolver gates + effective-AC math + DEX-save bonus +
+multiattack LOS repositioning (`multiattackRepAction`) + the multiattack
+sub-attack gate upgraded to `effectiveAttackNeed`; attack/save events carry
+`cover`; `crucible-viewer.js` renders cover slabs (½ low, ¾ tall) and
+phrases cover in the event log; `crucible-dm.html` battlefield brushes +
+editor rendering; `encounter-schema.js` accepts the two new terrain types.
+Cache-busters bumped (spatial v2, engine v3, viewer v3, schema v2 across all
+five consuming pages). Tests: spatial 86 → 97, engine 216 → 222, schema
+26 → 27, viewer 16 — all green, no prior behavior regressed.
+
 ### Crucible: Reset edits / Revert to base — the undo path for overrides
 
 The Review parsed actions panel (`crucible-dm.html`) gains two footer

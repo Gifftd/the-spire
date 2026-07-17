@@ -520,6 +520,98 @@ test('resolveSave: autoHit applies damage with no roll, event flagged', () => {
   assertEq(saves[0].autoHit, true);
   assertEq(saves[0].passed, false);
 });
+
+// ── v4.0: line of sight + 5.5e cover ──
+function coverFixture(terrainSpots) {
+  const map = { width:10, height:10, terrain: Array.from({length:10}, () => new Array(10).fill(null)) };
+  for (const [x, y, type] of (terrainSpots || [])) map.terrain[y][x] = { type };
+  const me = { side:'monster', name:'Archer', x:0, y:0, _mapRef: map,
+               monster:{ name:'Archer' } };
+  const target = { side:'pc', name:'PC', x:4, y:0, hp:30, maxHp:30, ac:10,
+                   downed:false, dead:false, damageTypesReceivedThisTurn:new Set() };
+  const bow = { sourceActionName:'Longbow', kind:'attack', actionRange:'ranged',
+                range:[150, 600], toHit:0,
+                damage:[{ dice:'1d8', mod:2, type:'piercing' }] };
+  return { map, me, target, bow };
+}
+test('cover: wall between → total cover, ranged attack cannot be made', () => {
+  const { me, target, bow } = coverFixture([[2, 0, 'wall']]);
+  const ev = [];
+  const r = Crucible.resolveAttackMonster(me, target, bow, () => 0.5, ev, 1);
+  assertEq(r.hit, false);
+  assertEq(r.blockedBy, 'total-cover');
+  assertEq(ev.length, 0);                       // no attack event — the shot never happens
+  assertEq(target.hp, 30);
+});
+test('cover: half cover adds +2 AC (borderline hit becomes miss)', () => {
+  const { me, target, bow } = coverFixture([[2, 0, 'cover-half']]);
+  const ev = [];
+  // rng 0.5 → roll 11; toHit 0 vs AC 10 would hit; vs AC 10+2 misses.
+  const r = Crucible.resolveAttackMonster(me, target, bow, () => 0.5, ev, 1);
+  assertEq(r.hit, false);
+  assertEq(ev.length, 1);
+  assertEq(ev[0].cover, 'half');
+});
+test('cover: three-quarters adds exactly +5 AC', () => {
+  const a = coverFixture([[2, 0, 'cover-34']]);
+  a.bow.toHit = 4;   // roll 11 + 4 = 15 vs AC 10+5 = 15 → hits (bonus is 5, not more)
+  const r1 = Crucible.resolveAttackMonster(a.me, a.target, a.bow, () => 0.5, [], 1);
+  assertEq(r1.hit, true);
+  const b = coverFixture([[2, 0, 'cover-34']]);
+  b.bow.toHit = 3;   // roll 11 + 3 = 14 vs 15 → miss
+  const r2 = Crucible.resolveAttackMonster(b.me, b.target, b.bow, () => 0.5, [], 1);
+  assertEq(r2.hit, false);
+});
+test('cover: an intervening creature grants half cover on attacks', () => {
+  const { me, target, bow } = coverFixture([]);
+  const blocker = { side:'pc', name:'Bodyguard', x:2, y:0, hp:20, maxHp:20,
+                    downed:false, dead:false };
+  const ev = [];
+  const r = Crucible.resolveAttackMonster(me, target, bow, () => 0.5, ev, 1, [me, blocker, target]);
+  assertEq(r.hit, false);                        // roll 11 vs AC 12 (10 + half cover)
+  assertEq(ev[0].cover, 'half');
+});
+test('cover: half cover grants +2 on DEX saves', () => {
+  const map = { width:10, height:10, terrain: Array.from({length:10}, () => new Array(10).fill(null)) };
+  map.terrain[0][2] = { type:'cover-half' };
+  const me = { name:'Hag', x:0, y:0, _mapRef: map };
+  const mkTarget = () => ({ side:'pc', name:'PC', x:4, y:0,
+    pm:{ identity:{ level:5 }, abilities:{ str:10,dex:10,con:10,int:10,wis:10,cha:10 }, profs:{ saves:{} } },
+    hp:30, maxHp:30, ac:14, dead:false, downed:false, conditions:new Map(),
+    damageTypesReceivedThisTurn:new Set() });
+  const action = { sourceActionName:'Blast', kind:'save', saveAbility:'dex', saveDc:12,
+                   damageOnFail:[{ dice:'2d6', mod:0, type:'fire' }],
+                   damageOnSave:[], halfOnSave:false, aoeTargets:1 };
+  // rng 0.5 → roll 11: without cover 11 < 12 fails; with half cover 11+2 ≥ 12 passes.
+  const t = mkTarget();
+  const ev = [];
+  Crucible.resolveSave(me, [t], action, () => 0.5, ev, 1);
+  assertEq(ev[0].passed, true);
+  assertEq(ev[0].cover, 'half');
+  assertEq(t.hp, 30);
+  // Same roll with a CON save: cover gives nothing, save fails.
+  const t2 = mkTarget();
+  const ev2 = [];
+  Crucible.resolveSave(me, [t2], { ...action, saveAbility:'con' }, () => 0.5, ev2, 1);
+  assertEq(ev2[0].passed, false);
+});
+test('cover: total cover from the origin → unaffected by the save effect', () => {
+  const map = { width:10, height:10, terrain: Array.from({length:10}, () => new Array(10).fill(null)) };
+  map.terrain[0][2] = { type:'wall' };
+  const me = { name:'Hag', x:0, y:0, _mapRef: map };
+  const t = { side:'pc', name:'PC', x:4, y:0,
+    pm:{ identity:{ level:5 }, abilities:{ str:10,dex:10,con:10,int:10,wis:10,cha:10 }, profs:{ saves:{} } },
+    hp:30, maxHp:30, ac:14, dead:false, downed:false, conditions:new Map(),
+    damageTypesReceivedThisTurn:new Set() };
+  const action = { sourceActionName:'Blast', kind:'save', saveAbility:'dex', saveDc:99,
+                   damageOnFail:[{ dice:'8d6', mod:0, type:'fire' }],
+                   damageOnSave:[], halfOnSave:false, aoeTargets:1 };
+  const ev = [];
+  Crucible.resolveSave(me, [t], action, () => 0.5, ev, 1);
+  assertEq(ev[0].cover, 'total');
+  assertEq(ev[0].passed, true);
+  assertEq(t.hp, 30);
+});
 test('runTrial: PC vs Goblin, seeded → deterministic outcome', () => {
   const pm = { id:'pm1', identity:{ name:'Aria', level:5 },
                abilities:{ str:14,dex:14,con:14,int:10,wis:10,cha:10 },

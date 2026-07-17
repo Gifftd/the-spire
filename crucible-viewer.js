@@ -223,6 +223,17 @@
                  <text x="${CELL/2}" y="${CELL/2 + 4}" text-anchor="middle">${label}</text>
                </g>`
             );
+          } else if (t.type === 'cover-half' || t.type === 'cover-34') {
+            // v4.0 cover: low obstacle — bottom-half slab so it reads as
+            // something you duck behind; ¾ cover is drawn taller.
+            const frac = t.type === 'cover-34' ? 0.72 : 0.45;
+            const ch = Math.round(CELL * frac);
+            terrainHtml.push(
+              `<g class="terrain-cover" transform="translate(${px}, ${py})">
+                 <rect y="${CELL - ch}" width="${CELL}" height="${ch}" rx="2" />
+                 <text x="${CELL/2}" y="${CELL/2 + 4}" text-anchor="middle">${t.type === 'cover-34' ? '¾' : '½'}</text>
+               </g>`
+            );
           }
         }
       }
@@ -343,11 +354,15 @@
         case 'attack':    return 'R' + ev.round + ' · ' + ev.actor +
           (ev.thrown ? ' throws ' + ev.action + ' at ' + ev.target
                      : ' → ' + ev.target + ' · ' + ev.action) +
-          ' (roll ' + ev.roll + ') → ' + (ev.hit ? 'hit ' + ev.damageDealt : 'miss');
+          ' (roll ' + ev.roll + ')' +
+          (ev.cover ? ' vs ' + (ev.cover === 'three-quarters' ? '¾' : '½') + ' cover' : '') +
+          ' → ' + (ev.hit ? 'hit ' + ev.damageDealt : 'miss');
         case 'damage':    return 'R' + ev.round + ' · ' + ev.target + ' takes ' + ev.amount + ' ' + ev.dmgType;
         case 'heal':      return 'R' + ev.round + ' · ' + ev.actor + ' heals ' + ev.target + ' +' + ev.amount + (ev.revived ? ' REVIVED' : '');
         case 'save':      return 'R' + ev.round + ' · ' + ev.actor + ' → ' + ev.target + ' · ' + ev.action
-                               + (ev.autoHit ? ' hits automatically' : ' save ' + (ev.passed ? 'passed' : 'failed'));
+                               + (ev.cover === 'total' ? ' — blocked by total cover'
+                                  : (ev.autoHit ? ' hits automatically' : ' save ' + (ev.passed ? 'passed' : 'failed'))
+                                    + (ev.cover ? ' (' + (ev.cover === 'three-quarters' ? '¾' : '½') + ' cover)' : ''));
         case 'aoe':       return 'R' + ev.round + ' · AoE ' + ev.shape + ' @ (' + ev.center.x + ',' + ev.center.y + ') hits ' + ev.targets.length;
         case 'opportunity-attack': return 'R' + ev.round + ' · OoA ' + ev.attackerName + ' on ' + ev.targetName + ' → ' + (ev.hit ? 'hit ' + ev.damageDealt : 'miss');
         case 'feature':   return 'R' + ev.round + ' · ⚡ ' + (ev.what || '');

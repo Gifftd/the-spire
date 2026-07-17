@@ -103,6 +103,65 @@
   }
   CrucibleSpatial.hasLineOfSight = hasLineOfSight;
 
+  // ─────────── 5.5e cover (2024 PHB) ───────────
+  // Cover between an attacker (or AoE origin) and a target. Most protective
+  // source applies — sources never stack:
+  //   'total'          — a wall blocks the sight line → can't be targeted
+  //   'three-quarters' — a ¾-cover obstacle on the line → +5 AC / +5 DEX saves
+  //   'half'           — a ½-cover obstacle or another creature → +2 / +2
+  //   null             — clear shot
+  // Obstacle terrain: { type:'cover-half' } (low wall, furniture, creature-
+  // height rubble) and { type:'cover-34' } (arrow slit, portcullis, tree
+  // trunk). Neither blocks movement or sight — walls remain the total-cover
+  // source. The sight line is sampled center-to-center (Bresenham), and cells
+  // under either combatant's own footprint never count as cover.
+  function coverBetween(map, attacker, target, occupants) {
+    if (!attacker || !target
+        || typeof attacker.x !== 'number' || typeof target.x !== 'number') return null;
+    if (!hasLineOfSight(map, attacker, target)) return 'total';
+    // Walk the Bresenham line, collecting strictly-between cells.
+    const exclude = new Set();
+    for (const c of footprintCells(attacker)) exclude.add(c.x + ',' + c.y);
+    for (const c of footprintCells(target)) exclude.add(c.x + ',' + c.y);
+    const between = [];
+    let x0 = attacker.x, y0 = attacker.y;
+    const x1 = target.x, y1 = target.y;
+    const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+    const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+    let err = dx - dy;
+    while (true) {
+      if (!exclude.has(x0 + ',' + y0)) between.push({ x: x0, y: y0 });
+      if (x0 === x1 && y0 === y1) break;
+      const e2 = 2 * err;
+      if (e2 > -dy) { err -= dy; x0 += sx; }
+      if (e2 <  dx) { err += dx; y0 += sy; }
+    }
+    let cover = null;
+    for (const cell of between) {
+      const t = terrainAt(map, cell.x, cell.y);
+      if (t && t.type === 'cover-34') return 'three-quarters';   // best short of total
+      if (t && t.type === 'cover-half') cover = 'half';
+    }
+    // An intervening creature (either side, not the two involved) grants
+    // half cover. Downed/dead bodies don't.
+    if (!cover && Array.isArray(occupants)) {
+      const line = new Set(between.map(c => c.x + ',' + c.y));
+      for (const o of occupants) {
+        if (o === attacker || o === target || o.dead || o.downed) continue;
+        if (typeof o.x !== 'number' || typeof o.y !== 'number') continue;
+        if (footprintCells(o).some(c => line.has(c.x + ',' + c.y))) { cover = 'half'; break; }
+      }
+    }
+    return cover;
+  }
+  CrucibleSpatial.coverBetween = coverBetween;
+
+  // AC / DEX-save bonus for a cover level.
+  function coverAcBonus(cover) {
+    return cover === 'three-quarters' ? 5 : cover === 'half' ? 2 : 0;
+  }
+  CrucibleSpatial.coverAcBonus = coverAcBonus;
+
   // A* with Chebyshev heuristic. Returns the cell list from start (excluded)
   // to the chosen endpoint (included). On maxSteps exhaustion, returns the
   // best-effort partial path toward the goal. Empty array if no progress.

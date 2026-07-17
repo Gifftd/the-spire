@@ -228,7 +228,7 @@
                 const c = row[x];
                 if (c === null || c === undefined) continue;
                 if (typeof c !== 'object') { push('map.terrain[' + y + '][' + x + ']', 'cell must be null or object'); continue; }
-                if (!['wall','difficult','damaging'].includes(c.type)) {
+                if (!['wall','difficult','damaging','cover-half','cover-34'].includes(c.type)) {
                   push('map.terrain[' + y + '][' + x + '].type', 'unknown terrain type: ' + c.type);
                 }
                 if (c.type === 'damaging') {

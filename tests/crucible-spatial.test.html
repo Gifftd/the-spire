@@ -591,6 +591,74 @@ test('hasLineOfSight: difficult terrain does NOT block LOS', () => {
   assertEq(CrucibleSpatial.hasLineOfSight(m, {x:0,y:0}, {x:5,y:5}), true);
 });
 
+group('coverBetween (5.5e cover)');
+function coverMap() {
+  return { width:12, height:12, terrain: Array.from({length:12}, () => new Array(12).fill(null)) };
+}
+test('coverBetween: clear line → null', () => {
+  const m = coverMap();
+  assertEq(CrucibleSpatial.coverBetween(m, {x:0,y:0}, {x:6,y:0}), null);
+});
+test('coverBetween: wall on line → total', () => {
+  const m = coverMap();
+  m.terrain[0][3] = { type:'wall' };
+  assertEq(CrucibleSpatial.coverBetween(m, {x:0,y:0}, {x:6,y:0}), 'total');
+});
+test('coverBetween: cover-half cell on line → half (+2)', () => {
+  const m = coverMap();
+  m.terrain[0][3] = { type:'cover-half' };
+  assertEq(CrucibleSpatial.coverBetween(m, {x:0,y:0}, {x:6,y:0}), 'half');
+  assertEq(CrucibleSpatial.coverAcBonus('half'), 2);
+});
+test('coverBetween: cover-34 cell on line → three-quarters (+5)', () => {
+  const m = coverMap();
+  m.terrain[0][3] = { type:'cover-34' };
+  assertEq(CrucibleSpatial.coverBetween(m, {x:0,y:0}, {x:6,y:0}), 'three-quarters');
+  assertEq(CrucibleSpatial.coverAcBonus('three-quarters'), 5);
+});
+test('coverBetween: half + ¾ on the same line → most protective (¾), no stacking', () => {
+  const m = coverMap();
+  m.terrain[0][2] = { type:'cover-half' };
+  m.terrain[0][4] = { type:'cover-34' };
+  assertEq(CrucibleSpatial.coverBetween(m, {x:0,y:0}, {x:6,y:0}), 'three-quarters');
+});
+test('coverBetween: cover terrain does NOT block LOS or beat a wall', () => {
+  const m = coverMap();
+  m.terrain[0][2] = { type:'cover-34' };
+  m.terrain[0][4] = { type:'wall' };
+  assertEq(CrucibleSpatial.hasLineOfSight(m, {x:0,y:0}, {x:6,y:0}), false);
+  assertEq(CrucibleSpatial.coverBetween(m, {x:0,y:0}, {x:6,y:0}), 'total');
+});
+test('coverBetween: intervening creature → half', () => {
+  const m = coverMap();
+  const a = { x:0, y:0 }, t = { x:6, y:0 };
+  const blocker = { x:3, y:0, dead:false, downed:false };
+  assertEq(CrucibleSpatial.coverBetween(m, a, t, [a, t, blocker]), 'half');
+});
+test('coverBetween: dead/downed bodies give no cover', () => {
+  const m = coverMap();
+  const a = { x:0, y:0 }, t = { x:6, y:0 };
+  const corpse = { x:3, y:0, dead:true, downed:false };
+  assertEq(CrucibleSpatial.coverBetween(m, a, t, [a, t, corpse]), null);
+});
+test('coverBetween: creature off the line gives no cover', () => {
+  const m = coverMap();
+  const a = { x:0, y:0 }, t = { x:6, y:0 };
+  const bystander = { x:3, y:2, dead:false, downed:false };
+  assertEq(CrucibleSpatial.coverBetween(m, a, t, [a, t, bystander]), null);
+});
+test('coverBetween: adjacent combatants → null (nothing between)', () => {
+  const m = coverMap();
+  m.terrain[0][0] = { type:'cover-34' };   // under the attacker — own cell never counts
+  assertEq(CrucibleSpatial.coverBetween(m, {x:0,y:0}, {x:1,y:0}), null);
+});
+test('coverBetween: Large attacker footprint cells never count as cover', () => {
+  const m = coverMap();
+  const a = { x:0, y:0, sizeCells:2 };   // occupies (0,0)-(1,1)
+  m.terrain[0][1] = { type:'cover-half' };  // inside attacker footprint
+  assertEq(CrucibleSpatial.coverBetween(m, a, {x:6,y:0}), null);
+});
+
 group('canAttackFrom + findShootingCell');
 
 test('canAttackFrom: melee adjacent → true', () => {
