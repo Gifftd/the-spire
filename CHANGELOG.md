@@ -9,7 +9,36 @@ Dates are YYYY-MM-DD.
 
 ## [Unreleased] — 2026-07-15
 
-### Crucible v4.0: attacks respect line of sight + 5.5e cover rules
+### Crucible v4.1: starting placements + scenario setups (ambush / surrounded / …)
+
+The battlefield editor now handles WHO starts WHERE, not just terrain.
+
+- **Manual placement**: a "Place:" chip row lists every PC and every monster
+  instance (Scout #1, Scout #2, Ogre…). Click a chip, click a grid cell —
+  the token lands there (Large+ footprints drawn at size), and selection
+  auto-advances to the next unplaced token for fast setup. Click a placed
+  token to pick it back up; placements refuse walls/edges, persist in
+  localStorage alongside the terrain (keyed `pc:<id>` / `m:<Name>#<i>` so
+  they survive reloads and re-added picks), and are dropped if the map
+  shrinks past them. Partial placement is fine — anyone unplaced falls back
+  to the default opposing rows.
+- **Scenario setups**: a Setup picker + 🎲 Roll positions button generates
+  starting positions via the new pure `CrucibleSpatial.generatePlacements`
+  (deterministic given an rng): `straight-on assault` (opposing edge bands),
+  `ambush` (PCs in a marching cluster, monsters springing from a random
+  180° arc at close range), `surrounded` (monsters ring the party),
+  `flanked` (pincer from two opposite sides), `scattered` (chaotic melee).
+  Rolled positions land on the grid as normal placements — tweak any token
+  by hand afterwards, re-roll for a different look, or Clear positions.
+  Every token is guaranteed a free, in-bounds, non-wall cell with no
+  footprint overlaps (expanding ring search around each ideal spot).
+- `runSim` passes the placements through `party._encounter.placement` —
+  the engine's existing override path (`placeCombatants`), so replays show
+  the authored setup. Verified in-browser: authored spawns match exactly,
+  each preset produces its shape, and the chips stay in sync as PCs and
+  picks change. Tests: spatial 97 → 104 (per-scenario shape + sanity:
+  everyone placed, in bounds, off walls, no footprint overlap, wall-avoid
+  fallback, 2×2 footprints).
 
 **Bugfix — ranged attacks ignored walls.** The attack resolvers gated only on
 distance, and the multiattack movement path gated only on range — so an

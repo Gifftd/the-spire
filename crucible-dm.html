@@ -145,6 +145,12 @@
     .terrain-paint-grid .terrain-wall { fill: var(--c-ink-faint); }
     .terrain-paint-grid .terrain-difficult { fill: #806c3a; opacity: 0.5; }
     .terrain-paint-grid .terrain-cover rect { fill: #8a7a52; opacity: 0.7; }
+    .place-chips { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+    .place-chip { border: 1px solid var(--chip-color, var(--c-border)); color: var(--chip-color, var(--c-ink));
+                  background: transparent; border-radius: 9999px; padding: 0.1rem 0.55rem;
+                  font-size: 0.75rem; cursor: pointer; opacity: 0.65; }
+    .place-chip.placed { opacity: 1; }
+    .place-chip.active { background: var(--chip-color, var(--c-teal)); color: #101418; opacity: 1; }
     .terrain-paint-grid .terrain-damaging rect { fill: #c43838; opacity: 0.5; }
     .terrain-paint-grid .terrain-damaging text { fill: #ffdd99; font-family: var(--font-display);
                                                   font-size: 0.55rem; pointer-events: none; }
@@ -218,7 +224,7 @@
 <script src="bestiary-merge.js?v=1"></script>
 <script src="crucible-parser.js?v=2"></script>
 <script src="pc-features.js?v=1"></script>
-<script src="crucible-spatial.js?v=2"></script>
+<script src="crucible-spatial.js?v=3"></script>
 <script src="crucible-engine.js?v=3"></script>
 <script src="crucible-viewer.js?v=3"></script>
 <script>
@@ -327,12 +333,14 @@ function renderParty() {
     root.textContent = 'No PCs yet. Click "+ Add PC" or "Import from War Table."';
     refreshGate();
     renderFmBudget();
+    renderBattlefieldPanel();
     return;
   }
   root.className = '';
   root.innerHTML = party.map(pm => renderPCCard(pm)).join('');
   refreshGate();
   renderFmBudget();
+  renderBattlefieldPanel();   // party changed → placement token chips change
 }
 
 function renderPCCard(pm) {
@@ -1484,6 +1492,8 @@ document.getElementById('btn-run').addEventListener('click', async () => {
     </div>`;
   try {
     // v2 terrain: attach the authored battlefield map so runTrial sees it.
+    // v4.1: plus any authored starting placements (partial is fine — the
+    // engine's default rows fill in whoever wasn't placed).
     party._encounter = {
       map: {
         width: battlefield.width,
@@ -1491,6 +1501,7 @@ document.getElementById('btn-run').addEventListener('click', async () => {
         blocked: null,
         terrain: battlefield.terrain,
       },
+      placement: buildPlacementOverride(),
     };
     const result = await Crucible.runSim({
       party,
@@ -1888,11 +1899,13 @@ function loadBattlefield() {
         if (!Array.isArray(obj.terrain) || obj.terrain.length !== obj.height) {
           obj.terrain = emptyTerrain(obj.width, obj.height);
         }
+        // v4.1: starting placements, keyed 'pc:<pmId>' / 'm:<Name>#<i>'.
+        if (!obj.placements || typeof obj.placements !== 'object') obj.placements = {};
         return obj;
       }
     }
   } catch (e) { console.warn('battlefield load failed', e); }
-  return { width: 20, height: 20, terrain: emptyTerrain(20, 20) };
+  return { width: 20, height: 20, terrain: emptyTerrain(20, 20), placements: {} };
 }
 
 function saveBattlefield() {
@@ -1903,6 +1916,82 @@ let battlefield = loadBattlefield();
 let currentBrush = 'erase';            // 'erase' | 'wall' | 'difficult' | 'damaging' | 'cover-half' | 'cover-34'
 let damagingBrushSpec = { dice: '1d6', mod: 0, dmgType: 'fire' };
 let isPainting = false;
+let placementSelected = null;          // token key awaiting a grid click, or null
+let scenarioChoice = 'straight-on';    // last-picked setup preset
+
+// ─────────── v4.1: starting placements ───────────
+// One token per PC and per monster INSTANCE. Keys are stable across page
+// reloads ('pc:<pmId>' / 'm:<Name>#<i>'); buildPlacementOverride maps them to
+// the engine's combatant ids ('pc:<pmId>' / '<pickId>:<i>') at run time, so
+// regenerated pickIds don't orphan saved positions.
+function placementTokens() {
+  const out = [];
+  for (const pm of party) {
+    const nm = (pm.identity && pm.identity.name) || pm.id;
+    out.push({ key: 'pc:' + pm.id, side: 'pc', name: nm,
+               label: nm.slice(0, 2).toUpperCase(), sizeCells: 1,
+               color: (typeof CrucibleViewer !== 'undefined') ? CrucibleViewer.pcColor('pc:' + pm.id) : '#4ca0d0' });
+  }
+  const counters = {};
+  for (const p of picks) {
+    for (let i = 1; i <= (p.count || 1); i++) {
+      const name = p.monster.name;
+      counters[name] = (counters[name] || 0) + 1;
+      out.push({ key: 'm:' + name + '#' + counters[name], side: 'monster',
+                 name: name + (p.count > 1 || counters[name] > 1 ? ' #' + counters[name] : ''),
+                 label: name.slice(0, 2).toUpperCase(),
+                 sizeCells: Crucible.monsterSizeCells(p.monster), color: '#c85050' });
+    }
+  }
+  return out;
+}
+
+// Engine placement override for runTrial: same key walk as placementTokens.
+function buildPlacementOverride() {
+  const placement = [];
+  const pls = battlefield.placements || {};
+  for (const pm of party) {
+    const p = pls['pc:' + pm.id];
+    if (p) placement.push({ id: 'pc:' + pm.id, x: p.x, y: p.y });
+  }
+  const counters = {};
+  for (const pick of picks) {
+    for (let i = 1; i <= (pick.count || 1); i++) {
+      const name = pick.monster.name;
+      counters[name] = (counters[name] || 0) + 1;
+      const p = pls['m:' + name + '#' + counters[name]];
+      if (p) placement.push({ id: pick.pickId + ':' + i, x: p.x, y: p.y });
+    }
+  }
+  return placement;
+}
+
+function selectPlacementToken(key) {
+  placementSelected = (placementSelected === key) ? null : key;
+  renderBattlefieldPanel();
+}
+
+function clearPlacements() {
+  battlefield.placements = {};
+  placementSelected = null;
+  saveBattlefield();
+  renderBattlefieldPanel();
+}
+
+function rollPlacements() {
+  const sel = document.getElementById('scenario-select');
+  if (sel) scenarioChoice = sel.value;
+  const tokens = placementTokens();
+  if (!tokens.length) { UI.toast('Add PCs and monsters first.', 'info'); return; }
+  const map = { width: battlefield.width, height: battlefield.height, terrain: battlefield.terrain };
+  const placed = CrucibleSpatial.generatePlacements(scenarioChoice,
+    tokens.map(t => ({ id: t.key, side: t.side, sizeCells: t.sizeCells })), map, Math.random);
+  battlefield.placements = {};
+  for (const p of placed) battlefield.placements[p.id] = { x: p.x, y: p.y };
+  placementSelected = null;
+  saveBattlefield();
+  renderBattlefieldPanel();
+}
 
 function setMapSize(w, h) {
   w = Math.max(5, Math.min(50, parseInt(w) || battlefield.width));
@@ -1916,7 +2005,11 @@ function setMapSize(w, h) {
       next[y][x] = battlefield.terrain[y][x] || null;
     }
   }
-  battlefield = { width: w, height: h, terrain: next };
+  const placements = {};
+  for (const [k, p] of Object.entries(battlefield.placements || {})) {
+    if (p && p.x < w && p.y < h) placements[k] = p;   // drop out-of-bounds on shrink
+  }
+  battlefield = { width: w, height: h, terrain: next, placements };
   saveBattlefield();
   renderBattlefieldPanel();
 }
@@ -1980,6 +2073,50 @@ function renderBattlefieldPanel() {
   for (let i = 0; i <= battlefield.width; i++) gridLines.push(`<line x1="${i*CELL}" y1="0" x2="${i*CELL}" y2="${h}" class="grid-line" />`);
   for (let i = 0; i <= battlefield.height; i++) gridLines.push(`<line x1="0" y1="${i*CELL}" x2="${w}" y2="${i*CELL}" class="grid-line" />`);
 
+  // v4.1: starting-position tokens (drawn over the cells; pointer-events off
+  // so grid clicks still land on the .cell rects underneath).
+  const tokens = placementTokens();
+  const tokensHtml = tokens.map(t => {
+    const p = (battlefield.placements || {})[t.key];
+    if (!p) return '';
+    const n = t.sizeCells || 1;
+    const cxp = p.x * CELL + (n * CELL) / 2, cyp = p.y * CELL + (n * CELL) / 2;
+    return `<g class="place-token" opacity="0.95">
+      <circle cx="${cxp}" cy="${cyp}" r="${(n * CELL) / 2 - 2}" fill="${t.color}"
+              stroke="${t.side === 'pc' ? '#f8f5ee' : '#2a1515'}" stroke-width="1.5" />
+      <text x="${cxp}" y="${cyp + 3.5}" text-anchor="middle"
+            style="font: 700 ${Math.max(8, n * 7)}px var(--font-body); fill:#101418;">${escapeHtml(t.label)}</text>
+    </g>`;
+  }).join('');
+  const chipsHtml = tokens.map(t => {
+    const placed = !!(battlefield.placements || {})[t.key];
+    const sel = placementSelected === t.key;
+    return `<button class="place-chip ${sel ? 'active' : ''} ${placed ? 'placed' : ''}"
+                    style="--chip-color:${t.color}"
+                    title="${placed ? 'Placed — click to reselect and move' : 'Click, then click a grid cell to place'}"
+                    onclick="selectPlacementToken('${t.key}')">${escapeHtml(t.name)}${placed ? ' ✓' : ''}</button>`;
+  }).join('');
+  const placementRow = tokens.length ? `
+      <div class="terrain-paint-row" style="align-items:center;">
+        <span style="color:var(--c-ink-faint); font-size:0.8rem">Place:</span>
+        <div class="place-chips">${chipsHtml}</div>
+      </div>
+      <div class="terrain-paint-row" style="align-items:center;">
+        <span style="color:var(--c-ink-faint); font-size:0.8rem">Setup:</span>
+        <select id="scenario-select" class="pc-input" onchange="scenarioChoice = this.value">
+          ${[['straight-on','straight-on assault'],['ambush','ambush'],['surrounded','surrounded'],
+             ['flanked','flanked (pincer)'],['scattered','scattered melee']].map(([v, label]) =>
+            `<option value="${v}" ${scenarioChoice === v ? 'selected' : ''}>${label}</option>`).join('')}
+        </select>
+        <button class="btn btn--sm" onclick="rollPlacements()">🎲 Roll positions</button>
+        <button class="btn btn--sm" onclick="clearPlacements()">Clear positions</button>
+      </div>
+      ${placementSelected ? `<div style="color:var(--c-teal-bright); font-size:0.78rem;">
+        Placing <b>${escapeHtml((tokens.find(t => t.key === placementSelected) || {}).name || '')}</b> — click a grid cell. Click a placed token to pick it up.
+      </div>` : `<div style="color:var(--c-ink-faint); font-size:0.78rem;">
+        Unplaced combatants use the default opposing rows. Placements are kept between sessions.
+      </div>`}` : '';
+
   const damagingFields = currentBrush === 'damaging' ? `
     <div class="terrain-paint-row">
       <label>Dice <input class="pc-input" type="text" value="${escapeHtml(damagingBrushSpec.dice)}"
@@ -2017,6 +2154,7 @@ function renderBattlefieldPanel() {
         </div>
       </div>
       ${damagingFields}
+      ${placementRow}
       <svg class="terrain-paint-grid" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"
            onmousedown="onTerrainPaintDown(event)"
            onmousemove="onTerrainPaintMove(event)"
@@ -2024,13 +2162,66 @@ function renderBattlefieldPanel() {
            onmouseleave="onTerrainPaintUp()">
         <g class="grid-lines">${gridLines.join('')}</g>
         <g class="cells">${cellsHtml.join('')}</g>
+        <g class="place-tokens" style="pointer-events:none;">${tokensHtml}</g>
       </svg>
     </div>`;
 }
 
 function onTerrainPaintDown(ev) {
+  // v4.1: a selected token claims the click — place it. Clicking an
+  // already-placed token (with none selected) picks it back up.
+  const target = ev.target;
+  const cellHit = target && target.classList.contains('cell');
+  if (cellHit) {
+    const x = parseInt(target.dataset.x, 10);
+    const y = parseInt(target.dataset.y, 10);
+    if (placementSelected) { placeTokenAt(placementSelected, x, y); return; }
+    const hit = tokenAtCell(x, y);
+    if (hit) {
+      delete battlefield.placements[hit];
+      placementSelected = hit;               // picked up — next click drops it
+      saveBattlefield();
+      renderBattlefieldPanel();
+      return;
+    }
+  }
   isPainting = true;
   paintAtEvent(ev);
+}
+
+function tokenAtCell(x, y) {
+  const tokens = placementTokens();
+  for (const t of tokens) {
+    const p = (battlefield.placements || {})[t.key];
+    if (!p) continue;
+    const n = t.sizeCells || 1;
+    if (x >= p.x && x < p.x + n && y >= p.y && y < p.y + n) return t.key;
+  }
+  return null;
+}
+
+function placeTokenAt(key, x, y) {
+  const t = placementTokens().find(tt => tt.key === key);
+  if (!t) { placementSelected = null; renderBattlefieldPanel(); return; }
+  const n = t.sizeCells || 1;
+  // Light validation: footprint in bounds + off walls (overlaps between
+  // tokens are allowed here — the engine nudges them apart at spawn).
+  for (let dy = 0; dy < n; dy++) {
+    for (let dx = 0; dx < n; dx++) {
+      const cx = x + dx, cy = y + dy;
+      if (cx >= battlefield.width || cy >= battlefield.height
+          || (battlefield.terrain[cy][cx] && battlefield.terrain[cy][cx].type === 'wall')) {
+        UI.toast('That footprint doesn\'t fit there (wall or edge).', 'info');
+        return;
+      }
+    }
+  }
+  battlefield.placements[key] = { x, y };
+  // Auto-advance to the next unplaced token for fast setup.
+  const next = placementTokens().find(tt => !(battlefield.placements || {})[tt.key]);
+  placementSelected = next ? next.key : null;
+  saveBattlefield();
+  renderBattlefieldPanel();
 }
 function onTerrainPaintMove(ev) {
   if (!isPainting) return;
@@ -2143,6 +2334,7 @@ function renderEncounter() {
     root.dataset.hasPicks = '';
     refreshGate();
     renderFmBudget();
+    renderBattlefieldPanel();
     return;
   }
   root.className = '';
@@ -2206,6 +2398,7 @@ function renderEncounter() {
     </div>`).join('');
   refreshGate();
   renderFmBudget();
+  renderBattlefieldPanel();   // picks changed → placement token chips change
 }
 
 function openOverridePanel(pickId) {

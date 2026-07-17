@@ -674,6 +674,104 @@
   }
   CrucibleSpatial.coneCells = coneCells;
 
+  // ─────────── v4.1: scenario placement generator ───────────
+  // Generates starting positions for a tactical setup. Pure + deterministic
+  // given `rng` (a () => [0,1) function). tokens: [{ id, side:'pc'|'monster',
+  // sizeCells }]. Returns [{ id, x, y }] — every token placed on a free,
+  // non-wall cell with its whole footprint in bounds and non-overlapping.
+  // Scenarios:
+  //   'straight-on' — opposing bands on opposite edges (classic assault)
+  //   'ambush'      — PCs in a marching cluster; monsters close, in a 180°
+  //                   arc from a random direction (they spring the trap)
+  //   'surrounded'  — PCs tight in the middle; monsters ring them evenly
+  //   'flanked'     — monsters split into two groups on opposite sides
+  //   'scattered'   — everyone at uniform random free cells (chaotic melee)
+  function generatePlacements(scenario, tokens, map, rng) {
+    rng = rng || Math.random;
+    const claimed = new Set();
+    const w = map.width, h = map.height;
+
+    const fits = (x, y, n) => {
+      for (let dy = 0; dy < n; dy++) {
+        for (let dx = 0; dx < n; dx++) {
+          const cx = x + dx, cy = y + dy;
+          if (cx < 0 || cy < 0 || cx >= w || cy >= h) return false;
+          if (isWall(map, cx, cy)) return false;
+          if (claimed.has(cx + ',' + cy)) return false;
+        }
+      }
+      return true;
+    };
+    const claim = (x, y, n) => {
+      for (let dy = 0; dy < n; dy++) for (let dx = 0; dx < n; dx++) claimed.add((x+dx) + ',' + (y+dy));
+    };
+    // Place as close to (tx,ty) as possible: expanding Chebyshev ring search
+    // (deterministic scan order inside each ring).
+    const placeNear = (out, token, tx, ty) => {
+      const n = token.sizeCells || 1;
+      tx = Math.round(tx); ty = Math.round(ty);
+      for (let r = 0; r < Math.max(w, h); r++) {
+        for (let dy = -r; dy <= r; dy++) {
+          for (let dx = -r; dx <= r; dx++) {
+            if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+            const x = tx + dx, y = ty + dy;
+            if (fits(x, y, n)) { claim(x, y, n); out.push({ id: token.id, x, y }); return true; }
+          }
+        }
+      }
+      return false;   // pathological map (all walls) — token left unplaced
+    };
+
+    const pcs  = tokens.filter(t => t.side === 'pc');
+    const mons = tokens.filter(t => t.side !== 'pc');
+    const out = [];
+    const cx = (w - 1) / 2, cy = (h - 1) / 2;
+    const jitter = (span) => (rng() * 2 - 1) * span;
+
+    // PC cluster used by ambush/surrounded/flanked: a tight column near center.
+    const clusterPcs = () => {
+      pcs.forEach((t, i) => {
+        placeNear(out, t, cx + jitter(1), cy - (pcs.length - 1) / 2 + i + jitter(0.5));
+      });
+    };
+    const ringMonsters = (radius, arcStart, arcSpan) => {
+      mons.forEach((t, i) => {
+        const theta = arcStart + arcSpan * ((i + 0.5) / mons.length) + jitter(arcSpan * 0.06);
+        placeNear(out, t, cx + Math.cos(theta) * radius, cy + Math.sin(theta) * radius);
+      });
+    };
+
+    if (scenario === 'ambush') {
+      clusterPcs();
+      const dir = rng() * Math.PI * 2;
+      ringMonsters(Math.min(4, Math.min(w, h) / 3), dir - Math.PI / 2, Math.PI);
+    } else if (scenario === 'surrounded') {
+      clusterPcs();
+      ringMonsters(Math.max(3, Math.min(w, h) * 0.35), rng() * Math.PI * 2, Math.PI * 2);
+    } else if (scenario === 'flanked') {
+      clusterPcs();
+      const horizontal = rng() < 0.5;
+      mons.forEach((t, i) => {
+        const left = i < Math.ceil(mons.length / 2);
+        const edgeX = horizontal ? (left ? 1 : w - 2) : cx + jitter(w * 0.2);
+        const edgeY = horizontal ? cy + jitter(h * 0.2) : (left ? 1 : h - 2);
+        placeNear(out, t, edgeX, edgeY);
+      });
+    } else if (scenario === 'scattered') {
+      for (const t of tokens) placeNear(out, t, rng() * (w - 1), rng() * (h - 1));
+    } else {
+      // 'straight-on' (default): opposing bands on the left/right edges.
+      pcs.forEach((t, i) => {
+        placeNear(out, t, 1 + jitter(0.5), cy - (pcs.length - 1) / 2 + i + jitter(0.5));
+      });
+      mons.forEach((t, i) => {
+        placeNear(out, t, w - 2 + jitter(0.5), cy - (mons.length - 1) / 2 + i + jitter(0.5));
+      });
+    }
+    return out;
+  }
+  CrucibleSpatial.generatePlacements = generatePlacements;
+
   function enumerateCastPoints(attacker, action, map) {
     const range = action.range || 0;
     const shape = action.shape;
